@@ -85,8 +85,8 @@ cd runanywhere-sdks/core
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
-# With ML backends
-cmake -B build -DRAC_BUILD_BACKENDS=ON
+# With ML backends (engines/ lives outside core/, so configure the repo root)
+cmake -S .. -B build -DRAC_BUILD_BACKENDS=ON
 cmake --build build
 ```
 

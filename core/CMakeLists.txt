@@ -41,6 +41,20 @@ option(
 # does not branch on it — RAG is folded into rac_commons independently (see below).
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
 
+# ...which means a standalone `cmake -S core` cannot honour it: engines/ is
+# added by the repo-root CMakeLists.txt only, so no engine target exists no
+# matter what this is set to, and the configure still succeeds. Refuse instead
+# of handing back a backend-less build that looks like it honoured the request.
+# That silent no-op is what shipped RACommons-windows-x64 with zero engines for
+# several releases; see the Windows packaging rules further down this file.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND RAC_BUILD_BACKENDS)
+    message(FATAL_ERROR
+        "RAC_BUILD_BACKENDS=ON cannot be honoured here: engines/ is added by the "
+        "repo-root CMakeLists.txt, not by core/. Configure the repo root instead "
+        "(from core/: cmake -S .. -B build -DRAC_BUILD_BACKENDS=ON), or drop the "
+        "flag for a commons-only build.")
+endif()
+
 # Ensure EMSCRIPTEN is always defined so
 # generator-expression references like $<BOOL:${EMSCRIPTEN}> below do not trip
 # CMake's --warn-uninitialized check on native (non-Emscripten) builds. The
