@@ -293,6 +293,15 @@ jobs:
           path: neurun
           token: ${{ secrets.NEURUN_TOKEN }}
           persist-credentials: false
+      # rac/rac_defaults_generated.h is gitignored codegen output (.gitignore:548)
+      # that the rac_*_types.h headers all #include, so a checkout alone cannot
+      # compile against them. Pure Python, no protoc. Without this the ABI check
+      # reports "ABI DRIFT" for a missing prerequisite -- a false alarm, which is
+      # how guards get muted.
+      - name: Generate the gitignored C defaults header
+        if: steps.neurun.outcome == 'success'
+        run: python3 idl/codegen/generate_cpp_defaults.py
+
       - name: Compile the NeuRT op tables against THIS PR's headers
         if: steps.neurun.outcome == 'success'
         env:
@@ -308,7 +317,18 @@ jobs:
             echo "::error::$script missing — the NeuRT ABI guard moved or was deleted"
             exit 1
           fi
+          set +e
           bash "$script" "$GITHUB_WORKSPACE"
+          rc=$?
+          set -e
+          if [ "$rc" -eq 3 ]; then
+            echo "::error::The NeuRT ABI guard SKIPPED (exit 3) instead of running."
+            echo "::error::Its SDK include-path probe found nothing — almost certainly this"
+            echo "::error::checkout of neurun predates RunanywhereAI/neurun#67, which fixed a"
+            echo "::error::stale hardcoded path that made the guard skip on every run."
+            exit 1
+          fi
+          exit "$rc"
       - name: Note why it was skipped
         if: steps.neurun.outcome != 'success'
         run: |
