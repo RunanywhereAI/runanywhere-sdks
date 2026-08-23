@@ -25,6 +25,24 @@ Guidance for AI coding assistants working in this repository.
 - **Use full local build parallelism** (`-j "$(sysctl -n hw.logicalcpu)"` / equivalent),
   scaling down only under real memory/thermal pressure — not because load average looks
   high.
+- **Multi-agent workflows run on Sonnet.** When fanning work out to subagents (the
+  `Workflow` tool, or several parallel `Agent` calls), pass `model: 'sonnet'` on every
+  `agent(...)` call rather than letting them inherit the session model. A fan-out of
+  8-10 probes reading large files is exactly the shape where Sonnet is the right
+  cost/latency trade, and these agents are doing bounded, well-specified retrieval and
+  analysis rather than open-ended reasoning. Reserve the session's stronger model for
+  the synthesis step that consumes their reports, and for anything where a wrong answer
+  is expensive and hard to detect — a final design decision, an adversarial verification
+  pass, or a security-relevant judgement.
+
+  ```js
+  // in a Workflow script
+  const findings = await parallel(LENSES.map((l) => () =>
+    agent(l.prompt, { label: `probe:${l.key}`, schema: FINDINGS, model: 'sonnet' })))
+
+  // the synthesis that reads them can stay on the session model
+  const plan = await agent(synthesisPrompt, { schema: PLAN, effort: 'high' })
+  ```
 
 ## The most important architectural rule: logic lives at the lowest layer that serves everyone
 

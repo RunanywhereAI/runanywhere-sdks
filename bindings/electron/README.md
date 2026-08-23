@@ -44,7 +44,7 @@ tree with `RA_NATIVE_DIR`, and stage the QAIRT runtime into the qhexrt package w
 `RA_QNN_RUNTIME_DIR`.
 
 Prerequisites: a C++ toolchain (MSVC on Windows), Node.js, and a `runanywhere-commons`
-build with backends enabled. See [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) for CUDA
+build with backends enabled. See the `electron-*` presets in `CMakePresets.json` for CUDA
 builds, integration tests, and contributor details.
 
 ## Quick start (Node)
@@ -213,7 +213,7 @@ Failures throw `SDKException` with `.code`, `.category`, and `.recoverySuggestio
 
 ## Contributing
 
-Build and test details: [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md).
+Build and test details: this file's Build section plus the `electron-*` presets in `CMakePresets.json` (each carries its own doc comment).
 
 ## License
 
