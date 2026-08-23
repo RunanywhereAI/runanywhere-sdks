@@ -120,20 +120,18 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      # Same pin/rationale as release.yml's native_ios job: build the real
-      # engine, not the non-routable shell, and keep it reproducible.
-      - name: Checkout neurun (NeuRT engine source)
-        uses: actions/checkout@v7
-        with:
-          repository: RunanywhereAI/neurun
-          # Bumped 2026-08-22 to pick up "kernels: port Qwen3.8 IQ1 to Hexagon
-          # v81 (#62)". Keep this a PINNED SHA, never a branch: NeuRT is a
-          # private engine built from source here, and a floating ref would make
-          # released binaries irreproducible.
-          ref: 901c249833731d4e455f2aab4dff0c57139776d3
-          token: ${{ secrets.NEURUN_TOKEN }}
-          path: neurun
-          persist-credentials: false
+      # NeuRT arrives as prebuilt archives pinned in core/VERSIONS, same as
+      # release.yml's native_ios job. Exit 3 means "no token": a stub would ship
+      # an engine that registers, claims Apple availability and serves nothing.
+      - name: Download prebuilt NeuRT archives (macOS slice)
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash scripts/build/download-neurt.sh --slice macos-arm64 || {
+            echo "::error::NeuRT prebuilt unavailable; refusing to package a stub."
+            exit 1
+          }
 
       - uses: ./.github/actions/setup-toolchain
         with:
@@ -151,11 +149,9 @@ jobs:
         run: npm install
 
       - name: Configure electron-macos (all real backends + NeuRT)
-        env:
-          NEURT_ROOT: ${{ github.workspace }}/neurun
         run: |
           set -euo pipefail
-          cmake --preset electron-macos -B build/electron-macos -DNEURT_ROOT="${NEURT_ROOT}"
+          cmake --preset electron-macos -B build/electron-macos
 
       - name: Build commons + llamacpp + onnx + sherpa + neurt + addon
         run: |

@@ -167,25 +167,9 @@ jobs:
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
-      # The NeuRT (Apple ANE) engine is built and published by the sibling PRIVATE
-      # `neurun` repo. We link its published archives; we do not compile its source.
-      #
-      # This replaced a `checkout` of neurun pinned to a commit, plus a build that
-      # regex-parsed that repo's CMakeLists.txt for a source list. That arrangement
-      # broke three releases in a row: commons widened rac_llm_stream_callback_fn
-      # with `tokens_in_delta`, the pinned neurun commit still passed 4 arguments,
-      # and native_ios died at rac_llm_ops_neurt.cpp with "too few arguments to
-      # function call, expected 5, have 4" for v0.20.15, v0.20.16 AND v0.20.17.
-      # Because every packaging job needs native_ios, all three shipped iOS-only —
-      # 18 assets where a healthy release has 55+.
-      #
-      # A prebuilt cannot fail that way: neurun compiles the adapters against these
-      # headers in ITS OWN CI before publishing, and the archive carries a receipt
-      # naming the RAC_PLUGIN_API_VERSION it saw. The downloader refuses a mismatch
-      # here rather than discovering it mid-build.
-      #
-      # Pinned by tag + SHA-256 in core/VERSIONS (NEURT_RELEASE_TAG, NEURT_*_SHA256),
-      # exactly like sherpa-onnx. Needs NEURUN_TOKEN (read on RunanywhereAI/neurun).
+      # NeuRT arrives as prebuilt archives pinned in core/VERSIONS. Exit 3 means
+      # "no token", which is right for a fork PR and catastrophic for a release:
+      # a stub registers, claims Apple availability and serves nothing.
       - name: Download prebuilt NeuRT archives (all Apple slices)
         env:
           NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
@@ -220,10 +204,6 @@ jobs:
         # and the Package.swift binary targets expect.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          # No NEURT_ROOT: the engine discovers the downloaded archives under
-          # core/third_party/neurt/<slice>/ and links them. Setting NEURT_ROOT here
-          # would be ignored anyway — prebuilt deliberately wins over source, so a
-          # release cannot silently depend on whatever checkout is on the runner.
         run: bash core/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v7

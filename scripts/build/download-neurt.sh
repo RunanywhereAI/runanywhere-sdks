@@ -2,25 +2,15 @@
 # =============================================================================
 # download-neurt.sh — fetch the prebuilt NeuRT archives for one Apple slice.
 #
-# NeuRT (the Apple Neural Engine engine) is built and published by the PRIVATE
-# `neurun` repo. This script is the CONSUMER half of that boundary; the producer
-# half is `NeuRT/tools/scripts/package-rac-dist.sh` over there.
-#
-# This repo used to compile neurun's source: engines/neurt/CMakeLists.txt resolved
-# a NEURT_ROOT checkout and regex-parsed neurun's root CMakeLists.txt for a source
-# list. Consequences: only someone holding that private repo could build this
-# repo's Apple release, and a stray `)` inside a comment over there silently
-# dropped a source file here. Now we link published bytes, pinned by tag + SHA-256
-# in core/VERSIONS exactly like sherpa-onnx.
+# NeuRT is built and published by the private `neurun` repo; this repo links the
+# published archives, pinned by tag + SHA-256 in core/VERSIONS.
 #
 # Usage:
 #   download-neurt.sh --slice <macos-arm64|ios-arm64|ios-arm64-simulator> [--force]
 #   download-neurt.sh --all [--force]
 #
-# Auth: a GitHub token with read access to the private neurun repo, via
-# $NEURUN_TOKEN or $GH_TOKEN. Without one this exits 3 (NOT 1) — the same
-# "no prebuilt selected" convention validate-qhexrt-prebuilt.py uses, so a public
-# build can fall back to the non-routable shell instead of failing the build.
+# Auth via $NEURUN_TOKEN or $GH_TOKEN. Without one this exits 3 (not 1), so a
+# public build degrades to the non-routable shell instead of failing.
 # =============================================================================
 set -euo pipefail
 
@@ -46,9 +36,8 @@ done
 [[ ${#SLICES[@]} -gt 0 ]] || { echo "[ERROR] pass --slice <name> or --all" >&2; exit 2; }
 
 # ---- pins -------------------------------------------------------------------
-# core/VERSIONS is the single source of truth. Do NOT add fallback defaults here:
-# a hardcoded default silently drifts from the pin and then requests a release
-# asset that does not exist, which surfaces as a 404 rather than a version error.
+# core/VERSIONS is the single source of truth; no fallback defaults, so a drifted
+# pin fails loudly rather than 404-ing on a nonexistent asset.
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/core/scripts/load-versions.sh"
 
@@ -59,8 +48,7 @@ for required in NEURT_REPO NEURT_RELEASE_TAG NEURT_RAC_ABI_VERSION; do
     fi
 done
 
-# The ABI version the archives must have been built against — read from the header
-# rather than trusted from VERSIONS, so the pin cannot drift from the real ABI.
+# Read the ABI from the header, not from VERSIONS, so the pin cannot drift.
 ABI_HEADER="${REPO_ROOT}/core/include/rac/plugin/rac_plugin_entry.h"
 LOCAL_ABI="$(awk '$1=="#define" && $2=="RAC_PLUGIN_API_VERSION" {gsub(/[^0-9]/,"",$3); print $3; exit}' "$ABI_HEADER")"
 if [[ -z "$LOCAL_ABI" ]]; then
@@ -97,8 +85,8 @@ fetch_slice() {
     local dest="${DEST_ROOT}/${slice}"
     local stamp="${dest}/.pinned"
 
-    # Cache on the exact pin, not merely on "a directory exists". A stale tree from
-    # a previous tag is the failure mode that makes a re-pin look like a no-op.
+    # Cache on the exact pin: a stale tree from a previous tag would make a re-pin
+    # look like a no-op.
     if [[ "$FORCE" -eq 0 && -f "$stamp" && "$(cat "$stamp")" == "${NEURT_RELEASE_TAG}:${expected}" ]]; then
         echo "[OK] ${slice}: already at ${NEURT_RELEASE_TAG}"
         return 0
@@ -128,10 +116,9 @@ fetch_slice() {
     rm -rf "$dest"; mkdir -p "$dest"
     tar -xzf "${tmp}/${asset}" -C "$dest" --strip-components=1
 
-    # ---- the ABI receipt ----------------------------------------------------
-    # This is why the boundary is safe. A vtable-layout change would relink these
-    # archives cleanly and corrupt dispatch at runtime; a static archive resolves
-    # no symbols, so no link error would ever appear.
+    # The receipt is what makes this boundary safe: a vtable-layout change relinks
+    # cleanly and corrupts dispatch at runtime, and a static archive resolves no
+    # symbols, so nothing else would catch it.
     local receipt="${dest}/RECEIPT.json"
     [[ -f "$receipt" ]] || { echo "[ERROR] ${slice}: RECEIPT.json missing from the archive" >&2; return 1; }
     local got_abi; got_abi="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['rac_plugin_api_version'])" "$receipt")"
@@ -146,8 +133,7 @@ fetch_slice() {
         return 1
     fi
 
-    # Fail closed on the archive set. A partial extract links to a confusing
-    # "undefined symbol neurt::Generator::load" much later.
+    # Fail closed on the archive set; a partial extract fails much later at link.
     local missing=0
     for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a libneurt_rac_diffusion.a; do
         [[ -f "${dest}/lib/${lib}" ]] || { echo "[ERROR] ${slice}: missing ${lib}" >&2; missing=1; }
