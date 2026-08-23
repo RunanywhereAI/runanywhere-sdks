@@ -309,40 +309,37 @@ LIBARCHIVE_VERSION=3.8.7
 RAC_COMMONS_VERSION=0.1.1
 
 # =============================================================================
-# NeuRT (Apple Neural Engine) — prebuilt archives published by the private
-# `neurun` repo, pinned the same way sherpa-onnx is. No NeuRT source is needed.
+# neurun — the PRIVATE repo that builds and publishes both accelerator engines
 # =============================================================================
+# One neurun release carries both engines' payloads. Pinned by tag + SHA-256 the
+# same way sherpa-onnx is; no engine source enters this repo.
+#
+# The repo is shared, but each engine keeps its OWN release tag: a release can be
+# cut for one lane only (see that repo's `lanes` input), so a tag may carry just
+# one engine's assets.
+#
 # NEURT_RAC_ABI_VERSION must equal RAC_PLUGIN_API_VERSION in
-# core/include/rac/plugin/rac_plugin_entry.h; the downloader enforces it against
-# each archive's receipt. Bump by cutting a neurun release and copying the pin
-# block from its release notes.
-NEURT_REPO=RunanywhereAI/neurun
+# core/include/rac/plugin/rac_plugin_entry.h. The downloader enforces it against
+# each archive's receipt.
+#
+# QHEXRT_*_RECEIPT is the payload's own build-receipt digest, which is also its
+# directory name, so the downloader can prove the extracted tree is the payload
+# that was pinned rather than trusting the archive's claim about itself.
+#
+# QAIRT is read for HEADERS ONLY when QHexRT is built; its runtime is dlopen'd on
+# device and never redistributed, and the publisher asserts no Qualcomm binary
+# reaches the payload.
+#
+# To bump: cut a neurun release, then paste the pin block from its release notes.
+# Never compute these locally — a local build's bytes are never the published ones.
+NEURUN_REPO=RunanywhereAI/neurun
+
 NEURT_RELEASE_TAG=v0.20.26
 NEURT_RAC_ABI_VERSION=9
 NEURT_MACOS_ARM64_SHA256=cde625d0d521d202634a0709a9228edf940fe73e1b640782f707efd465eb4e42
 NEURT_IOS_ARM64_SHA256=afc21c4fd448d1593d4c411f90f48d113cedcc6f65c090e4d3a75141b70aef2b
 NEURT_IOS_ARM64_SIMULATOR_SHA256=43f245b110e820dd839f29d10691b5cda5da671de74289f6fe479053aa046a38
 
-# =============================================================================
-# QHexRT (the Qualcomm Hexagon NPU engine — built and published by the PRIVATE
-# `neurun` repo, consumed here as a prebuilt payload)
-# =============================================================================
-# Same boundary as NEURT_* above, different accelerator. Until now this payload
-# was HAND-STAGED into engines/qhexrt/prebuilt/ by whoever held both repos and a
-# QAIRT licence — which is how the Electron win-arm64 lane once pinned a receipt
-# staged months earlier and shipped NPU kernels from an old commit.
-#
-# Each ABI is a separate, content-addressed payload whose directory name is its
-# own build-receipt SHA-256. QHEXRT_*_RECEIPT records which one this pin expects,
-# so scripts/build/download-qhexrt.sh can verify the extracted tree really is the
-# payload that was pinned rather than trusting the archive's own claim.
-#
-# QAIRT is read for HEADERS ONLY on the producer side; the QNN runtime is
-# dlopen'd on device and is never redistributed. The payload carries no Qualcomm
-# binary — neurun's packaging script asserts this before publishing.
-#
-# To bump: cut a neurun release, then copy the pin block from its release notes.
-QHEXRT_REPO=RunanywhereAI/neurun
 QHEXRT_RELEASE_TAG=v0.20.26
 QHEXRT_ARM64_V8A_SHA256=d5240c9d04d3534acb3bd3163dbe255a46a9d38e1f08493ab2fdf7ff637185e2
 QHEXRT_ARM64_V8A_RECEIPT=45c7ee050232bf8fae72450774869e621064a334a407ec69cb52e7aeb61a4b11

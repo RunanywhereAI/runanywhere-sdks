@@ -41,7 +41,7 @@ done
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/core/scripts/load-versions.sh"
 
-for required in NEURT_REPO NEURT_RELEASE_TAG NEURT_RAC_ABI_VERSION; do
+for required in NEURUN_REPO NEURT_RELEASE_TAG NEURT_RAC_ABI_VERSION; do
     if [[ -z "${!required:-}" ]]; then
         echo "[ERROR] ${required} not set in core/VERSIONS" >&2
         exit 1
@@ -92,14 +92,14 @@ fetch_slice() {
         return 0
     fi
 
-    echo "[DOWNLOAD] ${slice} <- ${NEURT_REPO} ${NEURT_RELEASE_TAG}"
+    echo "[DOWNLOAD] ${slice} <- ${NEURUN_REPO} ${NEURT_RELEASE_TAG}"
     local tmp; tmp="$(mktemp -d)"
     # shellcheck disable=SC2064
     trap "rm -rf '$tmp'" RETURN
 
     if ! GH_TOKEN="$TOKEN" gh release download "$NEURT_RELEASE_TAG" \
-            --repo "$NEURT_REPO" --pattern "$asset" --dir "$tmp" 2>"${tmp}/err"; then
-        echo "[ERROR] could not download ${asset} from ${NEURT_REPO}@${NEURT_RELEASE_TAG}" >&2
+            --repo "$NEURUN_REPO" --pattern "$asset" --dir "$tmp" 2>"${tmp}/err"; then
+        echo "[ERROR] could not download ${asset} from ${NEURUN_REPO}@${NEURT_RELEASE_TAG}" >&2
         sed 's/^/        /' "${tmp}/err" >&2 || true
         return 1
     fi

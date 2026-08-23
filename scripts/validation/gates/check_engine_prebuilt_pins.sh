@@ -47,6 +47,7 @@ for a in "${QHEXRT_ABIS[@]}"; do
     check_sha_var "QHEXRT_${u}_SHA256"
     check_sha_var "QHEXRT_${u}_RECEIPT"
 done
+[[ -n "${NEURUN_REPO:-}"       ]] || bad "NEURUN_REPO is not set"
 [[ -n "${NEURT_RELEASE_TAG:-}"  ]] || bad "NEURT_RELEASE_TAG is not set"
 [[ -n "${QHEXRT_RELEASE_TAG:-}" ]] || bad "QHEXRT_RELEASE_TAG is not set"
 [[ $fail -eq 0 ]] && ok "all pins present and well-formed"
@@ -207,7 +208,7 @@ if [[ "$OFFLINE" -eq 1 || -z "$TOKEN" ]]; then
     note "SKIPPED (offline or no NEURUN_TOKEN): cannot verify the release itself."
     note "Local pin checks above still ran."
 else
-    repo="${NEURT_REPO:-RunanywhereAI/neurun}"
+    repo="${NEURUN_REPO:-RunanywhereAI/neurun}"
     listing="$(GH_TOKEN="$TOKEN" gh release view "$NEURT_RELEASE_TAG" --repo "$repo" \
                  --json assets --jq '.assets[].name' 2>/dev/null || true)"
     if [[ -z "$listing" ]]; then
@@ -243,7 +244,7 @@ else
         done
         for a in "${QHEXRT_ABIS[@]}"; do
             var="QHEXRT_$(echo "$a" | tr 'a-z-' 'A-Z_')_SHA256"
-            qrepo="${QHEXRT_REPO:-$repo}"
+            qrepo="${NEURUN_REPO:-$repo}"
             if ! GH_TOKEN="$TOKEN" gh release download "$QHEXRT_RELEASE_TAG" --repo "$qrepo" \
                     --pattern "qhexrt-${a}-v${qv}.tar.gz.sha256" --dir "$tmp" --clobber 2>/dev/null; then
                 bad "could not download the published checksum for qhexrt-${a}"; continue

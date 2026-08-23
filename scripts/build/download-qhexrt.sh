@@ -57,7 +57,7 @@ RECEIPT_VAR="QHEXRT_${KEY_UPPER}_RECEIPT"
 EXPECTED_SHA="${!SHA_VAR:-}"
 EXPECTED_RECEIPT="${!RECEIPT_VAR:-}"
 
-for pair in "QHEXRT_REPO:${QHEXRT_REPO:-}" "QHEXRT_RELEASE_TAG:${QHEXRT_RELEASE_TAG:-}" \
+for pair in "NEURUN_REPO:${NEURUN_REPO:-}" "QHEXRT_RELEASE_TAG:${QHEXRT_RELEASE_TAG:-}" \
             "${SHA_VAR}:${EXPECTED_SHA}" "${RECEIPT_VAR}:${EXPECTED_RECEIPT}"; do
     if [[ -z "${pair#*:}" ]]; then
         echo "[ERROR] ${pair%%:*} not set in core/VERSIONS" >&2
@@ -93,14 +93,14 @@ DEST="${PREBUILT}/versions/${EXPECTED_RECEIPT}"
 if [[ "$FORCE" -eq 0 && -d "$DEST" && -f "${DEST}/qhexrt-prebuilt.json" ]]; then
     echo "[OK] ${ABI}: ${EXPECTED_RECEIPT} already present"
 else
-    echo "[DOWNLOAD] ${ABI} <- ${QHEXRT_REPO} ${QHEXRT_RELEASE_TAG}"
+    echo "[DOWNLOAD] ${ABI} <- ${NEURUN_REPO} ${QHEXRT_RELEASE_TAG}"
     tmp="$(mktemp -d)"
     # shellcheck disable=SC2064
     trap "rm -rf '$tmp'" EXIT
 
     if ! GH_TOKEN="$TOKEN" gh release download "$QHEXRT_RELEASE_TAG" \
-            --repo "$QHEXRT_REPO" --pattern "$ASSET" --dir "$tmp" 2>"${tmp}/err"; then
-        echo "[ERROR] could not download ${ASSET} from ${QHEXRT_REPO}@${QHEXRT_RELEASE_TAG}" >&2
+            --repo "$NEURUN_REPO" --pattern "$ASSET" --dir "$tmp" 2>"${tmp}/err"; then
+        echo "[ERROR] could not download ${ASSET} from ${NEURUN_REPO}@${QHEXRT_RELEASE_TAG}" >&2
         sed 's/^/        /' "${tmp}/err" >&2 || true
         exit 1
     fi
