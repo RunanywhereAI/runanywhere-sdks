@@ -16,6 +16,10 @@ OFFLINE=0
 [[ "${1:-}" == "--offline" ]] && OFFLINE=1
 
 fail=0
+# This gate aborted once with NO output at all: `set -o pipefail` propagated a
+# grep-found-nothing exit through a command substitution. A guard that dies
+# silently is worse than no guard, so report any unexpected abort with its line.
+trap 'rc=$?; [[ $rc -ne 0 && $rc -ne 1 ]] && echo "  [FAIL] gate aborted unexpectedly at line $LINENO (exit $rc)" >&2; exit $rc' ERR
 note() { printf '  %s\n' "$*"; }
 bad()  { printf '  [FAIL] %s\n' "$*" >&2; fail=1; }
 ok()   { printf '  [OK] %s\n' "$*"; }
@@ -152,13 +156,19 @@ for s in "${NEURT_SLICES[@]}"; do
     cand="${REPO_ROOT}/core/third_party/neurt/${s}/RECEIPT.json"
     [[ -f "$cand" ]] && receipts+=("$cand")
 done
-for r in "${receipts[@]:-}"; do
-    [[ -n "$r" ]] || continue
-    c="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('sdks_commit',''))" "$r" 2>/dev/null || true)"
-    commits+=("$c")
-done
-uniq_commits="$(printf '%s\n' "${commits[@]:-}" | sort -u | grep -v '^$' | wc -l | tr -d ' ')"
-if [[ "${uniq_commits:-0}" -gt 1 ]]; then
+if [[ ${#receipts[@]} -gt 0 ]]; then
+    for r in "${receipts[@]}"; do
+        c="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('sdks_commit',''))" "$r" 2>/dev/null || true)"
+        [[ -n "$c" ]] && commits+=("$c")
+    done
+fi
+# `grep` exits 1 on no match and `set -o pipefail` propagates that, so an empty
+# commit list aborted the whole gate with no message. Count without a pipeline.
+uniq_commits=0
+if [[ ${#commits[@]} -gt 0 ]]; then
+    uniq_commits="$(printf '%s\n' "${commits[@]}" | sort -u | wc -l | tr -d ' ')"
+fi
+if [[ "$uniq_commits" -gt 1 ]]; then
     bad "downloaded slices disagree on sdks_commit; they are not from one release:"
     printf '         %s\n' "${commits[@]}" >&2
 fi
