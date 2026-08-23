@@ -788,7 +788,11 @@ jobs:
           # nothing here noticed, because the only checks were "dir exists" and
           # "zip exists". Both were true.
           zip="dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip"
-          listing="$(7z l -ba -slt "$zip" | sed -n 's/^Path = //p')"
+          # 7z reports Windows paths with BACKSLASHES (x64\lib\rac_commons.dll), so
+          # normalize before matching: the `(^|/)name$` test below can never match a
+          # backslash path, which made this assertion fail a build whose DLLs were
+          # all present and routable.
+          listing="$(7z l -ba -slt "$zip" | sed -n 's/^Path = //p' | tr '\\' '/')"
           missing=0
           for want in \
               rac_commons.dll \
