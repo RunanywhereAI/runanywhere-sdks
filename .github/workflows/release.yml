@@ -266,6 +266,26 @@ jobs:
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: bash core/scripts/build-android.sh ${{ matrix.abi }}
+      # build-core-android.sh stages engine .so files with copy_if_exists, which
+      # SILENTLY no-ops when the lib was never built. That is the same guarded-copy
+      # pattern that shipped Windows with zero engines for several releases, so a
+      # failed QHexRT fetch would otherwise produce a green Android release with no
+      # NPU engine in it. Assert the carrier is actually in the archive.
+      - name: Assert the QHexRT carrier shipped (arm64-v8a)
+        if: matrix.abi == 'arm64-v8a'
+        run: |
+          set -euo pipefail
+          zip="core/dist/RACommons-android-arm64-v8a-v${{ needs.validate.outputs.version }}.zip"
+          [[ -f "$zip" ]] || { echo "::error::missing $zip"; exit 1; }
+          if ! unzip -l "$zip" | grep -q "librunanywhere_qhexrt.so"; then
+            echo "::error::librunanywhere_qhexrt.so is absent from $zip."
+            echo "::error::Android would ship without the Hexagon NPU engine. Check the"
+            echo "::error::QHexRT download step and validate-qhexrt-prebuilt.py's verdict."
+            unzip -l "$zip" | sed 's/^/    /'
+            exit 1
+          fi
+          echo "QHexRT carrier present in $(basename "$zip")"
+
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v7
         with:

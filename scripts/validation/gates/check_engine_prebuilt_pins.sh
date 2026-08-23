@@ -97,6 +97,35 @@ expect_fetch "electron macOS (NeuRT)" \
 expect_fetch "electron win-arm64 (QHexRT)" \
     ".github/workflows/electron-native-package.yml" "download-qhexrt.sh --abi win-arm64"
 
+# Downstream consumers get the engines via an sdks artifact rather than fetching
+# themselves, so what matters for them is that the artifact is REQUIRED, not that
+# they fetch. Assert those requirements exist, since a missing one degrades to
+# "packaged without the engine" with no error.
+expect_requires() {
+    local what="$1" file="$2" pattern="$3"
+    if [[ ! -f "${REPO_ROOT}/${file}" ]]; then bad "$file is missing"; return; fi
+    grep -q -- "$pattern" "${REPO_ROOT}/${file}" \
+        && ok "$what requires its engine artifact" \
+        || bad "$what does NOT require '$pattern' ($file)"
+}
+# Apple: every binding consumes the ONE xcframework native_ios builds.
+expect_requires "swift packaging (NeuRT xcframework)" \
+    "bindings/swift/scripts/build-core-xcframework.sh" "libneurt_core.a"
+expect_requires "react-native packaging (NeuRT xcframework)" \
+    "bindings/react-native/scripts/package-sdk.sh" "RABackendNeuRT"
+expect_requires "flutter packaging (NeuRT xcframework)" \
+    "bindings/flutter/scripts/package-sdk.sh" "RABackendNeuRT"
+# rcli-macos links the staged xcframeworks and smoke-tests registration. A shell
+# REFUSES to register, so asserting neurt appears in `backends --json` proves it
+# is routable -- the strongest check in the tree; keep it.
+expect_requires "rcli macOS (asserts neurt registers)" \
+    ".github/workflows/release.yml" "grep -q '\"name\":\"neurt\"'"
+# Android: QHexRT .so is staged into all three Android SDKs from one build.
+expect_requires "android packaging (QHexRT jniLibs, all 3 SDKs)" \
+    "scripts/build/build-core-android.sh" "KOTLIN_QHEXRT_DEST"
+expect_requires "android release asserts the QHexRT carrier ships" \
+    ".github/workflows/release.yml" "librunanywhere_qhexrt.so"
+
 # No consumer may point at a hand-staged payload by absolute path again.
 echo "== no hand-staged payload paths =="
 if grep -rnE "QHEXRT_ROOT: *['\"][A-Za-z]:\\\\|NEURT_ROOT: *['\"]?[A-Za-z]:\\\\|qhexrt-prebuilt\\\\versions" \
