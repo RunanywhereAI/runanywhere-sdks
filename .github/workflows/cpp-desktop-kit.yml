@@ -52,6 +52,21 @@ jobs:
           cmake --build --preset cpp-desktop-macos-arm64 --target package-cpp-desktop-tarball \
             -j "$(sysctl -n hw.logicalcpu)"
           ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+          python3 - <<'PY'
+          import glob, sys, tarfile
+          tars = glob.glob("dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz")
+          if not tars:
+              sys.exit("no macOS kit tarball")
+          names = tarfile.open(tars[0]).getnames()
+          need = (
+              "include/runanywhere/proto/model_types.pb.h",
+              "share/runanywhere/SCHEMA_LOCK",
+          )
+          missing = [n for n in need if not any(x.endswith(n) for x in names)]
+          if missing:
+              sys.exit("kit tarball missing: " + ", ".join(missing))
+          print(f"kit ok: {len(names)} entries")
+          PY
           shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
             | tee dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256
       - uses: actions/upload-artifact@v4
@@ -86,6 +101,19 @@ jobs:
           $ver = (Get-Content core/VERSION -Raw).Trim()
           $tar = "dist/RunAnywhere-cpp-desktop-windows-x64-v$ver.tar.gz"
           if (-not (Test-Path $tar)) { throw "missing $tar" }
+          python -c @"
+          import sys, tarfile
+          names = tarfile.open(r'$tar').getnames()
+          need = (
+              'include/runanywhere/proto/model_types.pb.h',
+              'share/runanywhere/SCHEMA_LOCK',
+          )
+          missing = [n for n in need if not any(x.endswith(n) for x in names)]
+          if missing:
+              sys.exit('kit tarball missing: ' + ', '.join(missing))
+          print(f'kit ok: {len(names)} entries')
+          "@
+          if ($LASTEXITCODE -ne 0) { throw "kit tarball contents check failed" }
           Get-FileHash $tar -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
             Set-Content "$tar.sha256"
