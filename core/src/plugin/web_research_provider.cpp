@@ -50,7 +50,11 @@ constexpr int32_t kSearchTimeoutMs = 15000;
 // stage boundary, so per-stage token budgets are also the worst case for how
 // long a cancel waits.
 constexpr int32_t kTriageTokens = 48;
-constexpr int32_t kQuestionTokens = 160;
+// A reasoning model narrates before it answers even with thinking disabled, and
+// the narration is charged to this budget. At 160 the queries were still being
+// written when the budget ran out, so planning returned nothing and the whole
+// pass collapsed to a single search on the original question.
+constexpr int32_t kQuestionTokens = 384;
 constexpr int32_t kComposeTokens = 640;
 
 // Directive rather than descriptive: under AUTO tool choice this text is the
@@ -231,6 +235,7 @@ std::vector<std::string> plan_questions(const std::string& question, size_t want
 
     std::vector<std::string> questions;
     if (ok) {
+        reply = rac::tools::web::strip_reasoning_block(reply);
         size_t start = 0;
         while (start <= reply.size() && questions.size() < wanted) {
             const size_t nl = reply.find('\n', start);
@@ -483,6 +488,32 @@ const rac_tool_provider_t kProvider = {
 }  // namespace
 
 namespace rac::tools::web {
+
+/**
+ * Drop a reasoning block the model emitted anyway.
+ *
+ * `disable_thinking` is set on every call here, and models still open a
+ * `<think>` block. Parsing the raw reply means every line of reasoning is a
+ * candidate query; an unterminated block means the reply is *all* reasoning
+ * and there is nothing to take from it.
+ */
+std::string strip_reasoning_block(const std::string& text) {
+    static const char* kOpen[] = {"<think>", "<thinking>", "<reasoning>"};
+    static const char* kClose[] = {"</think>", "</thinking>", "</reasoning>"};
+    std::string out = text;
+    for (size_t tag = 0; tag < 3; ++tag) {
+        size_t at = 0;
+        while ((at = out.find(kOpen[tag], at)) != std::string::npos) {
+            const size_t end = out.find(kClose[tag], at);
+            if (end == std::string::npos) {
+                out.erase(at);
+                break;
+            }
+            out.erase(at, end + std::strlen(kClose[tag]) - at);
+        }
+    }
+    return trim(out);
+}
 
 /** Strip "1.", "-", "*", "Q:" and surrounding quotes from a listed line. */
 std::string normalize_query_line(const std::string& line) {
