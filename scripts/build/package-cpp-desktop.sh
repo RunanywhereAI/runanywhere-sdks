@@ -3,7 +3,8 @@
 # Does not produce an rcli binary.
 #
 #   scripts/build/package-cpp-desktop.sh [preset]
-#   default preset: cpp-desktop-macos-arm64 on Darwin, cpp-desktop-windows-x64 else
+#   Darwin defaults to cpp-desktop-macos-arm64; Windows to cpp-desktop-windows-x64.
+#   Linux has no default preset and exits 2 unless one is passed.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"

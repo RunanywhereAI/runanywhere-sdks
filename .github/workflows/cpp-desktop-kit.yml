@@ -118,8 +118,9 @@ jobs:
       - name: Upload kits to ${{ inputs.attach_tag }}
         env:
           GH_TOKEN: ${{ github.token }}
+          ATTACH_TAG: ${{ inputs.attach_tag }}
         run: |
           set -euo pipefail
           ls -la artifacts
-          gh release upload "${{ inputs.attach_tag }}" artifacts/RunAnywhere-cpp-desktop-*.tar.gz* \
+          gh release upload "$ATTACH_TAG" artifacts/RunAnywhere-cpp-desktop-*.tar.gz* \
             --repo "${{ github.repository }}" --clobber
