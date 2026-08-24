@@ -221,8 +221,10 @@ file(WRITE "${RAC_KIT_OUT}/share/runanywhere/PLUGIN_API_VERSION" "${RAC_PLUGIN_A
 if(APPLE)
     set(RUNANYWHERE_KIT_SYSTEM_LIBS "Threads::Threads;ZLIB::ZLIB;CURL::libcurl;dl;bz2")
 elseif(WIN32)
-    # libcurl (static vcpkg) needs these plus the curl/zlib archives themselves.
-    set(RUNANYWHERE_KIT_SYSTEM_LIBS "ws2_32;crypt32;bcrypt;secur32;wldap32;normaliz;advapi32")
+    # libcurl (static vcpkg) + libarchive (xar/xmllite) need these plus the
+    # curl/zlib archives themselves. iphlpapi: if_nametoindex; xmllite/ole32:
+    # CreateXmlReader.
+    set(RUNANYWHERE_KIT_SYSTEM_LIBS "ws2_32;crypt32;bcrypt;secur32;wldap32;normaliz;advapi32;iphlpapi;xmllite;ole32")
     foreach(_root IN ITEMS "$ENV{VCPKG_INSTALLATION_ROOT}" "$ENV{VCPKG_ROOT}")
         if(_root AND EXISTS "${_root}/installed/x64-windows-static/lib")
             set(_vlib "${_root}/installed/x64-windows-static/lib")
