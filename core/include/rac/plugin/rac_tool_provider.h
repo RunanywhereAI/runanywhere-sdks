@@ -69,6 +69,22 @@ struct rac_tool_context {
     /** Cancellation check for a provider between stages, without emitting. */
     rac_bool_t (*is_cancelled)(const rac_tool_context_t* ctx);
 
+    /**
+     * Prior conversation turns, alternating user/assistant, excluding the
+     * current one. NULL / 0 when the tool runs outside a conversation.
+     *
+     * A tool that has to interpret the user's words needs them: "what does
+     * that news say?" is unanswerable without the turn before it. Borrowed for
+     * the duration of `execute` and not owned by the provider.
+     *
+     * Deliberately NOT something to feed into a summarising step. A tool that
+     * reasons over fetched material should do that on a clean context, or the
+     * conversation leaks into the summary and the model starts answering from
+     * what it said earlier instead of from what it fetched.
+     */
+    const char* const* history;
+    int32_t n_history;
+
     /** Commons-owned. Opaque to providers. */
     void* state;
 };

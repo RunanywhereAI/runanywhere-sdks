@@ -160,7 +160,7 @@ void test_stages_reach_sink_stamped() {
 
     runanywhere::v1::ToolResult result;
     const bool handled = rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"),
-                                                                      4242u, nullptr, &result);
+                                                                      4242u, nullptr, {}, &result);
 
     CHECK(handled, "provider answered the call");
     CHECK(g_stages_run == 3, "provider ran every stage");
@@ -203,7 +203,7 @@ void test_no_sink_still_runs() {
 
     runanywhere::v1::ToolResult result;
     const bool handled = rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"), 0u,
-                                                                      nullptr, &result);
+                                                                      nullptr, {}, &result);
 
     CHECK(handled, "provider answered the call");
     CHECK(g_stages_run == 3, "nobody listening is not a reason to stop");
@@ -219,7 +219,7 @@ void test_sink_refusal_stops_provider() {
     rac_tool_progress_sink_register(recording_sink, nullptr);
 
     runanywhere::v1::ToolResult result;
-    rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"), 1u, nullptr, &result);
+    rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"), 1u, nullptr, {}, &result);
 
     CHECK(g_stages_run == 0, "provider abandoned after the refused emit");
     CHECK(g_received.size() == 1, "only the refused event was delivered");
@@ -237,7 +237,7 @@ void test_cancel_short_circuits_emit() {
 
     runanywhere::v1::ToolResult result;
     rac::llm::tool_calling::execute_via_provider(
-        make_call("staged_tool"), 7u, []() { return true; }, &result);
+        make_call("staged_tool"), 7u, []() { return true; }, {}, &result);
 
     CHECK(g_stages_run == 0, "provider stopped at its first emit");
     CHECK(g_received.empty(), "cancelled events never reach the sink");
@@ -259,7 +259,7 @@ void test_cancel_visible_between_stages() {
     auto cancel_after_two = [&emits_seen]() { return emits_seen++ >= 2; };
 
     runanywhere::v1::ToolResult result;
-    rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"), 9u, cancel_after_two,
+    rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"), 9u, cancel_after_two, {},
                                                  &result);
 
     CHECK(g_stages_run == 2, "stopped at the between-stage cancel poll");
@@ -280,7 +280,7 @@ void test_unregister_stops_delivery() {
     CHECK(rac_tool_progress_sink_is_registered() == RAC_FALSE, "sink reported cleared");
 
     runanywhere::v1::ToolResult result;
-    rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"), 0u, nullptr, &result);
+    rac::llm::tool_calling::execute_via_provider(make_call("staged_tool"), 0u, nullptr, {}, &result);
     CHECK(g_received.empty(), "nothing delivered after unregister");
     CHECK(g_stages_run == 3, "the tool still ran");
     rac_tool_provider_unregister("staged_tool");
@@ -294,7 +294,7 @@ void test_provider_may_ignore_context() {
 
     runanywhere::v1::ToolResult result;
     const bool handled = rac::llm::tool_calling::execute_via_provider(make_call("silent_tool"), 0u,
-                                                                      nullptr, &result);
+                                                                      nullptr, {}, &result);
 
     CHECK(handled, "provider answered the call");
     CHECK(result.result_json() == "{\"summary\":\"quiet\"}", "result returned");
@@ -309,7 +309,7 @@ void test_unowned_call_falls_through() {
     reset();
     runanywhere::v1::ToolResult result;
     const bool handled = rac::llm::tool_calling::execute_via_provider(make_call("nobody_owns_this"),
-                                                                      0u, nullptr, &result);
+                                                                      0u, nullptr, {}, &result);
     CHECK(!handled, "dispatch declined the call");
 }
 

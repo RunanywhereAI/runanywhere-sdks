@@ -39,6 +39,30 @@ std::string normalize_query_line(const std::string& line);
 std::string build_evidence(const std::vector<SearchResult>& sources);
 
 /**
+ * @brief Whether a model's reply is a search query rather than an answer.
+ *
+ * The failure that made this necessary: asked to write a query, a small model
+ * answers the question instead, and the answer becomes the search string. A
+ * real run searched for "Apple today's latest news is about the new iPhone 15
+ * Pro Max with 4K Ultra HD display and 200W charging". Queries are short and
+ * are not sentences; answers are long and are.
+ */
+bool looks_like_query_not_answer(const std::string& line);
+
+/**
+ * @brief Whether an answer's [n] citations all resolve to a real source.
+ *
+ * The compose step is the last place a model can invent, and unlike the query
+ * step its output IS checkable: an answer built from the sources cites them,
+ * and an answer citing [5] when four were supplied was not built from them.
+ * Cheap, deterministic, and no second model call — which is the whole point.
+ *
+ * @param source_count how many sources were supplied
+ * @param out_cited    set to how many distinct valid citations were found
+ */
+bool citations_resolve(const std::string& answer, size_t source_count, size_t* out_cited);
+
+/**
  * @brief Drop a reasoning block the model emitted despite thinking being off.
  *
  * An unterminated block means the whole reply is reasoning, so nothing is

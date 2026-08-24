@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 #include "rac/plugin/rac_tool_provider.h"
 
@@ -26,7 +27,8 @@ class ToolProgressScope {
      *                         be empty, which reads as never cancelled
      */
     ToolProgressScope(std::string tool_name, uint64_t run_loop_handle,
-                      std::function<bool()> is_cancelled);
+                      std::function<bool()> is_cancelled,
+                      const std::vector<std::string>& history = {});
 
     ToolProgressScope(const ToolProgressScope&) = delete;
     ToolProgressScope& operator=(const ToolProgressScope&) = delete;
@@ -52,6 +54,9 @@ class ToolProgressScope {
     uint64_t run_loop_handle_;
     std::function<bool()> is_cancelled_;
     uint64_t sequence_ = 0;
+    // Owned so the pointer array handed across the ABI outlives the call.
+    std::vector<std::string> history_;
+    std::vector<const char*> history_ptrs_;
 };
 
 }  // namespace rac::plugin

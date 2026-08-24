@@ -334,14 +334,15 @@ void test_pipeline_end_to_end() {
 
 // The worst bug this tool had, pinned so it cannot return.
 //
-// A generation used to sit between the question and the search, nominally to
-// "turn the request into a search query". Asked for a query, a small model
-// answers the question instead: a real MLX run searched for "Apple today's
-// latest news is about the new iPhone 15 Pro Max with 4K Ultra HD display and
-// 200W charging". Everything downstream then worked perfectly on a fabricated
-// premise, which is far worse than failing outright.
+// A generation sits between the question and the search to resolve what the
+// user is referring to. Asked for a query, a small model answers the question
+// instead: a real MLX run searched for "Apple today's latest news is about the
+// new iPhone 15 Pro Max with 4K Ultra HD display and 200W charging", and
+// everything downstream then worked perfectly on a fabricated premise. With no
+// model loaded here that generation fails, which exercises the fallback: the
+// user's own words, which cannot be invented.
 void test_query_is_the_users_words() {
-    std::printf("[6] the search query is the question, never a generated one\n");
+    std::printf("[9] the search query falls back to the question, never a generated one\n");
     const std::string question = "What is the latest news about Apple today?";
     const json result = run_tool(question);
 
@@ -364,8 +365,60 @@ void test_query_is_the_users_words() {
           "the reported query matches what was asked");
 }
 
+// The compose step's one checkable failure. A model that answers from memory
+// writes prose that reads exactly like a researched answer; the citations are
+// the only mechanical tell, and they cost nothing to verify.
+// The guard on the one remaining generation upstream of the search.
+void test_generated_query_guard() {
+    std::printf("[6] a generated \"query\" that is really an answer is rejected\n");
+
+    CHECK(web::looks_like_query_not_answer("apple latest news today"), "a short query passes");
+    CHECK(web::looks_like_query_not_answer("India Today news channel schedule"),
+          "a noun-phrase query passes");
+
+    // The exact string a real MLX run produced and searched for.
+    CHECK(!web::looks_like_query_not_answer(
+              "Apple today's latest news is about the new iPhone 15 Pro Max with 4K Ultra HD "
+              "display and 200W charging."),
+          "the fabricated sentence that caused this is rejected");
+
+    CHECK(!web::looks_like_query_not_answer("The M5 chip was announced in November."),
+          "a declarative sentence is rejected");
+    CHECK(!web::looks_like_query_not_answer(
+              "apple news today covering products services earnings retail and everything else "
+              "that happened"),
+          "an over-long string is rejected");
+    CHECK(!web::looks_like_query_not_answer("Thinking Process:"), "commentary is still rejected");
+}
+
+void test_citation_grounding() {
+    std::printf("[7] an answer is checked against the sources it cites\n");
+    size_t cited = 0;
+
+    CHECK(web::citations_resolve("Apple shipped the M5 [1] in November [2].", 3, &cited),
+          "citations within range are grounded");
+    CHECK(cited == 2, "distinct citations counted");
+
+    CHECK(!web::citations_resolve("Apple shipped the M5 chip in November.", 3, &cited),
+          "an answer citing nothing is not grounded");
+    CHECK(cited == 0, "no citations counted");
+
+    // The tell for invention: a source index that was never supplied.
+    CHECK(!web::citations_resolve("Revenue rose [5].", 3, &cited),
+          "a citation past the last source is not grounded");
+
+    CHECK(!web::citations_resolve("See [0].", 3, &cited),
+          "citations are 1-based, so [0] is not a source");
+
+    CHECK(web::citations_resolve("Both [2] and [2] again.", 2, &cited) && cited == 1,
+          "a repeated citation counts once");
+
+    CHECK(!web::citations_resolve("An array literal [x] is not a citation.", 2, &cited),
+          "non-numeric brackets are ignored");
+}
+
 void test_no_results_is_honest() {
-    std::printf("[7] a search with nothing to find says so\n");
+    std::printf("[8] a search with nothing to find says so\n");
     const json result = run_tool("");
     CHECK(result.value("error", std::string()).find("Call web_research again") != std::string::npos,
           "empty question rejected");
@@ -381,6 +434,8 @@ int main() {
     test_evidence_step();
     test_pipeline_end_to_end();
     test_query_is_the_users_words();
+    test_generated_query_guard();
+    test_citation_grounding();
     test_no_results_is_honest();
     std::printf("=== %d checks, %d failed ===\n", g_test_count, g_fail_count);
     return g_fail_count == 0 ? 0 : 1;

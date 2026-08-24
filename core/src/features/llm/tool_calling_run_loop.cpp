@@ -39,10 +39,10 @@
 #include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
 #include "features/llm/tool_provider_dispatch.h"
-#include "rac/plugin/rac_tool_provider.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/plugin/rac_tool_provider.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
@@ -869,7 +869,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                     [cancel_state]() {
                         return cancel_state->cancel_requested.load(std::memory_order_acquire);
                     },
-                    &tool_result);
+                    ctx.generation.history, &tool_result);
             }
             if (provider_admitted &&
                 cancel_state->cancel_requested.load(std::memory_order_acquire)) {
