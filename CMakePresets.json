@@ -118,6 +118,7 @@
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake",
                 "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+                "CMAKE_SYSTEM_PROCESSOR": "AMD64",
                 "RAC_BUILD_CLI": "OFF",
                 "RAC_PACKAGE_CPP_DESKTOP": "ON",
                 "RAC_DESKTOP_ADAPTER": "ON",
