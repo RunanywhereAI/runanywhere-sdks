@@ -25,6 +25,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
+#include "plugin/web_research_internal.h"
 #include "plugin/web_search_client.h"
 #include "rac/plugin/rac_tool_provider.h"
 #include "rac/plugin/rac_web_research.h"
@@ -183,8 +184,35 @@ void test_page_content_extraction() {
           "no transport reads as nothing");
 }
 
+// The provider's query filter, reached through the same rules it applies.
+// These are the exact lines a reasoning model produced in a real run.
+void test_query_filtering() {
+    std::printf("[8] planned queries reject model commentary\n");
+    struct Case {
+        const char* line;
+        bool expected;
+        const char* label;
+    };
+    const Case cases[] = {
+        {"latest Apple news August 2026", true, "a real query is kept"},
+        {"Apple product announcements this week", true, "another real query"},
+        {"Thinking Process:", false, "a heading is rejected"},
+        {"Task: Write 4 different search queries.", false, "a lead-in is rejected"},
+        {"**Analyze the Request:**", false, "bold commentary is rejected"},
+        {"# Queries", false, "a markdown heading is rejected"},
+        {"news", false, "a single word is not a query"},
+        {"", false, "an empty line is rejected"},
+        {"I will now write four different search queries that together cover what the user "
+         "is asking about, considering recency and relevance and several other factors",
+         false, "prose is rejected"},
+    };
+    for (const auto& item : cases) {
+        CHECK(web::query_is_usable(item.line) == item.expected, item.label);
+    }
+}
+
 void test_registration() {
-    std::printf("[8] registration\n");
+    std::printf("[9] registration\n");
     CHECK(rac_tool_web_research_register() == RAC_SUCCESS, "registered");
     const rac_tool_provider_t* provider = rac_tool_provider_find("web_research");
     CHECK(provider != nullptr, "found in the registry");
@@ -233,7 +261,7 @@ json run_tool(const char* args) {
 }
 
 void test_no_transport_is_reported() {
-    std::printf("[9] no HTTP transport: reported, not hung\n");
+    std::printf("[10] no HTTP transport: reported, not hung\n");
     const json result = run_tool(R"({"question":"what shipped in Swift 6.2"})");
     CHECK(result.contains("error"), "an error is reported");
     if (result.contains("error")) {
@@ -246,7 +274,7 @@ void test_no_transport_is_reported() {
 }
 
 void test_missing_question_rejected() {
-    std::printf("[10] a call with no question\n");
+    std::printf("[11] a call with no question\n");
     const json result = run_tool(R"({})");
     CHECK(result.value("error", std::string()) == "missing question", "rejected up front");
 
@@ -284,6 +312,7 @@ int main() {
     test_missing_snippet_does_not_steal();
     test_empty_and_junk();
     test_page_content_extraction();
+    test_query_filtering();
     test_registration();
     test_no_transport_is_reported();
     test_missing_question_rejected();

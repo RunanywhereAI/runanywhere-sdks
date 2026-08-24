@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "plugin/web_research_internal.h"
 #include "plugin/web_search_client.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_types.h"
@@ -148,27 +149,6 @@ char* dup_c(const std::string& text) {
     return out;
 }
 
-/** Strip "1.", "-", "*", "Q:" and surrounding quotes from a listed line. */
-std::string strip_list_marker(const std::string& line) {
-    std::string out = trim(line);
-    size_t at = 0;
-    while (at < out.size() && (std::isdigit(static_cast<unsigned char>(out[at])) != 0)) {
-        ++at;
-    }
-    if (at > 0 && at < out.size() && (out[at] == '.' || out[at] == ')')) {
-        out = trim(out.substr(at + 1));
-    } else if (!out.empty() && (out[0] == '-' || out[0] == '*' || out[0] == 0x2022)) {
-        out = trim(out.substr(1));
-    }
-    if (out.size() > 2 && (out.rfind("Q:", 0) == 0 || out.rfind("q:", 0) == 0)) {
-        out = trim(out.substr(2));
-    }
-    if (out.size() > 1 && out.front() == '"' && out.back() == '"') {
-        out = out.substr(1, out.size() - 2);
-    }
-    return out;
-}
-
 // --- one generation --------------------------------------------------------
 
 /**
@@ -254,10 +234,9 @@ std::vector<std::string> plan_questions(const std::string& question, size_t want
         size_t start = 0;
         while (start <= reply.size() && questions.size() < wanted) {
             const size_t nl = reply.find('\n', start);
-            const std::string line = strip_list_marker(
+            const std::string line = rac::tools::web::normalize_query_line(
                 reply.substr(start, nl == std::string::npos ? std::string::npos : nl - start));
-            // Two words is the floor for something worth spending a request on.
-            if (line.size() > 3 && line.find(' ') != std::string::npos) {
+            if (rac::tools::web::query_is_usable(line)) {
                 questions.push_back(line);
             }
             if (nl == std::string::npos) {
@@ -502,6 +481,75 @@ const rac_tool_provider_t kProvider = {
 };
 
 }  // namespace
+
+namespace rac::tools::web {
+
+/** Strip "1.", "-", "*", "Q:" and surrounding quotes from a listed line. */
+std::string normalize_query_line(const std::string& line) {
+    std::string out = trim(line);
+    size_t at = 0;
+    while (at < out.size() && (std::isdigit(static_cast<unsigned char>(out[at])) != 0)) {
+        ++at;
+    }
+    if (at > 0 && at < out.size() && (out[at] == '.' || out[at] == ')')) {
+        out = trim(out.substr(at + 1));
+    } else if (!out.empty() && (out[0] == '-' || out[0] == '*' || out[0] == 0x2022)) {
+        out = trim(out.substr(1));
+    }
+    if (out.size() > 2 && (out.rfind("Q:", 0) == 0 || out.rfind("q:", 0) == 0)) {
+        out = trim(out.substr(2));
+    }
+    if (out.size() > 1 && out.front() == '"' && out.back() == '"') {
+        out = out.substr(1, out.size() - 2);
+    }
+    // Models bold their queries as often as not; the asterisks would otherwise
+    // travel into the search string.
+    if (out.size() > 4 && out.rfind("**", 0) == 0 && out.compare(out.size() - 2, 2, "**") == 0) {
+        out = trim(out.substr(2, out.size() - 4));
+    }
+    return out;
+}
+
+/**
+ * Whether a line the model produced is actually a search query.
+ *
+ * Asking for "one query per line and nothing else" does not stop a reasoning
+ * model prefacing the list with its own commentary, and every such line was
+ * being searched verbatim — real runs searched "Thinking Process:" and
+ * "**Analyze the Request:**", which is where the junk results came from.
+ */
+bool query_is_usable(const std::string& line) {
+    if (line.size() < 8) {
+        return false;
+    }
+    // A heading or a lead-in, not a question. Models write "Thinking Process:",
+    // "Task:", "Queries:" before the list they were asked for.
+    if (line.back() == ':') {
+        return false;
+    }
+    // Markdown emphasis and headings only ever appear in commentary here.
+    if (line.front() == '#' || line.front() == '*' || line.front() == '`') {
+        return false;
+    }
+    // A label on the first word ("Task:", "Note:", "Step 1:") marks a lead-in
+    // rather than a query, and unlike a heading it can still end in a full
+    // stop: "Task: Write 4 different search queries." reads as a sentence.
+    const size_t first_space = line.find(' ');
+    if (first_space != std::string::npos && line[first_space - 1] == ':') {
+        return false;
+    }
+    size_t words = 1;
+    for (const char c : line) {
+        if (c == ' ') {
+            ++words;
+        }
+    }
+    // Two words is the floor for something worth a request; past about twenty
+    // it is prose the model wrote about the task rather than a query.
+    return words >= 2 && words <= 20;
+}
+
+}  // namespace rac::tools::web
 
 extern "C" {
 
