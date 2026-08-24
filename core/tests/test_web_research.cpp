@@ -211,8 +211,23 @@ void test_query_filtering() {
     }
 }
 
+void test_reasoning_block_stripping() {
+    std::printf("[9] reasoning blocks are dropped before queries are read\n");
+    CHECK(web::strip_reasoning_block("<think>plan plan</think>real query here") ==
+              "real query here",
+          "a closed block is removed");
+    CHECK(web::strip_reasoning_block("a\n<thinking>x</thinking>\nb").find("x") == std::string::npos,
+          "an alternate tag is removed");
+    // Unterminated means the budget ran out mid-reasoning: there is no query
+    // after it, and keeping the text would search the reasoning.
+    CHECK(web::strip_reasoning_block("<think>never closed").empty(),
+          "an unterminated block leaves nothing");
+    CHECK(web::strip_reasoning_block("plain queries") == "plain queries",
+          "text with no block is untouched");
+}
+
 void test_registration() {
-    std::printf("[9] registration\n");
+    std::printf("[10] registration\n");
     CHECK(rac_tool_web_research_register() == RAC_SUCCESS, "registered");
     const rac_tool_provider_t* provider = rac_tool_provider_find("web_research");
     CHECK(provider != nullptr, "found in the registry");
@@ -261,7 +276,7 @@ json run_tool(const char* args) {
 }
 
 void test_no_transport_is_reported() {
-    std::printf("[10] no HTTP transport: reported, not hung\n");
+    std::printf("[11] no HTTP transport: reported, not hung\n");
     const json result = run_tool(R"({"question":"what shipped in Swift 6.2"})");
     CHECK(result.contains("error"), "an error is reported");
     if (result.contains("error")) {
@@ -274,7 +289,7 @@ void test_no_transport_is_reported() {
 }
 
 void test_missing_question_rejected() {
-    std::printf("[11] a call with no question\n");
+    std::printf("[12] a call with no question\n");
     const json result = run_tool(R"({})");
     CHECK(result.value("error", std::string()) == "missing question", "rejected up front");
 
@@ -313,6 +328,7 @@ int main() {
     test_empty_and_junk();
     test_page_content_extraction();
     test_query_filtering();
+    test_reasoning_block_stripping();
     test_registration();
     test_no_transport_is_reported();
     test_missing_question_rejected();
