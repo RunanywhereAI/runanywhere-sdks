@@ -70,6 +70,7 @@ int run_auth_login(const GlobalOptions& options) {
             .field("device_uuid", summary.persistent_device_id)
             .field("token_expires_at", format_epoch_seconds(summary.token_expires_at))
             .field("has_completed_http_setup", summary.has_completed_http_setup)
+            .field("device_registered", summary.device_registered == 1)
             .field("assignments", static_cast<int64_t>(summary.assignment_count));
         if (!summary.warning.empty()) {
             json.field("warning", summary.warning);

@@ -379,6 +379,16 @@ void publish_component_event(runanywhere::v1::SDKComponent component,
                                 : runanywhere::v1::ERROR_SEVERITY_INFO,
                             component);
     auto* lifecycle = event.mutable_component_lifecycle();
+    // kind was never set, so every one of these events left the switch in
+    // proto_event_type_string() through the outer default: arm and became
+    // "unknown" — which track_proto() drops before it reaches the wire. Model
+    // load/unload/evict state transitions have therefore never been observable.
+    lifecycle->set_kind(
+        load_result != nullptr
+            ? runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED
+            : (unload_result != nullptr
+                   ? runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED
+                   : runanywhere::v1::COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED));
     lifecycle->set_component(component);
     lifecycle->set_previous_state(previous);
     lifecycle->set_current_state(current);

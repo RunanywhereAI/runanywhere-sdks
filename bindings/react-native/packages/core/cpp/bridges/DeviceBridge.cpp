@@ -101,8 +101,11 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
     g_deviceCallbackStrings.chipName = info.chipName;
     g_deviceCallbackStrings.gpuFamily = info.gpuFamily;
     g_deviceCallbackStrings.batteryState = info.batteryState;
-    g_deviceCallbackStrings.deviceFingerprint =
-        info.deviceFingerprint.empty() ? info.deviceId : info.deviceFingerprint;
+    // Identity is the persistent per-install id, and nothing else: a
+    // hardware-class hash here let registration overwrite the row's key, so
+    // the next authenticate minted a duplicate, and let two identical devices
+    // in one org share a row.
+    g_deviceCallbackStrings.deviceFingerprint = info.deviceId;
 
     // Fill out the struct - matches Swift's implementation
     outInfo->device_id = g_deviceCallbackStrings.deviceId.c_str();

@@ -2,9 +2,11 @@
  * @file telemetry_json.cpp
  * @brief JSON serialization for telemetry payloads
  *
- * Environment-aware encoding:
- * - Development (Supabase): Uses sdk_event_id, event_timestamp, includes all fields
- * - Production (FastAPI): Uses id, timestamp, skips modality/device_id (batch level)
+ * The V2 ingest shape is environment-independent: `id`/`timestamp`, with
+ * modality carried by the endpoint path and device_id at the batch level.
+ *
+ * framework/platform/sdk_binding/battery_state are closed vocabularies
+ * (idl/http/sdk-openapi.json); see add_vocabulary_string below.
  */
 
 #include <cmath>
@@ -18,6 +20,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_vocabulary.h"
 
 // =============================================================================
 // JSON BUILDER HELPERS
@@ -212,6 +215,24 @@ bool has_string(const char* value) {
     return value != nullptr && value[0] != '\0';
 }
 
+// Emit a closed-vocabulary field, or null if the value is not a member.
+//
+// framework/platform/sdk_binding/battery_state are enums on the wire (see
+// idl/http/sdk-openapi.json); the backend refuses anything else and quarantines
+// the event. Sending a wrong value is worse than sending none: it silently
+// widens the dimension, which is how four spellings of llama.cpp and both "ios"
+// and "iOS" ended up in the stored rows. Dropping the field keeps the event's
+// metrics while making the bug loud in the device log.
+void add_vocabulary_string(JsonBuilder& json, const char* key, const char* value,
+                           const char* const* table, size_t count) {
+    if (value && !rac_telemetry_vocabulary_contains(table, count, value)) {
+        RAC_LOG_WARNING("Telemetry", "Dropping %s: '%s' is not in the published vocabulary", key,
+                        value);
+        value = nullptr;
+    }
+    json.add_string(key, value);
+}
+
 bool has_client_info(const rac_client_info_t& info) {
     return has_string(info.sdk_binding) || has_string(info.app_identifier) ||
            has_string(info.app_name) || has_string(info.app_version) ||
@@ -267,11 +288,16 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_string("session_id", payload->session_id);
     json.add_string("model_id", payload->model_id);
     json.add_string("model_name", payload->model_name);
-    json.add_string("framework", payload->framework);
+    // Which engine executed the work. One key, one closed vocabulary, shared
+    // with model_catalog.framework and models.framework server-side. Matches
+    // this proto's own InferenceFramework naming.
+    add_vocabulary_string(json, "framework", payload->framework, RAC_TELEMETRY_FRAMEWORK_VALUES,
+                          RAC_TELEMETRY_FRAMEWORK_COUNT);
 
     json.add_string("device", payload->device);
     json.add_string("os_version", payload->os_version);
-    json.add_string("platform", payload->platform);
+    add_vocabulary_string(json, "platform", payload->platform, RAC_TELEMETRY_PLATFORM_VALUES,
+                          RAC_TELEMETRY_PLATFORM_COUNT);
     json.add_string("sdk_version", payload->sdk_version);
 
     // processing_time_ms: emit as a real value (including a measured 0 ms) when a
@@ -286,9 +312,15 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_bool("is_probe", payload->is_probe, payload->has_is_probe);
 
     // ---- SDK origin + live device state (stamped by the manager) ----------
-    json.add_string("sdk_binding", payload->sdk_binding);
+    add_vocabulary_string(json, "sdk_binding", payload->sdk_binding,
+                          RAC_TELEMETRY_SDK_BINDING_VALUES, RAC_TELEMETRY_SDK_BINDING_COUNT);
+    json.add_string("app_identifier", payload->app_identifier);
+    json.add_string("app_name", payload->app_name);
+    json.add_string("app_version", payload->app_version);
     json.add_double_or_null("battery_level", payload->battery_level, payload->battery_level >= 0);
-    json.add_string_or_null("battery_state", payload->battery_state);
+    add_vocabulary_string(json, "battery_state", payload->battery_state,
+                          RAC_TELEMETRY_BATTERY_STATE_VALUES,
+                          RAC_TELEMETRY_BATTERY_STATE_COUNT);
     json.add_bool("is_low_power_mode", payload->is_low_power_mode, payload->has_is_low_power_mode);
     json.add_int_or_null("total_memory", payload->total_memory, payload->total_memory > 0);
     json.add_int_or_null("available_memory", payload->available_memory,
@@ -299,23 +331,28 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
                          payload->online_core_count > 0);
 
     // ---- Modality-specific fields ------------------------------------------
+    // Measured metrics use `_or_null` with a `>= 0` presence test, because the
+    // payload initializes them to a negative "not measured" sentinel. The old
+    // add_int/add_double skipped zeros, which made a real 0 (an empty
+    // generation, silence with word_count 0) indistinguishable from a value that
+    // was never captured — both arrived as NULL.
     const char* modality = payload->modality ? payload->modality : "system";
     if (strcmp(modality, "llm") == 0) {
-        json.add_int("input_tokens", payload->input_tokens);
-        json.add_int("output_tokens", payload->output_tokens);
-        json.add_int("total_tokens", payload->total_tokens);
-        json.add_double("tokens_per_second", payload->tokens_per_second);
-        json.add_double("time_to_first_token_ms", payload->time_to_first_token_ms);
-        json.add_double("prompt_eval_time_ms", payload->prompt_eval_time_ms);
-        json.add_double("generation_time_ms", payload->generation_time_ms);
-        json.add_int("context_length", payload->context_length);
+        json.add_int_or_null("input_tokens", payload->input_tokens, payload->input_tokens >= 0);
+        json.add_int_or_null("output_tokens", payload->output_tokens, payload->output_tokens >= 0);
+        json.add_int_or_null("total_tokens", payload->total_tokens, payload->total_tokens >= 0);
+        json.add_double_or_null("tokens_per_second", payload->tokens_per_second, payload->tokens_per_second >= 0);
+        json.add_double_or_null("time_to_first_token_ms", payload->time_to_first_token_ms, payload->time_to_first_token_ms >= 0);
+        json.add_double_or_null("prompt_eval_time_ms", payload->prompt_eval_time_ms, payload->prompt_eval_time_ms >= 0);
+        json.add_double_or_null("generation_time_ms", payload->generation_time_ms, payload->generation_time_ms >= 0);
+        json.add_int_or_null("context_length", payload->context_length, payload->context_length >= 0);
         json.add_double_always("temperature", payload->temperature);
-        json.add_int("max_tokens", payload->max_tokens);
+        json.add_int_or_null("max_tokens", payload->max_tokens, payload->max_tokens >= 0);
     } else if (strcmp(modality, "stt") == 0) {
-        json.add_double("audio_duration_ms", payload->audio_duration_ms);
-        json.add_double("real_time_factor", payload->real_time_factor);
-        json.add_int("word_count", payload->word_count);
-        json.add_double("confidence", payload->confidence);
+        json.add_double_or_null("audio_duration_ms", payload->audio_duration_ms, payload->audio_duration_ms >= 0);
+        json.add_double_or_null("real_time_factor", payload->real_time_factor, payload->real_time_factor >= 0);
+        json.add_int_or_null("word_count", payload->word_count, payload->word_count >= 0);
+        json.add_double_or_null("confidence", payload->confidence, payload->confidence >= 0);
         json.add_string("language", payload->language);
         json.add_int("segment_index", payload->segment_index);
         // Hybrid STT router attribution (null on plain single-backend STT).
@@ -323,28 +360,28 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_bool("was_fallback", payload->was_fallback, payload->has_was_fallback);
         json.add_int("attempt_count", payload->attempt_count);
     } else if (strcmp(modality, "tts") == 0) {
-        json.add_int("character_count", payload->character_count);
-        json.add_double("characters_per_second", payload->characters_per_second);
-        json.add_int("audio_size_bytes", payload->audio_size_bytes);
-        json.add_int("sample_rate", payload->sample_rate);
+        json.add_int_or_null("character_count", payload->character_count, payload->character_count >= 0);
+        json.add_double_or_null("characters_per_second", payload->characters_per_second, payload->characters_per_second >= 0);
+        json.add_int_or_null("audio_size_bytes", payload->audio_size_bytes, payload->audio_size_bytes >= 0);
+        json.add_int_or_null("sample_rate", payload->sample_rate, payload->sample_rate >= 0);
         json.add_string("voice", payload->voice);
-        json.add_double("output_duration_ms", payload->output_duration_ms);
+        json.add_double_or_null("output_duration_ms", payload->output_duration_ms, payload->output_duration_ms >= 0);
     } else if (strcmp(modality, "vlm") == 0) {
         // VLM = LLM token fields PLUS vision fields. Both groups ride the
         // properties carrier now: vlm_module.cpp writes input/total tokens,
         // tps, ttft, prompt_eval_time_ms, vision_tokens, vision_encode_time_ms
         // and image_resolution, and the SDK_COMPONENT_VLM arm of
         // telemetry_manager.cpp reads every one of them back.
-        json.add_int("input_tokens", payload->input_tokens);
-        json.add_int("output_tokens", payload->output_tokens);
-        json.add_int("total_tokens", payload->total_tokens);
-        json.add_double("tokens_per_second", payload->tokens_per_second);
-        json.add_double("time_to_first_token_ms", payload->time_to_first_token_ms);
-        json.add_double("prompt_eval_time_ms", payload->prompt_eval_time_ms);
-        json.add_double("generation_time_ms", payload->generation_time_ms);
-        json.add_int("context_length", payload->context_length);
+        json.add_int_or_null("input_tokens", payload->input_tokens, payload->input_tokens >= 0);
+        json.add_int_or_null("output_tokens", payload->output_tokens, payload->output_tokens >= 0);
+        json.add_int_or_null("total_tokens", payload->total_tokens, payload->total_tokens >= 0);
+        json.add_double_or_null("tokens_per_second", payload->tokens_per_second, payload->tokens_per_second >= 0);
+        json.add_double_or_null("time_to_first_token_ms", payload->time_to_first_token_ms, payload->time_to_first_token_ms >= 0);
+        json.add_double_or_null("prompt_eval_time_ms", payload->prompt_eval_time_ms, payload->prompt_eval_time_ms >= 0);
+        json.add_double_or_null("generation_time_ms", payload->generation_time_ms, payload->generation_time_ms >= 0);
+        json.add_int_or_null("context_length", payload->context_length, payload->context_length >= 0);
         json.add_double_always("temperature", payload->temperature);
-        json.add_int("max_tokens", payload->max_tokens);
+        json.add_int_or_null("max_tokens", payload->max_tokens, payload->max_tokens >= 0);
         json.add_int("image_count", payload->image_count);
         json.add_int("vision_tokens", payload->vision_tokens);
         json.add_double("vision_encode_time_ms", payload->vision_encode_time_ms);
@@ -368,7 +405,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_int("input_count", payload->input_count);
         json.add_int("vectors_produced", payload->vectors_produced);
         json.add_int("embedding_dimension", payload->embedding_dimension);
-        json.add_int("total_tokens", payload->total_tokens);
+        json.add_int_or_null("total_tokens", payload->total_tokens, payload->total_tokens >= 0);
         json.add_int("batch_size", payload->batch_size);
         json.add_string("embedding_model", payload->model_id);
     } else if (strcmp(modality, "voice") == 0) {
@@ -386,7 +423,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("speech_duration_ms", payload->speech_duration_ms);
         json.add_double("silence_duration_ms", payload->silence_duration_ms);
         json.add_int("segment_count", payload->segment_count);
-        json.add_int("sample_rate", payload->sample_rate);
+        json.add_int_or_null("sample_rate", payload->sample_rate, payload->sample_rate >= 0);
     } else if (strcmp(modality, "lora") == 0) {
         // base model rides on model_id; adapter_id + operation + adapter_size_bytes
         // via the carrier (size is stat-ed from the adapter path in rac_lora_service).
@@ -547,7 +584,9 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_int_always("performance_cores", info->performance_cores);
         json.add_int_always("efficiency_cores", info->efficiency_cores);
 
-        // Device fingerprint (fallback to device_id if not set)
+        // Identity, with the persistent id as the fallback. A platform callback
+        // that leaves this empty is correct; one that fills it with a hardware
+        // hash is what caused duplicate device rows.
         const char* fingerprint = info->device_fingerprint
                                       ? info->device_fingerprint
                                       : (info->device_id ? info->device_id : "");

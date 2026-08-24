@@ -652,6 +652,20 @@ target_compile_features(test_telemetry_extraction PRIVATE cxx_std_20)
 rac_test_define_have_protobuf(test_telemetry_extraction)
 add_test(NAME telemetry_extraction_tests COMMAND test_telemetry_extraction)
 
+# Platform bridge: every value a binding supplies must reach the wire. Covers the
+# platform half for ALL SDKs, since they all hand facts to commons through the
+# same two flat C structs.
+add_executable(test_platform_bridge test_platform_bridge.cpp)
+target_include_directories(test_platform_bridge PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_platform_bridge PRIVATE rac_commons)
+rac_link_archive_deps(test_platform_bridge)
+target_compile_features(test_platform_bridge PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_platform_bridge)
+add_test(NAME platform_bridge_tests COMMAND test_platform_bridge)
+
 # --- Model registry proto-byte ABI tests -------------------------------------
 # Exercises register/update/get/list/remove using serialized ModelInfo and
 # ModelInfoList bytes. SKIP-style fallback when Protobuf is unavailable.

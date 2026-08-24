@@ -215,7 +215,8 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         const char* error, const char* model_id = nullptr,
-                        const char* adapter_id = nullptr, int64_t adapter_size_bytes = 0) {
+                        const char* adapter_id = nullptr, int64_t adapter_size_bytes = 0,
+                        const char* framework = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -231,6 +232,12 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_component(runanywhere::v1::SDK_COMPONENT_LLM);
     if (model_id != nullptr && model_id[0] != '\0') {
         cap->set_model_id(model_id);  // base model — telemetry "base_model_id"
+    }
+    // Which engine the base model is loaded on. CapabilityOperationEvent has no
+    // framework field, so it rides the properties carrier — same as embeddings
+    // and VLM. Without it every LoRA row landed with framework NULL.
+    if (framework != nullptr && framework[0] != '\0') {
+        (*event.mutable_properties())["framework"] = framework;
     }
     if (operation) {
         event.set_operation_id(operation);
@@ -276,11 +283,11 @@ std::string adapter_id_for(const runanywhere::v1::LoraAdapterConfig& config) {
 
 void publish_failure(rac_result_t code, const char* operation, const char* message,
                      const char* model_id = nullptr, const char* adapter_id = nullptr,
-                     int64_t adapter_size_bytes = 0) {
+                     int64_t adapter_size_bytes = 0, const char* framework = nullptr) {
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED, operation,
                        (message != nullptr) && message[0] != '\0' ? message
                                                                   : rac_error_message(code),
-                       model_id, adapter_id, adapter_size_bytes);
+                       model_id, adapter_id, adapter_size_bytes, framework);
     (void)rac_sdk_event_publish_failure(code, message, "llm", operation, RAC_TRUE);
 }
 
@@ -665,13 +672,17 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         rc = ref.ops->clear_lora(ref.impl);
         if (rc != RAC_SUCCESS) {
             mark_apply_error(&result, rc, rac_error_message(rc));
-            publish_failure(rc, "lora.apply", rac_error_message(rc), base_model_id.c_str());
+            publish_failure(rc, "lora.apply", rac_error_message(rc), base_model_id.c_str(),
+                            /*adapter_id=*/nullptr, /*adapter_size_bytes=*/0,
+                            ref.framework_name);
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
         track_lora_cleared(backend_impl, base_model_id);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED,
-                           "lora.apply.replaceExisting", nullptr, base_model_id.c_str());
+                           "lora.apply.replaceExisting", nullptr, base_model_id.c_str(),
+                           /*adapter_id=*/nullptr, /*adapter_size_bytes=*/0,
+                           ref.framework_name);
     }
 
     for (const auto& config : request.adapters()) {
@@ -683,7 +694,7 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
             mark_apply_error(&result, rc, rac_error_message(rc));
             publish_failure(rc, "lora.apply", rac_error_message(rc), base_model_id.c_str(),
                             adapter_id_for(config).c_str(),
-                            adapter_file_size(config.adapter_path()));
+                            adapter_file_size(config.adapter_path()), ref.framework_name);
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
@@ -695,7 +706,7 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED,
                            "lora.apply", nullptr, base_model_id.c_str(),
                            adapter_id_for(config).c_str(),
-                           adapter_file_size(config.adapter_path()));
+                           adapter_file_size(config.adapter_path()), ref.framework_name);
     }
 
     rac::llm::release_lifecycle_llm(&ref);

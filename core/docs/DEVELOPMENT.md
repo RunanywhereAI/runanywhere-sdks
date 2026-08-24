@@ -24,7 +24,6 @@ Contributor guide for building, integrating, and extending the internal C/C++ co
 | `RAC_BUILD_PYTHON_MODULE` | OFF | The `runanywhere-python` pybind11 extension |
 | `RAC_GPU_CUDA` | OFF | Build llama.cpp with the CUDA backend (NVIDIA; needs the CUDA toolkit) |
 | `RAC_REGENERATE_PROTO` | OFF | Re-run `idl/codegen/generate_cpp.sh` when `.proto` files change |
-| `RAC_INCLUDE_LOCAL_DEV_CONFIG` | OFF | Compile the git-ignored local development credentials; never for packaging |
 
 Per-engine `RAC_BACKEND_<NAME>` options are declared by each engine's own `CMakeLists.txt`, not centrally: `RAC_BACKEND_SHERPA` (ON), `RAC_BACKEND_CLOUD` (ON), `RAC_BACKEND_MLX` (ON, Apple), `RAC_BACKEND_NEURT` (Apple), and `RAC_BACKEND_QHEXRT` (OFF; private prebuilt archive). Each engine self-gates with a `return()` guard, so `engines/` descends into all of them unconditionally.
 

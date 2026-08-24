@@ -826,6 +826,17 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
                                 std::chrono::steady_clock::now() - load_start)
                                 .count());
 
+    // Adopt the engine that actually served the load, not the caller's
+    // preferred/catalog pin — see rac_lifecycle_get_framework(). Only on
+    // success: a failed load resolved no engine.
+    if (result == RAC_SUCCESS) {
+        const rac_inference_framework_t resolved =
+            rac_lifecycle_get_framework(component->lifecycle);
+        if (resolved != RAC_FRAMEWORK_UNKNOWN) {
+            component->actual_framework = resolved;
+        }
+    }
+
 #if defined(RAC_HAVE_PROTOBUF)
     {
         runanywhere::v1::ModelEvent m;

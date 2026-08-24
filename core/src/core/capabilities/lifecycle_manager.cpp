@@ -523,6 +523,22 @@ const char* rac_lifecycle_get_model_id(rac_handle_t handle) {
     return it->second->model_id.c_str();
 }
 
+rac_inference_framework_t rac_lifecycle_get_framework(rac_handle_t handle) {
+    if (handle == nullptr) {
+        return RAC_FRAMEWORK_UNKNOWN;
+    }
+
+    auto* mgr = static_cast<LifecycleManager*>(handle);
+    std::lock_guard<std::mutex> g(detail::g_lifecycle_mutex);
+    auto it = detail::g_loaded.find(mgr->component);
+    if (it == detail::g_loaded.end() || it->second->owner_lifecycle != mgr) {
+        return RAC_FRAMEWORK_UNKNOWN;
+    }
+    // LoadedModel::framework is the engine that actually executed the load,
+    // resolved from the winning vtable — not the caller's requested pin.
+    return detail::c_framework_from_proto(it->second->framework);
+}
+
 const char* rac_lifecycle_get_model_name(rac_handle_t handle) {
     if (handle == nullptr) {
         return nullptr;
@@ -905,6 +921,13 @@ const char* rac_lifecycle_get_model_id(rac_handle_t handle) {
         return nullptr;
     }
     return mgr->current_model_id.c_str();
+}
+
+rac_inference_framework_t rac_lifecycle_get_framework(rac_handle_t /*handle*/) {
+    // This build does not carry the proto lifecycle, so the engine that served
+    // a load is not recorded. UNKNOWN is honest; guessing would reintroduce the
+    // bug this accessor exists to fix.
+    return RAC_FRAMEWORK_UNKNOWN;
 }
 
 const char* rac_lifecycle_get_model_name(rac_handle_t handle) {

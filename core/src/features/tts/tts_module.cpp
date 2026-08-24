@@ -59,7 +59,9 @@ struct rac_tts_component {
     /** Resolved inference framework (defaults to the Sherpa speech backend) */
     rac_inference_framework_t actual_framework;
 
-    rac_tts_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_SHERPA) {
+    // Default UNKNOWN, not SHERPA: the real engine is adopted from the
+    // lifecycle after a load, and a wrong default is worse than no value.
+    rac_tts_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_UNKNOWN) {
         // Initialize with defaults - matches rac_tts_types.h rac_tts_config_t
         config = RAC_TTS_CONFIG_DEFAULT;
 
@@ -456,6 +458,17 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
         static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now() - load_start)
                                 .count());
+
+    // Adopt the engine that actually served the load, not the caller's
+    // preferred/catalog pin — see rac_lifecycle_get_framework(). Only on
+    // success: a failed load resolved no engine.
+    if (result == RAC_SUCCESS) {
+        const rac_inference_framework_t resolved =
+            rac_lifecycle_get_framework(component->lifecycle);
+        if (resolved != RAC_FRAMEWORK_UNKNOWN) {
+            component->actual_framework = resolved;
+        }
+    }
 
 #if defined(RAC_HAVE_PROTOBUF)
     {

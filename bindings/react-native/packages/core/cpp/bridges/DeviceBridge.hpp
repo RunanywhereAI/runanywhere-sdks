@@ -47,7 +47,6 @@ struct DeviceInfo {
     int32_t efficiencyCores = 0;
     bool isSimulator = false;
     std::string sdkVersion;
-    std::string deviceFingerprint;
 };
 
 /**

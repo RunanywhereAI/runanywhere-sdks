@@ -193,6 +193,29 @@ static int64_t json_extract_int(const char* json, const char* key, int64_t defau
     return result;
 }
 
+// Extract a JSON boolean. `found` distinguishes an explicit false from an
+// absent key — the difference between "this backend says the device is not
+// registered" and "this backend is too old to say", which drive different
+// behaviour in the registration heal.
+static bool json_extract_bool(const char* json, const char* key, bool* found) {
+    if (found)
+        *found = false;
+    const char* value = json_find_value(json, key);
+    if (!value || strncmp(value, "null", 4) == 0)
+        return false;
+    if (strncmp(value, "true", 4) == 0) {
+        if (found)
+            *found = true;
+        return true;
+    }
+    if (strncmp(value, "false", 5) == 0) {
+        if (found)
+            *found = true;
+        return false;
+    }
+    return false;
+}
+
 // =============================================================================
 // Auth Request/Response Serialization
 // =============================================================================
@@ -234,6 +257,12 @@ int rac_auth_response_from_json(const char* json, rac_auth_response_t* out_respo
     out_response->organization_id = json_extract_string(json, "organization_id");
     out_response->token_type = json_extract_string(json, "token_type");
     out_response->expires_in = (int32_t)json_extract_int(json, "expires_in", 0);
+
+    bool have_device_registered = false;
+    const bool device_registered =
+        json_extract_bool(json, "device_registered", &have_device_registered);
+    out_response->device_registered = device_registered ? RAC_TRUE : RAC_FALSE;
+    out_response->has_device_registered = have_device_registered ? RAC_TRUE : RAC_FALSE;
 
     // Validate required fields
     if (!out_response->access_token || !out_response->refresh_token) {
