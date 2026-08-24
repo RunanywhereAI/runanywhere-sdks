@@ -228,7 +228,19 @@ elseif(WIN32)
     # does not satisfy a zlibstatic.lib DEFAULTLIB / unresolved reference.
     foreach(_need IN ITEMS zlibstatic.lib bz2_bundled.lib)
         if(NOT EXISTS "${RAC_KIT_OUT}/lib/${_need}")
-            file(GLOB_RECURSE _hits "${RAC_BINARY_DIR}/${_need}")
+            set(_hits "")
+            foreach(_cand IN ITEMS
+                    "${RAC_BINARY_DIR}/${_need}"
+                    "${RAC_BINARY_DIR}/lib/${_need}"
+                    "${RAC_BINARY_DIR}/lib/Release/${_need}"
+                    "${RAC_BINARY_DIR}/lib/Debug/${_need}")
+                if(EXISTS "${_cand}")
+                    list(APPEND _hits "${_cand}")
+                endif()
+            endforeach()
+            if(NOT _hits)
+                file(GLOB_RECURSE _hits "${RAC_BINARY_DIR}/*/${_need}")
+            endif()
             if(_hits)
                 list(GET _hits 0 _found)
                 file(COPY "${_found}" DESTINATION "${RAC_KIT_OUT}/lib")

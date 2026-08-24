@@ -29,6 +29,7 @@ endif()
 set(_kit_genex)
 foreach(_t IN ITEMS
         rac_commons
+        zlibstatic bz2_bundled
         llama llama-common llama-common-base ggml ggml-base ggml-cpu ggml-metal ggml-cuda ggml-vulkan ggml-blas
         rac_runtime_onnxrt rac_runtime_coreml
         rac_backend_llamacpp rac_backend_onnx rac_backend_sherpa
