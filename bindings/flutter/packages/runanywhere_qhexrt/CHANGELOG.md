@@ -5,6 +5,18 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.27] - 2026-08-24
+
+### Changed
+
+- The Hexagon NPU payload is now fetched from a pinned prebuilt release instead
+  of being staged by hand, with atomic selection on every platform.
+- The QAIRT/QNN runtime the engine depends on at execution time is now a
+  separate, pinned, checksum-verified private artifact — fetched with the same
+  credential as the engine payload, so a build that can reach one reaches both.
+  A build without that credential correctly falls back to the non-routable
+  shell rather than shipping a half-configured engine.
+
 ## [0.20.26] - 2026-08-23
 
 ### Changed

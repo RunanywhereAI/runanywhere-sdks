@@ -359,8 +359,9 @@ jobs:
 
       # Replaces a hand-copied C:\actions-runner-state directory that carried no
       # version information and had already gone stale once (QAIRT 2.45.x staged
-      # against a newer install). Now a checksum-pinned public asset, and the
-      # pairing gate proves it is the SDK this engine was built against.
+      # against a newer install). Now a checksum-pinned PRIVATE asset on the
+      # neurun repo (NEURUN_TOKEN below), and the pairing gate proves it is the
+      # SDK this engine was built against.
       - name: Download the pinned QAIRT runtime (win-arm64)
         shell: bash
         env:

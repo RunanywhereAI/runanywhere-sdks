@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/qhexrt",
-  "version": "0.20.26",
+  "version": "0.20.27",
   "description": "On-device NPU acceleration backend for RunAnywhere (React Native) — LLM/VLM/STT/TTS on Qualcomm Snapdragon Hexagon (V75/V79/V81), Android arm64.",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -60,7 +60,7 @@
     "@runanywhere/proto-ts": "workspace:*"
   },
   "peerDependencies": {
-    "@runanywhere/core": ">=0.20.26",
+    "@runanywhere/core": ">=0.20.27",
     "react": ">=19.0.0",
     "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"

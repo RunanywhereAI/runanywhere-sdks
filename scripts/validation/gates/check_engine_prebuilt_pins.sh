@@ -32,6 +32,7 @@ source "${REPO_ROOT}/scripts/build/_release_asset.sh"
 # The engines, their ABIs/slices, and the asset basename each publishes.
 NEURT_SLICES=(macos-arm64 ios-arm64 ios-arm64-simulator)
 QHEXRT_ABIS=(arm64-v8a win-arm64)
+QAIRT_PLATFORMS=(arm64-v8a win-arm64)
 
 echo "== engine prebuilt pins =="
 
@@ -49,9 +50,14 @@ for a in "${QHEXRT_ABIS[@]}"; do
     check_sha_var "QHEXRT_${u}_SHA256"
     check_sha_var "QHEXRT_${u}_RECEIPT"
 done
-[[ -n "${NEURUN_REPO:-}"       ]] || bad "NEURUN_REPO is not set"
-[[ -n "${NEURT_RELEASE_TAG:-}"  ]] || bad "NEURT_RELEASE_TAG is not set"
-[[ -n "${QHEXRT_RELEASE_TAG:-}" ]] || bad "QHEXRT_RELEASE_TAG is not set"
+for p in "${QAIRT_PLATFORMS[@]}"; do
+    check_sha_var "QAIRT_RUNTIME_$(echo "$p" | tr 'a-z-' 'A-Z_')_SHA256"
+done
+[[ -n "${NEURUN_REPO:-}"          ]] || bad "NEURUN_REPO is not set"
+[[ -n "${NEURT_RELEASE_TAG:-}"     ]] || bad "NEURT_RELEASE_TAG is not set"
+[[ -n "${QHEXRT_RELEASE_TAG:-}"    ]] || bad "QHEXRT_RELEASE_TAG is not set"
+[[ -n "${QAIRT_RUNTIME_VERSION:-}"     ]] || bad "QAIRT_RUNTIME_VERSION is not set"
+[[ -n "${QAIRT_RUNTIME_RELEASE_TAG:-}" ]] || bad "QAIRT_RUNTIME_RELEASE_TAG is not set"
 [[ $fail -eq 0 ]] && ok "all pins present and well-formed"
 
 # ---- 2. the ABI pin matches the header it must match ------------------------
@@ -137,13 +143,15 @@ expect_requires "electron win-arm64 fetches the pinned QAIRT runtime" \
 
 # No consumer may point at a hand-staged payload by absolute path again.
 echo "== no hand-staged payload paths =="
-if grep -rnE "QHEXRT_ROOT: *['\"][A-Za-z]:\\\\|NEURT_ROOT: *['\"]?[A-Za-z]:\\\\|qhexrt-prebuilt\\\\versions" \
-     "${REPO_ROOT}/.github/workflows/" >/dev/null 2>&1; then
-    bad "a workflow pins an engine payload by absolute path; use the downloader"
-    grep -rnE "QHEXRT_ROOT: *['\"][A-Za-z]:\\\\|qhexrt-prebuilt\\\\versions" \
-        "${REPO_ROOT}/.github/workflows/" | sed 's/^/         /' >&2
+# Also covers QAIRT: RA_QNN_RUNTIME_DIR pointing at a literal Windows path is
+# exactly the C:\actions-runner-state\qhexrt-qnn-runtime-flat regression --
+# that directory carried no version info and had already gone stale once.
+HANDSTAGE_RE="QHEXRT_ROOT: *['\"][A-Za-z]:\\\\|NEURT_ROOT: *['\"]?[A-Za-z]:\\\\|QAIRT_ROOT: *['\"][A-Za-z]:\\\\|RA_QNN_RUNTIME_DIR: *['\"][A-Za-z]:\\\\|qhexrt-prebuilt\\\\versions|qairt-runtime\\\\versions"
+if grep -rnE "$HANDSTAGE_RE" "${REPO_ROOT}/.github/workflows/" >/dev/null 2>&1; then
+    bad "a workflow pins an engine or QAIRT payload by absolute path; use the downloader"
+    grep -rnE "$HANDSTAGE_RE" "${REPO_ROOT}/.github/workflows/" | sed 's/^/         /' >&2
 else
-    ok "no workflow hardcodes an engine payload path"
+    ok "no workflow hardcodes an engine or QAIRT payload path"
 fi
 
 # ---- 3b. the headers the prebuilt was compiled against have not moved -------
@@ -247,6 +255,30 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
         done
         [[ $fail -eq 0 ]] && ok "release carries all $(( ${#want[@]} * 2 )) expected files"
 
+        # QAIRT is on its OWN tag too -- the SDK version and the engine version
+        # move independently, so it is fetched from a separate release listing.
+        qairt_listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
+                     -H "Accept: application/vnd.github+json" \
+                     "https://api.github.com/repos/${repo}/releases/tags/${QAIRT_RUNTIME_RELEASE_TAG}" \
+                   | python3 -c "import json,sys
+rel=json.load(sys.stdin)
+for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
+        if [[ -z "$qairt_listing" ]]; then
+            bad "could not read release ${QAIRT_RUNTIME_RELEASE_TAG} from $repo"
+        else
+            qairt_want=()
+            for p in "${QAIRT_PLATFORMS[@]}"; do
+                qairt_want+=("qairt-runtime-${p}-v${QAIRT_RUNTIME_VERSION}.tar.gz")
+            done
+            qairt_fail_before=$fail
+            for w in "${qairt_want[@]}"; do
+                if ! grep -qx "$w" <<<"$qairt_listing"; then bad "QAIRT release is missing $w"
+                elif ! grep -qx "${w}.sha256" <<<"$qairt_listing"; then bad "QAIRT release is missing ${w}.sha256"
+                fi
+            done
+            [[ $fail -eq $qairt_fail_before ]] && ok "QAIRT release carries all $(( ${#qairt_want[@]} * 2 )) expected files"
+        fi
+
         # The pin must equal the PUBLISHED checksum. A local rebuild produces
         # different bytes, so a hand-copied pin can describe something that was
         # never released -- exactly the drift this boundary exists to prevent.
@@ -257,7 +289,7 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
                     "neurt-${s}-v${nv}.tar.gz.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
                 bad "could not download the published checksum for neurt-${s}"; continue
             fi
-            pub="$(cat "$tmp/neurt-${s}-v${nv}.tar.gz.sha256")"
+            pub="$(cut -d' ' -f1 < "$tmp/neurt-${s}-v${nv}.tar.gz.sha256")"
             [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
                                       || bad "$var=${!var} but the release publishes $pub"
         done
@@ -268,7 +300,19 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
                     "qhexrt-${a}-v${qv}.tar.gz.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
                 bad "could not download the published checksum for qhexrt-${a}"; continue
             fi
-            pub="$(cat "$tmp/qhexrt-${a}-v${qv}.tar.gz.sha256")"
+            pub="$(cut -d' ' -f1 < "$tmp/qhexrt-${a}-v${qv}.tar.gz.sha256")"
+            [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
+                                      || bad "$var=${!var} but the release publishes $pub"
+        done
+        for p in "${QAIRT_PLATFORMS[@]}"; do
+            var="QAIRT_RUNTIME_$(echo "$p" | tr 'a-z-' 'A-Z_')_SHA256"
+            qairt_repo="${NEURUN_REPO:-$repo}"
+            aname="qairt-runtime-${p}-v${QAIRT_RUNTIME_VERSION}.tar.gz"
+            if ! fetch_release_asset "$qairt_repo" "$QAIRT_RUNTIME_RELEASE_TAG" \
+                    "${aname}.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
+                bad "could not download the published checksum for qairt-runtime-${p}"; continue
+            fi
+            pub="$(cut -d' ' -f1 < "$tmp/${aname}.sha256")"
             [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
                                       || bad "$var=${!var} but the release publishes $pub"
         done
