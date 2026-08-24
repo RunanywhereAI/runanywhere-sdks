@@ -777,9 +777,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          platform: macos
+      - name: Install ninja
+        run: brew install ninja
       - name: Configure + package C++ desktop kit
         run: |
           set -euo pipefail

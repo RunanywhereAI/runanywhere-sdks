@@ -43,9 +43,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          platform: macos
+      - name: Install ninja
+        run: brew install ninja
       - name: Configure + package
         run: |
           set -euo pipefail
