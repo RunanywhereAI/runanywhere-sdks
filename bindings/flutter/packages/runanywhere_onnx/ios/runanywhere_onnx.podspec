@@ -25,12 +25,11 @@ end
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_onnx'
   s.version          = '0.20.26'
-  # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
-  # s.version leads the published release because 0.20.20 republished only the
-  # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
-  # the checksums below are still the 0.20.19 ones. Bump this back to
-  # s.version once a matching release exists.
-  asset_version      = '0.20.26'
+  # iOS archives are downloaded from the v#{asset_version} GitHub release. This
+  # tracks s.version and only diverges when a version republishes non-iOS
+  # packages without cutting iOS archives (0.20.20 did that); then pin the last
+  # release that has them and restore this to s.version afterwards.
+  asset_version      = s.version.to_s
   s.summary          = 'RunAnywhere ONNX: STT, TTS, VAD for Flutter'
   s.description      = <<-DESC
 ONNX Runtime backend for RunAnywhere Flutter SDK. Provides speech-to-text (STT),

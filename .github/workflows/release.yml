@@ -842,6 +842,7 @@ jobs:
               rac_commons.dll \
               rac_backend_llamacpp.dll runanywhere_llamacpp.dll \
               rac_backend_onnx.dll runanywhere_onnx.dll onnxruntime.dll \
+              onnxruntime_providers_shared.dll \
               rac_backend_sherpa.dll runanywhere_sherpa.dll sherpa-onnx-c-api.dll; do
             if ! printf '%s\n' "$listing" | grep -Eqi "(^|/)${want}$"; then
               echo "::error::shipped Windows zip is missing $want"

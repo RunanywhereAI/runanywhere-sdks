@@ -148,7 +148,7 @@ PY
         echo "[ERROR] ${plat} staged an .exe; the runtime set must not include tools" >&2
         exit 1
     fi
-    if [[ "$(python3 -c "import json;print(json.load(open('$MANIFEST'))['platforms']['$plat']['layout'])")" == "flat" ]]; then
+    if [[ "$("$PY_BIN" -c "import json;print(json.load(open('$MANIFEST'))['platforms']['$plat']['layout'])")" == "flat" ]]; then
         # Flat means flat: any nesting breaks the Windows loader at runtime, and it
         # would do so silently at model load rather than here.
         if find "$stage" -mindepth 2 -type f | grep -q .; then

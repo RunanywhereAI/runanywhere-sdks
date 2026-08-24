@@ -70,9 +70,22 @@ ASSET="qairt-runtime-${PLATFORM}-v${VERSION}.tar.gz"
 DEST_ROOT="${REPO_ROOT}/engines/qhexrt/prebuilt/qairt-runtime/${PLATFORM}"
 DEST="${DEST_ROOT}/versions/${EXPECTED_SHA}"
 
+# A cached tree is re-validated, not trusted because its receipt exists: if a
+# library were deleted or edited while qairt-runtime.json survived, this path
+# would select it, and the pairing gate only compares the identity hash -- so the
+# first symptom would be the engine failing to load on a device.
+cached_ok=0
 if [[ -f "${DEST}/qairt-runtime.json" && "$FORCE" -eq 0 ]]; then
-    echo "[OK] ${PLATFORM}: QAIRT runtime ${VERSION} already present"
-else
+    if "$PY_BIN" "${REPO_ROOT}/scripts/build/_validate_qairt_runtime.py" \
+            "$DEST" "$PLATFORM" "$VERSION" >/dev/null 2>&1; then
+        cached_ok=1
+        echo "[OK] ${PLATFORM}: QAIRT runtime ${VERSION} already present and valid"
+    else
+        echo "[WARN] cached QAIRT runtime failed validation; re-downloading" >&2
+        rm -rf "$DEST"
+    fi
+fi
+if [[ "$cached_ok" -eq 0 ]]; then
     tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
     echo "[DOWNLOAD] QAIRT runtime ${PLATFORM} <- ${REPO} ${TAG}"
     # No token: these are public assets.
@@ -94,27 +107,10 @@ print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" "${tmp}/${ASSE
     [[ -f "${inner}/qairt-runtime.json" ]] || {
         echo "[ERROR] payload has no qairt-runtime.json receipt" >&2; exit 1; }
 
-    # Validate the STAGED tree before touching anything live.
-    "$PY_BIN" - "$inner" "$PLATFORM" "$VERSION" <<'PY'
-import hashlib, json, os, sys
-root, plat, version = sys.argv[1:4]
-r = json.load(open(os.path.join(root, "qairt-runtime.json"), encoding="utf-8"))
-if r.get("schema") != "qairt-runtime/v1":
-    sys.exit(f"[ERROR] unexpected receipt schema: {r.get('schema')}")
-for key, want in (("platform", plat), ("qairt_version", version)):
-    if r.get(key) != want:
-        sys.exit(f"[ERROR] receipt {key}={r.get(key)!r}, expected {want!r}")
-ident = os.path.join(root, r["identity_file"])
-if not os.path.isfile(ident):
-    sys.exit(f"[ERROR] payload is missing its identity file {r['identity_file']}")
-with open(ident, "rb") as fh:
-    if hashlib.sha256(fh.read()).hexdigest() != r["identity_sha256"]:
-        sys.exit("[ERROR] identity file does not match the receipt")
-missing = [f for f in r["files"] if not os.path.isfile(os.path.join(root, f))]
-if missing:
-    sys.exit("[ERROR] payload is missing runtime files: " + ", ".join(missing))
-print(f"[OK] receipt validates: {len(r['files'])} runtime files, QAIRT {version}")
-PY
+    # Validate the STAGED tree before touching anything live -- same checker the
+    # cached path above runs, so the two can never drift apart.
+    "$PY_BIN" "${REPO_ROOT}/scripts/build/_validate_qairt_runtime.py" \
+        "$inner" "$PLATFORM" "$VERSION"
 
     mkdir -p "${DEST_ROOT}/versions"
     rm -rf "${DEST}.incoming" "$DEST"

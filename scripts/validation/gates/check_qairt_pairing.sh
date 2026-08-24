@@ -32,10 +32,24 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PY_BIN="${PYTHON_BIN:-python3}"
 command -v "$PY_BIN" >/dev/null 2>&1 || PY_BIN=python
 
+# EXPLICIT is the release-job mode: a caller that names a platform is asserting
+# that pair must exist, so every skip below becomes fatal. Without that, a typo
+# like --platform win_arm64 builds paths that do not exist, nothing is compared,
+# and the gate prints [OK] and exits 0 -- a vacuous pass in the one check that
+# stands between a drifted pair and a device crash.
+EXPLICIT=0
 PLATFORMS=(arm64-v8a win-arm64)
 if [[ "${1:-}" == "--platform" ]]; then
     [[ -n "${2:-}" ]] || { echo "[ERROR] --platform needs a value" >&2; exit 2; }
+    case "$2" in
+        arm64-v8a|win-arm64) ;;
+        *) echo "[ERROR] unknown platform '$2' (expected arm64-v8a or win-arm64)" >&2; exit 2 ;;
+    esac
     PLATFORMS=("$2")
+    EXPLICIT=1
+elif [[ -n "${1:-}" ]]; then
+    echo "[ERROR] unknown argument '$1' (expected --platform <arm64-v8a|win-arm64>)" >&2
+    exit 2
 fi
 
 checked=0
@@ -43,8 +57,18 @@ for plat in "${PLATFORMS[@]}"; do
     engine="${REPO_ROOT}/engines/qhexrt/prebuilt/current/qhexrt-prebuilt.json"
     runtime="${REPO_ROOT}/engines/qhexrt/prebuilt/qairt-runtime/${plat}/current/qairt-runtime.json"
 
-    # Nothing selected is the intentional public/stub outcome, not a failure.
-    [[ -f "$engine" && -f "$runtime" ]] || continue
+    # Nothing selected is the intentional public/stub outcome when scanning, but a
+    # hard failure when the caller named this platform.
+    if [[ ! -f "$engine" || ! -f "$runtime" ]]; then
+        if [[ "$EXPLICIT" -eq 1 ]]; then
+            echo "[FAIL] ${plat}: expected an engine+runtime pair to compare, but:" >&2
+            [[ -f "$engine" ]]  || echo "        missing engine receipt:  $engine" >&2
+            [[ -f "$runtime" ]] || echo "        missing runtime receipt: $runtime" >&2
+            echo "        Run download-qhexrt.sh and download-qairt-runtime.sh for ${plat} first." >&2
+            exit 1
+        fi
+        continue
+    fi
 
     # Only compare when the selected engine payload IS this platform's -- a
     # single `current` selects one engine ABI at a time, so comparing an
@@ -53,7 +77,15 @@ for plat in "${PLATFORMS[@]}"; do
     sel_abi="$("$PY_BIN" -c "
 import json,sys
 print(json.load(open(sys.argv[1], encoding='utf-8')).get('android_abi',''))" "$engine")"
-    [[ "$sel_abi" == "$plat" ]] || continue
+    if [[ "$sel_abi" != "$plat" ]]; then
+        if [[ "$EXPLICIT" -eq 1 ]]; then
+            echo "[FAIL] ${plat}: the selected engine payload is for '${sel_abi}', not '${plat}'." >&2
+            echo "        A single 'current' selects one engine ABI at a time; re-run" >&2
+            echo "        download-qhexrt.sh --abi ${plat} before this gate." >&2
+            exit 1
+        fi
+        continue
+    fi
 
     "$PY_BIN" - "$engine" "$runtime" "$plat" <<'PY'
 import json, sys
@@ -85,5 +117,9 @@ PY
 done
 
 if [[ "$checked" -eq 0 ]]; then
+    if [[ "$EXPLICIT" -eq 1 ]]; then
+        echo "[FAIL] nothing was compared despite an explicit --platform." >&2
+        exit 1
+    fi
     echo "[OK] no engine+runtime pair selected — nothing to pair (public/stub build)"
 fi

@@ -242,10 +242,15 @@ find_qairt_root() {
         # ever lived beside the engine, "identity matches" would degenerate into
         # hashing a file against a copy of itself -- a check that looks closed and
         # is not. Designed out here rather than left to discipline.
-        local resolved
+        # Both sides physical: REPO_ROOT is built with `pwd`, which keeps symlink
+        # components, so comparing it against a `pwd -P` result would never match
+        # if any parent of the checkout is a symlink -- and this guard would pass
+        # silently, which is the one thing it must never do.
+        local resolved repo_real
         resolved="$(cd "${candidate}" && pwd -P)"
+        repo_real="$(cd "${REPO_ROOT}" && pwd -P)"
         case "${resolved}" in
-            "${REPO_ROOT}/engines/qhexrt/prebuilt/versions/"*)
+            "${repo_real}/engines/qhexrt/prebuilt/versions/"*)
                 echo "error: QAIRT runtime resolved inside the engine payload tree: ${resolved}" >&2
                 return 2 ;;
         esac
