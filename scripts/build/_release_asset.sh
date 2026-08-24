@@ -16,10 +16,12 @@ fetch_release_asset() {
 
     # Every current caller (download-neurt.sh, download-qhexrt.sh,
     # download-qairt-runtime.sh, check_engine_prebuilt_pins.sh) requires a real
-    # NEURUN_TOKEN and exits before reaching here without one -- NeuRT, QHexRT and
-    # the QAIRT runtime are all private assets on the neurun repo. This guard just
-    # avoids ever sending a literally empty Bearer header (GitHub rejects that
-    # outright) if a future caller legitimately has none.
+    # NEURUN_TOKEN (or GH_TOKEN as a fallback -- see each caller's own
+    # TOKEN="${NEURUN_TOKEN:-${GH_TOKEN:-}}") and exits before reaching here
+    # without one -- NeuRT, QHexRT and the QAIRT runtime are all private assets
+    # on the neurun repo. This guard just avoids ever sending a literally empty
+    # Bearer header (GitHub rejects that outright) if a future caller
+    # legitimately has none.
     local auth=()
     [[ -n "$token" ]] && auth=(-H "Authorization: Bearer ${token}")
 
