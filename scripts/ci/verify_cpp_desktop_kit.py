@@ -46,9 +46,11 @@ def main() -> int:
         missing.append("share/runanywhere/SCHEMA_LOCK")
 
     if args.windows:
-        for lib in ("zlibstatic.lib", "bz2_bundled.lib"):
+        for lib in ("zlibstatic.lib", "bz2_bundled.lib", "onnxruntime.lib"):
             if not any(n.endswith(lib) for n in names):
                 missing.append(f"lib/{lib}")
+        if not any(n.replace("\\", "/").endswith("third_party/onnxruntime.dll") for n in names):
+            missing.append("third_party/onnxruntime.dll")
 
     if missing:
         print("kit tarball missing:", file=sys.stderr)

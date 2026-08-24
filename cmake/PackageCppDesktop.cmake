@@ -197,7 +197,8 @@ if(RAC_BINARY_DIR)
         elseif(_n MATCHES "^(libarchive|archive|libutf8_range|utf8_range|libutf8_validity|utf8_validity|libllama-common.*|llama-common.*)\\.(a|lib)$"
            OR _n MATCHES "^libabsl_.*\\.a$"
            OR _n MATCHES "^absl_.*\\.lib$"
-           OR _n MATCHES "^(lib)?(zlibstatic|bz2_bundled)\\.(a|lib)$")
+           OR _n MATCHES "^(lib)?(zlibstatic|bz2_bundled)\\.(a|lib)$"
+           OR _n MATCHES "^onnxruntime\\.lib$")
             file(COPY "${_hit}" DESTINATION "${RAC_KIT_OUT}/lib")
             string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
         endif()

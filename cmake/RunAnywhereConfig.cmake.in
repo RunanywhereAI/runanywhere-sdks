@@ -82,14 +82,16 @@ if(NOT TARGET RunAnywhere::commons)
             endif()
         endif()
     endforeach()
-    # Link only the unversioned ONNX Runtime dylib. Versioned copies
-    # (libonnxruntime.1.dylib, libonnxruntime.1.*.dylib) are Mach-O stubs /
-    # compatibility names and fail with "unsupported mach-o filetype".
-    file(GLOB _kit_dylibs
-        "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.dylib"
-        "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.so"
-        "${RunAnywhere_THIRD_PARTY_DIR}/onnxruntime.dll")
-    list(APPEND _runanywhere_kit_extra ${_kit_dylibs})
+    # Unix: link the unversioned ORT dylib. Versioned copies
+    # (libonnxruntime.1.dylib) are Mach-O stubs and fail to load.
+    # Windows: never pass onnxruntime.dll to link.exe (LNK1107). The import
+    # library is staged as lib/onnxruntime.lib and already in EXTRA_LIBS.
+    if(NOT WIN32)
+        file(GLOB _kit_dylibs
+            "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.dylib"
+            "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.so")
+        list(APPEND _runanywhere_kit_extra ${_kit_dylibs})
+    endif()
     if(_runanywhere_kit_extra)
         set_property(TARGET RunAnywhere::commons APPEND PROPERTY
             INTERFACE_LINK_LIBRARIES ${_runanywhere_kit_extra})
