@@ -254,6 +254,70 @@ std::vector<SearchResult> parse_lite_html(const std::string& html) {
     return results;
 }
 
+std::string strip_non_content_elements(const std::string& html) {
+    // `<script>` and `<style>` bodies are not content, and removing only their
+    // tags leaves the JavaScript and CSS behind as text. `<noscript>` and
+    // comments go for the same reason.
+    static const char* kDropped[] = {"script", "style", "noscript", "template", "svg"};
+    std::string out = html;
+    for (const auto* element : kDropped) {
+        const std::string open = std::string("<") + element;
+        const std::string close = std::string("</") + element;
+        size_t at = 0;
+        while ((at = ifind(out, open, at)) != std::string::npos) {
+            const size_t end = ifind(out, close, at);
+            if (end == std::string::npos) {
+                out.erase(at);
+                break;
+            }
+            const size_t after = out.find('>', end);
+            out.erase(at, (after == std::string::npos ? out.size() : after + 1) - at);
+        }
+    }
+    size_t comment = 0;
+    while ((comment = out.find("<!--", comment)) != std::string::npos) {
+        const size_t end = out.find("-->", comment);
+        if (end == std::string::npos) {
+            out.erase(comment);
+            break;
+        }
+        out.erase(comment, end + 3 - comment);
+    }
+    return out;
+}
+
+std::string fetch_page_text(const std::string& url, size_t max_bytes, int32_t timeout_ms) {
+    if (url.empty() || rac_http_transport_is_registered() == RAC_FALSE) {
+        return {};
+    }
+    rac_http_client_t* client = nullptr;
+    if (rac_http_client_create(&client) != RAC_SUCCESS || client == nullptr) {
+        return {};
+    }
+
+    const rac_http_header_kv_t headers[] = {{"User-Agent", kUserAgent}, {"Accept", "text/html"}};
+    rac_http_request_t request{};
+    request.method = "GET";
+    request.url = url.c_str();
+    request.headers = headers;
+    request.header_count = 2;
+    request.timeout_ms = timeout_ms;
+    request.follow_redirects = RAC_TRUE;
+
+    rac_http_response_t response{};
+    const rac_result_t rc = rac_http_request_send(client, &request, &response);
+    std::string text;
+    if (rc == RAC_SUCCESS && response.status >= 200 && response.status < 300 &&
+        response.body_bytes != nullptr) {
+        const size_t len = std::min(response.body_len, max_bytes);
+        const std::string body(reinterpret_cast<const char*>(response.body_bytes), len);
+        text = strip_tags(strip_non_content_elements(body));
+    }
+    rac_http_response_free(&response);
+    rac_http_client_destroy(client);
+    return text;
+}
+
 std::string results_page_url(const std::string& query) {
     return std::string(kResultsUrl) + percent_encode(query);
 }

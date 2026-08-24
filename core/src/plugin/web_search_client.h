@@ -20,6 +20,8 @@ struct SearchResult {
     std::string title;
     std::string url;
     std::string snippet;
+    /// Readable page text, once the source has been fetched. Empty until then.
+    std::string body;
 };
 
 struct SearchOutcome {
@@ -39,6 +41,29 @@ SearchOutcome search(const std::string& query, size_t max_results, int32_t timeo
 
 /** @brief The `lite.duckduckgo.com` results page for `query`, for citation. */
 std::string results_page_url(const std::string& query);
+
+/**
+ * @brief Fetch `url` and return its readable text.
+ *
+ * A search snippet is one or two sentences, which is enough to rank a result
+ * and not enough to answer from. This reads the page behind the link so the
+ * model has the actual material.
+ *
+ * Returns an empty string when the fetch fails, the response is not HTML, or
+ * the page yields nothing readable — a source that cannot be read is skipped,
+ * never fatal. `max_bytes` caps what is pulled off the wire, since research
+ * runs on phones and some pages are enormous.
+ */
+std::string fetch_page_text(const std::string& url, size_t max_bytes, int32_t timeout_ms);
+
+/**
+ * @brief Strip script and style *bodies* before their tags are removed.
+ *
+ * `strip_tags` alone deletes `<script>` and keeps everything between it and
+ * `</script>`, which turns a modern page into a wall of JavaScript. Exposed
+ * for tests.
+ */
+std::string strip_non_content_elements(const std::string& html);
 
 // Exposed for tests.
 std::vector<SearchResult> parse_lite_html(const std::string& html);

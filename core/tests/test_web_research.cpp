@@ -153,8 +153,38 @@ void test_empty_and_junk() {
           "results page url is encoded");
 }
 
+void test_page_content_extraction() {
+    std::printf("[7] page text extraction\n");
+    const std::string page =
+        "<html><head><title>T</title>"
+        "<style>body{color:red}</style>"
+        "<script>var x = 1; if (x < 2) { alert('hi'); }</script>"
+        "</head><body>"
+        "<!-- a comment -->"
+        "<h1>The headline</h1><p>The first paragraph.</p>"
+        "<noscript>Enable JavaScript</noscript>"
+        "</body></html>";
+    const std::string text = web::strip_tags(web::strip_non_content_elements(page));
+
+    CHECK(text.find("The headline") != std::string::npos, "content kept");
+    CHECK(text.find("The first paragraph.") != std::string::npos, "paragraph kept");
+    // The reason this function exists: strip_tags alone deletes <script> and
+    // keeps the JavaScript between it and </script>.
+    CHECK(text.find("alert") == std::string::npos, "script body removed");
+    CHECK(text.find("var x") == std::string::npos, "script source removed");
+    CHECK(text.find("color:red") == std::string::npos, "style body removed");
+    CHECK(text.find("a comment") == std::string::npos, "comment removed");
+    CHECK(text.find("Enable JavaScript") == std::string::npos, "noscript removed");
+
+    CHECK(web::strip_non_content_elements("<script>unclosed").find("unclosed") == std::string::npos,
+          "an unclosed script does not leak");
+    CHECK(web::fetch_page_text("", 1024, 100).empty(), "an empty url reads as nothing");
+    CHECK(web::fetch_page_text("https://example.com", 1024, 100).empty(),
+          "no transport reads as nothing");
+}
+
 void test_registration() {
-    std::printf("[7] registration\n");
+    std::printf("[8] registration\n");
     CHECK(rac_tool_web_research_register() == RAC_SUCCESS, "registered");
     const rac_tool_provider_t* provider = rac_tool_provider_find("web_research");
     CHECK(provider != nullptr, "found in the registry");
@@ -203,7 +233,7 @@ json run_tool(const char* args) {
 }
 
 void test_no_transport_is_reported() {
-    std::printf("[8] no HTTP transport: reported, not hung\n");
+    std::printf("[9] no HTTP transport: reported, not hung\n");
     const json result = run_tool(R"({"question":"what shipped in Swift 6.2"})");
     CHECK(result.contains("error"), "an error is reported");
     if (result.contains("error")) {
@@ -216,7 +246,7 @@ void test_no_transport_is_reported() {
 }
 
 void test_missing_question_rejected() {
-    std::printf("[9] a call with no question\n");
+    std::printf("[10] a call with no question\n");
     const json result = run_tool(R"({})");
     CHECK(result.value("error", std::string()) == "missing question", "rejected up front");
 
@@ -253,6 +283,7 @@ int main() {
     test_parse_results();
     test_missing_snippet_does_not_steal();
     test_empty_and_junk();
+    test_page_content_extraction();
     test_registration();
     test_no_transport_is_reported();
     test_missing_question_rejected();
