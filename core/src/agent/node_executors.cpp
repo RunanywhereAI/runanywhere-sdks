@@ -146,7 +146,7 @@ bool parse_wav(const std::string& bytes, WavPcm* out) {
                (static_cast<uint32_t>(raw[at + 3]) << 24);
     };
 
-    if (bytes.size() < 44 || bytes.compare(0, 4, "RIFF") != 0 || bytes.compare(8, 4, "WAVE") != 0)
+    if (bytes.size() < 44 || !bytes.starts_with("RIFF") || bytes.compare(8, 4, "WAVE") != 0)
         return false;
 
     uint16_t format_tag = 0;
@@ -183,12 +183,12 @@ bool parse_wav(const std::string& bytes, WavPcm* out) {
 }
 
 std::string sniff_image_mime(const std::string& bytes) {
-    if (bytes.size() >= 8 && bytes.compare(0, 8, "\x89PNG\r\n\x1a\n") == 0)
+    if (bytes.size() >= 8 && bytes.starts_with("\x89PNG\r\n\x1a\n"))
         return "image/png";
     if (bytes.size() >= 3 && static_cast<uint8_t>(bytes[0]) == 0xFF &&
         static_cast<uint8_t>(bytes[1]) == 0xD8 && static_cast<uint8_t>(bytes[2]) == 0xFF)
         return "image/jpeg";
-    if (bytes.size() >= 12 && bytes.compare(0, 4, "RIFF") == 0 && bytes.compare(8, 4, "WEBP") == 0)
+    if (bytes.size() >= 12 && bytes.starts_with("RIFF") && bytes.compare(8, 4, "WEBP") == 0)
         return "image/webp";
     return "";
 }
@@ -1391,7 +1391,7 @@ rac_result_t run_http_request(const WorkflowNode& node, const ExpressionContext&
     std::string url;
     if (!resolve(config.url(), context, &url, out_error))
         return RAC_ERROR_INVALID_CONFIGURATION;
-    if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0) {
+    if (!url.starts_with("http://") && !url.starts_with("https://")) {
         *out_error = "HTTP node needs an absolute http:// or https:// URL";
         return RAC_ERROR_INVALID_CONFIGURATION;
     }

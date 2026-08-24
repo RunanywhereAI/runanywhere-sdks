@@ -551,13 +551,12 @@ TEST(bundle_assembles_packs_referenced_transitively) {
     nested->mutable_pack_node()->set_pack_id("pack-b");
 
     const std::unordered_map<std::string, NodePack> packs = {{"pack-a", pack_a},
-                                                              {"pack-b", pack_b}};
+                                                             {"pack-b", pack_b}};
     const WorkflowDocument document = document_with_pack_node("pack-a");
 
     WorkflowBundle bundle;
     std::string error;
-    const rac_result_t status =
-        assemble_bundle({document}, loader_over(packs), &bundle, &error);
+    const rac_result_t status = assemble_bundle({document}, loader_over(packs), &bundle, &error);
 
     CHECK(status == RAC_SUCCESS);
     CHECK(bundle.workflows_size() == 1);
@@ -571,8 +570,7 @@ TEST(bundle_assembly_skips_a_pack_it_cannot_load) {
 
     WorkflowBundle bundle;
     std::string error;
-    const rac_result_t status =
-        assemble_bundle({document}, loader_over(packs), &bundle, &error);
+    const rac_result_t status = assemble_bundle({document}, loader_over(packs), &bundle, &error);
 
     CHECK(status == RAC_SUCCESS);
     CHECK(bundle.workflows_size() == 1);
@@ -601,13 +599,12 @@ TEST(bundle_assembly_rejects_a_pack_cycle) {
     ref_a->mutable_pack_node()->set_pack_id("pack-a");
 
     const std::unordered_map<std::string, NodePack> packs = {{"pack-a", pack_a},
-                                                              {"pack-b", pack_b}};
+                                                             {"pack-b", pack_b}};
     const WorkflowDocument document = document_with_pack_node("pack-a");
 
     WorkflowBundle bundle;
     std::string error;
-    const rac_result_t status =
-        assemble_bundle({document}, loader_over(packs), &bundle, &error);
+    const rac_result_t status = assemble_bundle({document}, loader_over(packs), &bundle, &error);
 
     CHECK(status != RAC_SUCCESS);
     CHECK(error.find("cyclic") != std::string::npos);
