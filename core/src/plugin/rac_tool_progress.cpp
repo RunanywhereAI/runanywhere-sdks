@@ -72,11 +72,13 @@ namespace rac::plugin {
 
 ToolProgressScope::ToolProgressScope(std::string tool_name, uint64_t run_loop_handle,
                                      std::function<bool()> is_cancelled,
-                                     const std::vector<std::string>& history)
+                                     const std::vector<std::string>& history,
+                                     std::string user_prompt)
     : tool_name_(std::move(tool_name)),
       run_loop_handle_(run_loop_handle),
       is_cancelled_(std::move(is_cancelled)),
-      history_(history) {
+      history_(history),
+      user_prompt_(std::move(user_prompt)) {
     context_.emit = &ToolProgressScope::emit_thunk;
     context_.is_cancelled = &ToolProgressScope::cancelled_thunk;
     context_.state = this;
@@ -87,6 +89,7 @@ ToolProgressScope::ToolProgressScope(std::string tool_name, uint64_t run_loop_ha
     }
     context_.history = history_ptrs_.empty() ? nullptr : history_ptrs_.data();
     context_.n_history = static_cast<int32_t>(history_ptrs_.size());
+    context_.user_prompt = user_prompt_.empty() ? nullptr : user_prompt_.c_str();
 }
 
 bool ToolProgressScope::cancelled() const {

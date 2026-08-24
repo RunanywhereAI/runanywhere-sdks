@@ -39,7 +39,7 @@ namespace rac::llm::tool_calling {
  */
 bool execute_via_provider(const runanywhere::v1::ToolCall& call, uint64_t run_loop_handle,
                           std::function<bool()> is_cancelled,
-                          const std::vector<std::string>& history,
+                          const std::vector<std::string>& history, const std::string& user_prompt,
                           runanywhere::v1::ToolResult* out_result);
 
 /** @brief Whether a commons provider owns `name`. */

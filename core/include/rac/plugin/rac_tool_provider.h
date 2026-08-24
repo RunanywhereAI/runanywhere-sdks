@@ -85,6 +85,18 @@ struct rac_tool_context {
     const char* const* history;
     int32_t n_history;
 
+    /**
+     * The user's message for this turn, verbatim. NULL outside a conversation.
+     *
+     * A tool whose whole job is "answer this question" should not depend on
+     * the model correctly copying the question into an argument. Small models
+     * routinely call with no arguments at all, and telling them to try again
+     * does not work — they report the error instead of retrying. The question
+     * is already known here, so a tool can fall back to it and get on with
+     * the work.
+     */
+    const char* user_prompt;
+
     /** Commons-owned. Opaque to providers. */
     void* state;
 };

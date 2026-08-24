@@ -296,7 +296,14 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
         return RAC_SUCCESS;
     }
 
-    const std::string question = trim(string_field(args, "question"));
+    // The model is meant to pass the question, and small ones routinely call
+    // with no arguments at all. The question is already known here, so fall
+    // back to it rather than asking the model to try again — telling it to
+    // retry does not work, it reports the error as its answer instead.
+    std::string question = trim(string_field(args, "question"));
+    if (question.empty() && ctx->user_prompt != nullptr) {
+        question = trim(ctx->user_prompt);
+    }
     if (question.empty()) {
         *out_result_json =
             dup_c(error_payload("No question was supplied. Call web_research again with the user's "

@@ -869,7 +869,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                     [cancel_state]() {
                         return cancel_state->cancel_requested.load(std::memory_order_acquire);
                     },
-                    ctx.generation.history, &tool_result);
+                    ctx.generation.history, ctx.user_prompt, &tool_result);
             }
             if (provider_admitted &&
                 cancel_state->cancel_requested.load(std::memory_order_acquire)) {
