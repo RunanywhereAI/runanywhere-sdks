@@ -15,7 +15,7 @@ lives where it does) is [`scripts/README.md`](README.md); don't duplicate its ta
 | `release/` | version bump, artifact validation, npm/consumer-app publish helpers (see below) | `README.md` |
 | `setup/` | `doctor.sh`, `setup.sh`, `setup-toolchain.sh`, `detect-mode.sh`, `sync-skills.sh` | `README.md` |
 | `validation/` | CI gates (`gates/`), C++ commons checks (`commons/`), the seven-lane e2e harness (`e2e/`), plus root-level `verify_default_pool.sh` (cross-language default-value parity check) | [`validation/README.md`](validation/README.md) |
-| `ci/` | `oss_keyless_telemetry_blast.sh` — keyless OSS→staging telemetry smoke test (rcli build + assert all 12 modalities stored) | — |
+| `ci/` | `verify_cpp_desktop_kit.py` — kit tarball contract (proto headers, SCHEMA_LOCK, Windows zlibstatic/bz2). `oss_keyless_telemetry_blast.sh` is retired (CLI lives in RunanywhereAI/RCLI). | — |
 | `models/` | empty on this branch — a BigVGAN ONNX exporter and a Parakeet CTC prep script have existed here on other commits/branches; a stale `__pycache__` from one of those checkouts may linger locally and is safe to delete | — |
 
 ## Path resolution: every script derives repo root from its own location, never cwd

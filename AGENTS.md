@@ -183,7 +183,7 @@ per SDK — useful when porting a fix across SDKs — lives in
 
 The root `CMakeLists.txt` (version from `core/VERSION`) is the single entry point for
 native builds; `CMakePresets.json` defines `macos-{debug,release}`, `linux-{debug,release,asan}`,
-`ios-{device,simulator}`, `android-arm64`, `wasm`, and the `rcli-*`/`windows-*` presets.
+`ios-{device,simulator}`, `android-arm64`, `wasm`, `cpp-desktop-*`, and the `windows-*` presets.
 
 ```bash
 cmake --preset macos-debug && cmake --build build/macos-debug && ctest --preset macos-debug

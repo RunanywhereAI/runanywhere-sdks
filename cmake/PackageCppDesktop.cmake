@@ -196,7 +196,8 @@ if(RAC_BINARY_DIR)
             string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_dst};")
         elseif(_n MATCHES "^(libarchive|archive|libutf8_range|utf8_range|libutf8_validity|utf8_validity|libllama-common.*|llama-common.*)\\.(a|lib)$"
            OR _n MATCHES "^libabsl_.*\\.a$"
-           OR _n MATCHES "^absl_.*\\.lib$")
+           OR _n MATCHES "^absl_.*\\.lib$"
+           OR _n MATCHES "^(lib)?(zlibstatic|bz2_bundled)\\.(a|lib)$")
             file(COPY "${_hit}" DESTINATION "${RAC_KIT_OUT}/lib")
             string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
         endif()
@@ -221,6 +222,24 @@ elseif(WIN32)
                 endif()
             endforeach()
             break()
+        endif()
+    endforeach()
+    # rac_commons PUBLIC-links these by bare filename on MSVC. vcpkg zlib.lib
+    # does not satisfy a zlibstatic.lib DEFAULTLIB / unresolved reference.
+    foreach(_need IN ITEMS zlibstatic.lib bz2_bundled.lib)
+        if(NOT EXISTS "${RAC_KIT_OUT}/lib/${_need}")
+            file(GLOB_RECURSE _hits "${RAC_BINARY_DIR}/${_need}")
+            if(_hits)
+                list(GET _hits 0 _found)
+                file(COPY "${_found}" DESTINATION "${RAC_KIT_OUT}/lib")
+                string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_need};")
+            endif()
+        endif()
+        if(NOT EXISTS "${RAC_KIT_OUT}/lib/${_need}")
+            message(FATAL_ERROR
+                "PackageCppDesktop: Windows kit missing ${_need} "
+                "(rac_commons PUBLIC-links zlibstatic and bz2_bundled). "
+                "Searched ${RAC_BINARY_DIR}.")
         endif()
     endforeach()
 else()
