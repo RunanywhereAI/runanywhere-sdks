@@ -1,0 +1,65 @@
+{
+  "_comment": [
+    "The QAIRT/QNN runtime files RunAnywhere redistributes with the QHexRT engine.",
+    "RunAnywhere is an authorized Qualcomm partner; these are shipped under that agreement.",
+    "",
+    "THIS IS THE SINGLE SOURCE OF TRUTH for that file list. It previously lived in four",
+    "places that had already diverged: build-core-android.sh's qnn_host_libs/qnn_skel_libs,",
+    "bindings/kotlin/scripts/package-qhexrt.sh's QHEXRT_HOST_LIBS/QHEXRT_SKEL_LIBS, the",
+    "Electron flat staging dir, and the per-SDK jniLibs. A file added to one and not the",
+    "others fails a build with a name the other lists never mention.",
+    "",
+    "Paths are relative to a QAIRT SDK root (the directory containing sdk.yaml).",
+    "The engine compiles against QAIRT HEADERS ONLY and dlopens these at runtime, so",
+    "shipping them beside the engine is packaging, not linking."
+  ],
+  "identity_file": "sdk.yaml",
+  "notices": ["NOTICE.txt", "QNN_NOTICE.txt", "LICENSE.pdf"],
+  "platforms": {
+    "arm64-v8a": {
+      "_comment": [
+        "QAIRT-ROOT-SHAPED: build-core-android.sh reads lib/aarch64-android/ and",
+        "lib/hexagon-v<N>/unsigned/ from a QAIRT root and verifies identity by hashing",
+        "<root>/sdk.yaml. The layout and sdk.yaml are both load-bearing.",
+        "Skels are extracted on device and reached via ADSP_LIBRARY_PATH, so they stay",
+        "in their own directories rather than being flattened."
+      ],
+      "layout": "qairt-root",
+      "files": [
+        "lib/aarch64-android/libQnnHtp.so",
+        "lib/aarch64-android/libQnnHtpNetRunExtensions.so",
+        "lib/aarch64-android/libQnnHtpPrepare.so",
+        "lib/aarch64-android/libQnnSystem.so",
+        "lib/aarch64-android/libQnnHtpV75CalculatorStub.so",
+        "lib/aarch64-android/libQnnHtpV75Stub.so",
+        "lib/aarch64-android/libQnnHtpV79CalculatorStub.so",
+        "lib/aarch64-android/libQnnHtpV79Stub.so",
+        "lib/aarch64-android/libQnnHtpV81CalculatorStub.so",
+        "lib/aarch64-android/libQnnHtpV81Stub.so",
+        "lib/hexagon-v75/unsigned/libQnnHtpV75Skel.so",
+        "lib/hexagon-v79/unsigned/libQnnHtpV79Skel.so",
+        "lib/hexagon-v81/unsigned/libQnnHtpV81Skel.so"
+      ]
+    },
+    "win-arm64": {
+      "_comment": [
+        "FLAT, and that is not a convenience: Windows has no ADSP_LIBRARY_PATH, so the",
+        "loader resolves the HTP stub's dependencies through the DLL's own directory and",
+        "every file must sit in ONE directory.",
+        "The .cat catalog is MANDATORY -- without it the skel fails signature verification",
+        "and the error never names the catalog.",
+        "Consumed via RA_QNN_RUNTIME_DIR by bindings/electron/scripts/bundle-native.ts."
+      ],
+      "layout": "flat",
+      "files": [
+        "lib/aarch64-windows-msvc/QnnHtp.dll",
+        "lib/aarch64-windows-msvc/QnnSystem.dll",
+        "lib/aarch64-windows-msvc/QnnHtpPrepare.dll",
+        "lib/aarch64-windows-msvc/QnnHtpV81Stub.dll",
+        "lib/aarch64-windows-msvc/QnnHtpV81CalculatorStub.dll",
+        "lib/hexagon-v81/unsigned/libQnnHtpV81Skel.so",
+        "lib/hexagon-v81/unsigned/libqnnhtpv81.cat"
+      ]
+    }
+  }
+}

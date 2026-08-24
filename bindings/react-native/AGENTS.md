@@ -23,7 +23,7 @@ target-state design note (missing `mlx`/`qhexrt`) — prefer this file and the t
 | `packages/llamacpp` | `@runanywhere/llamacpp` | LlamaCPP backend registration (GGUF LLM + VLM) |
 | `packages/mlx` | `@runanywhere/mlx` | Apple MLX backend registration (LLM, VLM, speech, embeddings; physical iOS devices only) |
 | `packages/onnx` | `@runanywhere/onnx` | ONNX/Sherpa backend registration (STT, TTS, VAD) |
-| `packages/qhexrt` | `@runanywhere/qhexrt` | Qualcomm Hexagon NPU backend, Android-only, **private** — public `package-sdk.sh` runs never ship it (see Packaging below) |
+| `packages/qhexrt` | `@runanywhere/qhexrt` | Qualcomm Hexagon NPU backend, Android-only. **Published publicly on npm** (it carries the Qualcomm QAIRT runtime), but a default `package-sdk.sh` run does NOT stage it; that needs `--include-private-qhexrt` (see Packaging below) |
 
 Workspace dependency `../proto-ts` (`@runanywhere/proto-ts`) supplies protobuf-generated
 TS types.
@@ -217,5 +217,5 @@ The example sets `installConfig.hoistingLimits: "workspaces"`, so its deps stay 
 - **ESLint**: `@typescript-eslint/recommended` + `prettier`, `no-console: error`, `no-explicit-any: error`
 - **Prettier**: single quotes, 2-space indent, es5 trailing commas
 - **SwiftLint** (`.swiftlint.yml`, `packages/{core,llamacpp,onnx}/ios` only — mlx/qhexrt have no iOS side): `print()`, `NSLog()`, `os_log()`, `debugPrint()`, `Logger` are all banned as lint errors; use `SDKLogger`
-- **Versioning**: core + backend packages share one semver (currently `0.20.25`), managed by Lerna with conventional commits
+- **Versioning**: core + backend packages share one semver (currently `0.20.26`), managed by Lerna with conventional commits
 - **Package naming**: Kotlin Nitro-generated code uses namespace `com.margelo.nitro.runanywhere.*`

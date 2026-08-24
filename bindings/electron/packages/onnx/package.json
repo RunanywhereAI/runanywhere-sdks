@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/electron-onnx",
-  "version": "0.20.25",
+  "version": "0.20.26",
   "description": "RunAnywhere Electron SDK — ONNX backend plugin (embeddings / segmentation)",
   "publishConfig": {
     "access": "public"

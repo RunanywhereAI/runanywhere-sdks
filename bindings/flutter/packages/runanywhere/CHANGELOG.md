@@ -5,6 +5,20 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.26] - 2026-08-23
+
+### Changed
+
+- The Apple Neural Engine (NeuRT) and Hexagon NPU (QHexRT) engines now ship from
+  pinned, prebuilt archives published by the engine repository rather than being
+  compiled from private source. Each archive is verified by SHA-256 and by a build
+  receipt naming the plugin ABI version it was built against, so an engine built
+  against a different ABI is refused at download time instead of relinking cleanly
+  and corrupting dispatch at runtime.
+- No Flutter-facing API change. The effect is on provenance: the Apple xcframework
+  and the Android `arm64-v8a` payload this package depends on are now traceable to a
+  published artifact and its checksum.
+
 ## [0.20.25] - 2026-08-21
 
 ### Changed

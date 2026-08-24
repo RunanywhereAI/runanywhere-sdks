@@ -14,9 +14,14 @@ fetch_release_asset() {
     local repo="$1" tag="$2" name="$3" dest="$4" token="$5" py="$6"
     local api="https://api.github.com/repos/${repo}"
 
+    # An empty token is legitimate: the QAIRT runtime assets are public. Passing an
+    # empty Bearer header makes GitHub reject the request outright, so omit it.
+    local auth=()
+    [[ -n "$token" ]] && auth=(-H "Authorization: Bearer ${token}")
+
     local meta; meta="$(mktemp)"
     if ! curl -sSL --fail-with-body \
-            -H "Authorization: Bearer ${token}" \
+            "${auth[@]}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             -o "$meta" "${api}/releases/tags/${tag}"; then
@@ -46,7 +51,7 @@ PY
     mkdir -p "$dest"
     # octet-stream is what returns the bytes; the default Accept returns JSON.
     if ! curl -sSL --fail-with-body \
-            -H "Authorization: Bearer ${token}" \
+            "${auth[@]}" \
             -H "Accept: application/octet-stream" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             -o "${dest}/${name}" "${api}/releases/assets/${asset_id}"; then

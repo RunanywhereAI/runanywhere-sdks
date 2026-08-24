@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.25")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.26")
 //
 //   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
 //   the first one is fatal:
@@ -120,7 +120,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 // republished carrying Windows x64 and ARM64 natives, and 0.20.22 fixes their
 // packaging; none of v0.20.20, v0.20.21 or v0.20.22 exists as a tag with
 // release assets, so the remote binaryTargets must keep resolving 0.20.19.
-let sdkVersion = "0.20.25"
+let sdkVersion = "0.20.26"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]

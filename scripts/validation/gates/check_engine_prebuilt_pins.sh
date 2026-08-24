@@ -118,10 +118,22 @@ expect_requires "rcli macOS (asserts neurt registers)" \
 # Android: QHexRT .so is staged into all three Android SDKs from one build.
 expect_requires "android packaging (QHexRT jniLibs, all 3 SDKs)" \
     "scripts/build/build-core-android.sh" "KOTLIN_QHEXRT_DEST"
-# Single-quoted: the pattern must reach grep literally. Double quotes would let
-# bash expand $jni here and abort under `set -u`.
-expect_requires "android release asserts the QHexRT carrier is routable" \
-    ".github/workflows/release.yml" 'check_plugin_natives.py "$jni"'
+# The routability signal for Android is the marker the ENGINE embeds, not
+# check_plugin_natives.py. That tool looks for a carrier (librunanywhere_<id>)
+# with undefined ops symbols; the Android qhexrt build produces no such carrier,
+# so it printed "nothing to verify" and exited 0 -- a vacuous pass that would let
+# an engine-less Android build ship. Single-quoted so the pattern reaches grep
+# literally rather than being expanded here.
+expect_requires "android release asserts the QHexRT engine is routable" \
+    ".github/workflows/release.yml" 'grep -aFq "qhexrt:engine-available"'
+# The engine is useless without the runtime it dlopens, so the release must fetch
+# the pinned QAIRT redistributables and prove they pair with this engine.
+expect_requires "android release fetches the pinned QAIRT runtime" \
+    ".github/workflows/release.yml" "download-qairt-runtime.sh --platform arm64-v8a"
+expect_requires "android release checks the QAIRT/engine pairing" \
+    ".github/workflows/release.yml" "check_qairt_pairing.sh --platform arm64-v8a"
+expect_requires "electron win-arm64 fetches the pinned QAIRT runtime" \
+    ".github/workflows/electron-native-package.yml" "download-qairt-runtime.sh --platform win-arm64"
 
 # No consumer may point at a hand-staged payload by absolute path again.
 echo "== no hand-staged payload paths =="
