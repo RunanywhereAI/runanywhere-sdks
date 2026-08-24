@@ -39,6 +39,7 @@
 #include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
 #include "features/llm/tool_provider_dispatch.h"
+#include "rac/plugin/rac_tool_provider.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -557,6 +558,39 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     for (const auto& tool : req_options.tools()) {
         *ctx.tool_options.add_tools() = tool;
     }
+
+    // Offer every tool registered in commons alongside the host's own. Without
+    // this a provider is dispatchable but invisible: the model is never told it
+    // exists, so it never calls it and picks whichever host tool looks closest.
+    // Doing it here rather than in each binding is the whole point of the
+    // provider registry — Kotlin and Web get the same tools with no tool code.
+    // A host tool of the same name wins, so an app can still override.
+    for (size_t i = 0; i < rac_tool_provider_count(); ++i) {
+        const rac_tool_provider_t* provider = rac_tool_provider_at(i);
+        if (provider == nullptr || provider->name == nullptr) {
+            continue;
+        }
+        const std::string name = provider->name;
+        bool already_offered = false;
+        for (const auto& tool : ctx.tool_options.tools()) {
+            if (tool.name() == name) {
+                already_offered = true;
+                break;
+            }
+        }
+        if (already_offered) {
+            continue;
+        }
+        auto* offered = ctx.tool_options.add_tools();
+        offered->set_name(name);
+        offered->set_description(provider->description != nullptr ? provider->description : "");
+        offered->set_parameters(provider->parameters_json != nullptr ? provider->parameters_json
+                                                                     : "{}");
+        if (provider->category != nullptr) {
+            offered->set_category(provider->category);
+        }
+    }
+
     std::string tool_choice_error;
     if (!apply_explicit_tool_choice(&ctx, &tool_choice_error)) {
         emit_failure(out_result, RAC_ERROR_INVALID_ARGUMENT, tool_choice_error);
