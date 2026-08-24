@@ -55,13 +55,11 @@ constexpr int32_t kComposeTokens = 640;
 // Directive rather than descriptive: under AUTO tool choice this text is the
 // only thing deciding whether the model calls the tool at all.
 constexpr const char* kDescription =
-    "Researches a question on the live web. Plans several sub-questions, searches each one, "
-    "reads the results and answers from them with sources. Call this whenever the question "
-    "needs information that could have changed after your training data, or that you are not "
-    "certain about: current events, news, today's date or anything 'latest'/'current'/"
-    "'recent', prices, scores, release dates, or facts about people, products or versions "
-    "newer than your knowledge. Do not call it for general knowledge, definitions, maths, or "
-    "anything you already know with confidence.";
+    "Searches the live web and answers from what it finds, with sources. Use it for anything "
+    "current or time-sensitive: news, today's events, prices, scores, schedules, releases, or "
+    "any question about what is happening now or recently. It is the only way to reach "
+    "information newer than your training data, so reach for it rather than saying you cannot "
+    "know.";
 
 // One property, and a required one. An earlier version also advertised
 // `max_questions` and `clarification`, and a small model handed three
