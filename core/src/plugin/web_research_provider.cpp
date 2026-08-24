@@ -53,7 +53,6 @@ constexpr int32_t kSearchTimeoutMs = 15000;
 // Deliberately small. A cancel arriving mid-tool is only observed at the next
 // stage boundary, so per-stage token budgets are also the worst case for how
 // long a cancel waits.
-constexpr int32_t kQueryTokens = 64;
 constexpr int32_t kComposeTokens = 640;
 
 // Directive rather than descriptive: under AUTO tool choice this text is the
@@ -186,40 +185,23 @@ bool generate(const std::string& system_prompt, const std::string& prompt, int32
 // --- stages ----------------------------------------------------------------
 
 /**
- * Turn the request into one search query.
+ * The search query is the user's question, verbatim.
  *
- * This used to plan several sub-questions and search each. It never worked:
- * the model spent its whole budget reasoning and returned nothing, so every
- * run fell back to a single search anyway — while paying for the extra
- * generation and giving the model another chance to invent something. One
- * query, and the user's own words when the model gives nothing usable.
+ * There used to be a generation here that "turned the request into a search
+ * query". It was the single worst thing in this tool. Asked for a query, a
+ * small model answers the question instead — a real MLX run turned "What is
+ * the latest news about Apple today?" into "Apple today's latest news is about
+ * the new iPhone 15 Pro Max with 4K Ultra HD display and 200W charging", which
+ * is invented, and that invention became the search string. Every page read
+ * after it was about a product that does not exist, so the sources genuinely
+ * supported the fabrication and the answer looked researched.
+ *
+ * No filter catches that: it is a well-formed sentence of ordinary length.
+ * The only fix is to not let a model near the query. The user's own words are
+ * a good search string and cannot be hallucinated, and the verbatim fallback
+ * was already what produced every correct result this tool has returned.
  */
 std::string plan_query(const std::string& question) {
-    std::string reply;
-    const bool ok = generate(
-        "You turn a request into one web search query. Reply with the query and nothing "
-        "else: no commentary, no quotes, no explanation, one line.",
-        "Request: " + question + "\n\nSearch query:", kQueryTokens, &reply);
-    if (!ok) {
-        return question;
-    }
-
-    reply = rac::tools::web::strip_reasoning_block(reply);
-    size_t start = 0;
-    while (start <= reply.size()) {
-        const size_t nl = reply.find('\n', start);
-        const std::string line = rac::tools::web::normalize_query_line(
-            reply.substr(start, nl == std::string::npos ? std::string::npos : nl - start));
-        if (rac::tools::web::query_is_usable(line)) {
-            return line;
-        }
-        if (nl == std::string::npos) {
-            break;
-        }
-        start = nl + 1;
-    }
-    // The question as asked is a perfectly good query, and a far better one
-    // than anything salvaged out of a reply that failed every check.
     return question;
 }
 

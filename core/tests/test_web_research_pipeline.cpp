@@ -332,8 +332,40 @@ void test_pipeline_end_to_end() {
     CHECK(g_requests.size() == 4, "one search and three page fetches");
 }
 
+// The worst bug this tool had, pinned so it cannot return.
+//
+// A generation used to sit between the question and the search, nominally to
+// "turn the request into a search query". Asked for a query, a small model
+// answers the question instead: a real MLX run searched for "Apple today's
+// latest news is about the new iPhone 15 Pro Max with 4K Ultra HD display and
+// 200W charging". Everything downstream then worked perfectly on a fabricated
+// premise, which is far worse than failing outright.
+void test_query_is_the_users_words() {
+    std::printf("[6] the search query is the question, never a generated one\n");
+    const std::string question = "What is the latest news about Apple today?";
+    const json result = run_tool(question);
+
+    CHECK(result.value("query", std::string()) == question,
+          "the query searched is the question verbatim");
+
+    bool searched_the_question = false;
+    for (const auto& request : g_requests) {
+        if (request.url.find("duckduckgo.com/lite") == std::string::npos) {
+            continue;
+        }
+        // Percent-encoded, so match on a distinctive fragment of the question.
+        searched_the_question =
+            request.url.find("latest%20news%20about%20Apple") != std::string::npos;
+    }
+    CHECK(searched_the_question, "the question itself went to the search engine");
+
+    const Stage* understood = find_stage("understanding", RAC_TOOL_PROGRESS_COMPLETED);
+    CHECK(understood != nullptr && understood->detail == question,
+          "the reported query matches what was asked");
+}
+
 void test_no_results_is_honest() {
-    std::printf("[5] a search with nothing to find says so\n");
+    std::printf("[7] a search with nothing to find says so\n");
     const json result = run_tool("");
     CHECK(result.value("error", std::string()).find("Call web_research again") != std::string::npos,
           "empty question rejected");
@@ -348,6 +380,7 @@ int main() {
     test_scrape_step();
     test_evidence_step();
     test_pipeline_end_to_end();
+    test_query_is_the_users_words();
     test_no_results_is_honest();
     std::printf("=== %d checks, %d failed ===\n", g_test_count, g_fail_count);
     return g_fail_count == 0 ? 0 : 1;
