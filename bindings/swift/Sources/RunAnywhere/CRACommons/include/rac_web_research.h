@@ -1,0 +1,6 @@
+#ifndef RAC_SWIFT_RAC_WEB_RESEARCH_FORWARDER_H
+#define RAC_SWIFT_RAC_WEB_RESEARCH_FORWARDER_H
+
+#include "rac/plugin/rac_web_research.h"
+
+#endif  // RAC_SWIFT_RAC_WEB_RESEARCH_FORWARDER_H
