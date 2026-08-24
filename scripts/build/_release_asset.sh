@@ -14,8 +14,12 @@ fetch_release_asset() {
     local repo="$1" tag="$2" name="$3" dest="$4" token="$5" py="$6"
     local api="https://api.github.com/repos/${repo}"
 
-    # An empty token is legitimate: the QAIRT runtime assets are public. Passing an
-    # empty Bearer header makes GitHub reject the request outright, so omit it.
+    # Every current caller (download-neurt.sh, download-qhexrt.sh,
+    # download-qairt-runtime.sh, check_engine_prebuilt_pins.sh) requires a real
+    # NEURUN_TOKEN and exits before reaching here without one -- NeuRT, QHexRT and
+    # the QAIRT runtime are all private assets on the neurun repo. This guard just
+    # avoids ever sending a literally empty Bearer header (GitHub rejects that
+    # outright) if a future caller legitimately has none.
     local auth=()
     [[ -n "$token" ]] && auth=(-H "Authorization: Bearer ${token}")
 

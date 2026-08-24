@@ -184,7 +184,10 @@ with open(out, "wb") as raw:
                 with open(full, "rb") as fh:
                     tar.addfile(info, fh)
 PYTAR
-    (cd "$OUT_DIR" && shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256")
+    # Bare hash, no filename -- matches the NeuRT/QHexRT sidecar convention. Plain
+    # `shasum > file` appends the filename, which check_engine_prebuilt_pins.sh's
+    # raw string compare then fails on bytes that are otherwise identical.
+    (cd "$OUT_DIR" && shasum -a 256 "${name}.tar.gz" | awk '{print $1}' > "${name}.tar.gz.sha256")
     sha="$(cut -d' ' -f1 < "${OUT_DIR}/${name}.tar.gz.sha256")"
     bytes="$(wc -c < "${OUT_DIR}/${name}.tar.gz" | tr -d ' ')"
     echo "    -> ${name}.tar.gz  ($((bytes / 1048576)) MB)"

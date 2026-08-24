@@ -231,11 +231,14 @@ find_qairt_root() {
         fi
     done < <(find "${REPO_ROOT}/.." -maxdepth 4 -type d -path "*/qairt/*/lib/aarch64-android" -print 2>/dev/null | sort -r)
 
-    # LAST RESORT: the pinned public QAIRT runtime fetched by
-    # scripts/build/download-qairt-runtime.sh. Deliberately last, so any real
-    # local install still wins and every branch above keeps its fail-closed
-    # semantics. This is what lets a hosted runner (or a fork) build a routable
-    # Hexagon engine with no licensed QAIRT install.
+    # LAST RESORT: the pinned QAIRT runtime fetched by
+    # scripts/build/download-qairt-runtime.sh from the PRIVATE neurun repo (needs
+    # NEURUN_TOKEN/GH_TOKEN; that script exits 3 without one). Deliberately last,
+    # so any real local install still wins and every branch above keeps its
+    # fail-closed semantics. With the token, this is what lets a hosted runner
+    # build a routable Hexagon engine with no licensed QAIRT install on the
+    # machine; without it, this branch is skipped and the build falls back to the
+    # non-routable shell.
     candidate="${REPO_ROOT}/engines/qhexrt/prebuilt/qairt-runtime/arm64-v8a/current"
     if [ -d "${candidate}/lib/aarch64-android" ] && [ -f "${candidate}/qairt-runtime.json" ]; then
         # Refuse anything resolving INSIDE the engine payload tree. If the runtime
