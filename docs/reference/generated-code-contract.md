@@ -79,3 +79,19 @@ bumping `idl/VERSION` also fails.
 
 CI `idl-drift-check.yml` is **generate, then verify** — not "regenerate and diff", which
 cannot fail for an ignored file.
+
+## Downstream kits (RCLI)
+
+The C++ desktop kit (`package-cpp-desktop`) is how a second repo stays on this
+schema without running `protoc`:
+
+1. `idl/*.proto` is the only schema.
+2. Commons compiles it **once**; `.pb.cc` lives inside `librac_commons.a`.
+3. The kit ships the matching `include/runanywhere/proto/*.pb.h`, vendored
+   protobuf/absl headers, and a copy of `idl/SCHEMA_LOCK`.
+4. RCLI `find_package(RunAnywhere)` consumes those headers and pins
+   `IDL_SCHEMA_SHA256` in `cmake/sdk-pin.cmake`. A kit whose lock does not
+   match is a configure error.
+
+Do not add a second codegen path in RCLI. When the schema moves, cut a new
+SDK kit and bump the RCLI pin.

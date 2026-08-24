@@ -1,0 +1,120 @@
+# RunAnywhere C++ desktop kit — imported from a packaged prefix.
+#
+#   find_package(RunAnywhere @RAC_VERSION@ EXACT REQUIRED)
+#   target_link_libraries(app PRIVATE RunAnywhere::commons)
+#
+# Generated. Do not edit the copy inside a tarball.
+
+get_filename_component(PACKAGE_PREFIX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../" ABSOLUTE)
+
+set(RunAnywhere_VERSION "@RAC_VERSION@")
+set(RunAnywhere_PLUGIN_API_VERSION "@RAC_PLUGIN_API_VERSION@")
+set(RunAnywhere_IDL_DIR "${PACKAGE_PREFIX_DIR}/share/runanywhere/idl")
+set(RunAnywhere_IDL_VERSION "@RUNANYWHERE_KIT_IDL_VERSION@")
+set(RunAnywhere_IDL_SCHEMA_SHA256 "@RUNANYWHERE_KIT_IDL_SCHEMA_SHA256@")
+set(RunAnywhere_IDL_PROTOC_VERSION "@RUNANYWHERE_KIT_IDL_PROTOC_VERSION@")
+set(RunAnywhere_SCHEMA_LOCK "${PACKAGE_PREFIX_DIR}/share/runanywhere/SCHEMA_LOCK")
+set(RunAnywhere_PROTO_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/include/runanywhere/proto")
+set(RunAnywhere_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/include")
+set(RunAnywhere_LIBRARY_DIR "${PACKAGE_PREFIX_DIR}/lib")
+set(RunAnywhere_THIRD_PARTY_DIR "${PACKAGE_PREFIX_DIR}/third_party")
+set(RunAnywhere_PROTOBUF_ISOLATED @RUNANYWHERE_KIT_PROTOBUF_ISOLATED@)
+
+set(RunAnywhere_HAS_LLAMACPP @RUNANYWHERE_KIT_HAS_LLAMACPP@)
+set(RunAnywhere_HAS_ONNX @RUNANYWHERE_KIT_HAS_ONNX@)
+set(RunAnywhere_HAS_SHERPA @RUNANYWHERE_KIT_HAS_SHERPA@)
+set(RunAnywhere_HAS_MLX @RUNANYWHERE_KIT_HAS_MLX@)
+set(RunAnywhere_HAS_NEURT @RUNANYWHERE_KIT_HAS_NEURT@)
+set(RunAnywhere_HAS_CLOUD @RUNANYWHERE_KIT_HAS_CLOUD@)
+set(RunAnywhere_HAS_QHEXRT @RUNANYWHERE_KIT_HAS_QHEXRT@)
+set(RunAnywhere_HAS_RAG @RUNANYWHERE_KIT_HAS_RAG@)
+set(RunAnywhere_HAS_SERVER @RUNANYWHERE_KIT_HAS_SERVER@)
+set(RunAnywhere_HAS_DESKTOP_ADAPTER @RUNANYWHERE_KIT_HAS_DESKTOP_ADAPTER@)
+
+include(CMakeFindDependencyMacro)
+if(NOT WIN32)
+    find_dependency(Threads)
+    find_dependency(ZLIB)
+    find_dependency(CURL)
+endif()
+
+if(NOT TARGET RunAnywhere::commons)
+    add_library(RunAnywhere::commons STATIC IMPORTED)
+    set(_runanywhere_inc
+        "${RunAnywhere_INCLUDE_DIR}"
+        "${RunAnywhere_PROTO_INCLUDE_DIR}")
+    set(_runanywhere_defs "RAC_HAVE_PROTOBUF=1")
+    if(RunAnywhere_PROTOBUF_ISOLATED)
+        # Same token rewrite commons used to compile *.pb.cc into this archive.
+        list(APPEND _runanywhere_defs "google=runanywhere_internal")
+    endif()
+    set_target_properties(RunAnywhere::commons PROPERTIES
+        IMPORTED_LOCATION "${RunAnywhere_LIBRARY_DIR}/@RUNANYWHERE_KIT_COMMONS_ARCHIVE@"
+        INTERFACE_INCLUDE_DIRECTORIES "${_runanywhere_inc}"
+        INTERFACE_COMPILE_FEATURES "cxx_std_20"
+        INTERFACE_COMPILE_DEFINITIONS "${_runanywhere_defs}"
+    )
+    set(_runanywhere_kit_extra "@RUNANYWHERE_KIT_EXTRA_LIBS@")
+    file(GLOB _kit_archives
+        "${RunAnywhere_LIBRARY_DIR}/*.a"
+        "${RunAnywhere_LIBRARY_DIR}/*.lib")
+    foreach(_archive IN LISTS _kit_archives)
+        get_filename_component(_an "${_archive}" NAME)
+        if(NOT _an STREQUAL "@RUNANYWHERE_KIT_COMMONS_ARCHIVE@")
+            # Static plugin archives register via ctor; the linker otherwise
+            # drops them because rcli never references a symbol inside.
+            if(_an MATCHES "^(lib)?rac_backend_")
+                if(APPLE)
+                    list(APPEND _runanywhere_kit_extra "-Wl,-force_load,${_archive}")
+                elseif(MSVC)
+                    list(APPEND _runanywhere_kit_extra "/WHOLEARCHIVE:${_archive}")
+                else()
+                    list(APPEND _runanywhere_kit_extra
+                        "-Wl,--whole-archive" "${_archive}" "-Wl,--no-whole-archive")
+                endif()
+            else()
+                list(APPEND _runanywhere_kit_extra "${_archive}")
+            endif()
+        endif()
+    endforeach()
+    # Link only the unversioned ONNX Runtime dylib. Versioned copies
+    # (libonnxruntime.1.dylib, libonnxruntime.1.*.dylib) are Mach-O stubs /
+    # compatibility names and fail with "unsupported mach-o filetype".
+    file(GLOB _kit_dylibs
+        "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.dylib"
+        "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.so"
+        "${RunAnywhere_THIRD_PARTY_DIR}/onnxruntime.dll")
+    list(APPEND _runanywhere_kit_extra ${_kit_dylibs})
+    if(_runanywhere_kit_extra)
+        list(REMOVE_DUPLICATES _runanywhere_kit_extra)
+        set_property(TARGET RunAnywhere::commons APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES ${_runanywhere_kit_extra})
+    endif()
+    set(_runanywhere_kit_sys "@RUNANYWHERE_KIT_SYSTEM_LIBS@")
+    if(_runanywhere_kit_sys)
+        set_property(TARGET RunAnywhere::commons APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES ${_runanywhere_kit_sys})
+    endif()
+    if(APPLE)
+        set_property(TARGET RunAnywhere::commons APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES
+                "-framework Foundation" "-framework Accelerate" "-framework Metal"
+                "-framework MetalKit" "-framework CoreML")
+    endif()
+endif()
+
+foreach(_opt mlx neurt qhexrt)
+    string(TOUPPER ${_opt} _OPT)
+    if(RunAnywhere_HAS_${_OPT}
+       AND EXISTS "${RunAnywhere_LIBRARY_DIR}/librac_backend_${_opt}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        if(NOT TARGET RunAnywhere::${_opt})
+            add_library(RunAnywhere::${_opt} STATIC IMPORTED)
+            set_target_properties(RunAnywhere::${_opt} PROPERTIES
+                IMPORTED_LOCATION
+                    "${RunAnywhere_LIBRARY_DIR}/librac_backend_${_opt}${CMAKE_STATIC_LIBRARY_SUFFIX}"
+                INTERFACE_LINK_LIBRARIES RunAnywhere::commons)
+        endif()
+    endif()
+endforeach()
+
+set(RunAnywhere_FOUND TRUE)

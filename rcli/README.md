@@ -1,3 +1,11 @@
+# RunAnywhere CLI (`rcli`) — in-tree copy, retired
+
+**Do not build this tree.** The official CLI is [RunanywhereAI/RCLI](https://github.com/RunanywhereAI/RCLI) (`EXTERNAL/RCLI` in this checkout). It links a published C++ desktop kit (`find_package(RunAnywhere)`), not this subdirectory.
+
+This directory remains only as a reference for command coverage until the next SDK release drops it.
+
+---
+
 # RunAnywhere CLI (`rcli`)
 
 Run, manage, and serve on-device AI models from the terminal. One binary, multi-modal: LLM chat, VLM image understanding, speech-to-text, text-to-speech, voice activity detection, and a full voice pipeline — all running locally on the RunAnywhere C++ core.

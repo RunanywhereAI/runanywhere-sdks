@@ -1,0 +1,117 @@
+name: C++ desktop kit
+
+# Builds the find_package(RunAnywhere) prefix RCLI consumes. Does not build rcli.
+# Dispatch this to refresh kits without a full SDK release train. release.yml
+# also builds the same presets and attaches the tarballs to the GitHub Release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      attach_tag:
+        description: 'GitHub release tag to attach kits to (e.g. v0.20.25). Empty = artifacts only.'
+        required: false
+        default: ''
+  push:
+    paths:
+      - 'cmake/CppDesktopKit.cmake'
+      - 'cmake/PackageCppDesktop.cmake'
+      - 'cmake/RunAnywhereConfig.cmake.in'
+      - 'CMakePresets.json'
+      - 'core/**'
+      - 'engines/**'
+      - 'idl/**'
+      - '.github/workflows/cpp-desktop-kit.yml'
+    branches: [main]
+  pull_request:
+    paths:
+      - 'cmake/CppDesktopKit.cmake'
+      - 'cmake/PackageCppDesktop.cmake'
+      - 'cmake/RunAnywhereConfig.cmake.in'
+      - 'CMakePresets.json'
+      - '.github/workflows/cpp-desktop-kit.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cpp-desktop-kit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
+      - name: Configure + package
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-macos-arm64
+          cmake --build --preset cpp-desktop-macos-arm64 --target package-cpp-desktop-tarball \
+            -j "$(sysctl -n hw.logicalcpu)"
+          ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+          shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
+            | tee dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-macos-arm64
+          path: |
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: vcpkg curl (static)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static zlib:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Configure + package
+        shell: pwsh
+        run: |
+          cmake --preset cpp-desktop-windows-x64
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build --preset cpp-desktop-windows-x64 --config Release --target package-cpp-desktop-tarball
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          $ver = (Get-Content core/VERSION -Raw).Trim()
+          $tar = "dist/RunAnywhere-cpp-desktop-windows-x64-v$ver.tar.gz"
+          if (-not (Test-Path $tar)) { throw "missing $tar" }
+          Get-FileHash $tar -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content "$tar.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-windows-x64
+          path: |
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  attach-release:
+    if: github.event_name == 'workflow_dispatch' && inputs.attach_tag != ''
+    needs: [macos-arm64, windows-x64]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Upload kits to ${{ inputs.attach_tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -la artifacts
+          gh release upload "${{ inputs.attach_tag }}" artifacts/RunAnywhere-cpp-desktop-*.tar.gz* \
+            --repo "${{ github.repository }}" --clobber

@@ -399,11 +399,9 @@ jobs:
 
   native_rcli_macos:
     needs: [validate, native_ios]
-    # The production rcli is the Swift host that registers the MLX callbacks
-    # before entering the shared C++ CLI. It consumes the exact Apple release
-    # candidates produced above and requires Swift 6.2+ for mlx-audio-swift.
-    # Pull-request smoke keeps the faster CMake-only macos-14 lane.
-    if: ${{ !inputs.publish_from_run_id }}
+    # Product CLI moved to RunanywhereAI/RCLI (kit consumer). Keep the job
+    # id so publish `needs:` does not 404; skip the in-tree bottle.
+    if: false
     runs-on: macos-26
     timeout-minutes: 120
     steps:
@@ -649,7 +647,7 @@ jobs:
 
   native_rcli_linux:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
+    if: false  # Product CLI is RunanywhereAI/RCLI.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -681,7 +679,7 @@ jobs:
 
   native_rcli_windows:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
+    if: false  # Product CLI is RunanywhereAI/RCLI.
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -769,6 +767,74 @@ jobs:
           path: |
             rcli/dist/rcli-windows-x86_64-v*.zip
             rcli/dist/rcli-windows-x86_64-v*.zip.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_cpp_desktop_macos:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
+      - name: Configure + package C++ desktop kit
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-macos-arm64
+          cmake --build --preset cpp-desktop-macos-arm64 --target package-cpp-desktop-tarball \
+            -j "$(sysctl -n hw.logicalcpu)"
+          ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+          shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
+            | tee dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-macos
+          path: |
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_cpp_desktop_windows:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: vcpkg curl (static)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static zlib:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Configure + package C++ desktop kit
+        shell: pwsh
+        run: |
+          cmake --preset cpp-desktop-windows-x64
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build --preset cpp-desktop-windows-x64 --config Release --target package-cpp-desktop-tarball
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          $ver = (Get-Content core/VERSION -Raw).Trim()
+          $tar = "dist/RunAnywhere-cpp-desktop-windows-x64-v$ver.tar.gz"
+          if (-not (Test-Path $tar)) { throw "missing $tar" }
+          Get-FileHash $tar -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content "$tar.sha256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-windows
+          path: |
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -2086,6 +2152,8 @@ jobs:
       - native_rcli_macos
       - native_rcli_linux
       - native_rcli_windows
+      - native_cpp_desktop_macos
+      - native_cpp_desktop_windows
       - native_windows
       - native_web
       - native_electron
@@ -2131,11 +2199,10 @@ jobs:
         needs.native_ios.result == 'success' &&
         needs.native_android.result == 'success' &&
         needs.native_linux.result == 'success' &&
-        needs.native_rcli_macos.result == 'success' &&
-        needs.native_rcli_linux.result == 'success' &&
-        (needs.native_rcli_windows.result == 'success' ||
-         needs.native_rcli_windows.result == 'failure' ||
-         needs.native_rcli_windows.result == 'skipped') &&
+        needs.native_cpp_desktop_macos.result == 'success' &&
+        (needs.native_cpp_desktop_windows.result == 'success' ||
+         needs.native_cpp_desktop_windows.result == 'failure' ||
+         needs.native_cpp_desktop_windows.result == 'skipped') &&
         (needs.native_web.result == 'success' ||
          (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped')) &&
         needs.sdk_kotlin.result == 'success' &&
@@ -2268,21 +2335,14 @@ jobs:
             echo "  SKIP: Windows x64 advisory artifact absent (native_windows failed/skipped)"
           fi
           assert_pair "Web WASM"                       "RACommons-web-v${VERSION}.tar.gz"
-          assert_pair "rcli macOS arm64"               "rcli-macos-arm64-v${VERSION}.tar.gz"
-          # The DMG exists only when the Developer ID + notary secrets are set;
-          # without them the packaging step soft-skips it by design and ships the
-          # ad-hoc tarball alone. Asserting it unconditionally made publish
-          # unsatisfiable, which is what blocked every release after v0.20.10.
-          if [ -s "release-flat/rcli-macos-arm64-v${VERSION}.dmg" ]; then
-            assert_pair "rcli macOS notarized disk image" "rcli-macos-arm64-v${VERSION}.dmg"
+          assert_pair "C++ desktop kit macOS arm64"    "RunAnywhere-cpp-desktop-macos-arm64-v${VERSION}.tar.gz"
+          if [ -s "release-flat/RunAnywhere-cpp-desktop-windows-x64-v${VERSION}.tar.gz" ]; then
+            assert_pair "C++ desktop kit Windows x64" "RunAnywhere-cpp-desktop-windows-x64-v${VERSION}.tar.gz"
           else
-            echo "::warning::no notarized rcli DMG in this release — Developer ID/notary secrets are not configured"
+            echo "  SKIP: C++ desktop kit Windows x64 advisory artifact absent"
           fi
-          assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
-          if [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip" ] || [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip.sha256" ]; then
-            assert_pair "rcli Windows x86_64 (advisory)" "rcli-windows-x86_64-v${VERSION}.zip"
-          else
-            echo "  SKIP: rcli Windows x86_64 advisory artifact absent (job failed/skipped)"
+          if [ -s "release-flat/rcli-macos-arm64-v${VERSION}.tar.gz" ]; then
+            echo "  NOTE: in-tree rcli bottle present (legacy); official CLI is RunanywhereAI/RCLI"
           fi
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"
           assert_pair "Web proto package"              "runanywhere-proto-ts-${VERSION}.tgz"

@@ -171,9 +171,9 @@ jobs:
       - run: ctest --preset linux-asan
 
   rcli-macos:
-    # rcli desktop CLI — full-backend release build + modelless smoke.
-    # This is the one macOS lane that enables GGML_METAL, so it retains the
-    # older compatible runner while CPU-only native and SDK lanes use Xcode 26.
+    # Product CLI moved to RunanywhereAI/RCLI (kit consumer). In-tree RAC_BUILD_CLI
+    # is a hard error. Keep the job name so required checks do not 404; skip the work.
+    if: false
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v7
@@ -197,7 +197,7 @@ jobs:
         run: bash rcli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
 
   rcli-linux:
-    # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
+    if: false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -222,8 +222,7 @@ jobs:
         run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
 
   rcli-windows:
-    # Windows is compiled and exercised on the native runner. MLX remains
-    # Apple-only; the portable CLI ships llama.cpp + Sherpa/ONNX on Windows.
+    if: false
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
