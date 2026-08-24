@@ -553,12 +553,10 @@ static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buff
         LOGe("%s: native proto API failed with code %d (%s)", operation, buffer->status,
              buffer->error_message ? buffer->error_message : "");
         const rac_result_t status = buffer->status;
-        const std::string message =
-            buffer->error_message != nullptr ? buffer->error_message : "";
-        rac_proto_buffer_free(buffer);
         if (preserveFailure) {
-            throwNativeProtoFailure(env, operation, status, message.c_str());
+            throwNativeProtoFailure(env, operation, status, buffer->error_message);
         }
+        rac_proto_buffer_free(buffer);
         return nullptr;
     }
     if (buffer->size > 0 && buffer->data == nullptr) {

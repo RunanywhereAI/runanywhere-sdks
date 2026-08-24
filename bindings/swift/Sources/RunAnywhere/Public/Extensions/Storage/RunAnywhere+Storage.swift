@@ -29,6 +29,10 @@ extension RunAnywhere {
         modality: ModelCategory = .language,
         artifactType: RAModelArtifactType? = nil,
         memoryRequirement: Int64? = nil,
+        downloadSize: Int64? = nil,
+        contextLength: Int? = nil,
+        source: RAModelSource = .remote,
+        description: String? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false,
         cuaProfile: String? = nil
@@ -41,6 +45,10 @@ extension RunAnywhere {
             modality: modality,
             artifactType: artifactType,
             memoryRequirement: memoryRequirement,
+            downloadSize: downloadSize,
+            contextLength: contextLength,
+            source: source,
+            description: description,
             supportsThinking: supportsThinking,
             supportsLora: supportsLora,
             cuaProfile: cuaProfile
@@ -56,6 +64,10 @@ extension RunAnywhere {
         modality: ModelCategory = .language,
         artifactType: RAModelArtifactType? = nil,
         memoryRequirement: Int64? = nil,
+        downloadSize: Int64? = nil,
+        contextLength: Int? = nil,
+        source: RAModelSource = .remote,
+        description: String? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false,
         cuaProfile: String? = nil
@@ -69,6 +81,7 @@ extension RunAnywhere {
         request.name = name
         request.framework = framework
         request.category = modality
+        request.source = source
         if let id {
             request.id = id
         }
@@ -78,8 +91,16 @@ extension RunAnywhere {
         if let memoryRequirement {
             request.memoryRequiredBytes = memoryRequirement
         }
-        if modality.requiresContextLength {
+        if let downloadSize {
+            request.downloadSizeBytes = downloadSize
+        }
+        if let contextLength {
+            request.contextLength = Int32(clamping: contextLength)
+        } else if modality.requiresContextLength {
             request.contextLength = Int32(RADefaults.Storage.contextLength)
+        }
+        if let description, !description.isEmpty {
+            request.description_p = description
         }
         if supportsThinking {
             request.supportsThinking = true
@@ -112,6 +133,10 @@ extension RunAnywhere {
         modality: ModelCategory = .language,
         archiveType: RAArchiveType? = nil,
         memoryRequirement: Int64? = nil,
+        downloadSize: Int64? = nil,
+        contextLength: Int? = nil,
+        source: RAModelSource = .remote,
+        description: String? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false,
         cuaProfile: String? = nil
@@ -125,6 +150,10 @@ extension RunAnywhere {
             modality: modality,
             archiveType: archiveType,
             memoryRequirement: memoryRequirement,
+            downloadSize: downloadSize,
+            contextLength: contextLength,
+            source: source,
+            description: description,
             supportsThinking: supportsThinking,
             supportsLora: supportsLora,
             cuaProfile: cuaProfile
@@ -141,6 +170,10 @@ extension RunAnywhere {
         modality: ModelCategory = .language,
         archiveType: RAArchiveType? = nil,
         memoryRequirement: Int64? = nil,
+        downloadSize: Int64? = nil,
+        contextLength: Int? = nil,
+        source: RAModelSource = .remote,
+        description: String? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false,
         cuaProfile: String? = nil
@@ -170,9 +203,12 @@ extension RunAnywhere {
             framework: framework,
             downloadURL: downloadURL,
             artifact: .archive(archiveArtifact),
-            downloadSizeBytes: nil,
-            contextLength: modality.requiresContextLength ? 2048 : nil,
-            supportsThinking: supportsThinking
+            downloadSizeBytes: downloadSize,
+            contextLength: contextLength ?? (modality.requiresContextLength
+                ? RADefaults.Storage.contextLength : nil),
+            supportsThinking: supportsThinking,
+            description: description,
+            source: source
         )
         if let memoryRequirement {
             model.memoryRequiredBytes = memoryRequirement
@@ -203,8 +239,10 @@ extension RunAnywhere {
         memoryRequirement: Int64? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
+        supportsLora: Bool = false,
         source: RAModelSource = .remote,
         downloadSize: Int64? = nil,
+        description: String? = nil,
         cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         try await registerMultiFile(
@@ -216,8 +254,10 @@ extension RunAnywhere {
             memoryRequirement: memoryRequirement,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
+            supportsLora: supportsLora,
             source: source,
             downloadSize: downloadSize,
+            description: description,
             cuaProfile: cuaProfile
         )
     }
@@ -232,8 +272,10 @@ extension RunAnywhere {
         memoryRequirement: Int64? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
+        supportsLora: Bool = false,
         source: RAModelSource = .remote,
         downloadSize: Int64? = nil,
+        description: String? = nil,
         cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         guard isReady else {
@@ -253,12 +295,18 @@ extension RunAnywhere {
             to: &request
         )
         if let contextLength {
-            request.contextLength = Int32(contextLength)
+            request.contextLength = Int32(clamping: contextLength)
         } else if modality.requiresContextLength {
             request.contextLength = Int32(RADefaults.Storage.contextLength)
         }
         if supportsThinking {
             request.supportsThinking = true
+        }
+        if supportsLora {
+            request.supportsLora = true
+        }
+        if let description, !description.isEmpty {
+            request.description_p = description
         }
         if let cuaProfile, !cuaProfile.isEmpty {
             request.cuaProfile = cuaProfile
