@@ -268,7 +268,20 @@ std::string compose(const std::string& question, const std::vector<SearchResult>
                         "source(s)",
                         cited, sources.size());
     }
-    return answer;
+
+    // Citations resolving only proves the answer points at a real source, not
+    // that it says what the source says. A real run cited a page for a HomePod
+    // "Ghost Touch" interface the page never mentions. Removing the sentence is
+    // better than flagging it: a labelled fabrication is still a fabrication
+    // sitting in front of the reader.
+    size_t dropped = 0;
+    const std::string checked = rac::tools::web::drop_unsupported_claims(answer, sources, &dropped);
+    if (dropped > 0) {
+        RAC_LOG_WARNING(kTag, "dropped %zu claim(s) absent from the source they cited", dropped);
+    }
+    // Everything unsupported means there is no answer here, only invention.
+    // Returning nothing lets the caller fall back to the sources themselves.
+    return checked;
 }
 
 // --- the provider ----------------------------------------------------------
@@ -444,6 +457,173 @@ const rac_tool_provider_t kProvider = {
 }  // namespace
 
 namespace rac::tools::web {
+
+namespace {
+
+// Case-insensitive substring search. A source writes "HomePod" where an answer
+// may write "homepod", and a case difference is not a fabrication.
+bool contains_ignoring_case(const std::string& haystack, const std::string& needle) {
+    if (needle.empty() || needle.size() > haystack.size()) {
+        return false;
+    }
+    const auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(),
+                                [](char a, char b) {
+                                    return std::tolower(static_cast<unsigned char>(a)) ==
+                                           std::tolower(static_cast<unsigned char>(b));
+                                });
+    return it != haystack.end();
+}
+
+}  // namespace
+
+std::vector<std::string> quoted_spans(const std::string& sentence) {
+    std::vector<std::string> spans;
+    for (size_t at = 0; at < sentence.size(); ++at) {
+        const char c = sentence[at];
+        if (c != '"' && c != '\'') {
+            continue;
+        }
+        const size_t close = sentence.find(c, at + 1);
+        if (close == std::string::npos || close - at < 3) {
+            continue;
+        }
+        spans.push_back(sentence.substr(at + 1, close - at - 1));
+        at = close;
+    }
+    return spans;
+}
+
+std::vector<std::string> distinctive_terms(const std::string& sentence) {
+    std::vector<std::string> terms = quoted_spans(sentence);
+
+    // Numbers, keeping digits and separators so "94.9" and "164.39" survive.
+    std::string number;
+    for (const char c : sentence) {
+        if ((std::isdigit(static_cast<unsigned char>(c)) != 0) || (!number.empty() && c == '.')) {
+            number.push_back(c);
+            continue;
+        }
+        if (number.size() >= 2) {
+            while (!number.empty() && number.back() == '.') {
+                number.pop_back();
+            }
+            terms.push_back(number);
+        }
+        number.clear();
+    }
+    if (number.size() >= 2) {
+        terms.push_back(number);
+    }
+
+    // Capitalised words that are not the first of the sentence. A crude proper
+    // noun test, and crude is fine: a false negative just means one fewer
+    // thing checked, never a dropped sentence.
+    bool first_word = true;
+    std::string word;
+    for (size_t at = 0; at <= sentence.size(); ++at) {
+        const char c = at < sentence.size() ? sentence[at] : ' ';
+        if ((std::isalnum(static_cast<unsigned char>(c)) != 0) || c == '-') {
+            word.push_back(c);
+            continue;
+        }
+        if (!word.empty()) {
+            const bool capitalised = std::isupper(static_cast<unsigned char>(word[0])) != 0;
+            if (capitalised && !first_word && word.size() > 2) {
+                terms.push_back(word);
+            }
+            first_word = false;
+            word.clear();
+        }
+    }
+    return terms;
+}
+
+bool claim_supported(const std::string& sentence, const std::string& source_text) {
+    // Quoted phrases are judged strictly and all together. A fabrication wraps
+    // an invented detail around real entities — "the HomePod now uses a
+    // 'Ghost Touch' interface" names a real product, so requiring merely one
+    // matching term passes it. What gives it away is the quoted phrase the
+    // source never contains, and a model quoting something it did not read is
+    // the clearest fabrication signal available.
+    for (const auto& quoted : quoted_spans(sentence)) {
+        if (!contains_ignoring_case(source_text, quoted)) {
+            return false;
+        }
+    }
+
+    const auto terms = distinctive_terms(sentence);
+    if (terms.empty()) {
+        // Nothing specific enough to check. Paraphrase is legitimate.
+        return true;
+    }
+    for (const auto& term : terms) {
+        if (contains_ignoring_case(source_text, term)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string drop_unsupported_claims(const std::string& answer,
+                                    const std::vector<SearchResult>& sources, size_t* out_dropped) {
+    std::string kept;
+    size_t dropped = 0;
+    size_t start = 0;
+
+    while (start < answer.size()) {
+        size_t end = answer.find_first_of(".!?", start);
+        end = end == std::string::npos ? answer.size() : end + 1;
+        const std::string sentence = answer.substr(start, end - start);
+        start = end;
+
+        const std::string trimmed = trim(sentence);
+        if (trimmed.empty()) {
+            continue;
+        }
+
+        // Only a sentence that names its source can be checked against one.
+        size_t cited_index = 0;
+        for (size_t at = 0; at + 1 < trimmed.size(); ++at) {
+            if (trimmed[at] != '[') {
+                continue;
+            }
+            const size_t close = trimmed.find(']', at + 1);
+            if (close == std::string::npos || close - at > 4) {
+                continue;
+            }
+            size_t value = 0;
+            bool numeric = close > at + 1;
+            for (size_t d = at + 1; d < close; ++d) {
+                if (std::isdigit(static_cast<unsigned char>(trimmed[d])) == 0) {
+                    numeric = false;
+                    break;
+                }
+                value = value * 10 + static_cast<size_t>(trimmed[d] - '0');
+            }
+            if (numeric && value >= 1 && value <= sources.size()) {
+                cited_index = value;
+            }
+        }
+
+        if (cited_index == 0) {
+            kept += sentence;
+            continue;
+        }
+
+        const SearchResult& source = sources[cited_index - 1];
+        const std::string& text = source.body.empty() ? source.snippet : source.body;
+        if (claim_supported(trimmed, text + " " + source.title)) {
+            kept += sentence;
+        } else {
+            ++dropped;
+        }
+    }
+
+    if (out_dropped != nullptr) {
+        *out_dropped = dropped;
+    }
+    return trim(kept);
+}
 
 bool looks_like_query_not_answer(const std::string& line) {
     if (!query_is_usable(line)) {
