@@ -265,14 +265,15 @@ jobs:
           fi
           [[ "$rc" -eq 0 ]] || exit "$rc"
 
-      # The QAIRT/QNN runtime the engine dlopens on device. PUBLIC assets, no
-      # token: RunAnywhere is an authorized Qualcomm partner and already ships
-      # these binaries unauthenticated on npm. Without this, build-core-android.sh
-      # correctly refuses to package a routable engine whose runtime is absent --
-      # which is what broke the first v0.20.26 candidate, since no hosted runner
-      # has a licensed QAIRT install.
+      # The QAIRT/QNN runtime the engine dlopens on device. PRIVATE, same token as
+      # the engine payload. Without it build-core-android.sh correctly refuses to
+      # package a routable engine whose runtime is absent -- which is what broke
+      # the first v0.20.26 candidate, since no hosted runner has a licensed QAIRT
+      # install.
       - name: Download the pinned QAIRT runtime (arm64-v8a only)
         if: matrix.abi == 'arm64-v8a'
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
         run: bash scripts/build/download-qairt-runtime.sh --platform arm64-v8a
 
       # Two independent pins CAN drift. A drifted pair passes every other check

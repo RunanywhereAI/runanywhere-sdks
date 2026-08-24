@@ -13,17 +13,14 @@
 # Windows lane depended on a hand-copied directory of machine state that has
 # already gone stale once.
 #
-# RunAnywhere is an authorized Qualcomm partner and already distributes these
-# exact binaries publicly: @runanywhere/electron-qhexrt on npm ships QnnHtp.dll,
-# libQnnHtpV81Skel.so and libqnnhtpv81.cat with no authentication. This does not
-# expose anything new -- it makes an existing distribution named, versioned and
-# verifiable instead of implicit.
+# These go to the PRIVATE neurun repo, alongside the NeuRT and QHexRT payloads,
+# and are fetched with NEURUN_TOKEN. They are deliberately NOT published on the
+# public SDK repo: a public URL invites downloads we do not want to serve, and
+# nothing about the build needs them to be reachable without a token.
 #
-# The assets are published under their OWN tag (qairt-runtime-v<qairt-version>),
-# not the SDK release tag, because the QAIRT SDK version and the SDK release
-# version are independent axes. Asset names deliberately contain no "qhexrt"
-# substring so release.yml's private-leak guard (which hard-fails on any
-# *qhexrt* file reaching the public asset set) is unaffected.
+# They get their OWN tag (qairt-runtime-v<qairt-version>) rather than riding an
+# engine release, because the QAIRT SDK version and the engine version move
+# independently.
 #
 # Usage:
 #   publish-qairt-runtime.sh --qnn <QAIRT_ROOT> [--platform arm64-v8a|win-arm64|all]
@@ -36,7 +33,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MANIFEST="${REPO_ROOT}/scripts/build/qairt-runtime-manifest.json"
-PUBLISH_REPO="RunanywhereAI/runanywhere-sdks"
+PUBLISH_REPO="${NEURUN_REPO:-RunanywhereAI/neurun}"
 
 QNN_ROOT="${QNN_SDK_ROOT:-}"
 PLATFORM="all"
