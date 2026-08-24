@@ -28,7 +28,7 @@ class ToolProgressScope {
      */
     ToolProgressScope(std::string tool_name, uint64_t run_loop_handle,
                       std::function<bool()> is_cancelled,
-                      const std::vector<std::string>& history = {});
+                      const std::vector<std::string>& history = {}, std::string user_prompt = {});
 
     ToolProgressScope(const ToolProgressScope&) = delete;
     ToolProgressScope& operator=(const ToolProgressScope&) = delete;
@@ -57,6 +57,7 @@ class ToolProgressScope {
     // Owned so the pointer array handed across the ABI outlives the call.
     std::vector<std::string> history_;
     std::vector<const char*> history_ptrs_;
+    std::string user_prompt_;
 };
 
 }  // namespace rac::plugin

@@ -156,7 +156,8 @@ rac_bool_t never_cancelled(const rac_tool_context_t*) {
     return RAC_FALSE;
 }
 
-json run_tool(const std::string& question) {
+json run_tool(const std::string& question, const std::string& user_prompt = {},
+              bool pass_question_argument = true) {
     g_stages.clear();
     g_requests.clear();
     rac_tool_web_research_register();
@@ -168,8 +169,9 @@ json run_tool(const std::string& question) {
     ctx.emit = capture_emit;
     ctx.is_cancelled = never_cancelled;
     ctx.state = nullptr;
+    ctx.user_prompt = user_prompt.empty() ? nullptr : user_prompt.c_str();
 
-    const json args = {{"question", question}};
+    const json args = pass_question_argument ? json{{"question", question}} : json::object();
     const std::string args_text = args.dump();
     char* raw = nullptr;
     const rac_result_t rc = provider->execute(args_text.c_str(), &ctx, &raw, provider->user_data);
@@ -417,8 +419,28 @@ void test_citation_grounding() {
           "non-numeric brackets are ignored");
 }
 
+// What a small model actually does on a follow-up: calls the tool with no
+// arguments at all. Telling it to try again does not work — it reports the
+// error as its answer. The question is already known, so use it.
+void test_missing_argument_falls_back_to_the_user() {
+    std::printf("[8] a call with no arguments still researches the question\n");
+    const std::string asked = "what does that news say about the stock?";
+    const json result = run_tool("", asked, /*pass_question_argument=*/false);
+
+    CHECK(!result.contains("error"), "no error is surfaced to the reader");
+    CHECK(result.value("question", std::string()) == asked,
+          "the user's own message became the question");
+    CHECK(result.value("query", std::string()) == asked, "and the query searched");
+    CHECK(result.contains("sources"), "the tool did the work rather than asking for input");
+
+    // With neither an argument nor a user prompt there is genuinely nothing to
+    // research, and that is the only case that should report back.
+    const json nothing = run_tool("", "", /*pass_question_argument=*/false);
+    CHECK(nothing.contains("error"), "with nothing at all, it says so");
+}
+
 void test_no_results_is_honest() {
-    std::printf("[8] a search with nothing to find says so\n");
+    std::printf("[9] a search with nothing to find says so\n");
     const json result = run_tool("");
     CHECK(result.value("error", std::string()).find("Call web_research again") != std::string::npos,
           "empty question rejected");
@@ -436,6 +458,7 @@ int main() {
     test_query_is_the_users_words();
     test_generated_query_guard();
     test_citation_grounding();
+    test_missing_argument_falls_back_to_the_user();
     test_no_results_is_honest();
     std::printf("=== %d checks, %d failed ===\n", g_test_count, g_fail_count);
     return g_fail_count == 0 ? 0 : 1;
