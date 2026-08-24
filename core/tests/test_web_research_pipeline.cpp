@@ -393,6 +393,48 @@ void test_generated_query_guard() {
     CHECK(!web::looks_like_query_not_answer("Thinking Process:"), "commentary is still rejected");
 }
 
+// The failure a citation check cannot catch: an answer that cites a real
+// source and then says something the source never said.
+void test_unsupported_claims_are_dropped() {
+    std::printf("[8] claims absent from the source they cite are removed\n");
+
+    std::vector<web::SearchResult> sources;
+    web::SearchResult one;
+    one.title = "Apple Q3 earnings";
+    one.body = "Apple reported revenue of 94.9 billion dollars, up 6 percent on the year.";
+    sources.push_back(one);
+    web::SearchResult two;
+    two.title = "HomeKit update";
+    two.body = "Apple announced a HomeKit update letting the HomePod and AirTag communicate.";
+    sources.push_back(two);
+
+    CHECK(web::claim_supported("Revenue was 94.9 billion dollars [1].", sources[0].body),
+          "a figure present in the source is supported");
+    CHECK(!web::claim_supported("The HomePod now uses a \"Ghost Touch\" interface [2].",
+                                sources[1].body),
+          "an invented quoted phrase is not supported");
+    CHECK(web::claim_supported("This broadly confirms the earlier reporting.", sources[0].body),
+          "a sentence with nothing specific is left alone");
+
+    size_t dropped = 0;
+    const std::string answer =
+        "Apple reported revenue of 94.9 billion dollars [1]. "
+        "The HomePod now uses a \"Ghost Touch\" interface [2]. "
+        "Apple announced a HomeKit update [2].";
+    const std::string checked = web::drop_unsupported_claims(answer, sources, &dropped);
+
+    CHECK(dropped == 1, "exactly the invented claim was dropped");
+    CHECK(checked.find("Ghost Touch") == std::string::npos, "the fabrication is gone");
+    CHECK(checked.find("94.9 billion") != std::string::npos, "the supported figure survives");
+    CHECK(checked.find("HomeKit update") != std::string::npos, "the other real claim survives");
+
+    // An uncited sentence cannot be checked against anything, so it stays.
+    size_t none = 0;
+    const std::string uncited =
+        web::drop_unsupported_claims("A summary with no citation.", sources, &none);
+    CHECK(none == 0 && !uncited.empty(), "an uncited sentence is left alone");
+}
+
 void test_citation_grounding() {
     std::printf("[7] an answer is checked against the sources it cites\n");
     size_t cited = 0;
@@ -423,7 +465,7 @@ void test_citation_grounding() {
 // arguments at all. Telling it to try again does not work — it reports the
 // error as its answer. The question is already known, so use it.
 void test_missing_argument_falls_back_to_the_user() {
-    std::printf("[8] a call with no arguments still researches the question\n");
+    std::printf("[10] a call with no arguments still researches the question\n");
     const std::string asked = "what does that news say about the stock?";
     const json result = run_tool("", asked, /*pass_question_argument=*/false);
 
@@ -440,7 +482,7 @@ void test_missing_argument_falls_back_to_the_user() {
 }
 
 void test_no_results_is_honest() {
-    std::printf("[9] a search with nothing to find says so\n");
+    std::printf("[11] a search with nothing to find says so\n");
     const json result = run_tool("");
     CHECK(result.value("error", std::string()).find("Call web_research again") != std::string::npos,
           "empty question rejected");
@@ -457,6 +499,7 @@ int main() {
     test_pipeline_end_to_end();
     test_query_is_the_users_words();
     test_generated_query_guard();
+    test_unsupported_claims_are_dropped();
     test_citation_grounding();
     test_missing_argument_falls_back_to_the_user();
     test_no_results_is_honest();

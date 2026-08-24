@@ -50,6 +50,39 @@ std::string build_evidence(const std::vector<SearchResult>& sources);
 bool looks_like_query_not_answer(const std::string& line);
 
 /**
+ * @brief The specific, checkable parts of a claim.
+ *
+ * Quoted phrases, numbers and mid-sentence proper nouns: the things a model
+ * invents when it embellishes, and the things that must appear in a source if
+ * the claim really came from one. Ordinary prose is not extracted, because
+ * paraphrase is legitimate and unverifiable.
+ */
+std::vector<std::string> distinctive_terms(const std::string& sentence);
+
+/** @brief Quoted phrases in a sentence, straight or single quoted. */
+std::vector<std::string> quoted_spans(const std::string& sentence);
+
+/**
+ * @brief Whether a sentence's distinctive terms appear in the text it cites.
+ *
+ * True when the sentence makes no specific claim (nothing to verify) or when
+ * at least one distinctive term is found. False only for a sentence that is
+ * specific AND shares none of its specifics with its source — which is what a
+ * fabricated detail looks like. A real run produced a HomePod "Ghost Touch"
+ * interface cited to a page that never mentions it.
+ */
+bool claim_supported(const std::string& sentence, const std::string& source_text);
+
+/**
+ * @brief Drop sentences whose specifics are absent from the source they cite.
+ *
+ * Deterministic, and preferred over asking a model to check itself: the whole
+ * problem is that the model is the thing that is wrong.
+ */
+std::string drop_unsupported_claims(const std::string& answer,
+                                    const std::vector<SearchResult>& sources, size_t* out_dropped);
+
+/**
  * @brief Whether an answer's [n] citations all resolve to a real source.
  *
  * The compose step is the last place a model can invent, and unlike the query
