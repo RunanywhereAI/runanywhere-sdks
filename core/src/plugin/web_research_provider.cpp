@@ -56,25 +56,23 @@ constexpr const char* kDescription =
     "newer than your knowledge. Do not call it for general knowledge, definitions, maths, or "
     "anything you already know with confidence.";
 
+// One property, and a required one. An earlier version also advertised
+// `max_questions` and `clarification`, and a small model handed three
+// parameters emitted malformed JSON often enough to break the call outright
+// (`{"clarification": "",question":...,max_questions:6}`) — MLX has no grammar
+// constraint to fall back on, so bad JSON is simply a lost tool call. Both are
+// still accepted when present; neither needs to be the model's problem, and a
+// clarification comes back as part of the next question anyway.
 constexpr const char* kParameters = R"({
   "type": "object",
   "properties": {
     "question": {
       "type": "string",
       "description": "The question to research, in full. Not keywords."
-    },
-    "max_questions": {
-      "type": "integer",
-      "description": "How many sub-questions to research. 1 to 6, default 4. Lower is faster."
-    },
-    "clarification": {
-      "type": "string",
-      "description": "The user's answer to a clarification this tool asked for on an earlier call."
     }
   },
   "required": ["question"]
 })";
-
 const char* const kPublishedKeys[] = {"summary", "source_url", nullptr};
 
 // --- small helpers ---------------------------------------------------------
