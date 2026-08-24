@@ -848,6 +848,37 @@ merge_mlx_backend_macos_slice() {
 # rac_commons — mirrors how the ONNX slice folds in librac_runtime_onnxrt.a.
 # Both are first-party archives (system frameworks only, no third-party host
 # paths), so no path sanitization is required. This keeps
+# Where the NeuRT prebuilt archives for a slice live. Since #766 these are
+# IMPORTED CMake targets whose IMPORTED_LOCATION points into the downloaded
+# prebuilt tree, so they are NOT produced under the build root the way a built
+# target is -- and their filenames differ too (libneurt_rac_llm_ops.a, not
+# librac_neurt_llm_ops.a). Looking for the old built paths silently found
+# nothing, took the "shell slice" branch, and shipped an archive carrying
+# `U _g_neurt_llm_ops`: every target compiled, the xcframework packaged, and only
+# the rcli link failed, naming symbols instead of the cause.
+neurt_prebuilt_root_for_slice() {
+    case "$1" in
+        Release-iphoneos)          echo "${REPO_ROOT}/core/third_party/neurt/ios-arm64" ;;
+        Release-iphonesimulator)   echo "${REPO_ROOT}/core/third_party/neurt/ios-arm64-simulator" ;;
+        *)                         echo "${REPO_ROOT}/core/third_party/neurt/macos-arm64" ;;
+    esac
+}
+
+# The four archives that make the engine routable. Empty output means this is a
+# deliberate shell build (RAC_ALLOW_NEURT_STUB=1); the caller handles that.
+neurt_prebuilt_archives() {
+    local root="$1"
+    local rel
+    for rel in lib/libneurt_core.a lib/libneurt_rac_llm_ops.a \
+               lib/libneurt_rac_stt_ops.a lib/libneurt_rac_diffusion.a; do
+        [ -f "${root}/${rel}" ] || return 1
+    done
+    for rel in lib/libneurt_core.a lib/libneurt_rac_llm_ops.a \
+               lib/libneurt_rac_stt_ops.a lib/libneurt_rac_diffusion.a; do
+        echo "${root}/${rel}"
+    done
+}
+
 # RABackendNeuRT.xcframework self-contained.
 merge_neurt_backend_slice() {
     local build_root="$1"
@@ -872,18 +903,12 @@ merge_neurt_backend_slice() {
     local inputs=(
         "${build_root}/engines/neurt/${slice_dir}/librac_backend_neurt.a"
     )
-    local _neurt_llm_ops="${build_root}/engines/neurt/${slice_dir}/librac_neurt_llm_ops.a"
-    local _neurt_stt_ops="${build_root}/engines/neurt/${slice_dir}/librac_neurt_stt_ops.a"
-    local _neurt_core="${build_root}/engines/neurt/${slice_dir}/librac_neurt_core.a"
-    if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
-        inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
-        # The SPEECH op table, same story as the LLM one above: its own CMake target, so its
-        # objects are not in librac_backend_neurt.a, and omitting it ships an archive carrying
-        # `U _g_neurt_stt_ops`. Measured exactly that — every target compiled, the xcframework
-        # packaged, and the iOS app failed at its own link.
-        [ -f "${_neurt_stt_ops}" ] && inputs+=("${_neurt_stt_ops}")
+    local _prebuilt_root _archive
+    _prebuilt_root="$(neurt_prebuilt_root_for_slice "${slice_dir}")"
+    if _archives="$(neurt_prebuilt_archives "${_prebuilt_root}")"; then
+        while IFS= read -r _archive; do inputs+=("${_archive}"); done <<< "${_archives}"
     else
-        echo "note: NeuRT private archives absent — packaging the non-routable shell slice (${slice_dir})" >&2
+        echo "note: NeuRT prebuilt archives absent — packaging the non-routable shell slice (${slice_dir})" >&2
     fi
     inputs+=("${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a")
 
@@ -905,12 +930,10 @@ merge_neurt_backend_macos_slice() {
     local inputs=(
         "${build_root}/engines/neurt/librac_backend_neurt.a"
     )
-    local _neurt_llm_ops="${build_root}/engines/neurt/librac_neurt_llm_ops.a"
-    local _neurt_stt_ops="${build_root}/engines/neurt/librac_neurt_stt_ops.a"
-    local _neurt_core="${build_root}/engines/neurt/librac_neurt_core.a"
-    if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
-        inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
-        [ -f "${_neurt_stt_ops}" ] && inputs+=("${_neurt_stt_ops}")
+    local _prebuilt_root _archive
+    _prebuilt_root="$(neurt_prebuilt_root_for_slice macos)"
+    if _archives="$(neurt_prebuilt_archives "${_prebuilt_root}")"; then
+        while IFS= read -r _archive; do inputs+=("${_archive}"); done <<< "${_archives}"
     else
         echo "note: NeuRT private archives absent — packaging the non-routable shell slice (macos)" >&2
     fi
