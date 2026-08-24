@@ -42,6 +42,14 @@ foreach(_t IN ITEMS
         endif()
     endif()
 endforeach()
+# SHARED IMPORTED onnxruntime: TARGET_FILE is the DLL (unusable for
+# link.exe). Stage the import library instead.
+if(WIN32 AND TARGET onnxruntime)
+    get_target_property(_ort_type onnxruntime TYPE)
+    if(_ort_type STREQUAL "SHARED_LIBRARY")
+        string(APPEND _kit_genex "$<TARGET_LINKER_FILE:onnxruntime>\n")
+    endif()
+endif()
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/cpp-desktop-libs.txt" CONTENT "${_kit_genex}")
 
 set(_kit_os "${CMAKE_SYSTEM_NAME}")
@@ -128,6 +136,7 @@ endif()
 
 set(_kit_depends rac_commons)
 foreach(_t IN ITEMS
+        zlibstatic bz2_bundled
         llama llama-common llama-common-base ggml ggml-base ggml-cpu ggml-metal ggml-cuda ggml-vulkan ggml-blas
         rac_runtime_onnxrt rac_runtime_coreml
         rac_backend_llamacpp rac_backend_onnx rac_backend_sherpa

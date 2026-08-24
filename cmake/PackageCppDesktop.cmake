@@ -162,6 +162,16 @@ if(RAC_BINARY_DIR)
             file(COPY "${_hit}" DESTINATION "${RAC_KIT_OUT}/third_party")
         endforeach()
     endforeach()
+    # Import lib lives next to the FetchContent unzip, not as TARGET_FILE.
+    foreach(_ort_lib IN ITEMS
+            "${RAC_BINARY_DIR}/_deps/onnxruntime-src/lib/onnxruntime.lib"
+            "${RAC_BINARY_DIR}/lib/onnxruntime.lib")
+        if(EXISTS "${_ort_lib}")
+            file(COPY "${_ort_lib}" DESTINATION "${RAC_KIT_OUT}/lib")
+            string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/onnxruntime.lib;")
+            break()
+        endif()
+    endforeach()
     if(APPLE AND EXISTS "${RAC_KIT_OUT}/third_party/libonnxruntime.dylib")
         # The real dylib advertises LC_ID_DYLIB @rpath/libonnxruntime.1.dylib.
         # There is no loadable file by that name in the kit, so rewrite the id

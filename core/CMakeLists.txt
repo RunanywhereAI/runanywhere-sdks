@@ -215,6 +215,12 @@ set(_RAC_FORCE_BUNDLED_ZLIB OFF)
 if(EMSCRIPTEN OR ANDROID OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_ZLIB ON)
 endif()
+# Desktop-kit Windows CI installs vcpkg zlib for libcurl. That makes
+# find_package(ZLIB) succeed (zs.lib), so zlibstatic is never created and the
+# packager cannot stage zlibstatic.lib — the name rac_commons PUBLIC-links.
+if(RAC_PACKAGE_CPP_DESKTOP)
+    set(_RAC_FORCE_BUNDLED_ZLIB ON)
+endif()
 
 if(_RAC_FORCE_BUNDLED_ZLIB)
     message(STATUS "${RAC_PLATFORM_NAME}: forcing bundled zlib (cross-compile target)")
