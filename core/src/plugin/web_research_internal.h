@@ -10,6 +10,9 @@
 #define RAC_PLUGIN_WEB_RESEARCH_INTERNAL_H
 
 #include <string>
+#include <vector>
+
+#include "plugin/web_search_client.h"
 
 namespace rac::tools::web {
 
@@ -25,6 +28,15 @@ bool query_is_usable(const std::string& line);
 
 /** @brief Strip list markers, quotes and bold markup from one listed line. */
 std::string normalize_query_line(const std::string& line);
+
+/**
+ * @brief Build the evidence block the compose stage answers from.
+ *
+ * Exposed because this is the one place where "did the scrape actually reach
+ * the model" is answerable: it uses each source's page text when the page was
+ * read and falls back to the search snippet when it was not.
+ */
+std::string build_evidence(const std::vector<SearchResult>& sources);
 
 /**
  * @brief Drop a reasoning block the model emitted despite thinking being off.

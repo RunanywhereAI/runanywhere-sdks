@@ -42,6 +42,11 @@ constexpr size_t kSnippetBudget = 400;
 constexpr size_t kPagesToRead = 4;
 constexpr size_t kPageFetchBytes = 400 * 1024;
 constexpr size_t kPageTextBudget = 2000;
+// Floor for "this page yielded content". A consent wall or a JS shell strips
+// to a few dozen characters; a short wire item is a few hundred and is worth
+// reading. This was 200, which silently discarded real articles — a dropped
+// source is invisible in the answer and reads as the model inventing.
+constexpr size_t kMinReadableChars = 120;
 constexpr int32_t kPageTimeoutMs = 10000;
 constexpr int32_t kSearchTimeoutMs = 15000;
 
@@ -213,16 +218,7 @@ std::string plan_query(const std::string& question) {
 }
 
 std::string compose(const std::string& question, const std::vector<SearchResult>& sources) {
-    std::string evidence;
-    for (size_t i = 0; i < sources.size(); ++i) {
-        // The page text when the source was read, the search snippet when it
-        // was not. A snippet is a ranking signal; the page is the material.
-        const std::string& body = sources[i].body.empty() ? sources[i].snippet : sources[i].body;
-        const size_t budget = sources[i].body.empty() ? kSnippetBudget : kPageTextBudget;
-        evidence += "[" + std::to_string(i + 1) + "] " + sources[i].title + "\n" +
-                    truncate(body, budget) + "\n\n";
-    }
-
+    const std::string evidence = rac::tools::web::build_evidence(sources);
     std::string answer;
     const bool ok = generate(
         "You answer only from the sources below. Every fact in your answer must appear in "
@@ -320,7 +316,7 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
         // rather than fatal: its snippet still stands and the others carry the
         // answer. A very short body is nearly always a consent wall or a JS
         // shell rather than an article.
-        if (body.size() < 200) {
+        if (body.size() < kMinReadableChars) {
             ctx->emit(ctx, "reading", label.c_str(), RAC_TOOL_PROGRESS_FAILED,
                       "could not read this page");
             continue;
@@ -386,6 +382,19 @@ const rac_tool_provider_t kProvider = {
 }  // namespace
 
 namespace rac::tools::web {
+
+std::string build_evidence(const std::vector<SearchResult>& sources) {
+    std::string evidence;
+    for (size_t i = 0; i < sources.size(); ++i) {
+        // The page text when the source was read, the search snippet when it
+        // was not. A snippet is a ranking signal; the page is the material.
+        const std::string& body = sources[i].body.empty() ? sources[i].snippet : sources[i].body;
+        const size_t budget = sources[i].body.empty() ? kSnippetBudget : kPageTextBudget;
+        evidence += "[" + std::to_string(i + 1) + "] " + sources[i].title + "\n" +
+                    truncate(body, budget) + "\n\n";
+    }
+    return evidence;
+}
 
 /**
  * Drop a reasoning block the model emitted anyway.
