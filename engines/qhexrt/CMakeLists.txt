@@ -600,6 +600,16 @@ else()
     message(STATUS "  -> building not-routable shell (rejects with RAC_ERROR_BACKEND_UNAVAILABLE)")
 endif()
 
+option(RAC_REQUIRE_QHEXRT_ENGINE
+    "Fail configure unless a real QHexRT prebuilt is present (desktop overlay CI)"
+    OFF)
+if(RAC_REQUIRE_QHEXRT_ENGINE AND NOT RAC_QHEXRT_ENGINE_AVAILABLE)
+    message(FATAL_ERROR
+        "RAC_REQUIRE_QHEXRT_ENGINE=ON but QHexRT is not routable "
+        "(QHEXRT_ROOT=${QHEXRT_ROOT}). "
+        "Run: NEURUN_TOKEN=... scripts/build/download-qhexrt.sh --abi win-arm64")
+endif()
+
 rac_add_engine_plugin(qhexrt
     TARGET_NAME         rac_backend_qhexrt
     CXX_STANDARD        17

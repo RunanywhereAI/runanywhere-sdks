@@ -74,10 +74,39 @@ kit-bearing SDK release.
 
 ## Private packs
 
-NeuRT (Apple ANE) and QHexRT (Windows ARM64 NPU) are **not** in the public kit.
+NeuRT (Apple ANE) and QHexRT (Qualcomm Hexagon NPU, Windows ARM64) are **not**
+in the public kit tarball and **never** become GitHub Release assets.
+
+They ship as **private overlays** (workflow artifacts only):
+
+| Overlay | Host | Contents |
+|---------|------|----------|
+| `RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz` | macOS arm64 | `librac_backend_neurt.a` + neurun `libneurt_*.a` |
+| `RunAnywhere-cpp-desktop-windows-arm64-qhexrt-private-v*.tar.gz` | Windows arm64 | `rac_backend_qhexrt.lib` + QHexRT core/host + QAIRT DLLs |
+
+Public GitHub Release kits stay OSS (llama.cpp, Sherpa, ONNX, MLX on Apple). A
+Windows arm64 OSS kit is commons + desktop adapter only (ggml/ONNX do not
+configure on MSVC ARM64 today). Overlay that with the QHexRT pack on Snapdragon.
 
 ```bash
+# Fetch neurun payloads (needs NEURUN_TOKEN)
 NEURUN_TOKEN=... ./scripts/build/fetch-private-engine-pack.sh neurt macos-arm64
+NEURUN_TOKEN=... ./scripts/build/fetch-private-engine-pack.sh qhexrt windows-arm64
+
+# Build + package overlays (CI does this; do not use package-cpp-desktop-tarball)
+cmake --preset cpp-desktop-macos-arm64-neurt
+cmake --build --preset cpp-desktop-macos-arm64-neurt --target rac_backend_neurt
+./scripts/build/package-private-engine-overlay.sh --engine neurt \
+  --build-dir build/cpp-desktop-macos-arm64-neurt
+
+# Drop onto a public kit prefix
+tar xzf RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz -C "$KIT"
 ```
 
-RCLI defines `RCLI_HAS_NEURT` only when `RunAnywhere::neurt` (or the pack) is present.
+`find_package(RunAnywhere)` treats `lib/librac_backend_neurt.a` (or
+`rac_backend_qhexrt.lib`) as the source of truth even when the public kit was
+built with `HAS_NEURT=FALSE`. RCLI defines `RCLI_HAS_NEURT` /
+`RCLI_HAS_QHEXRT` only when those imported targets exist.
+
+Overlay CI fails closed: missing `NEURUN_TOKEN` or a non-routable shell is a
+hard error (`RAC_REQUIRE_NEURT_ENGINE` / `RAC_REQUIRE_QHEXRT_ENGINE`).

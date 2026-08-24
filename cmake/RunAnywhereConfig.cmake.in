@@ -63,7 +63,11 @@ if(NOT TARGET RunAnywhere::commons)
         if(NOT _an STREQUAL "@RUNANYWHERE_KIT_COMMONS_ARCHIVE@")
             # Static plugin archives register via ctor; the linker otherwise
             # drops them because rcli never references a symbol inside.
-            if(_an MATCHES "^(lib)?rac_backend_")
+            # Public-kit engines (llamacpp, mlx, onnx, sherpa, cloud) live in
+            # this glob. NeuRT / QHexRT overlays are linked via RunAnywhere::neurt
+            # / RunAnywhere::qhexrt below — including them here double-links the
+            # same archive and blows up on MSVC LNK2005.
+            if(_an MATCHES "^(lib)?rac_backend_" AND NOT _an MATCHES "(neurt|qhexrt)")
                 # Must be a link feature/flag, not INTERFACE_LINK_LIBRARIES
                 # with a leading slash — Ninja then stats `/WHOLEARCHIVE:C:/...`
                 # as a path and fails FindFirstFileExA.
@@ -113,12 +117,30 @@ foreach(_opt mlx neurt qhexrt)
     string(TOUPPER ${_opt} _OPT)
     set(_opt_lib
         "${RunAnywhere_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}rac_backend_${_opt}${CMAKE_STATIC_LIBRARY_SUFFIX}")
-    if(RunAnywhere_HAS_${_OPT} AND EXISTS "${_opt_lib}")
+    # Discover overlays dropped onto a public kit even when HAS_* was false
+    # at package time. Presence of the archive is the source of truth.
+    if(EXISTS "${_opt_lib}")
+        set(RunAnywhere_HAS_${_OPT} TRUE)
         if(NOT TARGET RunAnywhere::${_opt})
             add_library(RunAnywhere::${_opt} STATIC IMPORTED)
+            set(_opt_link RunAnywhere::commons)
+            if(_opt STREQUAL "neurt")
+                file(GLOB _preb
+                    "${RunAnywhere_LIBRARY_DIR}/libneurt_*.a"
+                    "${RunAnywhere_LIBRARY_DIR}/neurt_*.lib")
+            elseif(_opt STREQUAL "qhexrt")
+                file(GLOB _preb
+                    "${RunAnywhere_LIBRARY_DIR}/qhexrt_*.lib"
+                    "${RunAnywhere_LIBRARY_DIR}/libqhexrt_*.a")
+            else()
+                set(_preb "")
+            endif()
+            if(_preb)
+                list(APPEND _opt_link ${_preb})
+            endif()
             set_target_properties(RunAnywhere::${_opt} PROPERTIES
                 IMPORTED_LOCATION "${_opt_lib}"
-                INTERFACE_LINK_LIBRARIES RunAnywhere::commons)
+                INTERFACE_LINK_LIBRARIES "${_opt_link}")
         endif()
     endif()
 endforeach()
