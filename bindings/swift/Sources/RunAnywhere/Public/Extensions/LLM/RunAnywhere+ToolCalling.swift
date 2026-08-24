@@ -258,7 +258,11 @@ public extension RunAnywhere {
         // one LLM round-trip per tool. Default false preserves the
         // historical single-call-per-turn behavior.
         parallelToolCalls: Bool? = nil,
-        history: [String] = []
+        history: [String] = [],
+        // Stage-by-stage progress from tools that do multi-step work, e.g. the
+        // commons `web_research` tool. Called on commons' worker thread, so
+        // hop to the main actor before touching UI state.
+        onProgress: (@Sendable (ToolProgress) -> Void)? = nil
     ) async throws -> RAToolCallingResult {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -317,7 +321,8 @@ public extension RunAnywhere {
         return try await generateWithToolsCancellable(
             requestBytes: requestBytes,
             runLoop: runLoop,
-            cancelFn: cancelFn
+            cancelFn: cancelFn,
+            onProgress: onProgress
         )
     }
 
@@ -329,9 +334,10 @@ public extension RunAnywhere {
     private static func generateWithToolsCancellable(
         requestBytes: Data,
         runLoop: ToolCallingRunLoopProtoABI.RunLoop,
-        cancelFn: ToolCallingRunLoopProtoABI.Cancel
+        cancelFn: ToolCallingRunLoopProtoABI.Cancel,
+        onProgress: (@Sendable (ToolProgress) -> Void)? = nil
     ) async throws -> RAToolCallingResult {
-        let handleBox = HandleBox(cancel: cancelFn)
+        let handleBox = HandleBox(cancel: cancelFn, onProgress: onProgress)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<RAToolCallingResult, Error>) in
                 DispatchQueue.global(qos: .userInitiated).async {
@@ -576,12 +582,23 @@ private final class HandleBox: @unchecked Sendable {
 
     private let state = OSAllocatedUnfairLock<State>(initialState: State())
     private let cancel: ToolCallingRunLoopProtoABI.Cancel
+    private let onProgress: (@Sendable (ToolProgress) -> Void)?
 
-    init(cancel: @escaping ToolCallingRunLoopProtoABI.Cancel) {
+    init(
+        cancel: @escaping ToolCallingRunLoopProtoABI.Cancel,
+        onProgress: (@Sendable (ToolProgress) -> Void)? = nil
+    ) {
         self.cancel = cancel
+        self.onProgress = onProgress
     }
 
     func publish(_ handle: UInt64) {
+        // Subscribing here, rather than before the call, is what makes the
+        // handle available: commons mints it and publishes it synchronously
+        // before its first generation, so this runs before any tool can emit.
+        if let onProgress {
+            ToolProgressHub.shared.addObserver(handle: handle, onProgress)
+        }
         let shouldCancel = state.withLock { state in
             state.handle = handle
             guard state.cancellationRequested, !state.cancellationDelivered else { return false }
@@ -607,6 +624,10 @@ private final class HandleBox: @unchecked Sendable {
     }
 
     func clear() {
+        let handle = state.withLock { $0.handle }
+        if handle != 0 {
+            ToolProgressHub.shared.removeObserver(handle: handle)
+        }
         state.withLock { $0.handle = 0 }
     }
 }
