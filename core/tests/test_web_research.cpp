@@ -243,6 +243,11 @@ void test_registration() {
         }
         CHECK(std::string(provider->parameters_json).find("\"question\"") != std::string::npos,
               "question is a declared parameter");
+        // Not required at the schema level on purpose: commons validates before
+        // the tool runs, and a rejected call throws away the whole turn rather
+        // than letting the model correct itself.
+        CHECK(std::string(provider->parameters_json).find("required") == std::string::npos,
+              "no argument is marked required");
     }
     CHECK(rac_tool_web_research_unregister() == RAC_SUCCESS, "unregistered");
     CHECK(rac_tool_provider_find("web_research") == nullptr, "gone from the registry");
@@ -291,10 +296,11 @@ void test_no_transport_is_reported() {
 void test_missing_question_rejected() {
     std::printf("[12] a call with no question\n");
     const json result = run_tool(R"({})");
-    CHECK(result.value("error", std::string()) == "missing question", "rejected up front");
+    CHECK(result.value("error", std::string()).find("Call web_research again") != std::string::npos,
+          "rejected up front");
 
     const json blank = run_tool(R"({"question":"   "})");
-    CHECK(blank.value("error", std::string()) == "missing question",
+    CHECK(blank.value("error", std::string()).find("Call web_research again") != std::string::npos,
           "whitespace is not a question");
 
     const json broken = run_tool("not json at all");
@@ -305,7 +311,8 @@ void test_missing_question_rejected() {
 
     // A model writing {"question": 42} must degrade, not throw.
     const json wrong_type = run_tool(R"({"question":42})");
-    CHECK(wrong_type.value("error", std::string()) == "missing question",
+    CHECK(wrong_type.value("error", std::string()).find("Call web_research again") !=
+              std::string::npos,
           "a non-string question is treated as absent");
 
     // Models pass arguments the schema never advertised. Ignoring them beats
