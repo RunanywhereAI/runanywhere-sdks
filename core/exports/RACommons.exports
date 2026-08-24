@@ -1256,3 +1256,28 @@ _rac_rerank_destroy
 _rac_rerank_initialize
 _rac_rerank_rerank
 _rac_rerank_result_free
+
+# ============================================================================
+# AUTO-SYNC (2026-08-24): symbols appended by sync_rac_api_exports.sh.
+# Net-new RAC_API-decorated decls discovered in the commons headers and
+# not already covered by an earlier curated section. Routing rules live
+# in scripts/validation/commons/sync_rac_api_exports.sh (ROUTING_RULES).
+# Added 7 symbols to RACommons.exports, sorted alphabetically.
+# ============================================================================
+_rac_tool_progress_sink_is_registered
+_rac_tool_progress_sink_register
+_rac_tool_provider_at
+_rac_tool_provider_count
+_rac_tool_provider_find
+_rac_tool_provider_register
+_rac_tool_provider_unregister
+
+# ============================================================================
+# AUTO-SYNC (2026-08-24): symbols appended by sync_rac_api_exports.sh.
+# Net-new RAC_API-decorated decls discovered in the commons headers and
+# not already covered by an earlier curated section. Routing rules live
+# in scripts/validation/commons/sync_rac_api_exports.sh (ROUTING_RULES).
+# Added 2 symbols to RACommons.exports, sorted alphabetically.
+# ============================================================================
+_rac_tool_web_research_register
+_rac_tool_web_research_unregister

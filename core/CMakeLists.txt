@@ -763,6 +763,11 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.
     src/plugin/rac_runtime_registry.cpp
+    src/plugin/rac_tool_provider_registry.cpp
+    src/plugin/rac_tool_progress.cpp
+    src/plugin/web_search_client.cpp
+    src/plugin/web_research_provider.cpp
+    src/features/llm/tool_provider_dispatch.cpp
     src/infrastructure/download/download_orchestrator.cpp
     # model_registry.cpp was split per SRP into five TUs (slim core + struct
     # CRUD, proto<->C conversion, proto-byte ABI, filesystem discovery, and

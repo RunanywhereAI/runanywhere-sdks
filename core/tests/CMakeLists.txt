@@ -1038,6 +1038,34 @@ target_compile_features(test_storage_analyzer_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_storage_analyzer_proto)
 add_test(NAME storage_analyzer_proto_tests COMMAND test_storage_analyzer_proto)
 
+# web_research provider: scrape + degraded-path tests (no network).
+add_executable(test_web_research test_web_research.cpp)
+target_include_directories(test_web_research PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core/include
+    ${CMAKE_SOURCE_DIR}/core/src
+    ${CMAKE_SOURCE_DIR}/core/src/generated/proto
+)
+target_link_libraries(test_web_research PRIVATE rac_commons nlohmann_json::nlohmann_json)
+rac_link_archive_deps(test_web_research)
+target_compile_features(test_web_research PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_web_research)
+add_test(NAME web_research_tests COMMAND test_web_research)
+
+# Tool-provider progress emission (always built — no backend dep).
+add_executable(test_tool_progress test_tool_progress.cpp)
+target_include_directories(test_tool_progress PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core/include
+    ${CMAKE_SOURCE_DIR}/core/src
+    ${CMAKE_SOURCE_DIR}/core/src/generated/proto
+)
+target_link_libraries(test_tool_progress PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_progress)
+target_compile_features(test_tool_progress PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_progress)
+add_test(NAME tool_progress_tests COMMAND test_tool_progress)
+
 # ProviderRegistry<T> template unit tests (always built — no backend dep).
 add_executable(test_provider_registry test_provider_registry.cpp)
 target_include_directories(test_provider_registry PRIVATE
