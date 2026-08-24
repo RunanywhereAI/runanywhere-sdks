@@ -36,6 +36,13 @@ constexpr size_t kDefaultQuestions = 4;
 constexpr size_t kMaxQuestions = 6;
 constexpr size_t kResultsPerQuestion = 4;
 constexpr size_t kSnippetBudget = 400;
+// How many of the ranked results get read in full. Each is an HTTP round trip
+// and this runs on phones, so the cap is deliberately small: the top few carry
+// most of the answer, and a cancel is only noticed between stages.
+constexpr size_t kPagesToRead = 3;
+constexpr size_t kPageFetchBytes = 400 * 1024;
+constexpr size_t kPageTextBudget = 2000;
+constexpr int32_t kPageTimeoutMs = 10000;
 constexpr int32_t kSearchTimeoutMs = 15000;
 
 // Deliberately small. A cancel arriving mid-tool is only observed at the next
@@ -276,8 +283,12 @@ std::vector<std::string> plan_questions(const std::string& question, size_t want
 std::string compose(const std::string& question, const std::vector<SearchResult>& sources) {
     std::string evidence;
     for (size_t i = 0; i < sources.size(); ++i) {
+        // The page text when the source was read, the search snippet when it
+        // was not. A snippet is a ranking signal; the page is the material.
+        const std::string& body = sources[i].body.empty() ? sources[i].snippet : sources[i].body;
+        const size_t budget = sources[i].body.empty() ? kSnippetBudget : kPageTextBudget;
         evidence += "[" + std::to_string(i + 1) + "] " + sources[i].title + "\n" +
-                    truncate(sources[i].snippet, kSnippetBudget) + "\n\n";
+                    truncate(body, budget) + "\n\n";
     }
 
     std::string answer;
@@ -413,16 +424,51 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
         return RAC_SUCCESS;
     }
 
+    // Stage 4 — read the pages behind the top results.
+    if (!ctx->emit(ctx, "reading", "Reading the sources", RAC_TOOL_PROGRESS_STARTED, nullptr)) {
+        return RAC_ERROR_CANCELLED;
+    }
+    size_t read_count = 0;
+    for (size_t i = 0; i < sources.size() && read_count < kPagesToRead; ++i) {
+        if (ctx->is_cancelled(ctx) != RAC_FALSE) {
+            return RAC_ERROR_CANCELLED;
+        }
+        const std::string label = "Reading: " + sources[i].title;
+        const std::string body =
+            rac::tools::web::fetch_page_text(sources[i].url, kPageFetchBytes, kPageTimeoutMs);
+        // A page that will not load, or yields almost nothing, is skipped
+        // rather than fatal: its snippet still stands and the others carry the
+        // answer. A very short body is nearly always a consent wall or a JS
+        // shell rather than an article.
+        if (body.size() < 200) {
+            ctx->emit(ctx, "reading", label.c_str(), RAC_TOOL_PROGRESS_FAILED,
+                      "could not read this page");
+            continue;
+        }
+        sources[i].body = body;
+        ++read_count;
+        const std::string detail = std::to_string(body.size()) + " characters";
+        if (!ctx->emit(ctx, "reading", label.c_str(), RAC_TOOL_PROGRESS_COMPLETED,
+                       detail.c_str())) {
+            return RAC_ERROR_CANCELLED;
+        }
+    }
+    if (read_count == 0) {
+        ctx->emit(ctx, "reading", "Reading the sources", RAC_TOOL_PROGRESS_FAILED,
+                  "no page could be read; answering from search snippets");
+    }
+
     json source_list = json::array();
     for (const auto& source : sources) {
         source_list.push_back({{"title", source.title},
                                {"url", source.url},
-                               {"snippet", truncate(source.snippet, kSnippetBudget)}});
+                               {"snippet", truncate(source.snippet, kSnippetBudget)},
+                               {"read", !source.body.empty()}});
     }
     payload["sources"] = source_list;
     payload["source_url"] = sources.front().url;
 
-    // Stage 4 — answer from what came back.
+    // Stage 5 — answer from what came back.
     if (!ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_STARTED, nullptr)) {
         return RAC_ERROR_CANCELLED;
     }
