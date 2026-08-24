@@ -146,7 +146,7 @@ echo "== no hand-staged payload paths =="
 # Also covers QAIRT: RA_QNN_RUNTIME_DIR pointing at a literal Windows path is
 # exactly the C:\actions-runner-state\qhexrt-qnn-runtime-flat regression --
 # that directory carried no version info and had already gone stale once.
-HANDSTAGE_RE="QHEXRT_ROOT: *['\"][A-Za-z]:\\\\|NEURT_ROOT: *['\"]?[A-Za-z]:\\\\|QAIRT_ROOT: *['\"][A-Za-z]:\\\\|RA_QNN_RUNTIME_DIR: *['\"][A-Za-z]:\\\\|qhexrt-prebuilt\\\\versions|qairt-runtime\\\\versions"
+HANDSTAGE_RE="QHEXRT_ROOT: *['\"][A-Za-z]:\\\\|NEURT_ROOT: *['\"]?[A-Za-z]:\\\\|QAIRT_ROOT: *['\"][A-Za-z]:\\\\|RA_QNN_RUNTIME_DIR: *['\"][A-Za-z]:\\\\|qhexrt-prebuilt\\\\versions|qairt-runtime\\\\(arm64-v8a|win-arm64)\\\\versions"
 if grep -rnE "$HANDSTAGE_RE" "${REPO_ROOT}/.github/workflows/" >/dev/null 2>&1; then
     bad "a workflow pins an engine or QAIRT payload by absolute path; use the downloader"
     grep -rnE "$HANDSTAGE_RE" "${REPO_ROOT}/.github/workflows/" | sed 's/^/         /' >&2
@@ -231,6 +231,11 @@ if [[ "$OFFLINE" -eq 1 || -z "$TOKEN" ]]; then
     note "Local pin checks above still ran."
 else
     repo="${NEURUN_REPO:-RunanywhereAI/neurun}"
+    # Same precedence as scripts/build/download-qairt-runtime.sh -- if a future
+    # QAIRT_RUNTIME_REPO override ever points QAIRT at a different repo than the
+    # engine payloads, this gate must validate the same release the downloader
+    # actually fetches, not silently fall back to the engine repo.
+    qairt_repo="${QAIRT_RUNTIME_REPO:-${NEURUN_REPO:-RunanywhereAI/neurun}}"
     # curl, not `gh`: a self-hosted runner may not have the CLI at all.
     listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
                  -H "Accept: application/vnd.github+json" \
@@ -259,12 +264,12 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
         # move independently, so it is fetched from a separate release listing.
         qairt_listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
                      -H "Accept: application/vnd.github+json" \
-                     "https://api.github.com/repos/${repo}/releases/tags/${QAIRT_RUNTIME_RELEASE_TAG}" \
+                     "https://api.github.com/repos/${qairt_repo}/releases/tags/${QAIRT_RUNTIME_RELEASE_TAG}" \
                    | python3 -c "import json,sys
 rel=json.load(sys.stdin)
 for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
         if [[ -z "$qairt_listing" ]]; then
-            bad "could not read release ${QAIRT_RUNTIME_RELEASE_TAG} from $repo"
+            bad "could not read release ${QAIRT_RUNTIME_RELEASE_TAG} from $qairt_repo"
         else
             qairt_want=()
             for p in "${QAIRT_PLATFORMS[@]}"; do
@@ -306,7 +311,6 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
         done
         for p in "${QAIRT_PLATFORMS[@]}"; do
             var="QAIRT_RUNTIME_$(echo "$p" | tr 'a-z-' 'A-Z_')_SHA256"
-            qairt_repo="${NEURUN_REPO:-$repo}"
             aname="qairt-runtime-${p}-v${QAIRT_RUNTIME_VERSION}.tar.gz"
             if ! fetch_release_asset "$qairt_repo" "$QAIRT_RUNTIME_RELEASE_TAG" \
                     "${aname}.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
