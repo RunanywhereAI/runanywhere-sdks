@@ -335,7 +335,8 @@ void test_pipeline_end_to_end() {
 void test_no_results_is_honest() {
     std::printf("[5] a search with nothing to find says so\n");
     const json result = run_tool("");
-    CHECK(result.value("error", std::string()) == "missing question", "empty question rejected");
+    CHECK(result.value("error", std::string()).find("Call web_research again") != std::string::npos,
+          "empty question rejected");
 }
 
 }  // namespace

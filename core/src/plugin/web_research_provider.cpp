@@ -65,11 +65,18 @@ constexpr const char* kDescription =
     "information newer than your training data, so reach for it rather than saying you cannot "
     "know.";
 
-// One property, and a required one. Three advertised parameters made a small
+// One property, and deliberately NOT marked required. Three advertised parameters made a small
 // model emit malformed JSON often enough to lose the call outright
 // (`{"clarification": "",question":...,max_questions:6}`), and MLX has no
 // grammar constraint to catch it, so bad JSON is simply a dropped tool call.
 // Anything else a model passes is ignored rather than rejected.
+//
+// `required` is omitted because commons validates it before the tool ever
+// runs, and a small model that omits the argument then gets its call REJECTED
+// and the whole turn thrown away with "Missing required argument: question" —
+// the user sees "tools unavailable" and an answer from memory. Handled here
+// instead, a missing argument is a tool result the model can read and correct
+// on the next iteration, which is what a recoverable tool error is for.
 constexpr const char* kParameters = R"({
   "type": "object",
   "properties": {
@@ -77,8 +84,7 @@ constexpr const char* kParameters = R"({
       "type": "string",
       "description": "The question to research, in full. Not keywords."
     }
-  },
-  "required": ["question"]
+  }
 })";
 const char* const kPublishedKeys[] = {"summary", "source_url", nullptr};
 
@@ -219,6 +225,16 @@ std::string plan_query(const std::string& question) {
 
 std::string compose(const std::string& question, const std::vector<SearchResult>& sources) {
     const std::string evidence = rac::tools::web::build_evidence(sources);
+    // The one number that separates "the model was not given the material"
+    // from "the model was given it and answered from memory anyway". Without
+    // it, a fabricated answer and an empty evidence block look identical.
+    size_t read_sources = 0;
+    for (const auto& source : sources) {
+        read_sources += source.body.empty() ? 0 : 1;
+    }
+    RAC_LOG_INFO(kTag, "composing from %zu source(s), %zu read, %zu chars of evidence",
+                 sources.size(), read_sources, evidence.size());
+
     std::string answer;
     const bool ok = generate(
         "You answer only from the sources below. Every fact in your answer must appear in "
@@ -258,7 +274,10 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
 
     const std::string question = trim(string_field(args, "question"));
     if (question.empty()) {
-        *out_result_json = dup_c(error_payload("missing question").dump());
+        *out_result_json =
+            dup_c(error_payload("No question was supplied. Call web_research again with the user's "
+                                "question in the \"question\" argument.")
+                      .dump());
         return RAC_SUCCESS;
     }
 
