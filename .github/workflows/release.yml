@@ -7,6 +7,11 @@ name: Release
 # every client SDK package, computes SHA-256 checksums, and attaches the lot
 # to a single GitHub Release named v1.2.3.
 #
+# That asset set includes the C++ desktop kits
+# (RunAnywhere-cpp-desktop-{macos-arm64,windows-x64}-v1.2.3.tar.gz).
+# Official CLI bottles (rcli) are NOT produced here — they ship from
+# RunanywhereAI/RCLI, which consumes those kits via find_package(RunAnywhere).
+#
 # This workflow does NOT publish to npm / Maven Central / pub.dev /
 # Swift Package Registry / GitHub Packages. GitHub Releases is the only
 # distribution channel.
@@ -156,8 +161,7 @@ jobs:
   native_ios:
     needs: validate
     # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
-    # Use the macOS 26 runner line for Xcode 26 while keeping the desktop rcli
-    # lane on its existing macos-14 llama.cpp Metal pin.
+    # Use the macOS 26 runner line for Xcode 26 (mlx-audio-swift needs Swift 6.2+).
     if: ${{ !inputs.publish_from_run_id }}
     runs-on: macos-26
     # The Apple build compiles all XCFramework slices + the heavy mlx-swift/MLX
@@ -371,7 +375,7 @@ jobs:
       # libsherpa-onnx-c-api.so beside it, and STT/TTS/VAD cannot work on
       # Linux at all. Shipped that way through at least 0.20.24 and 0.20.25
       # (byte-identical carriers) because nothing asserted routability here —
-      # this job used to rely on a sibling rcli job to prefetch sherpa; it now fetches itself.
+      # Prefetch sherpa here (no sibling job supplies it).
       - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
         run: ./core/scripts/linux/download-sherpa-onnx.sh
       - name: Build + package commons for Linux x86_64
@@ -484,8 +488,7 @@ jobs:
       # Sherpa on Windows is a SHA-pinned prebuilt, not a source build. Without
       # this, sherpa still "builds" but as a non-routable stub
       # (RAC_SHERPA_ROUTABLE=0), and build-windows.bat now hard-fails instead of
-      # quietly shipping it. this job must prefetch sherpa itself; it previously assumed a sibling rcli job
-      # did, which is part of why the bundle shipped hollow.
+      # Prefetch sherpa here; a missing prebuilt used to ship a hollow Windows bundle.
       - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
         shell: cmd
         run: core\scripts\windows\download-sherpa-onnx.bat
@@ -1827,9 +1830,7 @@ jobs:
         needs.native_android.result == 'success' &&
         needs.native_linux.result == 'success' &&
         needs.native_cpp_desktop_macos.result == 'success' &&
-        (needs.native_cpp_desktop_windows.result == 'success' ||
-         needs.native_cpp_desktop_windows.result == 'failure' ||
-         needs.native_cpp_desktop_windows.result == 'skipped') &&
+        needs.native_cpp_desktop_windows.result == 'success' &&
         (needs.native_web.result == 'success' ||
          (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped')) &&
         needs.sdk_kotlin.result == 'success' &&
@@ -1963,11 +1964,7 @@ jobs:
           fi
           assert_pair "Web WASM"                       "RACommons-web-v${VERSION}.tar.gz"
           assert_pair "C++ desktop kit macOS arm64"    "RunAnywhere-cpp-desktop-macos-arm64-v${VERSION}.tar.gz"
-          if [ -s "release-flat/RunAnywhere-cpp-desktop-windows-x64-v${VERSION}.tar.gz" ]; then
-            assert_pair "C++ desktop kit Windows x64" "RunAnywhere-cpp-desktop-windows-x64-v${VERSION}.tar.gz"
-          else
-            echo "  SKIP: C++ desktop kit Windows x64 advisory artifact absent"
-          fi
+          assert_pair "C++ desktop kit Windows x64"    "RunAnywhere-cpp-desktop-windows-x64-v${VERSION}.tar.gz"
           # Official CLI bottles ship from RunanywhereAI/RCLI, not this repo.
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"
           assert_pair "Web proto package"              "runanywhere-proto-ts-${VERSION}.tgz"

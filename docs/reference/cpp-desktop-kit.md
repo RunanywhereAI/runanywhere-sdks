@@ -54,6 +54,24 @@ cmake -B build -DCMAKE_PREFIX_PATH=/path/to/dist/cpp-desktop-macos-arm64
 
 `find_package(RunAnywhere ${PIN} EXACT REQUIRED)` links `RunAnywhere::commons`.
 
+## How kits ship
+
+Two paths, same tarball names:
+
+1. **Full SDK train** (`.github/workflows/release.yml` on a `v*` tag). Jobs
+   `native_cpp_desktop_macos` and `native_cpp_desktop_windows` are first-class
+   assets. Publish requires both. Windows is a hard `assert_pair`, not advisory.
+   Official `rcli` bottles are **not** produced here — they ship from
+   [RCLI](https://github.com/RunanywhereAI/RCLI).
+2. **Dev refresh** (`.github/workflows/cpp-desktop-kit.yml`). PR/push builds
+   plus `workflow_dispatch`. The attach job uploads onto an **existing** GitHub
+   Release (`gh release view` then `gh release upload`). It never runs
+   `gh release create`.
+
+A kit-only prerelease on an already-published tag is a stopgap, not a Swift/npm
+train. The next full tag after this packaging lands is the first official
+kit-bearing SDK release.
+
 ## Private packs
 
 NeuRT (Apple ANE) and QHexRT (Windows ARM64 NPU) are **not** in the public kit.

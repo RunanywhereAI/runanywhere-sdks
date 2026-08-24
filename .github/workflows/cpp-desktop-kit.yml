@@ -122,5 +122,7 @@ jobs:
         run: |
           set -euo pipefail
           ls -la artifacts
+          # Attach-only: never create a release. Fail if the tag has no GitHub Release yet.
+          gh release view "$ATTACH_TAG" --repo "${{ github.repository }}" >/dev/null
           gh release upload "$ATTACH_TAG" artifacts/RunAnywhere-cpp-desktop-*.tar.gz* \
             --repo "${{ github.repository }}" --clobber
