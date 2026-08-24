@@ -78,7 +78,25 @@ def read_target(prebuilt: Path, current: Path) -> str:
                 raw = raw[len(prefix):]
         if PurePath(raw).is_absolute():
             raw = os.path.relpath(raw, os.path.abspath(prebuilt))
-    return PurePosixPath(*PurePath(raw).parts).as_posix()
+    posix = PurePosixPath(*PurePath(raw).parts).as_posix()
+    parts = PurePosixPath(posix).parts
+    if (
+        len(parts) == 2
+        and parts[0] == "versions"
+        and SHA256.fullmatch(parts[1])
+    ):
+        return posix
+    # Git-Bash paths vs native Windows Python: the junction is correct but
+    # relpath of mixed /d/... and C:\... forms is not `versions/<receipt>`.
+    # Resolve both sides and re-derive the relative POSIX path.
+    try:
+        rel = os.path.relpath(
+            os.fspath(Path(current).resolve(strict=True)),
+            os.fspath(Path(prebuilt).resolve(strict=True)),
+        )
+        return PurePosixPath(*PurePath(rel).parts).as_posix()
+    except (OSError, ValueError):
+        return posix
 
 
 def create(prebuilt: Path, receipt: str) -> None:

@@ -15,7 +15,11 @@ file(MAKE_DIRECTORY "${RAC_KIT_OUT}/lib/cmake/RunAnywhere")
 file(MAKE_DIRECTORY "${RAC_KIT_OUT}/share/runanywhere/idl")
 file(MAKE_DIRECTORY "${RAC_KIT_OUT}/third_party")
 
-file(COPY "${RAC_SOURCE_DIR}/core/include/rac" DESTINATION "${RAC_KIT_OUT}/include")
+# Public kits are OSS engines only. NeuRT / QHexRT headers ship in the private
+# overlay (package-private-engine-overlay.sh), never in this prefix.
+file(COPY "${RAC_SOURCE_DIR}/core/include/rac" DESTINATION "${RAC_KIT_OUT}/include"
+     PATTERN "*neurt*" EXCLUDE
+     PATTERN "*qhexrt*" EXCLUDE)
 
 file(GLOB _protos "${RAC_SOURCE_DIR}/idl/*.proto")
 if(_protos)

@@ -34,7 +34,7 @@ VERSION="$(tr -d '[:space:]' < "$ROOT/core/VERSION")"
 
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
-mkdir -p "$stage/lib" "$stage/bin" "$stage/share/runanywhere/private"
+mkdir -p "$stage/lib" "$stage/bin" "$stage/include" "$stage/share/runanywhere/private"
 
 copy_one() {
   local src="$1" dest="$2"
@@ -71,6 +71,9 @@ case "$ENGINE" in
     backend="$(find_backend_archive rac_backend_neurt)"
     min_bytes "$backend" 1000
     copy_one "$backend" "$stage/lib/"
+    mkdir -p "$stage/include/rac/plugin"
+    copy_one "$ROOT/core/include/rac/plugin/rac_plugin_entry_neurt.h" \
+      "$stage/include/rac/plugin/rac_plugin_entry_neurt.h"
     for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a libneurt_rac_diffusion.a; do
       copy_one "$PRE/lib/$lib" "$stage/lib/"
       min_bytes "$stage/lib/$lib" 8000
@@ -138,7 +141,8 @@ mkdir -p "$ROOT/dist"
 if [[ -z "$OUT" ]]; then
   OUT="$ROOT/dist/RunAnywhere-cpp-desktop-${OS_ARCH}-${ENGINE}-private-v${VERSION}.tar.gz"
 fi
-tar -C "$stage" -czf "$OUT" lib bin share
+# include/ is present for NeuRT (plugin entry header); QHexRT overlays have none.
+tar -C "$stage" -czf "$OUT" lib bin share include
 if command -v shasum >/dev/null 2>&1; then
   shasum -a 256 "$OUT" | tee "${OUT}.sha256"
 elif command -v sha256sum >/dev/null 2>&1; then
