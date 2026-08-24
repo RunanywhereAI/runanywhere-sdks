@@ -56,6 +56,18 @@ esac
 PY_BIN="${PYTHON_BIN:-python3}"
 command -v "$PY_BIN" >/dev/null 2>&1 || PY_BIN=python
 
+# Git-Bash `/d/a/...` vs native Windows Python `D:\a\...`. Same helper as
+# download-qhexrt.sh: mixed forms make `_selection.read_target` reject the
+# junction and leave `current` unusable to later Git-Bash walkers.
+to_py_path() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$1"
+    else
+        printf '%s' "$1"
+    fi
+}
+PY_SCRIPTS="$(to_py_path "${REPO_ROOT}/scripts/build")"
+
 VERSION="${QAIRT_RUNTIME_VERSION:-}"
 TAG="${QAIRT_RUNTIME_RELEASE_TAG:-}"
 case "$PLATFORM" in
@@ -84,8 +96,8 @@ DEST="${DEST_ROOT}/versions/${EXPECTED_SHA}"
 # first symptom would be the engine failing to load on a device.
 cached_ok=0
 if [[ -f "${DEST}/qairt-runtime.json" && "$FORCE" -eq 0 ]]; then
-    if "$PY_BIN" "${REPO_ROOT}/scripts/build/_validate_qairt_runtime.py" \
-            "$DEST" "$PLATFORM" "$VERSION" >/dev/null 2>&1; then
+    if "$PY_BIN" "$(to_py_path "${REPO_ROOT}/scripts/build/_validate_qairt_runtime.py")" \
+            "$(to_py_path "$DEST")" "$PLATFORM" "$VERSION" >/dev/null 2>&1; then
         cached_ok=1
         echo "[OK] ${PLATFORM}: QAIRT runtime ${VERSION} already present and valid"
     else
@@ -116,8 +128,8 @@ print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" "${tmp}/${ASSE
 
     # Validate the STAGED tree before touching anything live -- same checker the
     # cached path above runs, so the two can never drift apart.
-    "$PY_BIN" "${REPO_ROOT}/scripts/build/_validate_qairt_runtime.py" \
-        "$inner" "$PLATFORM" "$VERSION"
+    "$PY_BIN" "$(to_py_path "${REPO_ROOT}/scripts/build/_validate_qairt_runtime.py")" \
+        "$(to_py_path "$inner")" "$PLATFORM" "$VERSION"
 
     mkdir -p "${DEST_ROOT}/versions"
     rm -rf "${DEST}.incoming" "$DEST"
@@ -129,6 +141,6 @@ fi
 # relative symlink on POSIX) -- see scripts/build/_selection.py.
 "$PY_BIN" -c 'import sys; sys.path.insert(0, sys.argv[1]); import _selection;
 _selection.create(sys.argv[2], sys.argv[3])' \
-    "${REPO_ROOT}/scripts/build" "$DEST_ROOT" "$EXPECTED_SHA"
+    "$PY_SCRIPTS" "$(to_py_path "$DEST_ROOT")" "$EXPECTED_SHA"
 
 echo "[OK] ${PLATFORM} QAIRT runtime selected -> ${DEST}"

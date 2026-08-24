@@ -13,6 +13,38 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=/dev/null
 source "$ROOT/core/scripts/load-versions.sh"
 
+# Git-Bash `/d/a/...` vs native Windows Python `D:\a\...`. Junctions created or
+# read with mixed forms fail `_selection.read_target`'s versions/<receipt> check,
+# and Git-Bash `find` does not recurse a Windows junction at all.
+to_py_path() {
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+
+PY_BIN="$(command -v python3 || command -v python || true)"
+PY_SCRIPTS="$(to_py_path "$ROOT/scripts/build")"
+
+# Resolve prebuilt/current (symlink or Windows junction) to versions/<receipt>.
+resolve_current() {
+  local root="$1"
+  if [[ -z "$PY_BIN" ]]; then
+    printf '%s\n' "${root}/current"
+    return
+  fi
+  local rel
+  rel="$("$PY_BIN" -c 'import sys
+sys.path.insert(0, sys.argv[1])
+import _selection
+from pathlib import Path
+root = Path(sys.argv[2])
+print(_selection.read_target(root, root / "current"))
+' "$PY_SCRIPTS" "$(to_py_path "$root")")"
+  printf '%s\n' "${root}/${rel}"
+}
+
 ENGINE=""
 BUILD_DIR=""
 OUT=""
@@ -109,12 +141,34 @@ case "$ENGINE" in
       echo "QHexRT receipt missing under $PRE" >&2
       exit 1
     fi
-    qairt="$ROOT/engines/qhexrt/prebuilt/qairt-runtime/win-arm64/current"
-    if [[ ! -d "$qairt" ]]; then
-      echo "QAIRT runtime missing at $qairt — run download-qairt-runtime.sh --platform win-arm64" >&2
+    qairt_root="$ROOT/engines/qhexrt/prebuilt/qairt-runtime/win-arm64"
+    if [[ ! -e "${qairt_root}/current" ]]; then
+      echo "QAIRT runtime missing at ${qairt_root}/current — run download-qairt-runtime.sh --platform win-arm64" >&2
       exit 1
     fi
-    find "$qairt" -type f \( -name '*.dll' -o -name '*.lib' \) -exec cp {} "$stage/bin/" \;
+    # `find` on Git-Bash does not descend Windows junctions, so walking
+    # `current` looks empty even when versions/<receipt> is fully populated.
+    qairt="$(resolve_current "$qairt_root")"
+    if [[ ! -d "$qairt" ]]; then
+      echo "QAIRT runtime selection did not resolve to a directory: $qairt" >&2
+      exit 1
+    fi
+    if [[ -z "$PY_BIN" ]]; then
+      echo "python3/python required to copy QAIRT DLLs off a Windows junction" >&2
+      exit 1
+    fi
+    "$PY_BIN" -c 'import shutil, sys
+from pathlib import Path
+src, dst = Path(sys.argv[1]), Path(sys.argv[2])
+n = 0
+for p in src.rglob("*"):
+    if p.is_file() and p.suffix.lower() in {".dll", ".lib"}:
+        shutil.copy2(p, dst / p.name)
+        n += 1
+if n == 0:
+    sys.exit(f"QAIRT runtime at {src} produced no DLLs; refusing a stub overlay")
+print(f"copied {n} QAIRT runtime files")
+' "$(to_py_path "$qairt")" "$(to_py_path "$stage/bin")"
     shopt -s nullglob
     dlls=("$stage/bin"/*.dll)
     shopt -u nullglob
