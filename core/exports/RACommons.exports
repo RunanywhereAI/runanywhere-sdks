@@ -1307,3 +1307,12 @@ _rac_agent_workflow_list_proto
 _rac_agent_workflow_load_proto
 _rac_agent_workflow_save_proto
 _rac_agent_workflow_validate_proto
+
+# ============================================================================
+# AUTO-SYNC (2026-08-24): symbols appended by sync_rac_api_exports.sh.
+# Net-new RAC_API-decorated decls discovered in the commons headers and
+# not already covered by an earlier curated section. Routing rules live
+# in scripts/validation/commons/sync_rac_api_exports.sh (ROUTING_RULES).
+# Added 1 symbols to RACommons.exports, sorted alphabetically.
+# ============================================================================
+_rac_agent_schedule_next_fire

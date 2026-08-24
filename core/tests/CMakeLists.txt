@@ -308,6 +308,17 @@ target_compile_features(test_agent_workflow PRIVATE cxx_std_20)
 rac_test_define_have_protobuf(test_agent_workflow)
 add_test(NAME agent_workflow_tests COMMAND test_agent_workflow)
 
+add_executable(test_cron test_cron.cpp)
+target_include_directories(test_cron PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_cron PRIVATE rac_commons)
+rac_link_archive_deps(test_cron)
+target_compile_features(test_cron PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_cron)
+add_test(NAME cron_tests COMMAND test_cron)
+
 add_executable(test_solution_runner test_solution_runner.cpp)
 target_include_directories(test_solution_runner PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

@@ -2,8 +2,11 @@
 
 #include "workflow_validator.h"
 
+#include "cron.h"
+
 #include <algorithm>
 #include <deque>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -322,18 +325,18 @@ void validate_document(const WorkflowDocument& document,
             continue;
         }
         if (!by_id.emplace(node.id(), &node).second) {
-            const std::string id = node.id();
+            const std::string& id = node.id();
             add_issue(out_result, "duplicate node id '" + id + "'", &id);
             continue;
         }
         if (!node_has_config(node)) {
-            const std::string id = node.id();
+            const std::string& id = node.id();
             add_issue(out_result, "node '" + id + "' has no configuration set", &id);
         }
         // Expressions address nodes by name, so two nodes sharing one makes the
         // reference ambiguous rather than merely confusing.
         if (!node.name().empty() && !names.insert(node.name()).second) {
-            const std::string id = node.id();
+            const std::string& id = node.id();
             add_issue(out_result, "duplicate node name '" + node.name() + "'", &id);
         }
         if (is_trigger(node))
@@ -347,7 +350,7 @@ void validate_document(const WorkflowDocument& document,
 
     std::set<std::string> seen_edges;
     for (const auto& edge : document.edges()) {
-        const std::string from = edge.from_node();
+        const std::string& from = edge.from_node();
         const std::string signature =
             from + ":" + edge.from_port() + "->" + edge.to_node() + ":" + edge.to_port();
         if (!seen_edges.insert(signature).second) {
@@ -377,7 +380,7 @@ void validate_document(const WorkflowDocument& document,
         }
         if (std::find(to_ports.inputs.begin(), to_ports.inputs.end(), edge.to_port()) ==
             to_ports.inputs.end()) {
-            const std::string to = edge.to_node();
+            const std::string& to = edge.to_node();
             add_issue(out_result, "node '" + to + "' has no input port '" + edge.to_port() + "'",
                       &to);
         }
@@ -388,7 +391,7 @@ void validate_document(const WorkflowDocument& document,
             continue;
         for (const std::string& body_id : node.loop_over_items().body_node_ids()) {
             if (by_id.count(body_id) == 0) {
-                const std::string id = node.id();
+                const std::string& id = node.id();
                 add_issue(out_result,
                           "loop '" + id + "' references unknown body node '" + body_id + "'", &id);
             }
@@ -398,7 +401,7 @@ void validate_document(const WorkflowDocument& document,
     for (const WorkflowNode& node : document.nodes()) {
         for (const std::string& referenced : referenced_node_names(node)) {
             if (names.count(referenced) == 0) {
-                const std::string id = node.id();
+                const std::string& id = node.id();
                 add_issue(out_result, "expression references unknown node '" + referenced + "'",
                           &id);
             }
@@ -418,10 +421,37 @@ void validate_document(const WorkflowDocument& document,
                 });
             if (wired || config.arguments().count(port.name()) > 0)
                 continue;
-            const std::string id = node.id();
+            const std::string& id = node.id();
             add_issue(out_result,
                       "pack argument '" + port.name() + "' on node '" + id +
                           "' has no connection and no configured value",
+                      &id);
+        }
+    }
+
+    for (const WorkflowNode& node : document.nodes()) {
+        if (node.config_case() != WorkflowNode::kScheduleTrigger)
+            continue;
+        const auto& schedule = node.schedule_trigger();
+        if (schedule.kind() != runanywhere::v1::SCHEDULE_KIND_CRON)
+            continue;
+
+        const std::string& id = node.id();
+        if (schedule.cron().empty()) {
+            add_issue(out_result, "cron schedule on node '" + id + "' has no expression", &id);
+            continue;
+        }
+
+        std::string error;
+        const std::optional<CronExpression> parsed = CronExpression::parse(schedule.cron(), &error);
+        if (!parsed.has_value()) {
+            add_issue(out_result,
+                      "cron expression '" + schedule.cron() + "' on node '" + id +
+                          "' is invalid: " + error,
+                      &id);
+        } else if (!parsed->ever_fires()) {
+            add_issue(out_result,
+                      "cron expression '" + schedule.cron() + "' on node '" + id + "' never fires",
                       &id);
         }
     }
@@ -437,7 +467,7 @@ void validate_document(const WorkflowDocument& document,
     // computed so it never flips a document that is otherwise fine.
     for (const WorkflowNode& node : document.nodes()) {
         if (node.config_case() == WorkflowNode::kPackNode && node.pack_node().missing()) {
-            const std::string id = node.id();
+            const std::string& id = node.id();
             add_issue(out_result, "pack '" + node.pack_node().pack_id() + "' is not installed",
                       &id);
         }

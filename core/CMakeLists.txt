@@ -1877,6 +1877,7 @@ if(RAC_ENABLE_PROTOBUF)
         src/agent/pack_store.cpp
         src/agent/bundle.cpp
         src/agent/workflow_validator.cpp
+        src/agent/cron.cpp
         src/agent/expression.cpp
         src/agent/host_callbacks.cpp
         src/agent/node_executors.cpp
