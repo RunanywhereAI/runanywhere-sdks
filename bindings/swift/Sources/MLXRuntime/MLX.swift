@@ -962,7 +962,15 @@ private final class MLXSession: @unchecked Sendable {
                 // so commons' run loop saw output with no call in it and failed
                 // the turn. Re-emit the wire form it expects; commons owns the
                 // parse for every other engine and now owns it here too.
-                onToken(toolCallWireText(call))
+                //
+                // The return value is the consumer's stop signal, honored the
+                // same way `.chunk` honors it: a caller that has stopped reading
+                // must not keep the model generating.
+                if !onToken(toolCallWireText(call)) {
+                    shouldFlushHeldTokens = false
+                    cancel()
+                    break generationLoop
+                }
             case .rejectedToolCall(let rejection):
                 // A rejection only means MLX-LM could not match the call against
                 // tools *it* was told about, and commons never declares them to
@@ -974,7 +982,11 @@ private final class MLXSession: @unchecked Sendable {
                     mlxRuntimeLogger.debug(
                         "MLX forwarding rejected tool call (\(rejection.reason.rawValue)) to commons"
                     )
-                    onToken(rejection.rawTextPreview)
+                    if !onToken(rejection.rawTextPreview) {
+                        shouldFlushHeldTokens = false
+                        cancel()
+                        break generationLoop
+                    }
                 } else {
                     throw RejectedToolCallError(rejection)
                 }
@@ -1044,7 +1056,13 @@ private final class MLXSession: @unchecked Sendable {
                 // so commons' run loop saw output with no call in it and failed
                 // the turn. Re-emit the wire form it expects; commons owns the
                 // parse for every other engine and now owns it here too.
-                onToken(toolCallWireText(call))
+                //
+                // Cancelling is what stops this loop, not a `break`: the `break`
+                // in `.chunk` leaves the switch, and the `isCancelled` check at
+                // the top of the next iteration is what actually ends it.
+                if !onToken(toolCallWireText(call)) {
+                    cancel()
+                }
             case .rejectedToolCall(let rejection):
                 // A rejection only means MLX-LM could not match the call against
                 // tools *it* was told about, and commons never declares them to
@@ -1056,7 +1074,9 @@ private final class MLXSession: @unchecked Sendable {
                     mlxRuntimeLogger.debug(
                         "MLX forwarding rejected tool call (\(rejection.reason.rawValue)) to commons"
                     )
-                    onToken(rejection.rawTextPreview)
+                    if !onToken(rejection.rawTextPreview) {
+                        cancel()
+                    }
                 } else {
                     throw RejectedToolCallError(rejection)
                 }
