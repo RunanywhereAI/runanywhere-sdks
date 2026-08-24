@@ -183,6 +183,37 @@ class ScopedJniEnv {
     bool did_attach_ = false;
 };
 
+rac_result_t build_request_strings(JNIEnv* env, const rac_http_request_t* req,
+                                   jstring* out_method, jstring* out_url) {
+    if (env == nullptr || req == nullptr || req->method == nullptr || req->url == nullptr ||
+        out_method == nullptr || out_url == nullptr) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    *out_method = nullptr;
+    *out_url = nullptr;
+
+    jstring method = env->NewStringUTF(req->method);
+    if (method == nullptr || env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        if (method != nullptr)
+            env->DeleteLocalRef(method);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    jstring url = env->NewStringUTF(req->url);
+    if (url == nullptr || env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(method);
+        if (url != nullptr)
+            env->DeleteLocalRef(url);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    *out_method = method;
+    *out_url = url;
+    return RAC_SUCCESS;
+}
+
 // Helper: turn a string pair list into a jobjectArray<String> for
 // `OkHttpTransport.executeRequest(headersFlat=[k1,v1,...])`.
 rac_result_t build_headers_flat(JNIEnv* env, const rac_http_header_kv_t* headers,
@@ -418,18 +449,11 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     // Build jstring / jobjectArray / jbyteArray args. Always pass a
     // non-null headers array so Kotlin's executeRequest(headersFlat) loop
     // can do a plain `headersFlat.size` check.
-    jstring j_method = env->NewStringUTF(req->method);
-    jstring j_url = env->NewStringUTF(req->url);
-    if (j_method == nullptr || j_url == nullptr) {
-        if (env->ExceptionCheck() == JNI_TRUE) {
-            env->ExceptionClear();
-        }
-        if (j_method)
-            env->DeleteLocalRef(j_method);
-        if (j_url)
-            env->DeleteLocalRef(j_url);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
+    jstring j_method = nullptr;
+    jstring j_url = nullptr;
+    rac_result_t strings_rc = build_request_strings(env, req, &j_method, &j_url);
+    if (strings_rc != RAC_SUCCESS)
+        return strings_rc;
     jobjectArray j_headers = nullptr;
     rac_result_t headers_rc =
         build_headers_flat(env, req->headers, req->header_count, &j_headers);
@@ -589,18 +613,11 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
         return RAC_ERROR_INTERNAL;
     }
 
-    jstring j_method = env->NewStringUTF(req->method);
-    jstring j_url = env->NewStringUTF(req->url);
-    if (j_method == nullptr || j_url == nullptr) {
-        if (env->ExceptionCheck() == JNI_TRUE) {
-            env->ExceptionClear();
-        }
-        if (j_method)
-            env->DeleteLocalRef(j_method);
-        if (j_url)
-            env->DeleteLocalRef(j_url);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
+    jstring j_method = nullptr;
+    jstring j_url = nullptr;
+    rac_result_t strings_rc = build_request_strings(env, req, &j_method, &j_url);
+    if (strings_rc != RAC_SUCCESS)
+        return strings_rc;
     jobjectArray j_headers = nullptr;
     rac_result_t headers_rc =
         build_headers_flat(env, req->headers, req->header_count, &j_headers);
@@ -745,18 +762,11 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
         return RAC_ERROR_INTERNAL;
     }
 
-    jstring j_method = env->NewStringUTF(req->method);
-    jstring j_url = env->NewStringUTF(req->url);
-    if (j_method == nullptr || j_url == nullptr) {
-        if (env->ExceptionCheck() == JNI_TRUE) {
-            env->ExceptionClear();
-        }
-        if (j_method)
-            env->DeleteLocalRef(j_method);
-        if (j_url)
-            env->DeleteLocalRef(j_url);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
+    jstring j_method = nullptr;
+    jstring j_url = nullptr;
+    rac_result_t strings_rc = build_request_strings(env, req, &j_method, &j_url);
+    if (strings_rc != RAC_SUCCESS)
+        return strings_rc;
     jobjectArray j_headers = nullptr;
     rac_result_t headers_rc =
         build_headers_flat(env, req->headers, req->header_count, &j_headers);
