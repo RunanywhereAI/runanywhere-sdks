@@ -47,6 +47,8 @@ constexpr size_t kPageTextBudget = 2000;
 // reading. This was 200, which silently discarded real articles — a dropped
 // source is invisible in the answer and reads as the model inventing.
 constexpr size_t kMinReadableChars = 120;
+// A query is a few words; this only has to cover them plus any preamble.
+constexpr int32_t kQueryTokens = 64;
 constexpr int32_t kPageTimeoutMs = 10000;
 constexpr int32_t kSearchTimeoutMs = 15000;
 
@@ -143,7 +145,7 @@ char* dup_c(const std::string& text) {
  * call here wants a short, literal answer rather than prose.
  */
 bool generate(const std::string& system_prompt, const std::string& prompt, int32_t max_tokens,
-              std::string* out_text) {
+              std::string* out_text, const char* const* history = nullptr, int32_t n_history = 0) {
     rac::llm::LifecycleLlmRef ref;
     if (rac::llm::acquire_lifecycle_llm(&ref) != RAC_SUCCESS) {
         return false;
@@ -160,6 +162,11 @@ bool generate(const std::string& system_prompt, const std::string& prompt, int32
     options.streaming_enabled = RAC_FALSE;
     options.disable_thinking = RAC_TRUE;
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
+    // NULL history is a single-turn generation. Passing none is what keeps a
+    // summarising call from seeing the conversation, which is the difference
+    // between writing up the sources and answering from what was said earlier.
+    options.history = n_history > 0 ? history : nullptr;
+    options.n_history = n_history > 0 ? n_history : 0;
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
 
@@ -185,26 +192,46 @@ bool generate(const std::string& system_prompt, const std::string& prompt, int32
 // --- stages ----------------------------------------------------------------
 
 /**
- * The search query is the user's question, verbatim.
+ * Turn the request into a search query, using the conversation for context.
  *
- * There used to be a generation here that "turned the request into a search
- * query". It was the single worst thing in this tool. Asked for a query, a
- * small model answers the question instead — a real MLX run turned "What is
- * the latest news about Apple today?" into "Apple today's latest news is about
- * the new iPhone 15 Pro Max with 4K Ultra HD display and 200W charging", which
- * is invented, and that invention became the search string. Every page read
- * after it was about a product that does not exist, so the sources genuinely
- * supported the fabrication and the answer looked researched.
+ * History matters here and only here: "what does that news say?" is not a
+ * searchable string without the turn before it. Compose deliberately gets none
+ * — the conversation is context for working out what to look up, and
+ * contamination when writing up what was found.
  *
- * No filter catches that: it is a well-formed sentence of ordinary length.
- * The only fix is to not let a model near the query. The user's own words are
- * a good search string and cannot be hallucinated, and the verbatim fallback
- * was already what produced every correct result this tool has returned.
+ * Guarded, because this step is where a small model once put a fabricated
+ * iPhone into the search string: asked for a query it answered the question
+ * instead, and the answer became what we searched for. Anything that reads as
+ * an answer rather than a query is discarded for the user's own words, which
+ * are always usable and cannot be invented.
  */
-std::string plan_query(const std::string& question) {
+std::string plan_query(const std::string& question, const char* const* history, int32_t n_history) {
+    std::string reply;
+    const bool ok = generate(
+        "You write web search queries. Given the conversation and the latest request, "
+        "reply with the search query alone: a few words, not a sentence, not an answer, "
+        "no explanation. Use the conversation to resolve what the user is referring to.",
+        "Request: " + question + "\n\nSearch query:", kQueryTokens, &reply, history, n_history);
+    if (!ok) {
+        return question;
+    }
+
+    reply = rac::tools::web::strip_reasoning_block(reply);
+    size_t start = 0;
+    while (start <= reply.size()) {
+        const size_t nl = reply.find('\n', start);
+        const std::string line = rac::tools::web::normalize_query_line(
+            reply.substr(start, nl == std::string::npos ? std::string::npos : nl - start));
+        if (rac::tools::web::looks_like_query_not_answer(line)) {
+            return line;
+        }
+        if (nl == std::string::npos) {
+            break;
+        }
+        start = nl + 1;
+    }
     return question;
 }
-
 std::string compose(const std::string& question, const std::vector<SearchResult>& sources) {
     const std::string evidence = rac::tools::web::build_evidence(sources);
     // The one number that separates "the model was not given the material"
@@ -226,7 +253,22 @@ std::string compose(const std::string& question, const std::vector<SearchResult>
         "they do and do not cover.",
         "Question: " + question + "\n\nSources:\n" + evidence + "\nAnswer, citing sources:",
         kComposeTokens, &answer);
-    return ok ? answer : std::string();
+    if (!ok) {
+        return {};
+    }
+
+    // An answer with no citation, or one pointing at a source that was never
+    // supplied, was not built from the evidence. That is the compose step's
+    // one detectable failure and it is worth saying out loud rather than
+    // returning prose that reads exactly like a researched answer.
+    size_t cited = 0;
+    if (!rac::tools::web::citations_resolve(answer, sources.size(), &cited)) {
+        RAC_LOG_WARNING(kTag,
+                        "composed answer is not grounded: %zu valid citation(s) across %zu "
+                        "source(s)",
+                        cited, sources.size());
+    }
+    return answer;
 }
 
 // --- the provider ----------------------------------------------------------
@@ -271,7 +313,7 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
                    nullptr)) {
         return RAC_ERROR_CANCELLED;
     }
-    const std::string query = plan_query(question);
+    const std::string query = plan_query(question, ctx->history, ctx->n_history);
     payload["query"] = query;
     if (!ctx->emit(ctx, "understanding", "Understanding the question", RAC_TOOL_PROGRESS_COMPLETED,
                    query.c_str())) {
@@ -358,7 +400,19 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
                   "could not summarize; returning sources");
     } else {
         payload["summary"] = summary;
-        ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_COMPLETED, nullptr);
+        // Published so the turn that speaks to the user knows whether this
+        // summary actually rests on the sources beneath it.
+        size_t cited = 0;
+        const bool grounded = rac::tools::web::citations_resolve(summary, sources.size(), &cited);
+        payload["grounded"] = grounded;
+        payload["citations"] = cited;
+        if (grounded) {
+            ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_COMPLETED,
+                      nullptr);
+        } else {
+            ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_FAILED,
+                      "the answer does not cite the sources it was given");
+        }
     }
 
     RAC_LOG_INFO(kTag, "researched '%s' as '%s': %zu source(s), %zu read", question.c_str(),
@@ -383,6 +437,67 @@ const rac_tool_provider_t kProvider = {
 }  // namespace
 
 namespace rac::tools::web {
+
+bool looks_like_query_not_answer(const std::string& line) {
+    if (!query_is_usable(line)) {
+        return false;
+    }
+    // An answer is a sentence and ends like one; a query does not.
+    if (line.back() == '.' || line.back() == '!') {
+        return false;
+    }
+    size_t words = 1;
+    for (const char c : line) {
+        if (c == ' ') {
+            ++words;
+        }
+    }
+    // Generous for a search query, and well short of the nineteen-word
+    // sentence that caused this.
+    return words <= 12;
+}
+
+bool citations_resolve(const std::string& answer, size_t source_count, size_t* out_cited) {
+    std::vector<bool> seen(source_count, false);
+    size_t valid = 0;
+    bool any_out_of_range = false;
+
+    for (size_t at = 0; at + 1 < answer.size(); ++at) {
+        if (answer[at] != '[') {
+            continue;
+        }
+        const size_t close = answer.find(']', at + 1);
+        if (close == std::string::npos || close == at + 1 || close - at > 5) {
+            continue;
+        }
+        size_t index = 0;
+        bool numeric = true;
+        for (size_t d = at + 1; d < close; ++d) {
+            if (std::isdigit(static_cast<unsigned char>(answer[d])) == 0) {
+                numeric = false;
+                break;
+            }
+            index = index * 10 + static_cast<size_t>(answer[d] - '0');
+        }
+        if (!numeric) {
+            continue;
+        }
+        // 1-based, matching how build_evidence numbers them.
+        if (index == 0 || index > source_count) {
+            any_out_of_range = true;
+            continue;
+        }
+        if (!seen[index - 1]) {
+            seen[index - 1] = true;
+            ++valid;
+        }
+    }
+
+    if (out_cited != nullptr) {
+        *out_cited = valid;
+    }
+    return !any_out_of_range && valid > 0;
+}
 
 std::string build_evidence(const std::vector<SearchResult>& sources) {
     std::string evidence;

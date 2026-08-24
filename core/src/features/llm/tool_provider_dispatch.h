@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
@@ -38,6 +39,7 @@ namespace rac::llm::tool_calling {
  */
 bool execute_via_provider(const runanywhere::v1::ToolCall& call, uint64_t run_loop_handle,
                           std::function<bool()> is_cancelled,
+                          const std::vector<std::string>& history,
                           runanywhere::v1::ToolResult* out_result);
 
 /** @brief Whether a commons provider owns `name`. */

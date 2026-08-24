@@ -71,13 +71,22 @@ rac_bool_t rac_tool_progress_sink_is_registered(void) {
 namespace rac::plugin {
 
 ToolProgressScope::ToolProgressScope(std::string tool_name, uint64_t run_loop_handle,
-                                     std::function<bool()> is_cancelled)
+                                     std::function<bool()> is_cancelled,
+                                     const std::vector<std::string>& history)
     : tool_name_(std::move(tool_name)),
       run_loop_handle_(run_loop_handle),
-      is_cancelled_(std::move(is_cancelled)) {
+      is_cancelled_(std::move(is_cancelled)),
+      history_(history) {
     context_.emit = &ToolProgressScope::emit_thunk;
     context_.is_cancelled = &ToolProgressScope::cancelled_thunk;
     context_.state = this;
+
+    history_ptrs_.reserve(history_.size());
+    for (const auto& turn : history_) {
+        history_ptrs_.push_back(turn.c_str());
+    }
+    context_.history = history_ptrs_.empty() ? nullptr : history_ptrs_.data();
+    context_.n_history = static_cast<int32_t>(history_ptrs_.size());
 }
 
 bool ToolProgressScope::cancelled() const {
