@@ -25,10 +25,18 @@ class ToolProgressScope {
      * @param run_loop_handle  0 when the tool is running outside a run loop
      * @param is_cancelled     polled by the provider and before each emit; may
      *                         be empty, which reads as never cancelled
+     * @param history          prior turns, for a tool that must interpret the
+     *                         user's words
+     * @param user_prompt      this turn's message, so a tool can proceed when
+     *                         the model omits the argument
+     *
+     * Nothing is defaulted on purpose: a default let a call site silently miss
+     * `user_prompt`, which compiled and shipped a tool that could not see the
+     * question it was asked.
      */
     ToolProgressScope(std::string tool_name, uint64_t run_loop_handle,
-                      std::function<bool()> is_cancelled,
-                      const std::vector<std::string>& history = {}, std::string user_prompt = {});
+                      std::function<bool()> is_cancelled, const std::vector<std::string>& history,
+                      std::string user_prompt);
 
     ToolProgressScope(const ToolProgressScope&) = delete;
     ToolProgressScope& operator=(const ToolProgressScope&) = delete;
