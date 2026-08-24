@@ -151,8 +151,9 @@ RAC_API rac_result_t rac_agent_workflow_delete(const char* workflow_id);
  *
  * Writes serialized runanywhere.v1.WorkflowValidationResult bytes. Checks
  * duplicate node ids, edges naming unknown nodes or undeclared ports, cycles,
- * loop bodies referencing nodes outside the document, and expressions
- * referencing a node that does not precede the reader.
+ * loop bodies referencing nodes outside the document, expressions referencing a
+ * node that does not precede the reader, and a Schedule Trigger whose cron
+ * expression is unparseable or can never fire.
  *
  * A document that fails validation still returns RAC_SUCCESS: the verdict is
  * in the payload. A non-success return means validation could not run.
@@ -160,6 +161,32 @@ RAC_API rac_result_t rac_agent_workflow_delete(const char* workflow_id);
 RAC_API rac_result_t rac_agent_workflow_validate_proto(const uint8_t* document_proto_bytes,
                                                        size_t document_proto_size,
                                                        rac_proto_buffer_t* out_result);
+
+/**
+ * @brief When a five-field cron expression next fires, in Unix seconds.
+ *
+ * Commons owns no timer, so a host that runs Schedule Triggers asks this for
+ * the next due instant and sets its own clock. The expression is wall-clock, so
+ * @p utc_offset_seconds is the offset east of UTC the host wants it read in; a
+ * fire time that lands inside a DST transition is computed against that offset
+ * rather than the one in force at the instant itself.
+ *
+ * Accepts `*`, numbers, lists, ranges and steps in every field, 0 or 7 for
+ * Sunday, and the @c \@hourly, @c \@daily, @c \@midnight, @c \@weekly,
+ * @c \@monthly, @c \@yearly and @c \@annually aliases. Month and day names are
+ * not accepted.
+ *
+ * The result is strictly after @p after_unix_seconds, and the search stops four
+ * years out so a leap-year-only date is still found.
+ *
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_CONFIGURATION when the expression does
+ *         not parse, or RAC_ERROR_NOT_FOUND when it has no firing within the
+ *         search horizon — `0 0 30 2 *` has none at all.
+ */
+RAC_API rac_result_t rac_agent_schedule_next_fire(const char* cron_expression,
+                                                  int64_t after_unix_seconds,
+                                                  int32_t utc_offset_seconds,
+                                                  int64_t* out_unix_seconds);
 
 /**
  * @brief Create a run from serialized runanywhere.v1.WorkflowRunRequest bytes.

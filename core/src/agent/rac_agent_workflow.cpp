@@ -4,6 +4,7 @@
 
 #include "agent_workflow.pb.h"
 #include "bundle.h"
+#include "cron.h"
 #include "host_callbacks.h"
 #include "pack_store.h"
 #include "workflow_runner.h"
@@ -14,6 +15,7 @@
 #include <cstdio>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -134,6 +136,31 @@ rac_result_t rac_agent_workflow_validate_proto(const uint8_t* document_proto_byt
     runanywhere::v1::WorkflowValidationResult validation;
     rac::agent::validate_document(document, &validation);
     return write_message(validation, out_result);
+}
+
+rac_result_t rac_agent_schedule_next_fire(const char* cron_expression, int64_t after_unix_seconds,
+                                          int32_t utc_offset_seconds, int64_t* out_unix_seconds) {
+    if (cron_expression == nullptr || out_unix_seconds == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    *out_unix_seconds = 0;
+
+    std::string error;
+    const std::optional<rac::agent::CronExpression> expression =
+        rac::agent::CronExpression::parse(cron_expression, &error);
+    if (!expression.has_value()) {
+        rac_error_set_details(error.c_str());
+        return RAC_ERROR_INVALID_CONFIGURATION;
+    }
+
+    const std::optional<rac::agent::CronTime> next = expression->next_after(
+        rac::agent::cron_time_from_unix(after_unix_seconds, utc_offset_seconds));
+    if (!next.has_value()) {
+        rac_error_set_details("cron expression has no firing within the search horizon");
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    *out_unix_seconds = rac::agent::cron_time_to_unix(*next, utc_offset_seconds);
+    return RAC_SUCCESS;
 }
 
 rac_result_t rac_agent_run_create_proto(const uint8_t* request_proto_bytes,

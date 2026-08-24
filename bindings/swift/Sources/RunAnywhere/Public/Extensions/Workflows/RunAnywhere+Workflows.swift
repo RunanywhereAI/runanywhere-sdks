@@ -409,6 +409,39 @@ public extension RunAnywhere {
             )
         }
 
+        /// When a five-field cron expression next fires after `date`.
+        ///
+        /// Commons owns no timer, so a host that runs Schedule Triggers asks
+        /// for the next due instant and sets its own clock by it. Pure
+        /// computation: no SDK initialization, so a scheduler can call this
+        /// before services are ready.
+        ///
+        /// `timeZone` supplies the wall-clock the expression is read in. The
+        /// offset is taken at `date`, so a firing on the far side of a DST
+        /// change is computed against the offset in force now.
+        ///
+        /// Returns nil when the expression parses but never fires, as
+        /// `0 0 30 2 *` does, and throws when it does not parse at all. A
+        /// stored document cannot hold an unparseable one, because `save`
+        /// validates the cron first.
+        public func nextCronFireDate(
+            expression: String,
+            after date: Date = Date(),
+            timeZone: TimeZone = .current
+        ) throws -> Date? {
+            var next: Int64 = 0
+            let offset = Int32(timeZone.secondsFromGMT(for: date))
+            let after = Int64(date.timeIntervalSince1970.rounded(.down))
+            let result = expression.withCString {
+                rac_agent_schedule_next_fire($0, after, offset, &next)
+            }
+            if result == RAC_ERROR_NOT_FOUND { return nil }
+            guard result == RAC_SUCCESS else {
+                throw WorkflowErrors.failure(op: "rac_agent_schedule_next_fire", rc: result)
+            }
+            return Date(timeIntervalSince1970: TimeInterval(next))
+        }
+
         /// Create a run for a stored workflow.
         ///
         /// The run comes back in the created state; call `start()` to execute
