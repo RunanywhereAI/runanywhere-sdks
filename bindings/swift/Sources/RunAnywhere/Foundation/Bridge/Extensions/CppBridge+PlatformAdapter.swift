@@ -144,24 +144,17 @@ private struct PlatformAdapterRegistrationState: @unchecked Sendable {
 
 private let platformKeychainService = "com.runanywhere.sdk"
 
+/// Adapts the shared ``SecureStore`` to the C string-in / string-out contract
+/// the commons platform adapter expects. The decision about where secrets live
+/// is not made here — see ``SecureStore``.
 private enum PlatformSecureStore {
-    private static let modeEnv = "RUNANYWHERE_SWIFT_SECURE_STORE"
-    private static let directoryEnv = "RUNANYWHERE_SWIFT_SECURE_STORE_DIR"
-
-    static var usesFileStore: Bool {
-        guard let rawMode = getenv(modeEnv).map({ String(cString: $0).lowercased() }) else {
-            return false
-        }
-        return rawMode == "file" || rawMode == "filesystem"
-    }
+    static var usesFileStore: Bool { SecureStore.usesFileStore }
 
     static func get(_ key: String, outValue: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> rac_result_t {
         do {
-            let url = try url(for: key)
-            guard FileManager.default.fileExists(atPath: url.path) else {
+            guard let data = try SecureStore.read(key) else {
                 return RAC_ERROR_FILE_NOT_FOUND
             }
-            let data = try Data(contentsOf: url)
             guard let value = String(data: data, encoding: .utf8),
                   let copy = value.withCString({ rac_strdup($0) }) else {
                 return RAC_ERROR_SECURE_STORAGE_FAILED
@@ -175,12 +168,7 @@ private enum PlatformSecureStore {
 
     static func set(_ key: String, value: String) -> rac_result_t {
         do {
-            let url = try url(for: key)
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try Data(value.utf8).write(to: url, options: [.atomic])
+            try SecureStore.write(Data(value.utf8), for: key)
             return RAC_SUCCESS
         } catch {
             return RAC_ERROR_SECURE_STORAGE_FAILED
@@ -189,35 +177,11 @@ private enum PlatformSecureStore {
 
     static func delete(_ key: String) -> rac_result_t {
         do {
-            let url = try url(for: key)
-            if FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.removeItem(at: url)
-            }
+            try SecureStore.remove(key)
             return RAC_SUCCESS
         } catch {
             return RAC_ERROR_SECURE_STORAGE_FAILED
         }
-    }
-
-    private static func url(for key: String) throws -> URL {
-        let root: URL
-        if let rawDirectory = getenv(directoryEnv).map({ String(cString: $0) }),
-           !rawDirectory.isEmpty {
-            root = URL(fileURLWithPath: (rawDirectory as NSString).expandingTildeInPath, isDirectory: true)
-        } else {
-            root = try FileManager.default.url(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask,
-                appropriateFor: nil,
-                create: true
-            )
-            .appendingPathComponent("RunAnywhere/SecureStore", isDirectory: true)
-        }
-        return root.appendingPathComponent(hexKey(key), isDirectory: false)
-    }
-
-    private static func hexKey(_ key: String) -> String {
-        key.utf8.map { String(format: "%02x", $0) }.joined()
     }
 }
 

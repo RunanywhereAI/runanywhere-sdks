@@ -1,7 +1,11 @@
 import Foundation
 import Security
 
-/// Keychain manager for secure storage of sensitive data
+/// Keychain manager for secure storage of sensitive data.
+///
+/// Routes through ``SecureStore`` when the host has asked for a file-backed
+/// store, so this and the commons platform adapter never disagree about where
+/// a secret lives.
 /// This wrapper has no mutable Swift state; Security.framework serializes the
 /// keychain operations addressed by the immutable service/access-group keys.
 public final class KeychainManager: @unchecked Sendable {
@@ -63,6 +67,15 @@ public final class KeychainManager: @unchecked Sendable {
     ///   - key: Unique key for the data
     /// - Throws: SDKException if storage fails
     public func store(_ data: Data, for key: String) throws {
+        if SecureStore.usesFileStore {
+            do {
+                try SecureStore.write(data, for: key)
+                return
+            } catch {
+                throw SDKException(code: .keychainError, message: "Failed to store item in secure file store: \(error.localizedDescription)", category: .auth)
+            }
+        }
+
         var query = baseQuery(for: key)
         query[kSecValueData as String] = data
 
@@ -98,6 +111,13 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Returns: Stored data
     /// - Throws: SDKException if retrieval fails (but not for missing items - use retrieveDataIfExists for that)
     public func retrieveData(for key: String) throws -> Data {
+        if SecureStore.usesFileStore {
+            guard let data = try fileStoreData(for: key) else {
+                throw SDKException(code: .keychainError, message: "Item not found in secure file store", category: .auth)
+            }
+            return data
+        }
+
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -122,6 +142,10 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Returns: Stored data if found, nil if not found
     /// - Throws: SDKException only for actual keychain errors (not for missing items)
     public func retrieveDataIfExists(for key: String) throws -> Data? {
+        if SecureStore.usesFileStore {
+            return try fileStoreData(for: key)
+        }
+
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -164,6 +188,15 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Parameter key: Key for the item to delete
     /// - Throws: SDKException if deletion fails
     public func delete(for key: String) throws {
+        if SecureStore.usesFileStore {
+            do {
+                try SecureStore.remove(key)
+                return
+            } catch {
+                throw SDKException(code: .keychainError, message: "Failed to delete item from secure file store: \(error.localizedDescription)", category: .auth)
+            }
+        }
+
         let query = baseQuery(for: key)
         let status = SecItemDelete(query as CFDictionary)
 
@@ -176,6 +209,10 @@ public final class KeychainManager: @unchecked Sendable {
     /// - Parameter key: Key to check
     /// - Returns: True if item exists
     public func exists(for key: String) -> Bool {
+        if SecureStore.usesFileStore {
+            return SecureStore.exists(key)
+        }
+
         var query = baseQuery(for: key)
         query[kSecReturnData as String] = false
 
@@ -184,6 +221,14 @@ public final class KeychainManager: @unchecked Sendable {
     }
 
     // MARK: - Private Methods
+
+    private func fileStoreData(for key: String) throws -> Data? {
+        do {
+            return try SecureStore.read(key)
+        } catch {
+            throw SDKException(code: .keychainError, message: "Failed to read item from secure file store: \(error.localizedDescription)", category: .auth)
+        }
+    }
 
     private func baseQuery(for key: String) -> [String: Any] { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         var query: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type
