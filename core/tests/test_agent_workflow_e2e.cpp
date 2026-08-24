@@ -117,8 +117,8 @@ bool run_to_completion(const std::string& workflow_id, WorkflowRunRecord* out_re
         rac_proto_buffer_t buffer;
         rac_proto_buffer_init(&buffer);
         const rac_result_t result = rac_agent_run_record_proto(run, &buffer);
-        if (result == RAC_SUCCESS && buffer.data != nullptr
-            && !out_record->ParseFromArray(buffer.data, static_cast<int>(buffer.size))) {
+        if (result == RAC_SUCCESS && buffer.data != nullptr &&
+            !out_record->ParseFromArray(buffer.data, static_cast<int>(buffer.size))) {
             rac_proto_buffer_free(&buffer);
             rac_agent_run_destroy(run);
             return false;
@@ -126,9 +126,9 @@ bool run_to_completion(const std::string& workflow_id, WorkflowRunRecord* out_re
         rac_proto_buffer_free(&buffer);
 
         const WorkflowRunState state = out_record->state();
-        if (state == WorkflowRunState::WORKFLOW_RUN_STATE_SUCCEEDED
-            || state == WorkflowRunState::WORKFLOW_RUN_STATE_FAILED
-            || state == WorkflowRunState::WORKFLOW_RUN_STATE_CANCELLED) {
+        if (state == WorkflowRunState::WORKFLOW_RUN_STATE_SUCCEEDED ||
+            state == WorkflowRunState::WORKFLOW_RUN_STATE_FAILED ||
+            state == WorkflowRunState::WORKFLOW_RUN_STATE_CANCELLED) {
             rac_agent_run_destroy(run);
             return true;
         }
@@ -220,8 +220,7 @@ TEST(a_condition_skips_the_branch_it_did_not_take) {
     check->set_id("n2");
     check->set_name("Check");
     check->mutable_condition()->set_left("{{ Start.count }}");
-    check->mutable_condition()->set_operator_(
-        runanywhere::v1::COMPARISON_OPERATOR_GREATER_THAN);
+    check->mutable_condition()->set_operator_(runanywhere::v1::COMPARISON_OPERATOR_GREATER_THAN);
     check->mutable_condition()->set_right("3");
 
     add_transform(&document, "n3", "High", "band", "high");
@@ -248,8 +247,7 @@ TEST(a_filter_feeds_both_of_its_ports) {
     WorkflowDocument document;
     document.set_id("e2e-filter");
     document.set_name("Filter");
-    add_trigger(&document, "n1", "Start",
-                R"([{"n": 1}, {"n": 9}, {"n": 2}, {"n": 7}])");
+    add_trigger(&document, "n1", "Start", R"([{"n": 1}, {"n": 9}, {"n": 2}, {"n": 7}])");
 
     WorkflowNode* filter = document.add_nodes();
     filter->set_id("n2");
