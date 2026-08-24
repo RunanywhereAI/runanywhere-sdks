@@ -265,6 +265,23 @@ jobs:
           fi
           [[ "$rc" -eq 0 ]] || exit "$rc"
 
+      # The QAIRT/QNN runtime the engine dlopens on device. PUBLIC assets, no
+      # token: RunAnywhere is an authorized Qualcomm partner and already ships
+      # these binaries unauthenticated on npm. Without this, build-core-android.sh
+      # correctly refuses to package a routable engine whose runtime is absent --
+      # which is what broke the first v0.20.26 candidate, since no hosted runner
+      # has a licensed QAIRT install.
+      - name: Download the pinned QAIRT runtime (arm64-v8a only)
+        if: matrix.abi == 'arm64-v8a'
+        run: bash scripts/build/download-qairt-runtime.sh --platform arm64-v8a
+
+      # Two independent pins CAN drift. A drifted pair passes every other check
+      # and then crashes on a real Hexagon device, which is the one place CI
+      # cannot see.
+      - name: Assert the QAIRT runtime matches the engine's build identity
+        if: matrix.abi == 'arm64-v8a'
+        run: bash scripts/validation/gates/check_qairt_pairing.sh --platform arm64-v8a
+
       - name: Build + package commons for Android (${{ matrix.abi }})
         # build-android.sh delegates the build to build-core-android.sh (the
         # same script pr-build.yml uses), then stages the per-ABI .so set
@@ -287,17 +304,44 @@ jobs:
         run: |
           set -euo pipefail
           jni="bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs/arm64-v8a"
-          if [[ ! -f "$jni/librunanywhere_qhexrt.so" ]]; then
-            echo "::error::librunanywhere_qhexrt.so is absent from $jni."
-            echo "::error::Android would ship without the Hexagon NPU engine. Check the"
-            echo "::error::QHexRT download step and validate-qhexrt-prebuilt.py's verdict."
-            ls -la "$(dirname "$jni")" 2>/dev/null || true
+          # These are the names bindings/kotlin/scripts/package-qhexrt.sh ships, and
+          # they are what build-core-android.sh actually stages. There is NO
+          # librunanywhere_qhexrt.so on Android: qhexrt is built with
+          # TARGET_NAME rac_backend_qhexrt and has no separate carrier, unlike the
+          # llamacpp/onnx/sherpa plugins.
+          for want in librac_backend_qhexrt.so librac_backend_qhexrt_jni.so; do
+            if [[ ! -f "$jni/$want" ]]; then
+              echo "::error::$want is absent from $jni."
+              echo "::error::Android would ship without the Hexagon NPU engine. Check the"
+              echo "::error::QHexRT download step and validate-qhexrt-prebuilt.py's verdict."
+              ls -la "$jni" 2>/dev/null || true
+              exit 1
+            fi
+          done
+          # Presence is not routability: the stub engine has the SAME filename. Use
+          # the marker the engine itself embeds -- the same signal
+          # build-core-android.sh's validate_linked_qhexrt_outputs() checks.
+          #
+          # NOT check_plugin_natives.py here: that tool looks for a carrier
+          # (librunanywhere_<id>) with undefined ops symbols, finds none in this
+          # directory, prints "nothing to verify" and exits 0 -- a vacuous pass that
+          # would let an engine-less Android build through.
+          if ! grep -aFq "qhexrt:engine-available" "$jni/librac_backend_qhexrt.so"; then
+            echo "::error::librac_backend_qhexrt.so is the non-routable STUB."
+            echo "::error::The QHexRT payload or the QAIRT runtime was missing at build time."
             exit 1
           fi
-          # Presence is not routability: a stub carrier has the same filename. This
-          # is the same detector the Linux/Windows/Electron lanes use.
-          python3 scripts/validation/gates/check_plugin_natives.py "$jni"
-          echo "QHexRT carrier present and routable in $jni"
+          # The QNN runtime must ship with the engine or it registers at priority
+          # 150 and then fails at model load. build-core-android.sh stages these.
+          for want in libQnnHtp.so libQnnSystem.so libQnnHtpPrepare.so; do
+            [[ -f "$jni/$want" ]] || { echo "::error::$want absent from $jni"; exit 1; }
+          done
+          skels="bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/assets/runanywhere/qhexrt/skels/arm64-v8a"
+          for v in 75 79 81; do
+            [[ -f "$skels/libQnnHtpV${v}Skel.so" ]] || {
+              echo "::error::libQnnHtpV${v}Skel.so absent from $skels"; exit 1; }
+          done
+          echo "QHexRT engine routable, with its QNN runtime and all three DSP skels"
 
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v7

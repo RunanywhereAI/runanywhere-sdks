@@ -357,11 +357,25 @@ jobs:
           cmake --build build/electron-win-arm64-vs2026 --config Release --target rac_commons rac_backend_qhexrt runanywhere_native -- /m
           if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
 
+      # Replaces a hand-copied C:\actions-runner-state directory that carried no
+      # version information and had already gone stale once (QAIRT 2.45.x staged
+      # against a newer install). Now a checksum-pinned public asset, and the
+      # pairing gate proves it is the SDK this engine was built against.
+      - name: Download the pinned QAIRT runtime (win-arm64)
+        shell: bash
+        run: |
+          bash scripts/build/download-qairt-runtime.sh --platform win-arm64
+          bash scripts/validation/gates/check_qairt_pairing.sh --platform win-arm64
+
       - name: Stage native prebuilds (bundle:native, no pack yet)
         working-directory: bindings/electron
         shell: powershell
         env:
-          RA_QNN_RUNTIME_DIR: 'C:\actions-runner-state\qhexrt-qnn-runtime-flat'
+          # The extracted payload is already FLAT, which is what bundle-native.ts's
+          # stageQnnRuntime() requires -- Windows has no ADSP_LIBRARY_PATH, so every
+          # file must sit in one directory. Only the provenance changed here, from
+          # unverified machine state to a pinned download; that script is untouched.
+          RA_QNN_RUNTIME_DIR: '${{ github.workspace }}\engines\qhexrt\prebuilt\qairt-runtime\win-arm64\current'
           # bundle-native.ts's default win-arm64 lookup hardcodes
           # build/electron-win-arm64 (the VS2022 preset's binary dir) — this
           # preset's own doc comment warns its dir differs
