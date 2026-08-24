@@ -201,7 +201,7 @@ if [[ "$UPLOAD" -eq 1 ]]; then
             --title "QAIRT runtime ${QAIRT_VERSION}" \
             --notes "Qualcomm AI Runtime (QAIRT) ${QAIRT_VERSION} redistributables for the QHexRT Hexagon NPU engine, redistributed by RunAnywhere as an authorized Qualcomm partner.
 
-Pinned by SHA-256 in \`core/VERSIONS\` (\`QAIRT_RUNTIME_*\`) and fetched by \`scripts/build/download-qairt-runtime.sh\`. See \`THIRD-PARTY-NOTICES.md\`.
+Pinned by SHA-256 in \`core/VERSIONS\` (\`QAIRT_RUNTIME_*\`) and fetched by \`scripts/build/download-qairt-runtime.sh\`.
 
 Tagged separately from SDK releases because the QAIRT SDK version and the SDK release version are independent axes."
     fi

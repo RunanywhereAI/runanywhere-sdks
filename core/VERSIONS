@@ -333,7 +333,7 @@ RAC_COMMONS_VERSION=0.1.1
 # these binaries today, publicly and unauthenticated, inside
 # @runanywhere/electron-qhexrt and @runanywhere/qhexrt on npm. The QAIRT_RUNTIME_*
 # block below makes that distribution named, versioned and checksum-pinned instead
-# of implicit. See THIRD-PARTY-NOTICES.md.
+# of implicit.
 #
 # To bump: cut a neurun release, then paste the pin block from its release notes.
 # Never compute these locally — a local build's bytes are never the published ones.
