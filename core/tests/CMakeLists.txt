@@ -1038,6 +1038,20 @@ target_compile_features(test_storage_analyzer_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_storage_analyzer_proto)
 add_test(NAME storage_analyzer_proto_tests COMMAND test_storage_analyzer_proto)
 
+# web_research pipeline: every step asserted against a stub HTTP transport.
+add_executable(test_web_research_pipeline test_web_research_pipeline.cpp)
+target_include_directories(test_web_research_pipeline PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core/include
+    ${CMAKE_SOURCE_DIR}/core/src
+    ${CMAKE_SOURCE_DIR}/core/src/generated/proto
+)
+target_link_libraries(test_web_research_pipeline PRIVATE rac_commons nlohmann_json::nlohmann_json)
+rac_link_archive_deps(test_web_research_pipeline)
+target_compile_features(test_web_research_pipeline PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_web_research_pipeline)
+add_test(NAME web_research_pipeline_tests COMMAND test_web_research_pipeline)
+
 # web_research provider: scrape + degraded-path tests (no network).
 add_executable(test_web_research test_web_research.cpp)
 target_include_directories(test_web_research PRIVATE
