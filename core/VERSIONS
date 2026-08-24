@@ -327,13 +327,9 @@ RAC_COMMONS_VERSION=0.1.1
 # that was pinned rather than trusting the archive's claim about itself.
 #
 # QAIRT is read for HEADERS ONLY when QHexRT is built, and its runtime is dlopen'd
-# on device — both still true, and the neurun payload still carries no Qualcomm
-# binary. What is NOT true, and used to be claimed here, is that the runtime is
-# "never redistributed": RunAnywhere is an authorized Qualcomm partner and ships
-# these binaries today, publicly and unauthenticated, inside
-# @runanywhere/electron-qhexrt and @runanywhere/qhexrt on npm. The QAIRT_RUNTIME_*
-# block below makes that distribution named, versioned and checksum-pinned instead
-# of implicit.
+# on device; the neurun engine payload still carries no Qualcomm binary. The
+# runtime itself is pinned separately below and fetched from the PRIVATE neurun
+# repo with NEURUN_TOKEN, exactly like the engine payloads.
 #
 # To bump: cut a neurun release, then paste the pin block from its release notes.
 # Never compute these locally — a local build's bytes are never the published ones.
@@ -356,8 +352,11 @@ QHEXRT_WIN_ARM64_RECEIPT=073a1d0b2bd568212263d58cc45e71f2b233c30eea893a365e62bde
 # release version move independently, so these carry their own tag and are not
 # bumped by a neurun release.
 #
-# PUBLIC assets on this repo — no token — so a fork or a hosted runner can build a
-# routable Hexagon engine without a licensed QAIRT install. Produced by
+# PRIVATE assets on the neurun repo, fetched with NEURUN_TOKEN — the same
+# mechanism as NEURT_*/QHEXRT_* above, so a build that can reach one reaches all
+# three. A hosted runner with the token builds a routable Hexagon engine without a
+# licensed QAIRT install; without the token it gets the non-routable shell, which
+# is the intended public/fork outcome. Produced by
 # scripts/build/publish-qairt-runtime.sh from a licensed install (that step still
 # needs a human with the SDK) and fetched by scripts/build/download-qairt-runtime.sh.
 #

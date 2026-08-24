@@ -363,6 +363,8 @@ jobs:
       # pairing gate proves it is the SDK this engine was built against.
       - name: Download the pinned QAIRT runtime (win-arm64)
         shell: bash
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
         run: |
           bash scripts/build/download-qairt-runtime.sh --platform win-arm64
           bash scripts/validation/gates/check_qairt_pairing.sh --platform win-arm64

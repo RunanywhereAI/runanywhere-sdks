@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Fetch the pinned QAIRT/QNN runtime redistributables for one platform.
 #
-# These are PUBLIC assets -- no token. RunAnywhere is an authorized Qualcomm
-# partner and already distributes these exact binaries unauthenticated on npm
-# (@runanywhere/electron-qhexrt ships QnnHtp.dll, libQnnHtpV81Skel.so and
-# libqnnhtpv81.cat today). Publishing them here as pinned, versioned assets makes
-# an existing distribution verifiable rather than implicit, and is what lets a
-# hosted runner -- or a fork, or an external contributor -- build a routable
-# Hexagon engine without a licensed QAIRT install.
+# PRIVATE assets on the neurun repo, fetched with NEURUN_TOKEN -- the same
+# mechanism as the NeuRT and QHexRT payloads, so a build that can reach one can
+# reach all three. Keeping them off the public repo means they cannot be pulled
+# by anyone who happens to find the URL.
+#
+# This is what lets a hosted runner build a routable Hexagon engine without a
+# licensed QAIRT install on the machine; it still requires the token, so forks and
+# external PRs get the non-routable shell (the intended public outcome).
 #
 # The engine still compiles against QAIRT HEADERS ONLY and dlopens these at
 # runtime. Shipping them beside the engine is packaging, not linking.
@@ -65,7 +66,14 @@ for v in VERSION TAG EXPECTED_SHA; do
     [[ -n "${!v}" ]] || { echo "[ERROR] QAIRT_RUNTIME_* pin missing from core/VERSIONS ($v)" >&2; exit 2; }
 done
 
-REPO="${QAIRT_RUNTIME_REPO:-RunanywhereAI/runanywhere-sdks}"
+REPO="${QAIRT_RUNTIME_REPO:-${NEURUN_REPO:-RunanywhereAI/neurun}}"
+TOKEN="${NEURUN_TOKEN:-${GH_TOKEN:-}}"
+if [[ -z "$TOKEN" ]]; then
+    echo "[ERROR] NEURUN_TOKEN (or GH_TOKEN) is required: the QAIRT runtime is a" >&2
+    echo "        PRIVATE asset on ${REPO}." >&2
+    echo "        Without it the Hexagon engine cannot be packaged routable." >&2
+    exit 3
+fi
 ASSET="qairt-runtime-${PLATFORM}-v${VERSION}.tar.gz"
 DEST_ROOT="${REPO_ROOT}/engines/qhexrt/prebuilt/qairt-runtime/${PLATFORM}"
 DEST="${DEST_ROOT}/versions/${EXPECTED_SHA}"
@@ -88,8 +96,7 @@ fi
 if [[ "$cached_ok" -eq 0 ]]; then
     tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
     echo "[DOWNLOAD] QAIRT runtime ${PLATFORM} <- ${REPO} ${TAG}"
-    # No token: these are public assets.
-    fetch_release_asset "$REPO" "$TAG" "$ASSET" "$tmp" "" "$PY_BIN"
+    fetch_release_asset "$REPO" "$TAG" "$ASSET" "$tmp" "$TOKEN" "$PY_BIN"
 
     actual="$("$PY_BIN" -c "
 import hashlib,sys
