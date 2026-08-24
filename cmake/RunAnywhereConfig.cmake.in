@@ -64,10 +64,15 @@ if(NOT TARGET RunAnywhere::commons)
             # Static plugin archives register via ctor; the linker otherwise
             # drops them because rcli never references a symbol inside.
             if(_an MATCHES "^(lib)?rac_backend_")
+                # Must be a link feature/flag, not INTERFACE_LINK_LIBRARIES
+                # with a leading slash — Ninja then stats `/WHOLEARCHIVE:C:/...`
+                # as a path and fails FindFirstFileExA.
                 if(APPLE)
-                    list(APPEND _runanywhere_kit_extra "-Wl,-force_load,${_archive}")
+                    list(APPEND _runanywhere_kit_extra
+                        "-Wl,-force_load,${_archive}")
                 elseif(MSVC)
-                    list(APPEND _runanywhere_kit_extra "/WHOLEARCHIVE:${_archive}")
+                    list(APPEND _runanywhere_kit_extra
+                        "$<LINK_LIBRARY:WHOLE_ARCHIVE,${_archive}>")
                 else()
                     list(APPEND _runanywhere_kit_extra
                         "-Wl,--whole-archive" "${_archive}" "-Wl,--no-whole-archive")
