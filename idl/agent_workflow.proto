@@ -1,0 +1,716 @@
+// RunAnywhere IDL — agent workflow documents, run state, and host callbacks.
+//
+// A workflow is a user-drawn DAG of nodes executed on-device by the commons
+// agent runner. Distinct from pipeline.proto / solutions.proto, which describe
+// the streaming Solutions runtime and are not used here.
+//
+// Data moves between nodes as a list of WorkflowItem, mirroring the n8n
+// envelope: every node receives a list and emits a list, which is what makes
+// per-item iteration fall out without a separate scalar path.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "errors.proto";
+import "llm_options.proto";
+import "model_types.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "AgentWorkflowProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+message WorkflowDocument {
+    string id   = 1;
+    string name = 2;
+
+    repeated WorkflowNode nodes = 3;
+    repeated WorkflowEdge edges = 4;
+
+    int64 created_at_ms = 5;
+    int64 updated_at_ms = 6;
+
+    // Shape of this message, not the user's edit count. Readers reject a
+    // document from a newer schema rather than silently dropping fields.
+    uint32 schema_version = 7;
+}
+
+message NodePosition {
+    float x = 1;
+    float y = 2;
+}
+
+message WorkflowNode {
+    string id = 1;
+
+    // Display label, and the name expressions address this node by.
+    string name = 2;
+
+    NodePosition position = 3;
+
+    // The set oneof arm is the node's type; there is no separate type field.
+    oneof config {
+        ManualTriggerConfig   manual_trigger    = 10;
+        ToolCallConfig        tool_call         = 11;
+        LlmGenerateConfig     llm_generate      = 12;
+        ConditionConfig       condition         = 13;
+        LoopOverItemsConfig   loop_over_items   = 14;
+        CodeConfig            code              = 15;
+        HttpRequestConfig     http_request      = 16;
+        SetTransformConfig    set_transform     = 17;
+
+        ScheduleTriggerConfig schedule_trigger  = 18;
+
+        MergeConfig           merge             = 19;
+        FilterConfig          filter            = 20;
+        SplitOutConfig        split_out         = 21;
+        AggregateConfig       aggregate         = 22;
+        WaitConfig            wait              = 23;
+
+        FileReadConfig        file_read         = 24;
+        FileWriteConfig       file_write        = 25;
+
+        LlmStructuredConfig   llm_structured    = 26;
+        VisionConfig          vision            = 27;
+        EmbedConfig           embed             = 28;
+        RerankConfig          rerank            = 29;
+
+        TranscribeConfig      transcribe        = 30;
+        SpeakConfig           speak             = 31;
+        DetectVoiceConfig     detect_voice      = 32;
+        DiarizeConfig         diarize           = 33;
+        SegmentConfig         segment           = 34;
+
+        RagQueryConfig        rag_query         = 35;
+        RagIngestConfig       rag_ingest        = 36;
+
+        LoadModelConfig       load_model        = 37;
+
+        PackNodeConfig        pack_node         = 38;
+    }
+}
+
+// An instance of an installed NodePack on a canvas.
+//
+// The port list is mirrored from the pack at drop time rather than looked up at
+// run time, so a document that references a pack the machine does not have
+// still opens with the right shape. `missing` is set on load in that case and
+// the canvas draws a placeholder instead of failing the whole workflow, which
+// is the behaviour Sketchware gets right and most block editors do not.
+message PackNodeConfig {
+    string pack_id = 1;
+
+    map<string, string> arguments = 2;
+    repeated ToolArgumentPort ports = 3;
+
+    bool missing = 4;
+
+    // Mirrored from NodePack.outputs at drop time, same reasoning as `ports`.
+    // Empty means the pack has the single unnamed output every other node
+    // type has ("out").
+    repeated string outputs = 5;
+}
+
+message WorkflowEdge {
+    string from_node = 1;
+
+    // "out" on every node except Condition, which emits "true" and "false".
+    string from_port = 2;
+
+    string to_node = 3;
+    string to_port = 4;
+}
+
+// Node configuration
+//
+// Every field documented as an expression accepts `{{ Node Name.field }}`
+// references to an upstream node's output, resolved before the node runs.
+
+message ManualTriggerConfig {
+    // Seed items for the first node, as a JSON array. Empty means one item
+    // with an empty object, so a workflow with no input still executes once.
+    string initial_items_json = 1;
+}
+
+message ToolCallConfig {
+    // Resolved against the host's tool registry at run time, not at save time,
+    // so a workflow referencing a tool the host no longer registers fails on
+    // the run rather than becoming unopenable.
+    string tool_name = 1;
+
+    // Literal or expression per argument, used for any port left unconnected.
+    map<string, string> arguments = 2;
+
+    // The tool's argument list, copied into the document when the user picks
+    // the tool. Commons validates edges against this rather than against the
+    // host registry, which it cannot see — and it keeps a saved workflow
+    // self-describing, so the graph still renders with the right shape on a
+    // machine where that tool is not installed.
+    repeated ToolArgumentPort ports = 3;
+}
+
+message ToolArgumentPort {
+    string name        = 1;
+    string description = 2;
+    bool   required    = 3;
+    ToolArgumentType type = 4;
+}
+
+enum ToolArgumentType {
+    TOOL_ARGUMENT_TYPE_UNSPECIFIED = 0;
+    TOOL_ARGUMENT_TYPE_STRING      = 1;
+    TOOL_ARGUMENT_TYPE_NUMBER      = 2;
+    TOOL_ARGUMENT_TYPE_BOOLEAN     = 3;
+    TOOL_ARGUMENT_TYPE_OBJECT      = 4;
+    TOOL_ARGUMENT_TYPE_ARRAY       = 5;
+}
+
+message LlmGenerateConfig {
+    string prompt = 1;
+
+    optional string system_prompt = 2;
+
+    // Absent uses whichever model the host currently has loaded.
+    optional string model_id = 3;
+
+    optional LLMGenerationOptions generation = 4;
+}
+
+message ConditionConfig {
+    string left  = 1;
+    ComparisonOperator operator = 2;
+    string right = 3;
+}
+
+enum ComparisonOperator {
+    COMPARISON_OPERATOR_UNSPECIFIED  = 0;
+    COMPARISON_OPERATOR_EQUALS       = 1;
+    COMPARISON_OPERATOR_NOT_EQUALS   = 2;
+    COMPARISON_OPERATOR_CONTAINS     = 3;
+    COMPARISON_OPERATOR_GREATER_THAN = 4;
+    COMPARISON_OPERATOR_LESS_THAN    = 5;
+    COMPARISON_OPERATOR_IS_EMPTY     = 6;
+}
+
+message LoopOverItemsConfig {
+    // Expression yielding the list to walk.
+    string items = 1;
+
+    // Nodes run once per item. They stay in WorkflowDocument.nodes but are
+    // owned by this loop, so the outer graph never contains a cycle and the
+    // topological sort stays valid.
+    repeated string body_node_ids = 2;
+
+    // Hard ceiling. 0 means the runner's built-in cap applies.
+    uint32 max_iterations = 3;
+}
+
+message CodeConfig {
+    // JavaScript. Commons has no JS engine; the host evaluates this through
+    // the code callback (JavaScriptCore on Apple, node vm on Electron).
+    string source = 1;
+}
+
+message HttpRequestConfig {
+    HttpMethod method = 1;
+    string     url    = 2;
+
+    map<string, string> headers = 3;
+
+    optional string body       = 4;
+    optional uint32 timeout_ms = 5;
+
+    optional HttpAuth auth = 6;
+}
+
+// Credentials are kept out of the headers map so the editor can mask them and
+// a future release can move the secret into the platform keystore without
+// changing the wire shape.
+message HttpAuth {
+    HttpAuthKind kind = 1;
+
+    // Bearer token, or the API key value for the header and query kinds.
+    string secret = 2;
+
+    // Header name for HTTP_AUTH_KIND_HEADER, query parameter name for
+    // HTTP_AUTH_KIND_QUERY. Ignored by the bearer kind.
+    string name = 3;
+}
+
+enum HttpAuthKind {
+    HTTP_AUTH_KIND_UNSPECIFIED = 0;
+    HTTP_AUTH_KIND_BEARER      = 1;
+    HTTP_AUTH_KIND_HEADER      = 2;
+    HTTP_AUTH_KIND_QUERY       = 3;
+}
+
+enum HttpMethod {
+    HTTP_METHOD_UNSPECIFIED = 0;
+    HTTP_METHOD_GET         = 1;
+    HTTP_METHOD_POST        = 2;
+    HTTP_METHOD_PUT         = 3;
+    HTTP_METHOD_PATCH       = 4;
+    HTTP_METHOD_DELETE      = 5;
+}
+
+message SetTransformConfig {
+    repeated FieldAssignment assignments = 1;
+
+    // Drop input fields no assignment names.
+    bool keep_only_assigned = 2;
+}
+
+message FieldAssignment {
+    string field = 1;
+    string value = 2;
+}
+
+// Fires the workflow on a timer. Commons validates and runs the graph; the
+// host owns the clock, because a timer that survives sleep and relaunch is a
+// platform concern and differs between macOS and Electron.
+message ScheduleTriggerConfig {
+    ScheduleKind kind = 1;
+
+    // SCHEDULE_KIND_INTERVAL: seconds between runs.
+    uint32 interval_seconds = 2;
+
+    // SCHEDULE_KIND_DAILY: local wall-clock time to fire at.
+    uint32 hour   = 3;
+    uint32 minute = 4;
+
+    // SCHEDULE_KIND_CRON: a five-field expression, for hosts that support it.
+    string cron = 5;
+
+    // Seed items handed to the first node on each firing, as a JSON array.
+    string initial_items_json = 6;
+}
+
+enum ScheduleKind {
+    SCHEDULE_KIND_UNSPECIFIED = 0;
+    SCHEDULE_KIND_INTERVAL    = 1;
+    SCHEDULE_KIND_DAILY       = 2;
+    SCHEDULE_KIND_CRON        = 3;
+}
+
+// Concatenates every branch that reaches it. The only node with more than one
+// input port, so a fan-in does not need a dummy step.
+message MergeConfig {
+    uint32 input_count = 1;
+
+    // Drop items whose JSON body is byte-identical to one already seen.
+    bool deduplicate = 2;
+}
+
+message FilterConfig {
+    string left  = 1;
+    ComparisonOperator operator = 2;
+    string right = 3;
+
+    // Evaluate per item, so `{{ item.field }}` addresses the item under test.
+    bool keep_matching = 4;
+}
+
+// One item per element of a list, the inverse of Aggregate.
+message SplitOutConfig {
+    string field = 1;
+}
+
+// Collapses every input item into one, the inverse of Split Out.
+message AggregateConfig {
+    string field = 1;
+}
+
+message WaitConfig {
+    uint32 seconds = 1;
+}
+
+message FileReadConfig {
+    string path = 1;
+
+    // Text lands in the item's json body; binary lands in the binary map under
+    // this key, which is how audio and images reach the speech and vision
+    // nodes.
+    bool   binary       = 2;
+    string binary_key   = 3;
+    string mime_type    = 4;
+}
+
+message FileWriteConfig {
+    string path = 1;
+
+    // Expression for the text to write. Ignored when binary_key names an
+    // attachment on the incoming item.
+    string content    = 2;
+    string binary_key = 3;
+    bool   append     = 4;
+}
+
+message LlmStructuredConfig {
+    string prompt = 1;
+
+    // JSON Schema the model's answer must satisfy. The result lands parsed, so
+    // downstream expressions address its fields directly.
+    string json_schema = 2;
+
+    optional string system_prompt = 3;
+    optional string model_id      = 4;
+    optional LLMGenerationOptions generation = 5;
+}
+
+message VisionConfig {
+    string prompt = 1;
+
+    // Attachment on the incoming item holding the image bytes.
+    string binary_key = 2;
+
+    optional string model_id = 3;
+    optional LLMGenerationOptions generation = 4;
+}
+
+message EmbedConfig {
+    string text = 1;
+    optional string model_id = 2;
+}
+
+message RerankConfig {
+    string query = 1;
+
+    // Expression resolving to a list of strings.
+    string documents = 2;
+
+    uint32 top_n = 3;
+    optional string model_id = 4;
+}
+
+message TranscribeConfig {
+    string binary_key = 1;
+    optional string model_id = 2;
+    optional string language = 3;
+}
+
+message SpeakConfig {
+    string text = 1;
+
+    // Play through the speakers rather than returning the audio.
+    bool   play       = 2;
+    string binary_key = 3;
+
+    optional string model_id = 4;
+    optional string voice    = 5;
+}
+
+message DetectVoiceConfig {
+    string binary_key = 1;
+    optional float threshold = 2;
+}
+
+message DiarizeConfig {
+    string binary_key = 1;
+    optional string model_id = 2;
+    optional uint32 speaker_count = 3;
+}
+
+message SegmentConfig {
+    string text = 1;
+    optional string model_id = 2;
+}
+
+message RagQueryConfig {
+    string question = 1;
+
+    string embedding_model_id = 2;
+    string llm_model_id       = 3;
+
+    uint32 top_k = 4;
+}
+
+message RagIngestConfig {
+    string text = 1;
+
+    string embedding_model_id = 2;
+    string llm_model_id       = 3;
+
+    string document_id = 4;
+}
+
+// Bring a model up before later nodes need it, so a long first load is a step
+// the user can see rather than an unexplained pause inside another node.
+message LoadModelConfig {
+    string model_id = 1;
+    optional ModelCategory category = 2;
+}
+
+message WorkflowItem {
+    // Arbitrary user-shaped data. Carried as serialized JSON because the shape
+    // is defined by whatever the previous node emitted.
+    string json = 1;
+
+    map<string, WorkflowBinary> binary = 2;
+}
+
+message WorkflowBinary {
+    bytes  data      = 1;
+    string mime_type = 2;
+
+    optional string file_name = 3;
+}
+
+// What a user exports and shares: one or more workflows plus any node packs
+// they depend on, so a bundle opens on another machine without a second
+// download.
+message WorkflowBundle {
+    // Shape of this envelope. A reader refuses a newer one rather than
+    // importing a bundle it would silently misread.
+    uint32 format_version = 1;
+
+    // Free text for humans reading the file, never parsed.
+    string generator      = 2;
+    int64  exported_at_ms = 3;
+
+    repeated WorkflowDocument workflows = 4;
+    repeated NodePack         packs     = 5;
+}
+
+// Request naming which workflows to export. Every pack any of them
+// references — transitively, through a composite pack's own subgraph — is
+// resolved and bundled automatically, so there is nothing else to specify.
+message WorkflowBundleExportRequest {
+    repeated string workflow_ids = 1;
+}
+
+enum BundleItemKind {
+    BUNDLE_ITEM_KIND_UNSPECIFIED = 0;
+    BUNDLE_ITEM_KIND_WORKFLOW    = 1;
+    BUNDLE_ITEM_KIND_PACK        = 2;
+}
+
+message BundleImportIssue {
+    BundleItemKind kind    = 1;
+    string         id      = 2;
+    string         message = 3;
+}
+
+// Per-item outcome of an import, so one bad workflow or pack does not abort
+// the rest of the bundle.
+message WorkflowBundleImportResult {
+    repeated string imported_workflow_ids = 1;
+    repeated string imported_pack_ids     = 2;
+
+    repeated BundleImportIssue skipped = 3;
+}
+
+// A reusable node the user installs, exports, and shares.
+//
+// Two implementations, and the difference is what they are allowed to do. A
+// composite is a subgraph built from nodes that already exist, so importing one
+// grants no capability the host did not already have. A script carries
+// JavaScript, which is why it declares capabilities and the importer shows them
+// before enabling it.
+message NodePack {
+    string id          = 1;
+    string name        = 2;
+    string description = 3;
+    string author      = 4;
+    string version     = 5;
+
+    // Palette placement and card styling.
+    string category = 6;
+    string icon     = 7;
+    uint32 accent_rgb = 8;
+
+    repeated ToolArgumentPort inputs  = 9;
+    repeated string           outputs = 10;
+
+    oneof implementation {
+        CompositeImplementation composite = 11;
+        ScriptImplementation    script    = 12;
+    }
+
+    NodePackCapabilities capabilities = 13;
+}
+
+message CompositeImplementation {
+    // The subgraph. Runs inline when the pack node executes, the same way a
+    // loop body does, so it needs no separate scheduler.
+    WorkflowDocument graph = 1;
+
+    // Where the pack's inputs enter and its outputs leave. Empty entry means
+    // the graph's own trigger; empty exit means the last node in topological
+    // order.
+    string entry_node_id = 2;
+    string exit_node_id  = 3;
+}
+
+message ScriptImplementation {
+    // Evaluated through the same host callback the Code node uses, so a script
+    // pack gains no reach a Code node does not already have.
+    string source = 1;
+}
+
+// Declared by the pack, shown at import, and enforced by the host. A pack that
+// asks for nothing is safe to enable without a prompt.
+message NodePackCapabilities {
+    bool network    = 1;
+    bool filesystem = 2;
+
+    // Empty tool_names with tools set means any registered tool.
+    bool   tools      = 3;
+    repeated string tool_names = 4;
+}
+
+message NodePackList {
+    repeated NodePack packs = 1;
+}
+
+// Enough to populate a workflow list without loading every node of every
+// document off disk.
+message WorkflowSummary {
+    string id   = 1;
+    string name = 2;
+
+    int64 created_at_ms = 3;
+    int64 updated_at_ms = 4;
+
+    uint32 node_count = 5;
+}
+
+message WorkflowList {
+    repeated WorkflowSummary workflows = 1;
+}
+
+message WorkflowValidationResult {
+    bool valid = 1;
+    repeated WorkflowValidationIssue issues = 2;
+}
+
+message WorkflowValidationIssue {
+    string message = 1;
+
+    // Whichever of these the issue attaches to; a cycle sets neither.
+    optional string node_id   = 2;
+    optional string edge_from = 3;
+}
+
+enum NodeRunState {
+    NODE_RUN_STATE_UNSPECIFIED = 0;
+    NODE_RUN_STATE_PENDING     = 1;
+    NODE_RUN_STATE_RUNNING     = 2;
+    NODE_RUN_STATE_SUCCEEDED   = 3;
+    NODE_RUN_STATE_FAILED      = 4;
+
+    // The untaken side of a Condition. Not a failure.
+    NODE_RUN_STATE_SKIPPED     = 5;
+}
+
+enum WorkflowRunState {
+    WORKFLOW_RUN_STATE_UNSPECIFIED = 0;
+    WORKFLOW_RUN_STATE_RUNNING     = 1;
+    WORKFLOW_RUN_STATE_SUCCEEDED   = 2;
+    WORKFLOW_RUN_STATE_FAILED      = 3;
+    WORKFLOW_RUN_STATE_CANCELLED   = 4;
+}
+
+message NodeRun {
+    string       node_id = 1;
+    NodeRunState state   = 2;
+
+    int64 started_at_ms  = 3;
+    int64 finished_at_ms = 4;
+
+    repeated WorkflowItem output = 5;
+
+    optional SDKError error = 6;
+}
+
+// Persisted per run so a finished run stays inspectable and a failed one can
+// be resumed from the last succeeded node.
+message WorkflowRunRecord {
+    string run_id      = 1;
+    string workflow_id = 2;
+
+    WorkflowRunState state = 3;
+
+    int64 started_at_ms  = 4;
+    int64 finished_at_ms = 5;
+
+    repeated NodeRun node_runs = 6;
+
+    optional SDKError error = 7;
+}
+
+message WorkflowRunRequest {
+    string workflow_id = 1;
+
+    // Overrides ManualTriggerConfig.initial_items_json when non-empty.
+    repeated WorkflowItem initial_items = 2;
+}
+
+message WorkflowRunEvent {
+    string run_id = 1;
+
+    oneof event {
+        RunStarted       run_started        = 10;
+        NodeStateChanged node_state_changed = 11;
+        RunFinished      run_finished       = 12;
+    }
+}
+
+message RunStarted {
+    string workflow_id  = 1;
+    int64  started_at_ms = 2;
+}
+
+message NodeStateChanged {
+    string       node_id = 1;
+    NodeRunState state   = 2;
+
+    // Populated on SUCCEEDED so the canvas can show output without reloading
+    // the run record.
+    repeated WorkflowItem output = 3;
+
+    optional SDKError error = 4;
+}
+
+message RunFinished {
+    WorkflowRunState state          = 1;
+    int64            finished_at_ms = 2;
+
+    optional SDKError error = 3;
+}
+
+// Host callbacks
+//
+// Commons cannot reach the tool registry or a JavaScript engine; both live in
+// the host SDK. These cross the C ABI as serialized bytes, the same inversion
+// of control rac_platform_adapter_t uses for file and network access.
+
+message ToolInvocation {
+    string run_id  = 1;
+    string node_id = 2;
+
+    string tool_name      = 3;
+    string arguments_json = 4;
+}
+
+message ToolInvocationResult {
+    optional string   result_json = 1;
+    optional SDKError error       = 2;
+}
+
+message CodeInvocation {
+    string run_id  = 1;
+    string node_id = 2;
+
+    string source           = 3;
+    string input_items_json = 4;
+}
+
+message CodeInvocationResult {
+    optional string   output_items_json = 1;
+    optional SDKError error             = 2;
+}

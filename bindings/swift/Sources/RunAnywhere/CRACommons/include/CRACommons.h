@@ -116,6 +116,10 @@
 // Solutions — proto/YAML driven L5 solution runtime
 #include "rac_solution.h"
 
+// Agent workflow runner — document CRUD, validation, and run lifecycle for the
+// node-graph builder. Independent of the Solutions runtime above.
+#include "rac_agent_workflow.h"
+
 // =============================================================================
 // INFRASTRUCTURE - Events, Download, Model Management
 // =============================================================================

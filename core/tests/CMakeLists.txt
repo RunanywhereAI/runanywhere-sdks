@@ -280,6 +280,34 @@ target_compile_features(test_pipeline_executor PRIVATE cxx_std_17)
 rac_test_define_have_solutions(test_pipeline_executor)
 add_test(NAME pipeline_executor_tests COMMAND test_pipeline_executor)
 
+# Drives the public C ABI against real files, so it needs the desktop platform
+# adapter. Without RAC_DESKTOP_ADAPTER there is no adapter to install and every
+# storage call would return RAC_ERROR_ADAPTER_NOT_SET, so the target is simply
+# absent rather than present and failing.
+if(RAC_DESKTOP_ADAPTER)
+    add_executable(test_agent_workflow_e2e test_agent_workflow_e2e.cpp)
+    target_include_directories(test_agent_workflow_e2e PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_agent_workflow_e2e PRIVATE rac_commons)
+    rac_link_archive_deps(test_agent_workflow_e2e)
+    target_compile_features(test_agent_workflow_e2e PRIVATE cxx_std_20)
+    rac_test_define_have_protobuf(test_agent_workflow_e2e)
+    add_test(NAME agent_workflow_e2e_tests COMMAND test_agent_workflow_e2e)
+endif()
+
+add_executable(test_agent_workflow test_agent_workflow.cpp)
+target_include_directories(test_agent_workflow PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_agent_workflow PRIVATE rac_commons)
+rac_link_archive_deps(test_agent_workflow)
+target_compile_features(test_agent_workflow PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_agent_workflow)
+add_test(NAME agent_workflow_tests COMMAND test_agent_workflow)
+
 add_executable(test_solution_runner test_solution_runner.cpp)
 target_include_directories(test_solution_runner PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

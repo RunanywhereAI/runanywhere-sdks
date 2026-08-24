@@ -1281,3 +1281,29 @@ _rac_tool_provider_unregister
 # ============================================================================
 _rac_tool_web_research_register
 _rac_tool_web_research_unregister
+
+# ============================================================================
+# AUTO-SYNC (2026-08-24): symbols appended by sync_rac_api_exports.sh.
+# Net-new RAC_API-decorated decls discovered in the commons headers and
+# not already covered by an earlier curated section. Routing rules live
+# in scripts/validation/commons/sync_rac_api_exports.sh (ROUTING_RULES).
+# Added 18 symbols to RACommons.exports, sorted alphabetically.
+# ============================================================================
+_rac_agent_bundle_export_proto
+_rac_agent_bundle_import_proto
+_rac_agent_pack_delete
+_rac_agent_pack_list_proto
+_rac_agent_pack_load_proto
+_rac_agent_pack_save_proto
+_rac_agent_run_cancel
+_rac_agent_run_create_proto
+_rac_agent_run_destroy
+_rac_agent_run_record_load_proto
+_rac_agent_run_record_proto
+_rac_agent_run_start
+_rac_agent_set_host_callbacks
+_rac_agent_workflow_delete
+_rac_agent_workflow_list_proto
+_rac_agent_workflow_load_proto
+_rac_agent_workflow_save_proto
+_rac_agent_workflow_validate_proto
