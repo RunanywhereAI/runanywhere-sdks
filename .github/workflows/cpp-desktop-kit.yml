@@ -28,14 +28,17 @@ on:
       - 'cmake/PackageCppDesktop.cmake'
       - 'cmake/RunAnywhereConfig.cmake.in'
       - 'CMakePresets.json'
+      - 'core/**'
+      - 'engines/**'
+      - 'idl/**'
       - '.github/workflows/cpp-desktop-kit.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cpp-desktop-kit-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   macos-arm64:
@@ -68,7 +71,7 @@ jobs:
           print(f"kit ok: {len(names)} entries")
           PY
           shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
-            | tee dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256
+            | tee "dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: cpp-desktop-macos-arm64
@@ -129,6 +132,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.attach_tag != ''
     needs: [macos-arm64, windows-x64]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:

@@ -11,7 +11,10 @@ PRESET="${1:-}"
 if [[ -z "$PRESET" ]]; then
   case "$(uname -s)" in
     Darwin) PRESET=cpp-desktop-macos-arm64 ;;
-    Linux)  PRESET=cpp-desktop-macos-arm64; echo "WARN: using macOS preset name; override for linux" >&2 ;;
+    Linux)
+      echo "error: no cpp-desktop Linux kit preset; pass one explicitly" >&2
+      exit 2
+      ;;
     *)      PRESET=cpp-desktop-windows-x64 ;;
   esac
 fi

@@ -61,6 +61,9 @@ _kit_lock_key(IDL_PROTO_COUNT RUNANYWHERE_KIT_IDL_PROTO_COUNT)
 if(NOT RUNANYWHERE_KIT_IDL_SCHEMA_SHA256 OR NOT RUNANYWHERE_KIT_IDL_VERSION)
     message(FATAL_ERROR "PackageCppDesktop: idl/SCHEMA_LOCK is missing IDL_SCHEMA_SHA256 or IDL_VERSION")
 endif()
+if(NOT RUNANYWHERE_KIT_IDL_PROTO_COUNT MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "PackageCppDesktop: idl/SCHEMA_LOCK is missing a numeric IDL_PROTO_COUNT")
+endif()
 file(WRITE "${RAC_KIT_OUT}/include/runanywhere/proto/schema_lock.h"
 "#pragma once
 // Generated from idl/SCHEMA_LOCK. Do not edit.
@@ -124,7 +127,12 @@ if(EXISTS "${RAC_KIT_LIBS_FILE}")
         if(EXISTS "${_lib}" AND NOT "${_lib}" STREQUAL "${RAC_COMMONS_FILE}")
             file(COPY "${_lib}" DESTINATION "${RAC_KIT_OUT}/lib")
             get_filename_component(_n "${_lib}" NAME)
-            string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
+            # Backends are whole-archived from a GLOB in RunAnywhereConfig.cmake.
+            # Listing them here as well would duplicate the archive as a lazy
+            # extra and then REMOVE_DUPLICATES would strip --whole-archive flags.
+            if(NOT _n MATCHES "^(lib)?rac_backend_")
+                string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
+            endif()
         endif()
     endforeach()
 endif()
@@ -143,10 +151,13 @@ if(RAC_BINARY_DIR)
             # libonnxruntime.1.x.y.dylib (Mach-O type MH_DSYM). Copying it
             # and letting the real dylib's install name point at it makes
             # dyld abort with "unloadable mach-o file type 10".
-            execute_process(COMMAND file --brief "${_hit}" OUTPUT_VARIABLE _ft
-                            OUTPUT_STRIP_TRAILING_WHITESPACE)
-            if(NOT _ft MATCHES "dynamically linked shared library|shared object|DLL")
-                continue()
+            if(APPLE)
+                execute_process(COMMAND file --brief "${_hit}" OUTPUT_VARIABLE _ft
+                                OUTPUT_STRIP_TRAILING_WHITESPACE
+                                RESULT_VARIABLE _ft_rc)
+                if(NOT _ft_rc EQUAL 0 OR NOT _ft MATCHES "dynamically linked shared library")
+                    continue()
+                endif()
             endif()
             file(COPY "${_hit}" DESTINATION "${RAC_KIT_OUT}/third_party")
         endforeach()
@@ -198,7 +209,20 @@ file(WRITE "${RAC_KIT_OUT}/share/runanywhere/PLUGIN_API_VERSION" "${RAC_PLUGIN_A
 if(APPLE)
     set(RUNANYWHERE_KIT_SYSTEM_LIBS "Threads::Threads;ZLIB::ZLIB;CURL::libcurl;dl;bz2")
 elseif(WIN32)
-    set(RUNANYWHERE_KIT_SYSTEM_LIBS "ws2_32;crypt32;bcrypt;secur32")
+    # libcurl (static vcpkg) needs these plus the curl/zlib archives themselves.
+    set(RUNANYWHERE_KIT_SYSTEM_LIBS "ws2_32;crypt32;bcrypt;secur32;wldap32;normaliz;advapi32")
+    foreach(_root IN ITEMS "$ENV{VCPKG_INSTALLATION_ROOT}" "$ENV{VCPKG_ROOT}")
+        if(_root AND EXISTS "${_root}/installed/x64-windows-static/lib")
+            set(_vlib "${_root}/installed/x64-windows-static/lib")
+            foreach(_n IN ITEMS libcurl.lib zlib.lib)
+                if(EXISTS "${_vlib}/${_n}")
+                    file(COPY "${_vlib}/${_n}" DESTINATION "${RAC_KIT_OUT}/lib")
+                    string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
+                endif()
+            endforeach()
+            break()
+        endif()
+    endforeach()
 else()
     set(RUNANYWHERE_KIT_SYSTEM_LIBS "Threads::Threads;ZLIB::ZLIB;CURL::libcurl;dl;m")
 endif()
@@ -219,10 +243,6 @@ set(PACKAGE_VERSION_EXACT FALSE)
 if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
     set(PACKAGE_VERSION_COMPATIBLE TRUE)
     set(PACKAGE_VERSION_EXACT TRUE)
-elseif(PACKAGE_FIND_VERSION_MAJOR EQUAL ${RAC_VERSION})
-    if(PACKAGE_FIND_VERSION VERSION_LESS_EQUAL PACKAGE_VERSION)
-        set(PACKAGE_VERSION_COMPATIBLE TRUE)
-    endif()
 endif()
 ")
 

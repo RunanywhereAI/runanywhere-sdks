@@ -787,7 +787,7 @@ jobs:
             -j "$(sysctl -n hw.logicalcpu)"
           ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
           shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
-            | tee dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256
+            | tee "dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256"
       - uses: actions/upload-artifact@v7
         with:
           name: cpp-desktop-macos

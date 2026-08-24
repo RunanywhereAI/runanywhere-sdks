@@ -168,6 +168,9 @@ add_custom_target(package-cpp-desktop
     VERBATIM
     COMMENT "Staging C++ desktop kit at ${_kit_out}"
 )
+if(_kit_depends)
+    add_dependencies(package-cpp-desktop ${_kit_depends})
+endif()
 
 # Tarball next to the prefix for release.yml to pick up.
 add_custom_target(package-cpp-desktop-tarball
@@ -180,3 +183,4 @@ add_custom_target(package-cpp-desktop-tarball
     WORKING_DIRECTORY "${RAC_SOURCE_DIR}/dist"
     COMMENT "Tarring C++ desktop kit"
 )
+add_dependencies(package-cpp-desktop-tarball package-cpp-desktop)

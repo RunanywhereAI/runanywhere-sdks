@@ -67,6 +67,8 @@ if(NOT TARGET RunAnywhere::commons)
                 # Must be a link feature/flag, not INTERFACE_LINK_LIBRARIES
                 # with a leading slash — Ninja then stats `/WHOLEARCHIVE:C:/...`
                 # as a path and fails FindFirstFileExA.
+                # Do not REMOVE_DUPLICATES this list: GNU ld's
+                # --whole-archive / --no-whole-archive flags repeat per archive.
                 if(APPLE)
                     list(APPEND _runanywhere_kit_extra
                         "-Wl,-force_load,${_archive}")
@@ -77,8 +79,6 @@ if(NOT TARGET RunAnywhere::commons)
                     list(APPEND _runanywhere_kit_extra
                         "-Wl,--whole-archive" "${_archive}" "-Wl,--no-whole-archive")
                 endif()
-            else()
-                list(APPEND _runanywhere_kit_extra "${_archive}")
             endif()
         endif()
     endforeach()
@@ -91,7 +91,6 @@ if(NOT TARGET RunAnywhere::commons)
         "${RunAnywhere_THIRD_PARTY_DIR}/onnxruntime.dll")
     list(APPEND _runanywhere_kit_extra ${_kit_dylibs})
     if(_runanywhere_kit_extra)
-        list(REMOVE_DUPLICATES _runanywhere_kit_extra)
         set_property(TARGET RunAnywhere::commons APPEND PROPERTY
             INTERFACE_LINK_LIBRARIES ${_runanywhere_kit_extra})
     endif()
@@ -110,13 +109,13 @@ endif()
 
 foreach(_opt mlx neurt qhexrt)
     string(TOUPPER ${_opt} _OPT)
-    if(RunAnywhere_HAS_${_OPT}
-       AND EXISTS "${RunAnywhere_LIBRARY_DIR}/librac_backend_${_opt}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    set(_opt_lib
+        "${RunAnywhere_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}rac_backend_${_opt}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    if(RunAnywhere_HAS_${_OPT} AND EXISTS "${_opt_lib}")
         if(NOT TARGET RunAnywhere::${_opt})
             add_library(RunAnywhere::${_opt} STATIC IMPORTED)
             set_target_properties(RunAnywhere::${_opt} PROPERTIES
-                IMPORTED_LOCATION
-                    "${RunAnywhere_LIBRARY_DIR}/librac_backend_${_opt}${CMAKE_STATIC_LIBRARY_SUFFIX}"
+                IMPORTED_LOCATION "${_opt_lib}"
                 INTERFACE_LINK_LIBRARIES RunAnywhere::commons)
         endif()
     endif()

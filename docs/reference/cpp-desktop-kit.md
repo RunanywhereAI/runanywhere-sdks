@@ -5,7 +5,7 @@ to consume this SDK. It is not an rcli binary.
 
 ## Layout
 
-```
+```text
 include/rac/**                         public C ABI
 include/runanywhere/proto/*.pb.h       generated messages (same protoc as commons)
 include/google/protobuf/**             vendored runtime headers (PROTOBUF_VERSION pin)
