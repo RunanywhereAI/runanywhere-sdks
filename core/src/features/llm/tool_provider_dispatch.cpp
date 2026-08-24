@@ -68,7 +68,7 @@ bool execute_via_provider(const runanywhere::v1::ToolCall& call, uint64_t run_lo
     const std::string arguments = call.arguments_json().empty() ? "{}" : call.arguments_json();
 
     rac::plugin::ToolProgressScope scope(call.name(), run_loop_handle, std::move(is_cancelled),
-                                         history);
+                                         history, user_prompt);
 
     char* raw = nullptr;
     const rac_result_t rc =
