@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "plugin/web_research_internal.h"
 #include "plugin/web_search_client.h"
@@ -33,14 +34,12 @@ using rac::tools::web::SearchResult;
 constexpr const char* kTag = "WebResearch";
 constexpr const char* kToolName = "web_research";
 
-constexpr size_t kDefaultQuestions = 4;
-constexpr size_t kMaxQuestions = 6;
-constexpr size_t kResultsPerQuestion = 4;
+constexpr size_t kResultsPerSearch = 6;
 constexpr size_t kSnippetBudget = 400;
 // How many of the ranked results get read in full. Each is an HTTP round trip
 // and this runs on phones, so the cap is deliberately small: the top few carry
 // most of the answer, and a cancel is only noticed between stages.
-constexpr size_t kPagesToRead = 3;
+constexpr size_t kPagesToRead = 4;
 constexpr size_t kPageFetchBytes = 400 * 1024;
 constexpr size_t kPageTextBudget = 2000;
 constexpr int32_t kPageTimeoutMs = 10000;
@@ -49,12 +48,7 @@ constexpr int32_t kSearchTimeoutMs = 15000;
 // Deliberately small. A cancel arriving mid-tool is only observed at the next
 // stage boundary, so per-stage token budgets are also the worst case for how
 // long a cancel waits.
-constexpr int32_t kTriageTokens = 48;
-// A reasoning model narrates before it answers even with thinking disabled, and
-// the narration is charged to this budget. At 160 the queries were still being
-// written when the budget ran out, so planning returned nothing and the whole
-// pass collapsed to a single search on the original question.
-constexpr int32_t kQuestionTokens = 384;
+constexpr int32_t kQueryTokens = 64;
 constexpr int32_t kComposeTokens = 640;
 
 // Directive rather than descriptive: under AUTO tool choice this text is the
@@ -66,13 +60,11 @@ constexpr const char* kDescription =
     "information newer than your training data, so reach for it rather than saying you cannot "
     "know.";
 
-// One property, and a required one. An earlier version also advertised
-// `max_questions` and `clarification`, and a small model handed three
-// parameters emitted malformed JSON often enough to break the call outright
-// (`{"clarification": "",question":...,max_questions:6}`) — MLX has no grammar
-// constraint to fall back on, so bad JSON is simply a lost tool call. Both are
-// still accepted when present; neither needs to be the model's problem, and a
-// clarification comes back as part of the next question anyway.
+// One property, and a required one. Three advertised parameters made a small
+// model emit malformed JSON often enough to lose the call outright
+// (`{"clarification": "",question":...,max_questions:6}`), and MLX has no
+// grammar constraint to catch it, so bad JSON is simply a dropped tool call.
+// Anything else a model passes is ignored rather than rejected.
 constexpr const char* kParameters = R"({
   "type": "object",
   "properties": {
@@ -112,9 +104,8 @@ std::string truncate(const std::string& in, size_t limit) {
  * Read a string field without trusting its type.
  *
  * These arguments are written by a model, so a number or an object where a
- * string belongs is a normal occurrence rather than a bug. nlohmann's value()
- * throws on a type mismatch, which would take the tool down instead of
- * degrading.
+ * string belongs is ordinary rather than exceptional, and nlohmann's value()
+ * throws on a type mismatch.
  */
 std::string string_field(const json& args, const char* key) {
     const auto it = args.find(key);
@@ -122,27 +113,6 @@ std::string string_field(const json& args, const char* key) {
         return {};
     }
     return it->get<std::string>();
-}
-
-size_t question_count(const json& args) {
-    const auto it = args.find("max_questions");
-    if (it == args.end()) {
-        return kDefaultQuestions;
-    }
-    // Accept "4" as readily as 4: models quote numbers often enough that
-    // rejecting the string form would just look like the argument was ignored.
-    long long requested = 0;
-    if (it->is_number_integer()) {
-        requested = it->get<long long>();
-    } else if (it->is_string()) {
-        requested = std::strtoll(it->get<std::string>().c_str(), nullptr, 10);
-    } else {
-        return kDefaultQuestions;
-    }
-    if (requested <= 0) {
-        return kDefaultQuestions;
-    }
-    return std::min(static_cast<size_t>(requested), kMaxQuestions);
 }
 
 char* dup_c(const std::string& text) {
@@ -183,8 +153,16 @@ bool generate(const std::string& system_prompt, const std::string& prompt, int32
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
 
+    // Setting options.disable_thinking is not enough on its own: commons
+    // suppresses reasoning at the *prompt* level, and without the directive a
+    // thinking model spends the entire token budget inside an unterminated
+    // <think> block and returns nothing usable. run_generate_once does exactly
+    // this before calling generate; so must anything else that drives the LLM.
+    const std::string effective_prompt = rac::llm::apply_no_think_directive(
+        prompt, options.disable_thinking, ref.framework, ref.supports_thinking);
+
     rac_llm_result_t raw{};
-    const rac_result_t rc = ref.ops->generate(ref.impl, prompt.c_str(), &options, &raw);
+    const rac_result_t rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
     const bool ok = rc == RAC_SUCCESS && raw.text != nullptr;
     if (ok) {
         *out_text = trim(raw.text);
@@ -197,69 +175,41 @@ bool generate(const std::string& system_prompt, const std::string& prompt, int32
 // --- stages ----------------------------------------------------------------
 
 /**
- * Decide whether the question can be researched as written.
+ * Turn the request into one search query.
  *
- * Returns an empty string to proceed, or the clarification to put to the
- * user. Asking is deliberately not a blocking call into the host: the tool
- * returns `needs_input`, the app asks, and the next turn calls the tool again
- * with `clarification` filled in.
+ * This used to plan several sub-questions and search each. It never worked:
+ * the model spent its whole budget reasoning and returned nothing, so every
+ * run fell back to a single search anyway — while paying for the extra
+ * generation and giving the model another chance to invent something. One
+ * query, and the user's own words when the model gives nothing usable.
  */
-std::string triage(const std::string& question) {
+std::string plan_query(const std::string& question) {
     std::string reply;
     const bool ok = generate(
-        "You decide whether a research question can be searched as written. Answer with "
-        "exactly OK, or with CLARIFY: followed by one short question, when the request is too "
-        "vague or ambiguous to search. Prefer OK. Nothing else.",
-        "Request: " + question, kTriageTokens, &reply);
+        "You turn a request into one web search query. Reply with the query and nothing "
+        "else: no commentary, no quotes, no explanation, one line.",
+        "Request: " + question + "\n\nSearch query:", kQueryTokens, &reply);
     if (!ok) {
-        return {};
+        return question;
     }
-    const size_t at = reply.find("CLARIFY:");
-    if (at == std::string::npos) {
-        return {};
-    }
-    return trim(reply.substr(at + 8));
-}
 
-std::vector<std::string> plan_questions(const std::string& question, size_t wanted) {
-    std::string reply;
-    const bool ok = generate(
-        "You turn a request into search queries. Reply with one query per line and nothing "
-        "else: no numbering, no commentary, no blank lines. Each query stands alone and is "
-        "specific enough to search on its own.",
-        "Write " + std::to_string(wanted) +
-            " different search queries that together answer this request. Cover what, why, "
-            "how and when where they apply.\n\nRequest: " +
-            question,
-        kQuestionTokens, &reply);
-
-    std::vector<std::string> questions;
-    if (ok) {
-        reply = rac::tools::web::strip_reasoning_block(reply);
-        size_t start = 0;
-        while (start <= reply.size() && questions.size() < wanted) {
-            const size_t nl = reply.find('\n', start);
-            const std::string line = rac::tools::web::normalize_query_line(
-                reply.substr(start, nl == std::string::npos ? std::string::npos : nl - start));
-            if (rac::tools::web::query_is_usable(line)) {
-                questions.push_back(line);
-            }
-            if (nl == std::string::npos) {
-                break;
-            }
-            start = nl + 1;
+    reply = rac::tools::web::strip_reasoning_block(reply);
+    size_t start = 0;
+    while (start <= reply.size()) {
+        const size_t nl = reply.find('\n', start);
+        const std::string line = rac::tools::web::normalize_query_line(
+            reply.substr(start, nl == std::string::npos ? std::string::npos : nl - start));
+        if (rac::tools::web::query_is_usable(line)) {
+            return line;
         }
+        if (nl == std::string::npos) {
+            break;
+        }
+        start = nl + 1;
     }
-
-    // The original question is always worth searching, and it is the whole
-    // fallback when the model returns nothing usable.
-    if (std::find(questions.begin(), questions.end(), question) == questions.end()) {
-        questions.insert(questions.begin(), question);
-    }
-    if (questions.size() > wanted) {
-        questions.resize(wanted);
-    }
-    return questions;
+    // The question as asked is a perfectly good query, and a far better one
+    // than anything salvaged out of a reply that failed every check.
+    return question;
 }
 
 std::string compose(const std::string& question, const std::vector<SearchResult>& sources) {
@@ -275,11 +225,13 @@ std::string compose(const std::string& question, const std::vector<SearchResult>
 
     std::string answer;
     const bool ok = generate(
-        "You answer strictly from the search results given to you. Cite the results you use "
-        "as [1], [2] and so on. If the results do not answer the question, say so plainly "
-        "rather than filling the gap from memory.",
-        "Question: " + question + "\n\nSearch results:\n" + evidence + "\nAnswer:", kComposeTokens,
-        &answer);
+        "You answer only from the sources below. Every fact in your answer must appear in "
+        "them, and you cite the source you took it from as [1], [2] and so on. You do not add "
+        "anything you know from elsewhere, you do not guess, and you do not fill a gap with "
+        "something plausible. If the sources do not answer the question, say exactly what "
+        "they do and do not cover.",
+        "Question: " + question + "\n\nSources:\n" + evidence + "\nAnswer, citing sources:",
+        kComposeTokens, &answer);
     return ok ? answer : std::string();
 }
 
@@ -314,99 +266,45 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
         return RAC_SUCCESS;
     }
 
-    const size_t wanted = question_count(args);
-    const std::string clarification = trim(string_field(args, "clarification"));
-    const std::string subject =
-        clarification.empty() ? question : question + " (" + clarification + ")";
-
     json payload;
     payload["question"] = question;
 
-    // Stage 1 — understand what is being asked.
+    // Stage 1 — turn the request into a search query.
     if (!ctx->emit(ctx, "understanding", "Understanding the question", RAC_TOOL_PROGRESS_STARTED,
                    nullptr)) {
         return RAC_ERROR_CANCELLED;
     }
-    // A clarification the user already gave is the answer to the only question
-    // this stage could ask, so asking again would loop.
-    const std::string clarify = clarification.empty() ? triage(subject) : std::string();
-    if (!clarify.empty()) {
-        ctx->emit(ctx, "understanding", "Needs a clarification", RAC_TOOL_PROGRESS_COMPLETED,
-                  clarify.c_str());
-        payload["needs_input"] = clarify;
-        payload["summary"] = "I need one more detail before I can research this: " + clarify;
-        *out_result_json = dup_c(payload.dump());
-        return RAC_SUCCESS;
-    }
+    const std::string query = plan_query(question);
+    payload["query"] = query;
     if (!ctx->emit(ctx, "understanding", "Understanding the question", RAC_TOOL_PROGRESS_COMPLETED,
-                   subject.c_str())) {
+                   query.c_str())) {
         return RAC_ERROR_CANCELLED;
     }
 
-    // Stage 2 — plan the sub-questions.
-    if (!ctx->emit(ctx, "generating_questions", "Generating questions", RAC_TOOL_PROGRESS_STARTED,
-                   nullptr)) {
+    // Stage 2 — search it.
+    const std::string search_label = "Searching: " + query;
+    if (!ctx->emit(ctx, "gathering", search_label.c_str(), RAC_TOOL_PROGRESS_STARTED, nullptr)) {
         return RAC_ERROR_CANCELLED;
     }
-    const std::vector<std::string> questions = plan_questions(subject, wanted);
-    std::string question_list;
-    for (const auto& item : questions) {
-        question_list += (question_list.empty() ? "" : "\n") + item;
-    }
-    payload["sub_questions"] = questions;
-    if (!ctx->emit(ctx, "generating_questions", "Generating questions", RAC_TOOL_PROGRESS_COMPLETED,
-                   question_list.c_str())) {
-        return RAC_ERROR_CANCELLED;
-    }
-
-    // Stage 3 — search each of them.
-    if (!ctx->emit(ctx, "gathering", "Gathering data", RAC_TOOL_PROGRESS_STARTED, nullptr)) {
-        return RAC_ERROR_CANCELLED;
-    }
-    std::vector<SearchResult> sources;
-    std::vector<std::string> seen_urls;
-    std::string last_error;
-    for (const auto& item : questions) {
-        if (ctx->is_cancelled(ctx) != RAC_FALSE) {
-            return RAC_ERROR_CANCELLED;
-        }
-        const std::string label = "Searching: " + item;
-        const auto outcome = rac::tools::web::search(item, kResultsPerQuestion, kSearchTimeoutMs);
-        if (!outcome.ok) {
-            last_error = outcome.error;
-            ctx->emit(ctx, "gathering", label.c_str(), RAC_TOOL_PROGRESS_FAILED,
-                      outcome.error.c_str());
-            continue;
-        }
-        for (const auto& result : outcome.results) {
-            // The planned questions overlap on purpose, so their results do
-            // too; the same page cited twice is noise in the evidence block.
-            if (std::find(seen_urls.begin(), seen_urls.end(), result.url) != seen_urls.end()) {
-                continue;
-            }
-            seen_urls.push_back(result.url);
-            sources.push_back(result);
-        }
-        // Per-query label, not a repeated "Gathering data": this stage
-        // reports once per search, and a reader wants to see which ones ran.
-        const std::string detail = std::to_string(outcome.results.size()) + " result(s)";
-        if (!ctx->emit(ctx, "gathering", label.c_str(), RAC_TOOL_PROGRESS_COMPLETED,
-                       detail.c_str())) {
-            return RAC_ERROR_CANCELLED;
-        }
-    }
-
-    if (sources.empty()) {
-        const std::string message = last_error.empty() ? "no search results found" : last_error;
-        ctx->emit(ctx, "gathering", "Gathering data", RAC_TOOL_PROGRESS_FAILED, message.c_str());
+    const auto outcome = rac::tools::web::search(query, kResultsPerSearch, kSearchTimeoutMs);
+    if (!outcome.ok || outcome.results.empty()) {
+        const std::string message = outcome.ok ? "no search results found" : outcome.error;
+        ctx->emit(ctx, "gathering", search_label.c_str(), RAC_TOOL_PROGRESS_FAILED,
+                  message.c_str());
         payload["error"] = message;
-        payload["summary"] = "The web search returned nothing usable for this question.";
-        payload["source_url"] = rac::tools::web::results_page_url(question);
+        payload["summary"] = "The web search returned nothing for this question.";
+        payload["source_url"] = rac::tools::web::results_page_url(query);
         *out_result_json = dup_c(payload.dump());
         return RAC_SUCCESS;
     }
+    std::vector<SearchResult> sources = outcome.results;
+    const std::string found = std::to_string(sources.size()) + " result(s)";
+    if (!ctx->emit(ctx, "gathering", search_label.c_str(), RAC_TOOL_PROGRESS_COMPLETED,
+                   found.c_str())) {
+        return RAC_ERROR_CANCELLED;
+    }
 
-    // Stage 4 — read the pages behind the top results.
+    // Stage 3 — read the pages behind the results.
     if (!ctx->emit(ctx, "reading", "Reading the sources", RAC_TOOL_PROGRESS_STARTED, nullptr)) {
         return RAC_ERROR_CANCELLED;
     }
@@ -450,11 +348,11 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
     payload["sources"] = source_list;
     payload["source_url"] = sources.front().url;
 
-    // Stage 5 — answer from what came back.
+    // Stage 4 — answer from what was read.
     if (!ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_STARTED, nullptr)) {
         return RAC_ERROR_CANCELLED;
     }
-    const std::string summary = compose(subject, sources);
+    const std::string summary = compose(question, sources);
     if (summary.empty()) {
         // Falling back to the strongest snippet keeps the turn useful when the
         // compose pass fails; the model still sees every source below it.
@@ -466,8 +364,8 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
         ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_COMPLETED, nullptr);
     }
 
-    RAC_LOG_INFO(kTag, "researched '%s' across %zu question(s), %zu source(s)", question.c_str(),
-                 questions.size(), sources.size());
+    RAC_LOG_INFO(kTag, "researched '%s' as '%s': %zu source(s), %zu read", question.c_str(),
+                 query.c_str(), sources.size(), read_count);
     *out_result_json = dup_c(payload.dump());
     return RAC_SUCCESS;
 }

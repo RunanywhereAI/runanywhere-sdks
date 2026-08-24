@@ -308,12 +308,15 @@ void test_missing_question_rejected() {
     CHECK(wrong_type.value("error", std::string()) == "missing question",
           "a non-string question is treated as absent");
 
-    // Quoted numbers are common enough from models to be worth accepting.
-    const json quoted = run_tool(R"({"question":"anything","max_questions":"2"})");
-    CHECK(quoted.contains("error"), "a quoted count does not throw");
+    // Models pass arguments the schema never advertised. Ignoring them beats
+    // throwing, which would lose an otherwise valid call.
+    const json extra = run_tool(R"({"question":"anything","max_questions":"2"})");
+    CHECK(extra.value("question", std::string()) == "anything",
+          "an unadvertised argument is ignored, not fatal");
 
-    const json bad_count = run_tool(R"({"question":"anything","max_questions":{"a":1}})");
-    CHECK(bad_count.contains("error"), "a nonsense count does not throw");
+    const json odd = run_tool(R"({"question":"anything","depth":{"a":1}})");
+    CHECK(odd.value("question", std::string()) == "anything",
+          "an unadvertised object argument is ignored");
 }
 
 }  // namespace
