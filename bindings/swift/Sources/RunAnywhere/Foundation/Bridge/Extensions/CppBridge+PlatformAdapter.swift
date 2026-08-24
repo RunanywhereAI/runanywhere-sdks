@@ -370,9 +370,18 @@ private func platformFileWriteCallback(
 
     let pathString = String(cString: path)
     let fileData = Data(bytes: data, count: size)
+    let url = URL(fileURLWithPath: pathString)
 
     do {
-        try fileData.write(to: URL(fileURLWithPath: pathString))
+        // Commons addresses files by full path and has no way to create a
+        // directory, so anything writing into a folder that does not exist yet
+        // would fail here. Creating the parent matches what secure storage in
+        // this file already does.
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try fileData.write(to: url)
         return RAC_SUCCESS
     } catch {
         return RAC_ERROR_FILE_WRITE_FAILED
