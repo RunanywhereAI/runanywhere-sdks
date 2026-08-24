@@ -292,6 +292,16 @@ json error_payload(const std::string& message) {
     return payload;
 }
 
+// Carries a `recall` so the model can correct itself rather than reporting the
+// error to the reader, which is what it does when handed prose alone.
+json missing_question_payload() {
+    json payload = error_payload("No question was supplied.");
+    payload["recall"] = {{"tool", kToolName},
+                         {"arguments", {{"question", ""}}},
+                         {"why", "call again with the user's question in \"question\""}};
+    return payload;
+}
+
 rac_result_t web_research_execute(const char* args_json, const rac_tool_context_t* ctx,
                                   char** out_result_json, void* user_data) {
     (void)user_data;
@@ -318,10 +328,7 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
         question = trim(ctx->user_prompt);
     }
     if (question.empty()) {
-        *out_result_json =
-            dup_c(error_payload("No question was supplied. Call web_research again with the user's "
-                                "question in the \"question\" argument.")
-                      .dump());
+        *out_result_json = dup_c(missing_question_payload().dump());
         return RAC_SUCCESS;
     }
 

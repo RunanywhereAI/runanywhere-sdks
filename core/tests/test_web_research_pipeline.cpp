@@ -481,10 +481,36 @@ void test_missing_argument_falls_back_to_the_user() {
     CHECK(nothing.contains("error"), "with nothing at all, it says so");
 }
 
+// `recall` is what lets the model go again without asking the user. It is
+// only worth offering when another round could do better.
+void test_recall_is_offered_when_a_retry_could_help() {
+    std::printf("[11] a result that could not answer offers a recall\n");
+
+    // No argument at all: the model can fix this itself and must be told how.
+    const json no_argument = run_tool("", "", /*pass_question_argument=*/false);
+    CHECK(no_argument.contains("recall"), "a missing argument offers a recall");
+    if (no_argument.contains("recall")) {
+        CHECK(no_argument["recall"].value("tool", std::string()) == "web_research",
+              "the recall names the tool to call");
+        CHECK(no_argument["recall"].contains("arguments"), "and the arguments to call it with");
+        CHECK(!no_argument["recall"].value("why", std::string()).empty(),
+              "and says why another call is worth making");
+    }
+
+    // A run that read pages and produced a grounded answer has nothing to gain
+    // from going again, and offering one would just buy a second identical
+    // search.
+    const json good = run_tool("What did Apple announce?");
+    CHECK(good.value("sources", json::array()).size() > 0, "the good run found sources");
+    CHECK(!good.contains("recall") || good.value("grounded", false) == false,
+          "a run that answered does not ask to be repeated");
+}
+
 void test_no_results_is_honest() {
-    std::printf("[11] a search with nothing to find says so\n");
+    std::printf("[12] a search with nothing to find says so\n");
     const json result = run_tool("");
-    CHECK(result.value("error", std::string()).find("Call web_research again") != std::string::npos,
+    CHECK(result.value("error", std::string()).find("No question was supplied") !=
+              std::string::npos,
           "empty question rejected");
 }
 
@@ -502,6 +528,7 @@ int main() {
     test_unsupported_claims_are_dropped();
     test_citation_grounding();
     test_missing_argument_falls_back_to_the_user();
+    test_recall_is_offered_when_a_retry_could_help();
     test_no_results_is_honest();
     std::printf("=== %d checks, %d failed ===\n", g_test_count, g_fail_count);
     return g_fail_count == 0 ? 0 : 1;
