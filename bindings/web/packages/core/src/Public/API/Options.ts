@@ -43,7 +43,7 @@ export type AcceleratorPolicy = 'auto' | 'cpu' | 'gpu' | 'npu';
 /** One ranked backend choice for `LoadOptions.backendPreferences`. */
 export interface BackendPreference {
   backend: Backend;
-  /** `true` fails the load instead of falling back past this entry. */
+  /** Hard fallback boundary. Web rejects `true` until the load wire can carry it. */
   required?: boolean;
 }
 

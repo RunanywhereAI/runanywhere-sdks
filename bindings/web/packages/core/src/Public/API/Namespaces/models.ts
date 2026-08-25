@@ -8,6 +8,7 @@ import {
   ModelCompatibilityRequest,
   ModelCompatibilityResult,
   ModelFileRole,
+  type ModelLoadRequest,
   ModelRegistryStatus,
   type InferenceFramework,
   type ModelInfo,
@@ -156,6 +157,44 @@ function resolveLoadOptions(options?: LoadOptions): ResolvedLoadOptions {
     requestedBackend: backendPreferences?.[0],
     backendPreferences,
     accelerator,
+  };
+}
+
+function validateLoadOptions(options?: LoadOptions): void {
+  if (options?.threads !== undefined) {
+    throw SDKException.invalidConfiguration(
+      'LoadOptions.threads was retired from the load ABI (ModelLoadRequest reserved tag 7) '
+        + 'and is not a hard runtime guarantee. Remove it.',
+    );
+  }
+  if (options?.backendPreferences?.some((preference) => preference.required)) {
+    throw SDKException.invalidConfiguration(
+      'LoadOptions.backendPreferences.required cannot be carried by ModelLoadRequest because '
+        + 'backend_preferences contains framework enums only. Remove required or pass one '
+        + 'preferred backend.',
+    );
+  }
+}
+
+function makeModelLoadRequest(
+  id: string,
+  model: ModelInfo | null,
+  options: LoadOptions | undefined,
+  resolved: ResolvedLoadOptions,
+): ModelLoadRequest {
+  const framework = resolved.requestedBackend
+    ? backendToFramework(resolved.requestedBackend.backend)
+    : model?.framework;
+  return {
+    modelId: id,
+    category: model?.category,
+    framework,
+    forceReload: options?.forceReload ?? false,
+    validateAvailability: true,
+    contextLength: options?.contextLength,
+    backendPreferences: resolved.backendPreferences?.map(
+      (preference) => backendToFramework(preference.backend),
+    ) ?? [],
   };
 }
 
@@ -346,18 +385,13 @@ export const models = {
 
   /**
    * Load a model now instead of paying the cost on the first generation.
-   * contextLength and backendPreferences are forwarded on ModelLoadRequest.
-   * @throws SDKException when the model is absent, accelerator npu or threads
-   *   is requested (both unsupported on Web), or the backend rejects the load.
+   * contextLength and optional backendPreferences are forwarded on ModelLoadRequest.
+   * @throws SDKException when the model is absent, accelerator npu, threads, or a
+   *   required backend preference is requested, or the backend rejects the load.
    */
   async load(id: string, options?: LoadOptions): Promise<LoadedModel> {
     await ensureReady();
-    if (options?.threads !== undefined) {
-      throw SDKException.invalidConfiguration(
-        'LoadOptions.threads was retired from the load ABI (ModelLoadRequest reserved tag 7) '
-          + 'and is not a hard runtime guarantee. Remove it.'
-      );
-    }
+    validateLoadOptions(options);
     if (options?.accelerator === 'npu') {
       throw SDKException.unsupportedCapability(
         'LoadOptions.accelerator = npu',
@@ -369,18 +403,7 @@ export const models = {
       await Runtime.setAcceleration(resolved.accelerator === 'gpu' ? 'webgpu' : 'cpu');
     }
     const model = ModelRegistry.getModel(id);
-    const framework = resolved.requestedBackend
-      ? backendToFramework(resolved.requestedBackend.backend)
-      : model?.framework;
-    const result = await SDKCore.loadModel({
-      modelId: id,
-      category: model?.category,
-      framework,
-      forceReload: options?.forceReload ?? false,
-      validateAvailability: true,
-      contextLength: options?.contextLength,
-      backendPreferences: resolved.backendPreferences?.map((p) => backendToFramework(p.backend)) ?? [],
-    });
+    const result = await SDKCore.loadModel(makeModelLoadRequest(id, model, options, resolved));
     if (!result || result.error) {
       throw result?.error
         ? new SDKException(result.error)
@@ -532,5 +555,10 @@ function toProgressEvent(progress: DownloadProgress, operationId: string, sequen
   };
 }
 
-/** Test seam for the download progress mapping. */
-export const __testing__ = { toProgressEvent };
+/** Test seam for request construction and download progress mapping. */
+export const __testing__ = {
+  makeModelLoadRequest,
+  resolveLoadOptions,
+  toProgressEvent,
+  validateLoadOptions,
+};
