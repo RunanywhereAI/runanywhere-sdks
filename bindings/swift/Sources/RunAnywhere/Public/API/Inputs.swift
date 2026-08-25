@@ -109,7 +109,7 @@ public struct AudioInput: Sendable {
 
     // MARK: Lowering
 
-    func toSTTAudioSource() -> RASTTAudioSource {
+    func toSTTAudioSource() throws -> RASTTAudioSource {
         var source = RASTTAudioSource()
         source.channels = Int32(max(1, channels))
         if sampleRate > 0 { source.sampleRate = Int32(sampleRate) }
@@ -128,10 +128,46 @@ public struct AudioInput: Sendable {
             source.encoding = .container
             source.audioFormat = .wav
         case .file:
-            source.fileUri = path ?? ""
+            // Commons has no file I/O of its own — platform I/O is the SDK's
+            // job — and refuses a request carrying only a path, with a message
+            // about a missing platform adapter that reads as a setup problem
+            // rather than as "this input was never going to work". Read it here
+            // instead, which is what `.file` promised the caller.
+            guard let path else {
+                throw SDKException(
+                    code: .invalidInput,
+                    message: "AudioInput.file has no path",
+                    category: .validation
+                )
+            }
+            guard let contents = FileManager.default.contents(atPath: path) else {
+                throw SDKException(
+                    code: .invalidInput,
+                    message: "cannot read audio file at \(path)",
+                    category: .validation
+                )
+            }
+            source.audioData = contents
             source.encoding = .container
+            source.audioFormat = Self.containerFormat(forPath: path)
         }
         return source
+    }
+
+    /// The container a file's extension names. Guessing from bytes belongs in
+    /// commons, which already sniffs the header; this only has to name what the
+    /// caller handed over.
+    private static func containerFormat(forPath path: String) -> RAAudioFormat {
+        switch (path as NSString).pathExtension.lowercased() {
+        case "wav", "wave": return .wav
+        case "mp3": return .mp3
+        case "flac": return .flac
+        case "ogg", "oga": return .ogg
+        case "opus": return .opus
+        case "aac": return .aac
+        case "m4a": return .m4A
+        default: return .unspecified
+        }
     }
 
     func toVADAudioSource() throws -> RAVADAudioSource {
@@ -350,15 +386,18 @@ public struct ImageInput: Sendable {
 
     // MARK: Lowering
 
-    func toVLMImage() -> RAVLMImage {
-        switch source {
-        case .file(let path):
-            return RAVLMImage.fromFilePath(path)
-        case .encoded(let data):
-            return RAVLMImage.fromEncoded(data, mediaType: ImageInput.mediaType(of: data))
-        case .rawRgb(let data, let width, let height):
-            return RAVLMImage.fromRawRGB(data, width: width, height: height)
-        }
+    /// Always lowered to packed RGB.
+    ///
+    /// Commons refuses a `data` arm outright — the C ABI has no carrier for a
+    /// JPEG/PNG container, and feeding container bytes to a backend expecting
+    /// `width * height * 3` crashes it — so `ImageInput.bytes` reached the
+    /// boundary and came back "failed to convert VLMGenerationRequest". A file
+    /// path is accepted there, but then each engine loads the file its own way.
+    /// Decoding here instead means one path, decoded by the platform that owns
+    /// image I/O, and every engine receives pixels it can use.
+    func toVLMImage() throws -> RAVLMImage {
+        let pixels = try rawPixels()
+        return RAVLMImage.fromRawRGB(pixels.data, width: pixels.width, height: pixels.height)
     }
 
     /// Packed 24-bit RGB pixels, decoding the file or encoded buffer when needed.
