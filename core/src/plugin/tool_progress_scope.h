@@ -61,6 +61,9 @@ class ToolProgressScope {
     std::string tool_name_;
     uint64_t run_loop_handle_;
     std::function<bool()> is_cancelled_;
+    // Distinct per scope, so two providers running in parallel under one run
+    // loop do not both emit sequence 0 and collide in a consumer's key.
+    uint64_t execution_id_;
     uint64_t sequence_ = 0;
     // Owned so the pointer array handed across the ABI outlives the call.
     std::vector<std::string> history_;

@@ -454,4 +454,13 @@ message ToolProgress {
     // Wall-clock emit time, ms since epoch. Diagnostic only — ordering is
     // `sequence`, never this.
     int64 emitted_at_ms = 8;
+
+    // Distinct per execute() call, and stable for every event that call emits.
+    //
+    // `sequence` restarts at 0 for each execution, so with
+    // ToolCallingOptions.parallel_tool_calls two providers running under one
+    // run_loop_handle emit colliding (handle, sequence) pairs. A consumer
+    // keying rows off that pair loses events; pair this with `sequence`
+    // instead.
+    uint64 execution_id = 9;
 }

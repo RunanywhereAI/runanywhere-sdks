@@ -61,11 +61,17 @@ public struct ToolProgress: Sendable, Identifiable {
     /// than by arrival — the sink hops threads.
     public let sequence: UInt64
 
+    /// Distinct per execute() call, and the same for every event that call
+    /// emits. `sequence` restarts at 0 per execution, so with parallel tool
+    /// calls it alone is not unique within a generation.
+    public let executionID: UInt64
+
     /// Distinct per emitted event within one generation.
-    public var id: UInt64 { sequence }
+    public var id: String { "\(executionID).\(sequence)" }
 
     init?(proto: RAToolProgress) {
         guard let status = Status(proto: proto.status) else { return nil }
+        self.executionID = proto.executionID
         self.toolName = proto.toolName
         self.stageID = proto.stageID
         self.label = proto.label
