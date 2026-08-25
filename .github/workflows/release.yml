@@ -2226,8 +2226,10 @@ jobs:
               # jobs used to write `dist/foo.tar.gz`; rewrite so -c succeeds
               # and the published sidecar is consumer-usable.
               tmp="${checksum}.basename"
-              while read -r digest _ path; do
-                [ -n "$digest" ] || continue
+              while read -r digest path; do
+                digest="${digest%$'\r'}"
+                path="${path%$'\r'}"
+                [ -n "$digest" ] && [ -n "$path" ] || continue
                 printf '%s  %s\n' "$digest" "$(basename "$path")"
               done < "$checksum" > "$tmp"
               mv "$tmp" "$checksum"
