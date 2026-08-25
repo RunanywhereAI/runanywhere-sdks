@@ -401,7 +401,11 @@ rac_result_t vlm_initialize(void* impl, const char* model_path, const char* mmpr
 
 rac_result_t vlm_process(void* impl, const rac_vlm_image_t* image, const char* prompt,
                          const rac_vlm_options_t* options, rac_vlm_result_t* out_result) {
-    if (!image || !prompt || !out_result) {
+    // A null image is the text-only turn: a vision model is a language model
+    // with a vision tower, and refusing the imageless case is what stopped one
+    // being usable in an ordinary chat. The prompt and result slot stay
+    // mandatory.
+    if (!prompt || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
     rac_mlx_callbacks_t callbacks = {};
@@ -421,7 +425,8 @@ rac_result_t vlm_process(void* impl, const rac_vlm_image_t* image, const char* p
 rac_result_t vlm_process_stream(void* impl, const rac_vlm_image_t* image, const char* prompt,
                                 const rac_vlm_options_t* options,
                                 rac_vlm_stream_callback_fn callback, void* user_data) {
-    if (!image || !prompt || !callback) {
+    // See vlm_process: a null image means a text-only turn, not a bad call.
+    if (!prompt || !callback) {
         return RAC_ERROR_NULL_POINTER;
     }
     rac_mlx_callbacks_t callbacks = {};

@@ -979,6 +979,13 @@ void free_vlm_image(rac_vlm_image_t* image) {
     std::memset(image, 0, sizeof(*image));
 }
 
+/// A zeroed image is the text-only turn, which the backends take as a null
+/// pointer rather than as an empty struct.
+bool vlm_image_has_source(const rac_vlm_image_t& image) {
+    return image.file_path != nullptr || image.pixel_data != nullptr ||
+           image.base64_data != nullptr;
+}
+
 rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t request_size,
                                           runanywhere::v1::VLMGenerationRequest* out_request,
                                           rac_vlm_image_t* out_image,
@@ -991,11 +998,16 @@ rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t r
                                      static_cast<int>(request_size))) {
         return parse_error(out_error, "failed to parse VLMGenerationRequest");
     }
-    if (out_request->images_size() != 1) {
+    // Zero images is a text-only turn. A vision model is still a language
+    // model, and refusing the imageless case is what made a VLM unusable in an
+    // ordinary chat: it loads under the VLM component, so the LLM path cannot
+    // see it, and this path would not take it without a picture.
+    if (out_request->images_size() > 1) {
         return rac_proto_buffer_set_error(
             out_error, RAC_ERROR_INVALID_ARGUMENT,
-            "VLMGenerationRequest.images must contain exactly one image");
+            "VLMGenerationRequest.images holds at most one image");
     }
+    const bool has_image = out_request->images_size() == 1;
 
     const runanywhere::v1::LLMGenerationOptions& options_proto =
         out_request->has_options() ? out_request->options()
@@ -1007,7 +1019,8 @@ rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t r
     // of the options message, so the adapter no longer produces it.
     *out_prompt = out_request->prompt().c_str();
 
-    if (!rac::foundation::rac_vlm_image_from_proto(out_request->images(0), out_image) ||
+    if ((has_image &&
+         !rac::foundation::rac_vlm_image_from_proto(out_request->images(0), out_image)) ||
         !rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options)) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
                                           "failed to convert VLMGenerationRequest");
@@ -1016,7 +1029,8 @@ rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t r
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                           "VLMGenerationRequest.prompt is required");
     }
-    if (!out_image->file_path && !out_image->pixel_data && !out_image->base64_data) {
+    if (has_image && !out_image->file_path && !out_image->pixel_data &&
+        !out_image->base64_data) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                           "VLMImage source is required");
     }
@@ -1309,7 +1323,9 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                        ref.framework_name);
 
     rac_vlm_result_t raw = {};
-    rc = (ref.ops && ref.ops->process) ? ref.ops->process(ref.impl, &image, prompt, &options, &raw)
+    const rac_vlm_image_t* image_arg = vlm_image_has_source(image) ? &image : nullptr;
+    rc = (ref.ops && ref.ops->process)
+             ? ref.ops->process(ref.impl, image_arg, prompt, &options, &raw)
                                        : RAC_ERROR_NOT_SUPPORTED;
     if (rc != RAC_SUCCESS) {
         publish_failure(rc, "vlm.generate", rac_error_message(rc));
@@ -1468,7 +1484,8 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     dispatch_vlm_stream_event(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_STARTED, nullptr, false,
                               nullptr, nullptr, 0);
 
-    rc = ref.ops->process_stream(ref.impl, &image, prompt, &options,
+    rc = ref.ops->process_stream(ref.impl, vlm_image_has_source(image) ? &image : nullptr, prompt,
+                                 &options,
                                  generated_stream_token_trampoline, &ctx);
 
     flush_held_stream_text(&ctx);
