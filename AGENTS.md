@@ -74,7 +74,7 @@ platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control 
 call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings
 for every language.
 
-**Current version**: `0.20.25` (canonical source: `core/VERSION`)
+**Current version**: `0.20.28` (canonical source: `core/VERSION`)
 
 | SDK | Path | Bridge mechanism | Platforms |
 |-----|------|-------------------|-----------|
@@ -168,14 +168,10 @@ llamacpp=100, sherpa=90, onnx/cloud=50. An explicit engine name is honored throu
   `emscripten_fetch` on Web).
 - **NeuRT crosses a repo boundary as BYTES, not source**: the Apple engine is built and
   published by the private `neurun` repo and consumed here as prebuilt archives, pinned by
-  tag + SHA-256 in `core/VERSIONS` (`NEURT_*`) the same way sherpa-onnx is. Fetch with
-  `scripts/build/download-neurt.sh`. This repo previously resolved a `NEURT_ROOT` checkout
-  of that private repo and regex-parsed its `CMakeLists.txt` for a source list, which meant
-  only a holder of that repo could build the Apple release. Every archive carries a
-  `RECEIPT.json` naming the `RAC_PLUGIN_API_VERSION` it was compiled against, and both the
-  downloader and CMake refuse a mismatch — a vtable-layout change relinks cleanly and
-  corrupts dispatch at runtime, and a static archive resolves no symbols, so nothing else
-  would catch it.
+  tag + SHA-256 in `core/VERSIONS` (`NEURT_*`). Fetch with `scripts/build/download-neurt.sh`.
+  Each archive carries a receipt naming the `RAC_PLUGIN_API_VERSION` it was built against,
+  and both the downloader and CMake refuse a mismatch — a vtable-layout change relinks
+  cleanly and corrupts dispatch at runtime, so nothing else would catch it.
 
 A side-by-side comparison of entry point / bridge / streaming / events / storage / HTTP
 per SDK — useful when porting a fix across SDKs — lives in
@@ -187,7 +183,7 @@ per SDK — useful when porting a fix across SDKs — lives in
 
 The root `CMakeLists.txt` (version from `core/VERSION`) is the single entry point for
 native builds; `CMakePresets.json` defines `macos-{debug,release}`, `linux-{debug,release,asan}`,
-`ios-{device,simulator}`, `android-arm64`, `wasm`, and the `rcli-*`/`windows-*` presets.
+`ios-{device,simulator}`, `android-arm64`, `wasm`, `cpp-desktop-*`, and the `windows-*` presets.
 
 ```bash
 cmake --preset macos-debug && cmake --build build/macos-debug && ctest --preset macos-debug

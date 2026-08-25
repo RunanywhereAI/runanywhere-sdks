@@ -260,7 +260,7 @@ static const rac_engine_manifest_t k_neurt_manifest = {
 // via `rac_neurt_llm_ops` -> `rac_neurt_core`. NeuRT runs prebuilt Core ML graphs on the Apple
 // Neural Engine; it never compiles a model.
 //
-// NEURT_ROOT is NOT a hard requirement: without the neurun checkout engines/neurt builds a
+// A prebuilt is NOT a hard requirement: without one engines/neurt builds a
 // non-routable shell rather than failing configure, so the engine can be compiled on a CI host
 // that cannot clone the private repo. `RAC_NEURT_ROUTABLE` is what re-establishes the guarantee
 // the old FATAL_ERROR was after — in the stub arm the vtable's llm_ops slot is NULL and

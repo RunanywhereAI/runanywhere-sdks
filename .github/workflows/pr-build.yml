@@ -60,6 +60,12 @@ jobs:
         run: bash scripts/validation/gates/check_typescript_centralization.sh
       - name: WASM vendor provenance schema contract
         run: bash scripts/validation/gates/check_wasm_provenance_contract.sh
+      # Asserts the private-engine prebuilt boundary is whole: pins well-formed, the
+      # ABI pin equal to the header, and every consumer actually fetching a payload.
+      # Offline here -- the release-content half needs a token and runs at release time.
+      - name: Engine prebuilt pins and consumers
+        run: bash scripts/validation/gates/check_engine_prebuilt_pins.sh --offline
+
       - name: Release-train version coherence
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -127,7 +133,8 @@ jobs:
 
   macos-release:
     # Keep the release compile on the canonical Apple toolchain too. Metal is
-    # disabled in this preset; the dedicated rcli lane covers Metal separately.
+    # disabled in this preset (Apple GPU coverage lives in the C++ desktop kit
+    # and in RunanywhereAI/RCLI).
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
@@ -163,187 +170,6 @@ jobs:
       - run: cmake --preset linux-asan
       - run: cmake --build --preset linux-asan
       - run: ctest --preset linux-asan
-
-  rcli-macos:
-    # rcli desktop CLI — full-backend release build + modelless smoke.
-    # This is the one macOS lane that enables GGML_METAL, so it retains the
-    # older compatible runner while CPU-only native and SDK lanes use Xcode 26.
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v7
-      - run: brew install ninja protobuf
-      - run: cmake --preset rcli-macos-release
-      - run: cmake --build --preset rcli-macos-release
-      - name: Smoke (modelless)
-        run: |
-          set -euo pipefail
-          RCLI=build/rcli-macos-release/rcli/rcli
-          "$RCLI" version
-          BACKENDS="$("$RCLI" backends --json)"
-          echo "$BACKENDS"
-          # Release CLI must ship llama.cpp. MLX is linked (RCLI_HAS_MLX) but
-          # only registers once Swift callbacks are present (RunAnywhereMLXCLI).
-          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
-          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
-          "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
-          "$RCLI" info --json
-      - name: Package smoke
-        run: bash rcli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
-
-  rcli-linux:
-    # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev patchelf
-      - name: Sherpa-ONNX prebuilts
-        run: ./core/scripts/linux/download-sherpa-onnx.sh
-      - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON
-      - run: cmake --build --preset rcli-linux-release
-      - name: Unit tests
-        run: ctest --test-dir build/rcli-linux-release -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
-      - name: Smoke (modelless)
-        run: |
-          set -euo pipefail
-          RCLI=build/rcli-linux-release/rcli/rcli
-          "$RCLI" version
-          BACKENDS="$("$RCLI" backends --json)"
-          echo "$BACKENDS"
-          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
-          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
-          "$RCLI" info --json
-      - name: Package smoke
-        run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
-
-  rcli-windows:
-    # Windows is compiled and exercised on the native runner. MLX remains
-    # Apple-only; the portable CLI ships llama.cpp + Sherpa/ONNX on Windows.
-    runs-on: windows-2022
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          platform: windows
-      - name: Install static libcurl
-        shell: pwsh
-        run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-mingw-static --host-triplet=x64-mingw-static
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
-      - name: Sherpa-ONNX prebuilts
-        shell: cmd
-        run: core\scripts\windows\download-sherpa-onnx.bat
-      - name: Configure
-        shell: pwsh
-        run: cmake --preset rcli-windows-release -DRAC_BUILD_TESTS=ON
-      - name: Build
-        shell: pwsh
-        run: cmake --build --preset rcli-windows-release
-      - name: Add native runtimes to PATH
-        shell: pwsh
-        run: |
-          $Onnx = Get-ChildItem build/rcli-windows-release -Filter onnxruntime.dll -File -Recurse |
-            Where-Object { $_.FullName -match 'onnxruntime-src[\\/]lib' } |
-            Select-Object -First 1
-          if (-not $Onnx) { throw "onnxruntime.dll not found" }
-          $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          "$env:GITHUB_WORKSPACE\core\third_party\sherpa-onnx-windows\lib" |
-            Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Unit tests
-        shell: pwsh
-        run: >-
-          ctest --test-dir build/rcli-windows-release
-          -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
-      - name: Package and smoke
-        shell: pwsh
-        run: >-
-          ./rcli/scripts/package-rcli-windows.ps1
-          -BuildDir build/rcli-windows-release
-
-  neurt-abi-drift:
-    # The OTHER half of the drift loop. neurun's own CI (job `neurt-sdk-abi`)
-    # catches neurun's adapter drifting from these headers. This job catches the
-    # reverse -- THIS repo widening a rac_* signature under a private engine that
-    # cannot see the change until release time.
-    #
-    # That direction is the one that actually bit: commons widened
-    # rac_llm_stream_callback_fn with `tokens_in_delta`, NeuRT kept passing 4
-    # arguments, and native_ios failed with "too few arguments to function call,
-    # expected 5, have 4" on v0.20.15, v0.20.16 AND v0.20.17. Because every
-    # packaging job needs native_ios, all three shipped iOS-ONLY: 18 assets each,
-    # where 0.20.19+ ship 55+. Nothing Android, Linux, Windows, WASM, npm or Maven.
-    #
-    # Deliberately SKIPS instead of failing when NEURUN_TOKEN is unavailable: the
-    # engine source is private, so a fork PR can never run this. Skipping is
-    # correct there -- the same check runs unconditionally in neurun's own CI, and
-    # release.yml still builds the real thing.
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Check out the private NeuRT engine (skips on forks — no secret)
-        id: neurun
-        continue-on-error: true
-        uses: actions/checkout@v7
-        with:
-          repository: RunanywhereAI/neurun
-          path: neurun
-          token: ${{ secrets.NEURUN_TOKEN }}
-          persist-credentials: false
-      # rac/rac_defaults_generated.h is gitignored codegen output (.gitignore:548)
-      # that the rac_*_types.h headers all #include, so a checkout alone cannot
-      # compile against them. Pure Python, no protoc. Without this the ABI check
-      # reports "ABI DRIFT" for a missing prerequisite -- a false alarm, which is
-      # how guards get muted.
-      - name: Generate the gitignored C defaults header
-        # Needs no protoc, but does `import google.protobuf` (a pip package).
-        # bootstrap_pyproto.sh keeps the version pinned in one place
-        # (core/VERSIONS::PYTHON_PROTOBUF_VERSION) and prints an interpreter path.
-        if: steps.neurun.outcome == 'success'
-        run: |
-          set -euo pipefail
-          # The emitter shells out to a BARE `protoc`
-          # (idl/codegen/_convenience_common.py:235) with no env override, so it
-          # must be ON PATH, not merely resolvable.
-          py="$(idl/codegen/bootstrap_pyproto.sh)"
-          protoc_dir="$(idl/codegen/bootstrap_protoc.sh --print-dir)"
-          export PATH="$protoc_dir:$PATH"
-          "$py" idl/codegen/generate_cpp_defaults.py
-
-      - name: Compile the NeuRT op tables against THIS PR's headers
-        if: steps.neurun.outcome == 'success'
-        env:
-          # Turn "SDK headers not found" into a hard failure. The checkout is
-          # always present here, so a skip could only mean the script's path
-          # resolution broke -- which is exactly how this guard silently did
-          # nothing for three releases (neurun PR #67).
-          NEURT_ABI_REQUIRE_SDK: '1'
-        run: |
-          set -euo pipefail
-          script=neurun/NeuRT/tools/scripts/check_sdk_abi.sh
-          if [ ! -x "$script" ] && [ ! -f "$script" ]; then
-            echo "::error::$script missing — the NeuRT ABI guard moved or was deleted"
-            exit 1
-          fi
-          set +e
-          bash "$script" "$GITHUB_WORKSPACE"
-          rc=$?
-          set -e
-          if [ "$rc" -eq 3 ]; then
-            echo "::error::The NeuRT ABI guard SKIPPED (exit 3) instead of running."
-            echo "::error::Its SDK include-path probe found nothing — almost certainly this"
-            echo "::error::checkout of neurun predates RunanywhereAI/neurun#67, which fixed a"
-            echo "::error::stale hardcoded path that made the guard skip on every run."
-            exit 1
-          fi
-          exit "$rc"
-      - name: Note why it was skipped
-        if: steps.neurun.outcome != 'success'
-        run: |
-          echo "::notice::NeuRT ABI check skipped — no NEURUN_TOKEN (expected on fork PRs)."
 
   windows-commons-release:
     # PR-time coverage for core/scripts/build-windows.bat, i.e. exactly what
@@ -544,8 +370,7 @@ jobs:
 
   ios-device:
     # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
-    # Use the macOS 26 runner line for Xcode 26; only the Metal rcli lane keeps
-    # its explicit older-runner compatibility exception.
+    # Use the macOS 26 runner line for Xcode 26.
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7

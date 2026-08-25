@@ -5,6 +5,46 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.28] - 2026-08-24
+
+### Added
+
+- The C++ desktop kit is now a first-class release artifact (`macos-arm64`,
+  `windows-x64`, and a thin `windows-arm64` OSS kit). NeuRT and QHexRT ship as
+  optional private overlays, never inside the public GitHub Release.
+
+### Changed
+
+- No Flutter-facing API change.
+
+## [0.20.27] - 2026-08-24
+
+### Changed
+
+- The Apple Neural Engine (NeuRT) and Hexagon NPU (QHexRT) engines now ship from
+  pinned, prebuilt archives published by the private engine repository rather
+  than being compiled from source. Each archive is verified by SHA-256 and by a
+  build receipt naming the plugin ABI version it was built against.
+- The Hexagon engine's QAIRT/QNN runtime dependency is now pinned and fetched
+  the same way — as a private, checksum-verified artifact from the engine
+  repository, paired against the engine's own build identity so the two can
+  never silently drift apart.
+- No Flutter-facing API change.
+
+## [0.20.26] - 2026-08-23
+
+### Changed
+
+- The Apple Neural Engine (NeuRT) and Hexagon NPU (QHexRT) engines now ship from
+  pinned, prebuilt archives published by the engine repository rather than being
+  compiled from private source. Each archive is verified by SHA-256 and by a build
+  receipt naming the plugin ABI version it was built against, so an engine built
+  against a different ABI is refused at download time instead of relinking cleanly
+  and corrupting dispatch at runtime.
+- No Flutter-facing API change. The effect is on provenance: the Apple xcframework
+  and the Android `arm64-v8a` payload this package depends on are now traceable to a
+  published artifact and its checksum.
+
 ## [0.20.25] - 2026-08-21
 
 ### Changed
