@@ -8,7 +8,6 @@
 # Kotlin typed JSON adapters and external cloud-provider payloads.
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/CloudSttProvider.kt|kotlin:org-json-usage
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/Cloud.kt|kotlin:org-json-usage
-bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt|kotlin:json-serialisation
 # Web-search tool parses the external DuckDuckGo JSON response (not an SDK DTO);
 # mirrors the already-allowlisted Swift RunAnywhere+WebSearchTool.swift.
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereWebSearchTool.kt|kotlin:json-serialisation
@@ -57,7 +56,6 @@ core/include/rac/infrastructure/telemetry/rac_telemetry_manager.h|cpp:public-jso
 core/include/rac/backends/rac_llm_llamacpp.h|cpp:json-param-in-public-api
 core/include/rac/backends/rac_vlm_llamacpp.h|cpp:json-param-in-public-api
 core/include/rac/features/llm/rac_llm_service.h|cpp:json-param-in-public-api
-core/include/rac/features/llm/rac_llm_structured_output.h|cpp:json-param-in-public-api
 core/include/rac/features/embeddings/rac_embeddings_service.h|cpp:json-param-in-public-api
 core/include/rac/features/diffusion/rac_diffusion_service.h|cpp:json-param-in-public-api
 core/include/rac/features/vlm/rac_vlm_service.h|cpp:json-param-in-public-api
