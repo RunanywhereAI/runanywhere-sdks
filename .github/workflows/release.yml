@@ -2225,14 +2225,12 @@ jobs:
               # Sidecars must name the basename in this directory. macOS kit
               # jobs used to write `dist/foo.tar.gz`; rewrite so -c succeeds
               # and the published sidecar is consumer-usable.
-              tmp="${checksum}.basename"
-              while read -r digest path; do
-                digest="${digest%$'\r'}"
-                path="${path%$'\r'}"
-                [ -n "$digest" ] && [ -n "$path" ] || continue
-                printf '%s  %s\n' "$digest" "$(basename "$path")"
-              done < "$checksum" > "$tmp"
-              mv "$tmp" "$checksum"
+              # macOS kit sidecars used to name dist/foo.tar.gz. Strip a
+              # directory prefix only — GNU sha256sum binary lines are
+              # `hash *file` and must keep the asterisk.
+              if grep -q '  .*/' "$checksum"; then
+                sed -i -E 's|  .+/|  |' "$checksum"
+              fi
               sha256sum --check "$checksum"
             done
           )
