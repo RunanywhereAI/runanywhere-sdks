@@ -86,6 +86,16 @@ if(NOT TARGET RunAnywhere::commons)
             endif()
         endif()
     endforeach()
+    # Transitive SHARED deps of whole-archived backends must follow them on
+    # MSVC (one-pass). Apple ld is more forgiving but the same order is correct.
+    if(WIN32)
+        file(GLOB _sherpa_implibs "${RunAnywhere_LIBRARY_DIR}/sherpa-onnx*.lib")
+        list(APPEND _runanywhere_kit_extra ${_sherpa_implibs})
+    endif()
+    if(APPLE AND EXISTS "${RunAnywhere_LIBRARY_DIR}/libonnxruntime.a")
+        list(APPEND _runanywhere_kit_extra
+            "${RunAnywhere_LIBRARY_DIR}/libonnxruntime.a")
+    endif()
     # Unix: link the unversioned ORT dylib. Versioned copies
     # (libonnxruntime.1.dylib) are Mach-O stubs and fail to load.
     # Windows: never pass onnxruntime.dll to link.exe (LNK1107). The import

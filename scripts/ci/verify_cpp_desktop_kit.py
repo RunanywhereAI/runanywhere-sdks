@@ -186,6 +186,8 @@ def main() -> int:
         if args.windows:
             if not any("sherpa-onnx-c-api.dll" in n.replace("\\", "/") for n in canon):
                 missing.append("third_party/sherpa-onnx-c-api.dll")
+            if not any(n.replace("\\", "/").endswith("sherpa-onnx-c-api.lib") for n in canon):
+                missing.append("lib/sherpa-onnx-c-api.lib")
         elif not any(n.replace("\\", "/").endswith("libsherpa-onnx-c-api.a") for n in canon):
             missing.append("lib/libsherpa-onnx-c-api.a")
         if not any(

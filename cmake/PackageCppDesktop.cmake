@@ -187,6 +187,20 @@ if(RAC_BINARY_DIR)
             foreach(_dll IN LISTS _sherpa_dlls)
                 file(COPY "${_dll}" DESTINATION "${RAC_KIT_OUT}/third_party")
             endforeach()
+            # Import libs must be on the consumer link line (MSVC is one-pass).
+            # Never pass the DLLs to link.exe (LNK1107).
+            file(GLOB _sherpa_implibs "${_sherpa_win}/*.lib")
+            foreach(_implib IN LISTS _sherpa_implibs)
+                file(COPY "${_implib}" DESTINATION "${RAC_KIT_OUT}/lib")
+                get_filename_component(_n "${_implib}" NAME)
+                string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
+            endforeach()
+            if(EXISTS "${RAC_KIT_OUT}/lib/rac_backend_sherpa.lib"
+               AND NOT EXISTS "${RAC_KIT_OUT}/lib/sherpa-onnx-c-api.lib")
+                message(FATAL_ERROR
+                    "PackageCppDesktop: Windows kit has rac_backend_sherpa.lib but no "
+                    "sherpa-onnx-c-api.lib. Prefetch with download-sherpa-onnx.bat.")
+            endif()
         endif()
     endif()
     if(APPLE AND EXISTS "${RAC_KIT_OUT}/third_party/libonnxruntime.dylib")
