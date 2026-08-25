@@ -39,11 +39,18 @@ enum SecureStore {
             withIntermediateDirectories: true
         )
         try data.write(to: url, options: [.atomic])
-        // 0o600: the file store stands in for the keychain, so it should not
-        // be readable by other accounts on a shared machine.
-        try? FileManager.default.setAttributes(
-            [.posixPermissions: 0o600], ofItemAtPath: url.path
-        )
+        // 0o600: the file store stands in for the keychain, so it must not be
+        // readable by other accounts on a shared machine. A swallowed failure
+        // here leaves a secret at the default mode with nobody aware of it, so
+        // the write is undone and the error reaches the caller.
+        do {
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: url.path
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
     }
 
     static func remove(_ key: String) throws {

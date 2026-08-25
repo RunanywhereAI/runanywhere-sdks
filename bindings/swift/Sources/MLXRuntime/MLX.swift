@@ -973,6 +973,12 @@ private final class MLXSession: @unchecked Sendable {
                 // The return value is the consumer's stop signal, honored the
                 // same way `.chunk` honors it: a caller that has stopped reading
                 // must not keep the model generating.
+                //
+                // Held tokens go first. The repetition guard withholds chunks
+                // produced BEFORE this call, and they are only flushed after the
+                // loop, so emitting the call now would hand commons the text out
+                // of the order the model wrote it.
+                flushHeldTokens(from: &repetitionGuard, onToken: onToken)
                 if !onToken(toolCallWireText(call)) {
                     shouldFlushHeldTokens = false
                     cancel()
@@ -989,6 +995,8 @@ private final class MLXSession: @unchecked Sendable {
                     mlxRuntimeLogger.debug(
                         "MLX forwarding rejected tool call (\(rejection.reason.rawValue)) to commons"
                     )
+                    // Same ordering rule as `.toolCall` above.
+                    flushHeldTokens(from: &repetitionGuard, onToken: onToken)
                     if !onToken(rejection.rawTextPreview) {
                         shouldFlushHeldTokens = false
                         cancel()
