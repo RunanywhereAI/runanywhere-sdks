@@ -441,6 +441,7 @@ rac_result_t stub_provider_execute(const char* args_json, const rac_tool_context
 }
 
 const rac_tool_provider_t kStubProvider = {
+    /* abi_version */ RAC_TOOL_PROVIDER_ABI_VERSION,
     /* name */ "e2e_provider_tool",
     /* description */ "answers from commons",
     /* category */ "Test",
