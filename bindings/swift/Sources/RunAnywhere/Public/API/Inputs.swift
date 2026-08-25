@@ -9,6 +9,10 @@
 
 import Foundation
 
+#if canImport(AVFoundation)
+import AVFoundation
+#endif
+
 #if canImport(CoreGraphics)
 import CoreGraphics
 import ImageIO
@@ -120,55 +124,125 @@ public struct AudioInput: Sendable {
             // (pcmS16Le implies 16-bit, pcmF32Le implies 32-bit).
             source.audioData = data
             source.encoding = .pcmS16Le
+            source.audioFormat = .pcm
         case .float32:
             source.audioData = data
             source.encoding = .pcmF32Le
-        case .wav:
-            source.audioData = data
-            source.encoding = .container
-            source.audioFormat = .wav
-        case .file:
-            // Commons has no file I/O of its own — platform I/O is the SDK's
-            // job — and refuses a request carrying only a path, with a message
-            // about a missing platform adapter that reads as a setup problem
-            // rather than as "this input was never going to work". Read it here
-            // instead, which is what `.file` promised the caller.
-            guard let path else {
-                throw SDKException(
-                    code: .invalidInput,
-                    message: "AudioInput.file has no path",
-                    category: .validation
-                )
-            }
-            guard let contents = FileManager.default.contents(atPath: path) else {
-                throw SDKException(
-                    code: .invalidInput,
-                    message: "cannot read audio file at \(path)",
-                    category: .validation
-                )
-            }
-            source.audioData = contents
-            source.encoding = .container
-            source.audioFormat = Self.containerFormat(forPath: path)
+            source.audioFormat = .pcm
+        case .file, .wav:
+            // Decoded here rather than passed along as a container, because
+            // nothing downstream decodes one: commons hands `audio_data`
+            // straight to the engine without reading `encoding`, so a WAV
+            // arrived as if its 44-byte header were the first samples. Sherpa
+            // tolerated that (a header is about a millisecond of noise) while
+            // MLX refused the whole call, which is the more honest response to
+            // being handed a file it was told was PCM.
+            let decoded = try Self.decodeToPCM16(self)
+            source.audioData = decoded.samples
+            source.encoding = .pcmS16Le
+            // Stated rather than left to the default. Commons only copies this
+            // into rac_stt_options_t when it is set, and MLX refuses the call
+            // outright unless the options say PCM: an earlier revision that
+            // labelled a read-back file `.wav` here is exactly what made MLX
+            // speech reject audio the sherpa engines accepted.
+            source.audioFormat = .pcm
+            source.sampleRate = Int32(decoded.sampleRate)
+            source.channels = 1
         }
         return source
     }
 
-    /// The container a file's extension names. Guessing from bytes belongs in
-    /// commons, which already sniffs the header; this only has to name what the
-    /// caller handed over.
-    private static func containerFormat(forPath path: String) -> RAAudioFormat {
-        switch (path as NSString).pathExtension.lowercased() {
-        case "wav", "wave": return .wav
-        case "mp3": return .mp3
-        case "flac": return .flac
-        case "ogg", "oga": return .ogg
-        case "opus": return .opus
-        case "aac": return .aac
-        case "m4a": return .m4A
-        default: return .unspecified
+    /// Mono 16-bit PCM plus the rate it is at.
+    ///
+    /// Reading and decoding audio is platform I/O, which is the SDK's job under
+    /// the layering rules; commons has neither a decoder nor a file reader.
+    private static func decodeToPCM16(_ input: AudioInput) throws -> (samples: Data, sampleRate: Int) {
+        #if canImport(AVFoundation)
+        let url: URL
+        var temporary: URL?
+        defer { if let temporary { try? FileManager.default.removeItem(at: temporary) } }
+
+        switch input.encoding {
+        case .file:
+            guard let path = input.path else {
+                throw SDKException(code: .invalidInput, message: "AudioInput.file has no path",
+                                   category: .validation)
+            }
+            url = URL(fileURLWithPath: path)
+        default:
+            // AVAudioFile reads a file, so buffer-borne container bytes get one.
+            let scratch = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("wav")
+            try input.data.write(to: scratch)
+            temporary = scratch
+            url = scratch
         }
+
+        let file: AVAudioFile
+        do {
+            file = try AVAudioFile(forReading: url)
+        } catch {
+            throw SDKException(code: .invalidInput,
+                               message: "could not read audio at \(url.lastPathComponent): \(error)",
+                               category: .validation)
+        }
+
+        let rate = file.processingFormat.sampleRate
+        guard let target = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: rate,
+                                         channels: 1, interleaved: true),
+              let converter = AVAudioConverter(from: file.processingFormat, to: target) else {
+            throw SDKException(code: .invalidInput, message: "unsupported audio format",
+                               category: .validation)
+        }
+
+        var samples = Data()
+        let chunkFrames: AVAudioFrameCount = 16384
+        while file.framePosition < file.length {
+            guard let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                               frameCapacity: chunkFrames) else { break }
+            try file.read(into: input)
+            if input.frameLength == 0 { break }
+
+            let capacity = AVAudioFrameCount(
+                (Double(input.frameLength) * rate / file.processingFormat.sampleRate).rounded(.up) + 1
+            )
+            guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { break }
+            var pending: NSError?
+            var supplied = false
+            converter.convert(to: output, error: &pending) { _, status in
+                if supplied {
+                    status.pointee = .noDataNow
+                    return nil
+                }
+                supplied = true
+                status.pointee = .haveData
+                return input
+            }
+            if let pending {
+                throw SDKException(code: .invalidInput,
+                                   message: "could not decode audio: \(pending.localizedDescription)",
+                                   category: .validation)
+            }
+            if let channel = output.int16ChannelData?[0], output.frameLength > 0 {
+                samples.append(UnsafeBufferPointer(start: channel, count: Int(output.frameLength)))
+            }
+        }
+
+        guard !samples.isEmpty else {
+            throw SDKException(code: .invalidInput, message: "audio decoded to no samples",
+                               category: .validation)
+        }
+        return (samples, Int(rate))
+        #else
+        throw SDKException(
+            code: .featureNotAvailable,
+            message: "Decoding audio files needs AVFoundation; supply AudioInput.pcm16 instead",
+            category: .validation
+        )
+        #endif
     }
+
 
     func toVADAudioSource() throws -> RAVADAudioSource {
         var source = RAVADAudioSource()
