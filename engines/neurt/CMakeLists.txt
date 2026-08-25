@@ -109,6 +109,15 @@ endif()
 set(RAC_NEURT_ENGINE_AVAILABLE ${_neurt_available}
     CACHE INTERNAL "neurt engine is routable (a prebuilt slice was found)")
 
+option(RAC_REQUIRE_NEURT_ENGINE
+    "Fail configure unless a real NeuRT prebuilt is present (desktop overlay CI)"
+    OFF)
+if(RAC_REQUIRE_NEURT_ENGINE AND NOT _neurt_available)
+    message(FATAL_ERROR
+        "RAC_REQUIRE_NEURT_ENGINE=ON but no NeuRT prebuilt was found for '${_neurt_slice}'. "
+        "Run: NEURUN_TOKEN=... scripts/build/download-neurt.sh --slice ${_neurt_slice}")
+endif()
+
 if(NOT _neurt_available)
     message(STATUS "  neurt: no prebuilt slice — building the non-routable shell "
                    "(registration refused with RAC_ERROR_BACKEND_UNAVAILABLE).")

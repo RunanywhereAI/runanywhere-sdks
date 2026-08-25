@@ -74,7 +74,10 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
         or target_parts[0] != "versions"
         or not SHA256.fullmatch(target_parts[1])
     ):
-        raise RuntimeError("QHexRT prebuilt/current must directly name versions/<64-hex-receipt>")
+        raise RuntimeError(
+            f"QHexRT prebuilt/current must directly name versions/<64-hex-receipt> "
+            f"(got {raw_target!r})"
+        )
     selected_entry = prebuilt / raw_target
     if _selection.is_selection(selected_entry):
         raise RuntimeError("QHexRT selected immutable version must not be a symlink")

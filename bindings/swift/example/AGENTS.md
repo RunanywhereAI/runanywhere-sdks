@@ -63,7 +63,7 @@ unknown id with `Model '…' is not registered`, so the one `models.register` ca
 `main.swift` is required before generation.
 
 To try a different model, change `modelId`/`modelURL` in `Sources/main.swift`; canonical
-model ids and URLs live in `rcli/src/catalog/catalog.cpp`.
+model ids and URLs live in the [RCLI](https://github.com/RunanywhereAI/RCLI) catalog (`src/catalog/catalog.cpp`).
 
 Deliberately absent from this example: model catalogs, download/load UI, theming.
 

@@ -76,7 +76,7 @@ option(RAC_BUILD_SERVER       "Build the OpenAI-compatible HTTP server (runanywh
 option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Models, System TTS) on Apple hosts" ON)
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
-option(RAC_BUILD_CLI          "Build the rcli desktop CLI (rcli)" OFF)
+option(RAC_BUILD_CLI          "Retired: in-tree rcli was moved to RunanywhereAI/RCLI. Leaving ON is a hard error." OFF)
 option(RAC_BUILD_ELECTRON_HARNESS "Build the runanywhere-electron M0 Win32 inference harness" OFF)
 option(RAC_BUILD_ELECTRON_ADDON "Build the runanywhere-electron N-API .node addon" OFF)
 option(RAC_BUILD_PYTHON_MODULE "Build the runanywhere-python pybind11 _core module" OFF)
@@ -276,10 +276,14 @@ if(RAC_BUILD_TESTS)
     enable_testing()
 endif()
 
-# rcli desktop CLI. Added after engines/ because it links the
-# rac_backend_* targets that only exist once the engine subdirs configured.
+# In-tree rcli is retired. The product lives in RunanywhereAI/RCLI and
+# consumes the C++ desktop kit (find_package(RunAnywhere)).
 if(RAC_BUILD_CLI)
-    add_subdirectory(rcli)
+    message(FATAL_ERROR
+        "RAC_BUILD_CLI is retired. Build EXTERNAL/RCLI (RunanywhereAI/RCLI) against "
+        "the C++ desktop kit:\n"
+        "  cmake --preset cpp-desktop-macos-arm64 && cmake --build --preset cpp-desktop-macos-arm64\n"
+        "  cmake -S EXTERNAL/RCLI -B EXTERNAL/RCLI/build -DCMAKE_PREFIX_PATH=<kit>")
 endif()
 
 # runanywhere-electron M0 inference harness. Added after engines/ because it
@@ -772,6 +776,10 @@ else()
     set(_rac_plugin_mode "SHARED (dlopen-loaded)")
 endif()
 
+# C++ desktop kit (find_package(RunAnywhere) prefix for RCLI). After engines
+# so rac_backend_* targets exist for the kit's optional-engine flags.
+include(CppDesktopKit)
+
 message(STATUS "")
 message(STATUS "============================================")
 message(STATUS "RunAnywhere SDKs — root CMake configured")
@@ -785,7 +793,8 @@ message(STATUS "Server (HTTP)    : ${RAC_BUILD_SERVER}")
 message(STATUS "Platform backend : ${RAC_BUILD_PLATFORM}")
 message(STATUS "JNI bridge       : ${RAC_BUILD_JNI}")
 message(STATUS "Plugin smoke CLI : ${RAC_BUILD_PLUGIN_SMOKE}")
-message(STATUS "CLI (rcli)       : ${RAC_BUILD_CLI}")
+message(STATUS "CLI (in-tree)    : retired (RunanywhereAI/RCLI)")
+message(STATUS "C++ desktop kit  : ${RAC_PACKAGE_CPP_DESKTOP}")
 message(STATUS "Desktop adapter  : ${RAC_DESKTOP_ADAPTER}")
 message(STATUS "============================================")
 message(STATUS "")

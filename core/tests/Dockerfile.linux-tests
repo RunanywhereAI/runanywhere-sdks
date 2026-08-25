@@ -22,15 +22,15 @@ COPY . /src
 RUN ./core/scripts/linux/download-sherpa-onnx.sh
 
 # Build from the monorepo root so engine targets are available.
-# RAC_BUILD_CLI + RAC_DESKTOP_ADAPTER add the rcli binary (CLI e2e suite);
-# RAC_BUILD_SERVER backs `rcli serve`.
+# RAC_DESKTOP_ADAPTER supplies libcurl HTTP for model downloads in tests.
+# RAC_BUILD_SERVER builds the embeddable OpenAI HTTP library (not the product CLI).
+# RAC_BUILD_CLI is retired — in-tree rcli lives in RunanywhereAI/RCLI.
 RUN cmake -B /build -S /src \
     -DRAC_BUILD_TESTS=ON \
     -DRAC_BUILD_BACKENDS=ON \
     -DRAC_BACKEND_RAG=OFF \
     -DRAC_BUILD_PLATFORM=OFF \
     -DRAC_BUILD_SHARED=OFF \
-    -DRAC_BUILD_CLI=ON \
     -DRAC_DESKTOP_ADAPTER=ON \
     -DRAC_BUILD_SERVER=ON \
     -DRAC_RUNTIME_ONNXRT=ON \

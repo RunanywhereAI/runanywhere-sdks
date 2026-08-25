@@ -116,11 +116,8 @@ expect_requires "react-native packaging (NeuRT xcframework)" \
     "bindings/react-native/scripts/package-sdk.sh" "RABackendNeuRT"
 expect_requires "flutter packaging (NeuRT xcframework)" \
     "bindings/flutter/scripts/package-sdk.sh" "RABackendNeuRT"
-# rcli-macos links the staged xcframeworks and smoke-tests registration. A shell
-# REFUSES to register, so asserting neurt appears in `backends --json` proves it
-# is routable -- the strongest check in the tree; keep it.
-expect_requires "rcli macOS (asserts neurt registers)" \
-    ".github/workflows/release.yml" "grep -q '\"name\":\"neurt\"'"
+# NeuRT registration smoke for the desktop CLI lives in RunanywhereAI/RCLI.
+# The public C++ desktop kit does not ship NeuRT.
 # Android: QHexRT .so is staged into all three Android SDKs from one build.
 expect_requires "android packaging (QHexRT jniLibs, all 3 SDKs)" \
     "scripts/build/build-core-android.sh" "KOTLIN_QHEXRT_DEST"

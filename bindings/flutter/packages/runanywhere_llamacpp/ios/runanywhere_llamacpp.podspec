@@ -20,13 +20,13 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_llamacpp'
-  s.version          = '0.20.27'
+  s.version          = '0.20.28'
   # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
   # s.version leads the published release because 0.20.20 republished only the
   # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
   # the checksums below are still the 0.20.19 ones. Bump this back to
   # s.version once a matching release exists.
-  asset_version      = '0.20.27'
+  asset_version      = '0.20.28'
   s.summary          = 'RunAnywhere LlamaCPP: LLM text generation for Flutter'
   s.description      = <<-DESC
 LlamaCPP backend for RunAnywhere Flutter SDK. Provides LLM text generation

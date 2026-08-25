@@ -51,7 +51,7 @@ bindings/flutter/
     └── runanywhere_qhexrt/          # Qualcomm Hexagon NPU (Android-only)
 ```
 
-Backend packages depend on `runanywhere ^0.20.27`. Source checkouts prefer
+Backend packages depend on `runanywhere ^0.20.28`. Source checkouts prefer
 package-owned XCFramework/JNI staging, while public pub archives omit those
 large binaries and resolve versioned, checksum-verified release archives through
 CocoaPods/SwiftPM on iOS and Gradle on Android. MLX is CocoaPods-only because
@@ -463,11 +463,11 @@ lives in the bundled native backend (C++ engines or the Swift MLX runtime).
 
 | Component | Version |
 |-----------|---------|
-| `runanywhere` (Dart) | 0.20.27 |
-| `runanywhere_llamacpp` | 0.20.27 |
-| `runanywhere_mlx` | 0.20.27 |
-| `runanywhere_onnx` | 0.20.27 |
-| `runanywhere_qhexrt` | 0.20.27 |
+| `runanywhere` (Dart) | 0.20.28 |
+| `runanywhere_llamacpp` | 0.20.28 |
+| `runanywhere_mlx` | 0.20.28 |
+| `runanywhere_onnx` | 0.20.28 |
+| `runanywhere_qhexrt` | 0.20.28 |
 | `RACommons` native | 0.1.6 |
 | llama.cpp engine | runanywhere-b10453.4 |
 | ONNX Runtime | 1.28.0 |
