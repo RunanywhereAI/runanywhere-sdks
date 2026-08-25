@@ -450,6 +450,7 @@ rac_result_t web_research_execute(const char* args_json, const rac_tool_context_
 }
 
 const rac_tool_provider_t kProvider = {
+    /* abi_version */ RAC_TOOL_PROVIDER_ABI_VERSION,
     /* name */ kToolName,
     /* description */ kDescription,
     /* category */ "Web",
