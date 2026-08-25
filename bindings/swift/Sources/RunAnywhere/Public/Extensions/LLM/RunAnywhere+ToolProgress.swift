@@ -192,3 +192,50 @@ public extension RunAnywhere {
         return unregister() == RAC_SUCCESS
     }
 }
+
+// MARK: - Commons' own tools
+
+private enum ToolProviderABI {
+    typealias Count = @convention(c) () -> Int
+    typealias At = @convention(c) (Int) -> UnsafePointer<rac_tool_provider_t>?
+
+    static let count = NativeProtoABI.load("rac_tool_provider_count", as: Count.self)
+    static let at = NativeProtoABI.load("rac_tool_provider_at", as: At.self)
+
+    static func text(_ pointer: UnsafePointer<CChar>?) -> String? {
+        pointer.map { String(cString: $0) }
+    }
+}
+
+public extension RunAnywhere.Tools {
+    /// The tools commons registers itself, which ``list()`` never reports.
+    ///
+    /// A provider lives in the commons registry rather than this SDK's, so it
+    /// is callable without ever being listed: the tool-calling run loop offers
+    /// every provider alongside the host's own tools, and a workflow's Tool
+    /// Call node resolves one the same way. Anything that lets a person choose
+    /// a tool has to read both registries or half the set is invisible.
+    ///
+    /// A name in both is the host's — the same rule the run loop applies when
+    /// it merges the two.
+    ///
+    /// Empty when the linked RACommons predates the provider registry.
+    func nativeProviders() -> [ToolDefinition] {
+        guard let count = ToolProviderABI.count, let at = ToolProviderABI.at else { return [] }
+        return (0..<count()).compactMap { index in
+            guard let provider = at(index)?.pointee,
+                  let name = ToolProviderABI.text(provider.name), !name.isEmpty else { return nil }
+
+            var definition = ToolDefinition()
+            definition.name = name
+            definition.description_p = ToolProviderABI.text(provider.description) ?? ""
+            // A tool taking no arguments publishes "{}", so an absent schema is
+            // that rather than a reason to drop the tool.
+            definition.parameters = ToolProviderABI.text(provider.parameters_json) ?? "{}"
+            if let category = ToolProviderABI.text(provider.category), !category.isEmpty {
+                definition.category = category
+            }
+            return definition
+        }
+    }
+}

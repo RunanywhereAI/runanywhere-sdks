@@ -30,6 +30,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "features/llm/tool_provider_dispatch.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -1606,13 +1607,42 @@ rac_result_t run_tool_call(const WorkflowNode& node, const NodeInputs& inputs,
     invocation.set_tool_name(config.tool_name());
     invocation.set_arguments_json(arguments.dump());
 
-    const rac_agent_host_callbacks_t callbacks = host_callbacks();
+    // A tool registered in commons is answered here, exactly as the
+    // tool-calling run loop does it. Without this the host callback is the only
+    // path, and that callback reaches a binding's own registry — so a native
+    // provider like web_research is dispatchable from chat and invisible from a
+    // workflow, which is the same tool failing in one place and not the other.
     runanywhere::v1::ToolInvocationResult result;
-    const rac_result_t status =
-        invoke_host(callbacks.invoke_tool, callbacks.user_data, invocation, &result,
-                    "no tool callback is registered, so Tool Call nodes cannot run", out_error);
-    if (status != RAC_SUCCESS)
-        return status;
+    bool handled_by_provider = false;
+    if (rac::llm::tool_calling::provider_owns(config.tool_name())) {
+        runanywhere::v1::ToolCall call;
+        call.set_id(node.id());
+        call.set_name(config.tool_name());
+        call.set_arguments_json(invocation.arguments_json());
+
+        runanywhere::v1::ToolResult tool_result;
+        if (rac::llm::tool_calling::execute_via_provider(call, 0, nullptr, {}, std::string(),
+                                                         &tool_result)) {
+            if (tool_result.is_error()) {
+                *out_error = tool_result.error();
+                return RAC_ERROR_PROCESSING_FAILED;
+            }
+            result.set_result_json(tool_result.result_json());
+            handled_by_provider = true;
+        }
+    }
+
+    // Keyed on whether a provider answered, not on whether the payload is
+    // non-empty: a tool that legitimately returns nothing would otherwise fall
+    // through and fail against a host callback that was never meant to see it.
+    if (!handled_by_provider) {
+        const rac_agent_host_callbacks_t callbacks = host_callbacks();
+        const rac_result_t status =
+            invoke_host(callbacks.invoke_tool, callbacks.user_data, invocation, &result,
+                        "no tool callback is registered, so Tool Call nodes cannot run", out_error);
+        if (status != RAC_SUCCESS)
+            return status;
+    }
 
     if (result.has_error()) {
         *out_error = result.error().message();
