@@ -288,7 +288,7 @@ extension RunAnywhere {
         try await ensureServicesReady()
 
         var request = RASTTTranscriptionRequest()
-        request.audio = audio.toSTTAudioSource()
+        request.audio = try audio.toSTTAudioSource()
         request.options = options
         return try await CppBridge.STT.shared.transcribe(request)
     }
