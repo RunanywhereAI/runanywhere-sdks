@@ -86,6 +86,17 @@ if [[ -z "$PY_BIN" ]]; then
     exit 1
 fi
 
+# Git-Bash gives `/d/a/...`; native Windows Python wants `D:\a\...`. Junctions
+# created from a mixed path fail `read_target`'s versions/<receipt> check.
+to_py_path() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$1"
+    else
+        printf '%s' "$1"
+    fi
+}
+PY_SCRIPTS="$(to_py_path "${REPO_ROOT}/scripts/build")"
+
 VERSION="${QHEXRT_RELEASE_TAG#v}"
 ASSET="qhexrt-${ABI}-v${VERSION}.tar.gz"
 DEST="${PREBUILT}/versions/${EXPECTED_RECEIPT}"
@@ -139,9 +150,9 @@ else
     # the right mechanism per platform (symlink on POSIX, junction on Windows).
     "$PY_BIN" -c 'import sys; sys.path.insert(0, sys.argv[1]); import _selection;
 _selection.create(sys.argv[2], sys.argv[3])' \
-        "${REPO_ROOT}/scripts/build" "$probe" "$EXPECTED_RECEIPT"
-    if ! staged="$("$PY_BIN" "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py" \
-            --prebuilt "$probe" --android-abi "$ABI" 2>&1)"; then
+        "$PY_SCRIPTS" "$(to_py_path "$probe")" "$EXPECTED_RECEIPT"
+    if ! staged="$("$PY_BIN" "$(to_py_path "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py")" \
+            --prebuilt "$(to_py_path "$probe")" --android-abi "$ABI" 2>&1)"; then
         echo "[ERROR] payload failed the SDK validator; nothing was changed:" >&2
         echo "$staged" | sed 's/^/        /' >&2
         exit 1
@@ -164,19 +175,19 @@ fi
 if [[ -e "${PREBUILT}/current" && ! -L "${PREBUILT}/current" ]] \
     && ! "$PY_BIN" -c 'import sys; sys.path.insert(0, sys.argv[1]); import _selection, pathlib;
 sys.exit(0 if _selection.is_selection(pathlib.Path(sys.argv[2])) else 1)' \
-        "${REPO_ROOT}/scripts/build" "${PREBUILT}/current"; then
+        "$PY_SCRIPTS" "$(to_py_path "${PREBUILT}/current")"; then
     echo "[ERROR] ${PREBUILT}/current exists and is not a selection pointer; refusing to replace it." >&2
     exit 1
 fi
 "$PY_BIN" -c 'import sys; sys.path.insert(0, sys.argv[1]); import _selection;
 _selection.create(sys.argv[2], sys.argv[3])' \
-    "${REPO_ROOT}/scripts/build" "$PREBUILT" "$EXPECTED_RECEIPT"
+    "$PY_SCRIPTS" "$(to_py_path "$PREBUILT")" "$EXPECTED_RECEIPT"
 
 # ---- prove the SDK will accept it -------------------------------------------
 # The same validator the build preflight runs. Catching a bad payload here beats
 # catching it mid-build, where the error names a CMake target rather than a pin.
-if ! resolved="$("$PY_BIN" "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py" \
-        --prebuilt "$PREBUILT" --android-abi "$ABI" 2>&1)"; then
+if ! resolved="$("$PY_BIN" "$(to_py_path "${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py")" \
+        --prebuilt "$(to_py_path "$PREBUILT")" --android-abi "$ABI" 2>&1)"; then
     echo "[ERROR] the downloaded payload failed the SDK's own validator:" >&2
     echo "$resolved" | sed 's/^/        /' >&2
     exit 1

@@ -108,10 +108,12 @@ print(ra.llm.generate("Explain on-device AI in one sentence.",
                       LlmOptions(model="qwen2.5-0.5b")).text)
 ```
 
-Prefer a terminal? The same core ships as a CLI:
+Prefer a terminal? Install the CLI from [RunanywhereAI/RCLI](https://github.com/RunanywhereAI/RCLI) — it consumes the C++ desktop kit this repo publishes:
 
 ```bash
 brew install runanywhereai/tap/rcli
+# or
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.sh | sh
 rcli run qwen3 "Explain on-device AI in one sentence."
 ```
 
@@ -401,10 +403,10 @@ Install (macOS Apple Silicon, Linux x86_64/aarch64, Windows x86_64):
 ```bash
 brew install runanywhereai/tap/rcli
 # or
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/rcli/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.sh | sh
 ```
 
-[CLI README](rcli/)
+[CLI README](https://github.com/RunanywhereAI/RCLI)
 
 </details>
 
@@ -421,7 +423,7 @@ curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main
 | **Web** | Chromium, Safari, Firefox | Beta | npm (`@runanywhere/web`) | [SDK README](bindings/web/) |
 | **Electron** | Windows x64 desktop | Preview | [Build from source](bindings/electron/) | [SDK README](bindings/electron/) |
 | **Python** | Windows, macOS, Linux | Alpha | pip (`runanywhere`) | [SDK README](bindings/python/) |
-| **rcli** | macOS, Linux, Windows | Stable | Homebrew / install script | [CLI README](rcli/) |
+| **rcli** | macOS, Linux, Windows | Stable | Homebrew / install script | [RCLI](https://github.com/RunanywhereAI/RCLI) |
 
 All SDKs ship on one version line, currently **0.20.11**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
 
@@ -659,7 +661,6 @@ runanywhere-sdks/
 │   └── shared-apple/               # Apple transport shared by the RN + Flutter bindings
 │                                   # (iOS/Android/Web/Electron consumer apps live in their own repos)
 │
-├── rcli/                           # rcli, the terminal app built on core/
 ├── engines/                        # llamacpp, mlx, sherpa, onnx, neurt, qhexrt, cloud
 ├── runtimes/                       # cpu, coreml, onnxrt compute adapters
 ├── idl/                            # Protobuf schemas, generated bindings per language

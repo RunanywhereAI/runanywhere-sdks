@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let sdkVersion = "0.20.27"
+let sdkVersion = "0.20.28"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -23,7 +23,7 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let raCommonsTarget = runAnywhereBinaryTarget(
     name: "RACommons",
-    checksum: "b9986796fd9e7fb3b49a5649e4749007e8b86c8421cd6cdaaf094dc3629481c5"
+    checksum: "f7f58b1b8cf1274268046b5dbf4d805ce3fd11a5e6b11f21b74a3ca87f424aa1"
 )
 
 let package = Package(

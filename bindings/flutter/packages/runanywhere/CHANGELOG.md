@@ -5,6 +5,18 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.28] - 2026-08-24
+
+### Added
+
+- The C++ desktop kit is now a first-class release artifact (`macos-arm64`,
+  `windows-x64`, and a thin `windows-arm64` OSS kit). NeuRT and QHexRT ship as
+  optional private overlays, never inside the public GitHub Release.
+
+### Changed
+
+- No Flutter-facing API change.
+
 ## [0.20.27] - 2026-08-24
 
 ### Changed

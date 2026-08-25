@@ -1,3 +1,9 @@
+## [0.20.28] - 2026-08-24
+
+### Changed
+
+- Version-train bump only; no MLX-facing changes in this release.
+
 ## [0.20.27] - 2026-08-24
 
 ### Changed

@@ -1,0 +1,278 @@
+name: C++ desktop kit
+
+# Builds the find_package(RunAnywhere) prefix RCLI consumes. Does not build rcli.
+# Dispatch this to refresh kits without a full SDK release train. release.yml
+# also builds the same presets and attaches the tarballs to the GitHub Release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      attach_tag:
+        description: 'GitHub release tag to attach kits to (e.g. v0.20.25). Empty = artifacts only.'
+        required: false
+        default: ''
+  push:
+    paths:
+      - 'cmake/CppDesktopKit.cmake'
+      - 'cmake/PackageCppDesktop.cmake'
+      - 'cmake/RunAnywhereConfig.cmake.in'
+      - 'CMakePresets.json'
+      - 'core/**'
+      - 'engines/**'
+      - 'idl/**'
+      - 'scripts/build/package-private-engine-overlay.sh'
+      - 'scripts/build/fetch-private-engine-pack.sh'
+      - 'scripts/ci/verify_cpp_desktop_kit.py'
+      - '.github/workflows/cpp-desktop-kit.yml'
+    branches: [main]
+  pull_request:
+    paths:
+      - 'cmake/CppDesktopKit.cmake'
+      - 'cmake/PackageCppDesktop.cmake'
+      - 'cmake/RunAnywhereConfig.cmake.in'
+      - 'CMakePresets.json'
+      - 'core/**'
+      - 'engines/**'
+      - 'idl/**'
+      - 'scripts/build/package-private-engine-overlay.sh'
+      - 'scripts/build/fetch-private-engine-pack.sh'
+      - 'scripts/ci/verify_cpp_desktop_kit.py'
+      - '.github/workflows/cpp-desktop-kit.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpp-desktop-kit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ninja
+        run: brew install ninja
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/macos/download-sherpa-onnx.sh
+      - name: Configure + package
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-macos-arm64
+          cmake --build --preset cpp-desktop-macos-arm64 --target package-cpp-desktop-tarball \
+            -j "$(sysctl -n hw.logicalcpu)"
+          ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+          tar=$(echo dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --forbid-private-engines
+          shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
+            | tee "dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-macos-arm64
+          path: |
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: vcpkg curl (static)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static zlib:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
+      - name: Configure + package
+        shell: pwsh
+        run: |
+          cmake --preset cpp-desktop-windows-x64
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build --preset cpp-desktop-windows-x64 --config Release --target package-cpp-desktop-tarball
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          $ver = (Get-Content core/VERSION -Raw).Trim()
+          $tar = "dist/RunAnywhere-cpp-desktop-windows-x64-v$ver.tar.gz"
+          if (-not (Test-Path $tar)) { throw "missing $tar" }
+          python scripts/ci/verify_cpp_desktop_kit.py $tar --source-root . --windows --forbid-private-engines
+          if ($LASTEXITCODE -ne 0) { throw "kit tarball contents check failed" }
+          Get-FileHash $tar -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content "$tar.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-windows-x64
+          path: |
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  windows-arm64:
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+      - name: vcpkg curl (static arm64)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:arm64-windows-static zlib:arm64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Configure + package (OSS, no QHexRT)
+        shell: pwsh
+        run: |
+          cmake --preset cpp-desktop-windows-arm64
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build --preset cpp-desktop-windows-arm64 --config Release --target package-cpp-desktop-tarball
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          $ver = (Get-Content core/VERSION -Raw).Trim()
+          $tar = "dist/RunAnywhere-cpp-desktop-windows-arm64-v$ver.tar.gz"
+          if (-not (Test-Path $tar)) { throw "missing $tar" }
+          $actual = Get-Item $tar
+          $wantName = Split-Path $tar -Leaf
+          if ($actual.Name -cne $wantName) {
+            $tmp = Join-Path $actual.DirectoryName ("tmp-" + [guid]::NewGuid().ToString("n") + ".tar.gz")
+            Rename-Item -LiteralPath $actual.FullName -NewName (Split-Path $tmp -Leaf)
+            Rename-Item -LiteralPath $tmp -NewName $wantName
+          }
+          python scripts/ci/verify_cpp_desktop_kit.py $tar --source-root . --windows --allow-missing-onnxruntime --forbid-private-engines
+          if ($LASTEXITCODE -ne 0) { throw "kit tarball contents check failed" }
+          Get-FileHash $tar -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content "$tar.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-windows-arm64
+          path: |
+            dist/RunAnywhere-cpp-desktop-windows-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-arm64-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  macos-arm64-neurt-private:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ninja
+        run: brew install ninja
+      - name: Fetch NeuRT prebuilt
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NEURUN_TOKEN:-}" ]]; then
+            echo "::error::NEURUN_TOKEN is required for the NeuRT overlay (no stubs)."
+            exit 1
+          fi
+          bash scripts/build/download-neurt.sh --slice macos-arm64
+      - name: Build rac_backend_neurt + package overlay
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-macos-arm64-neurt
+          cmake --build --preset cpp-desktop-macos-arm64-neurt --target rac_backend_neurt \
+            -j "$(sysctl -n hw.logicalcpu)"
+          bash scripts/build/package-private-engine-overlay.sh \
+            --engine neurt \
+            --build-dir build/cpp-desktop-macos-arm64-neurt
+          tar=$(echo dist/RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --require-overlay neurt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-macos-arm64-neurt-private
+          path: |
+            dist/RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  windows-arm64-qhexrt-private:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+      - name: vcpkg curl (static arm64)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:arm64-windows-static zlib:arm64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Fetch QHexRT + QAIRT
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${NEURUN_TOKEN:-}" ]]; then
+            echo "::error::NEURUN_TOKEN is required for the QHexRT overlay (no stubs)."
+            exit 1
+          fi
+          bash scripts/build/download-qhexrt.sh --abi win-arm64
+          bash scripts/build/download-qairt-runtime.sh --platform win-arm64
+      - name: Build rac_backend_qhexrt + package overlay
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-windows-arm64-qhexrt
+          cmake --build --preset cpp-desktop-windows-arm64-qhexrt --config Release --target rac_backend_qhexrt
+          bash scripts/build/package-private-engine-overlay.sh \
+            --engine qhexrt \
+            --build-dir build/cpp-desktop-windows-arm64-qhexrt
+          tar=$(echo dist/RunAnywhere-cpp-desktop-windows-arm64-qhexrt-private-v*.tar.gz)
+          python scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --require-overlay qhexrt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-windows-arm64-qhexrt-private
+          path: |
+            dist/RunAnywhere-cpp-desktop-windows-arm64-qhexrt-private-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-arm64-qhexrt-private-v*.tar.gz.sha256
+          if-no-files-found: error
+
+  attach-release:
+    if: github.event_name == 'workflow_dispatch' && inputs.attach_tag != ''
+    needs: [macos-arm64, windows-x64, windows-arm64]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Upload kits to ${{ inputs.attach_tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTACH_TAG: ${{ inputs.attach_tag }}
+        run: |
+          set -euo pipefail
+          ls -la artifacts
+          # Attach-only: never create a release. Fail if the tag has no GitHub Release yet.
+          gh release view "$ATTACH_TAG" --repo "${{ github.repository }}" >/dev/null
+          # Public kits only. Never attach *neurt-private* / *qhexrt-private*.
+          gh release upload "$ATTACH_TAG" \
+            artifacts/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz* \
+            artifacts/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz* \
+            artifacts/RunAnywhere-cpp-desktop-windows-arm64-v*.tar.gz* \
+            --repo "${{ github.repository }}" --clobber

@@ -133,7 +133,8 @@ jobs:
 
   macos-release:
     # Keep the release compile on the canonical Apple toolchain too. Metal is
-    # disabled in this preset; the dedicated rcli lane covers Metal separately.
+    # disabled in this preset (Apple GPU coverage lives in the C++ desktop kit
+    # and in RunanywhereAI/RCLI).
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
@@ -169,104 +170,6 @@ jobs:
       - run: cmake --preset linux-asan
       - run: cmake --build --preset linux-asan
       - run: ctest --preset linux-asan
-
-  rcli-macos:
-    # rcli desktop CLI — full-backend release build + modelless smoke.
-    # This is the one macOS lane that enables GGML_METAL, so it retains the
-    # older compatible runner while CPU-only native and SDK lanes use Xcode 26.
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v7
-      - run: brew install ninja protobuf
-      - run: cmake --preset rcli-macos-release
-      - run: cmake --build --preset rcli-macos-release
-      - name: Smoke (modelless)
-        run: |
-          set -euo pipefail
-          RCLI=build/rcli-macos-release/rcli/rcli
-          "$RCLI" version
-          BACKENDS="$("$RCLI" backends --json)"
-          echo "$BACKENDS"
-          # Release CLI must ship llama.cpp. MLX is linked (RCLI_HAS_MLX) but
-          # only registers once Swift callbacks are present (RunAnywhereMLXCLI).
-          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
-          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
-          "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
-          "$RCLI" info --json
-      - name: Package smoke
-        run: bash rcli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
-
-  rcli-linux:
-    # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev patchelf
-      - name: Sherpa-ONNX prebuilts
-        run: ./core/scripts/linux/download-sherpa-onnx.sh
-      - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON
-      - run: cmake --build --preset rcli-linux-release
-      - name: Unit tests
-        run: ctest --test-dir build/rcli-linux-release -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
-      - name: Smoke (modelless)
-        run: |
-          set -euo pipefail
-          RCLI=build/rcli-linux-release/rcli/rcli
-          "$RCLI" version
-          BACKENDS="$("$RCLI" backends --json)"
-          echo "$BACKENDS"
-          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
-          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
-          "$RCLI" info --json
-      - name: Package smoke
-        run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
-
-  rcli-windows:
-    # Windows is compiled and exercised on the native runner. MLX remains
-    # Apple-only; the portable CLI ships llama.cpp + Sherpa/ONNX on Windows.
-    runs-on: windows-2022
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          platform: windows
-      - name: Install static libcurl
-        shell: pwsh
-        run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-mingw-static --host-triplet=x64-mingw-static
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
-      - name: Sherpa-ONNX prebuilts
-        shell: cmd
-        run: core\scripts\windows\download-sherpa-onnx.bat
-      - name: Configure
-        shell: pwsh
-        run: cmake --preset rcli-windows-release -DRAC_BUILD_TESTS=ON
-      - name: Build
-        shell: pwsh
-        run: cmake --build --preset rcli-windows-release
-      - name: Add native runtimes to PATH
-        shell: pwsh
-        run: |
-          $Onnx = Get-ChildItem build/rcli-windows-release -Filter onnxruntime.dll -File -Recurse |
-            Where-Object { $_.FullName -match 'onnxruntime-src[\\/]lib' } |
-            Select-Object -First 1
-          if (-not $Onnx) { throw "onnxruntime.dll not found" }
-          $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          "$env:GITHUB_WORKSPACE\core\third_party\sherpa-onnx-windows\lib" |
-            Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Unit tests
-        shell: pwsh
-        run: >-
-          ctest --test-dir build/rcli-windows-release
-          -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
-      - name: Package and smoke
-        shell: pwsh
-        run: >-
-          ./rcli/scripts/package-rcli-windows.ps1
-          -BuildDir build/rcli-windows-release
 
   windows-commons-release:
     # PR-time coverage for core/scripts/build-windows.bat, i.e. exactly what
@@ -467,8 +370,7 @@ jobs:
 
   ios-device:
     # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
-    # Use the macOS 26 runner line for Xcode 26; only the Metal rcli lane keeps
-    # its explicit older-runner compatibility exception.
+    # Use the macOS 26 runner line for Xcode 26.
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7

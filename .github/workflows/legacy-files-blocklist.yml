@@ -21,6 +21,8 @@ jobs:
         run: |
           set -euo pipefail
           blocked=(
+            "rcli"
+            "rcli/"
             "bindings/react-native/packages/core/src/Features/VoiceSession/VoiceSessionHandle.ts"
             "bindings/react-native/packages/core/src/Public/Extensions/RunAnywhere+VoiceSession.ts"
             "bindings/react-native/scripts/build-react-native.sh"

@@ -40,36 +40,36 @@ ARM64 devices are recommended. Metal on iOS and NEON on Android provide signific
 
 ## Installation
 
-Add the packages you need to `pubspec.yaml`. Pin to **0.20.27**:
+Add the packages you need to `pubspec.yaml`. Pin to **0.20.28**:
 
 **Core + LlamaCpp (LLM):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.27
-  runanywhere_llamacpp: 0.20.27
+  runanywhere: 0.20.28
+  runanywhere_llamacpp: 0.20.28
 ```
 
 **Core + ONNX (STT / TTS / VAD):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.27
-  runanywhere_onnx: 0.20.27
+  runanywhere: 0.20.28
+  runanywhere_onnx: 0.20.28
 ```
 
 **Core + MLX (Apple LLM / VLM / speech on physical iOS devices):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.27
-  runanywhere_mlx: 0.20.27
+  runanywhere: 0.20.28
+  runanywhere_mlx: 0.20.28
 ```
 
 **Optional NPU (Snapdragon Android):**
 
 ```yaml
-  runanywhere_qhexrt: 0.20.27
+  runanywhere_qhexrt: 0.20.28
 ```
 
 Then run:

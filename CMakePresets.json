@@ -86,67 +86,42 @@
         },
 
         {
-            "name": "rcli-macos-release",
-            "displayName": "rcli — macOS arm64 Release (Metal)",
+            "name": "cpp-desktop-macos-arm64",
+            "displayName": "C++ desktop kit — macOS arm64 (no CLI)",
             "inherits": "base-release",
             "cacheVariables": {
-                "RAC_BUILD_CLI": "ON",
+                "RAC_BUILD_CLI": "OFF",
+                "RAC_PACKAGE_CPP_DESKTOP": "ON",
                 "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_BACKENDS": "ON",
                 "RAC_BACKEND_LLAMACPP": "ON",
                 "RAC_BACKEND_MLX": "ON",
                 "RAC_BACKEND_SHERPA": "ON",
                 "RAC_BACKEND_ONNX": "ON",
-                "RAC_BACKEND_NEURT": "ON",
+                "RAC_BACKEND_NEURT": "OFF",
+                "RAC_BACKEND_QHEXRT": "OFF",
                 "RAC_RUNTIME_ONNXRT": "ON",
                 "RAC_RUNTIME_COREML": "ON",
                 "RAC_BACKEND_RAG": "ON",
-                "RAC_BUILD_SERVER": "ON",
+                "RAC_BUILD_SERVER": "OFF",
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "ON",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
-                "GGML_METAL": "ON",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
-                "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
-                "CMAKE_CXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
-                "CMAKE_OBJC_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
-                "CMAKE_OBJCXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks"
+                "GGML_METAL": "ON"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
         },
         {
-            "name": "rcli-linux-release",
-            "displayName": "rcli — Linux x86_64 Release",
-            "inherits": "base-release",
-            "cacheVariables": {
-                "RAC_BUILD_CLI": "ON",
-                "RAC_DESKTOP_ADAPTER": "ON",
-                "RAC_BUILD_BACKENDS": "ON",
-                "RAC_BACKEND_LLAMACPP": "ON",
-                "RAC_BACKEND_SHERPA": "ON",
-                "RAC_BACKEND_ONNX": "ON",
-                "RAC_RUNTIME_ONNXRT": "ON",
-                "RAC_BACKEND_RAG": "ON",
-                "RAC_BUILD_SERVER": "ON",
-                "RAC_STATIC_PLUGINS": "ON",
-                "RAC_BUILD_SHARED": "OFF",
-                "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
-                "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
-                "CMAKE_CXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks"
-            },
-            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
-        },
-        {
-            "name": "rcli-windows-release",
-            "displayName": "rcli — Windows x86_64 Release",
+            "name": "cpp-desktop-windows-x64",
+            "displayName": "C++ desktop kit — Windows x64 (no CLI)",
             "inherits": "base-release",
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
-                "VCPKG_HOST_TRIPLET": "x64-mingw-static",
-                "RAC_BUILD_CLI": "ON",
+                "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+                "CMAKE_SYSTEM_PROCESSOR": "AMD64",
+                "RAC_BUILD_CLI": "OFF",
+                "RAC_PACKAGE_CPP_DESKTOP": "ON",
                 "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_BACKENDS": "ON",
                 "RAC_BACKEND_LLAMACPP": "ON",
@@ -154,18 +129,67 @@
                 "RAC_BACKEND_ONNX": "ON",
                 "RAC_BACKEND_MLX": "OFF",
                 "RAC_BACKEND_NEURT": "OFF",
+                "RAC_BACKEND_QHEXRT": "OFF",
                 "RAC_RUNTIME_ONNXRT": "ON",
                 "RAC_BACKEND_RAG": "OFF",
                 "RAC_BUILD_SERVER": "OFF",
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
-                "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
-                "GGML_METAL": "OFF"
+                "RAC_BUILD_PLATFORM": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         },
-
+        {
+            "name": "cpp-desktop-macos-arm64-neurt",
+            "displayName": "C++ desktop overlay — macOS arm64 NeuRT (private)",
+            "inherits": "cpp-desktop-macos-arm64",
+            "cacheVariables": {
+                "RAC_BACKEND_NEURT": "ON",
+                "RAC_REQUIRE_NEURT_ENGINE": "ON",
+                "RAC_PACKAGE_CPP_DESKTOP": "OFF",
+                "RAC_BACKEND_LLAMACPP": "OFF",
+                "RAC_BACKEND_ONNX": "OFF",
+                "RAC_BACKEND_SHERPA": "OFF",
+                "RAC_BACKEND_MLX": "OFF"
+            }
+        },
+        {
+            "name": "cpp-desktop-windows-arm64",
+            "displayName": "C++ desktop kit — Windows arm64 OSS (no QHexRT)",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "arm64-windows-static",
+                "CMAKE_SYSTEM_PROCESSOR": "ARM64",
+                "RAC_BUILD_CLI": "OFF",
+                "RAC_PACKAGE_CPP_DESKTOP": "ON",
+                "RAC_DESKTOP_ADAPTER": "ON",
+                "RAC_BUILD_BACKENDS": "ON",
+                "RAC_BACKEND_LLAMACPP": "OFF",
+                "RAC_BACKEND_SHERPA": "OFF",
+                "RAC_BACKEND_ONNX": "OFF",
+                "RAC_BACKEND_MLX": "OFF",
+                "RAC_BACKEND_NEURT": "OFF",
+                "RAC_BACKEND_QHEXRT": "OFF",
+                "RAC_RUNTIME_ONNXRT": "OFF",
+                "RAC_BACKEND_RAG": "OFF",
+                "RAC_BUILD_SERVER": "OFF",
+                "RAC_STATIC_PLUGINS": "ON",
+                "RAC_BUILD_SHARED": "OFF",
+                "RAC_BUILD_PLATFORM": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "cpp-desktop-windows-arm64-qhexrt",
+            "displayName": "C++ desktop overlay — Windows arm64 QHexRT (private)",
+            "inherits": "cpp-desktop-windows-arm64",
+            "cacheVariables": {
+                "RAC_BACKEND_QHEXRT": "ON",
+                "RAC_REQUIRE_QHEXRT_ENGINE": "ON",
+                "RAC_PACKAGE_CPP_DESKTOP": "OFF"
+            }
+        },
         {
             "name": "android-arm64",
             "displayName": "Android arm64-v8a (cross-compile)",
@@ -405,9 +429,11 @@
         { "name": "linux-debug",      "configurePreset": "linux-debug" },
         { "name": "linux-release",    "configurePreset": "linux-release" },
         { "name": "linux-asan",       "configurePreset": "linux-asan" },
-        { "name": "rcli-macos-release", "configurePreset": "rcli-macos-release" },
-        { "name": "rcli-linux-release", "configurePreset": "rcli-linux-release" },
-        { "name": "rcli-windows-release", "configurePreset": "rcli-windows-release" },
+        { "name": "cpp-desktop-macos-arm64", "configurePreset": "cpp-desktop-macos-arm64", "targets": ["package-cpp-desktop-tarball"] },
+        { "name": "cpp-desktop-windows-x64", "configurePreset": "cpp-desktop-windows-x64", "targets": ["package-cpp-desktop-tarball"], "configuration": "Release" },
+        { "name": "cpp-desktop-macos-arm64-neurt", "configurePreset": "cpp-desktop-macos-arm64-neurt" },
+        { "name": "cpp-desktop-windows-arm64", "configurePreset": "cpp-desktop-windows-arm64", "targets": ["package-cpp-desktop-tarball"], "configuration": "Release" },
+        { "name": "cpp-desktop-windows-arm64-qhexrt", "configurePreset": "cpp-desktop-windows-arm64-qhexrt", "configuration": "Release" },
         { "name": "android-arm64",    "configurePreset": "android-arm64" },
         { "name": "android-armv7",    "configurePreset": "android-armv7" },
         { "name": "android-x86_64",   "configurePreset": "android-x86_64" },
@@ -428,7 +454,6 @@
     "testPresets": [
         { "name": "macos-debug",   "configurePreset": "macos-debug",   "output": { "outputOnFailure": true } },
         { "name": "linux-debug",   "configurePreset": "linux-debug",   "output": { "outputOnFailure": true } },
-        { "name": "linux-asan",    "configurePreset": "linux-asan",    "output": { "outputOnFailure": true } },
-        { "name": "rcli-windows-release", "configurePreset": "rcli-windows-release", "output": { "outputOnFailure": true } }
+        { "name": "linux-asan",    "configurePreset": "linux-asan",    "output": { "outputOnFailure": true } }
     ]
 }
