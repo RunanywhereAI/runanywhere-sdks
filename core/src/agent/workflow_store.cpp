@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#include <chrono>
 #include "workflow_store.h"
 
 #include <cstdlib>
@@ -136,6 +137,16 @@ rac_result_t adapter_list_directory(const std::string& path, std::vector<std::st
     return RAC_SUCCESS;
 }
 
+namespace {
+
+int64_t store_now_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+}  // namespace
+
 rac_result_t store_save_document(const runanywhere::v1::WorkflowDocument& document) {
     if (!id_is_safe(document.id())) {
         rac_error_set_details("workflow id must be 1-128 chars of [A-Za-z0-9_-]");
@@ -150,6 +161,10 @@ rac_result_t store_save_document(const runanywhere::v1::WorkflowDocument& docume
 
     runanywhere::v1::WorkflowDocument stored = document;
     stored.set_schema_version(kWorkflowSchemaVersion);
+    // The header promises a save refreshes this. Copying the caller's value
+    // meant a caller that never set it stored 0, and every WorkflowSummary
+    // then reported 0 as the last-modified time.
+    stored.set_updated_at_ms(store_now_ms());
 
     return write_message_json(join(directory, kDocumentFile), stored);
 }

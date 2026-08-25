@@ -48,6 +48,9 @@ class WorkflowRunner {
     /// Safe at any point in the lifecycle, including mid-run.
     runanywhere::v1::WorkflowRunRecord record() const;
 
+    /// True once start() has been accepted.
+    bool started() const;
+
    private:
     void run();
     void execute_one(const runanywhere::v1::WorkflowNode& node);

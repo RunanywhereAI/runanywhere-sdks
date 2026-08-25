@@ -142,6 +142,18 @@ rac_result_t bundle_import(const WorkflowBundle& bundle, WorkflowBundleImportRes
     }
 
     for (const WorkflowDocument& workflow : bundle.workflows()) {
+        // store_save_document stamps this build's schema_version onto whatever
+        // it writes, so a document from a newer build would be persisted as if
+        // it were ours and the newer-build guard in store_load_document could
+        // never fire for it. The fields this build does not know would be gone.
+        if (workflow.schema_version() > kWorkflowSchemaVersion) {
+            auto* issue = out_result->add_skipped();
+            issue->set_kind(runanywhere::v1::BUNDLE_ITEM_KIND_WORKFLOW);
+            issue->set_id(workflow.id());
+            issue->set_message("workflow was written by a newer build");
+            continue;
+        }
+
         runanywhere::v1::WorkflowValidationResult validation;
         validate_document(workflow, &validation);
         if (!validation.valid()) {
