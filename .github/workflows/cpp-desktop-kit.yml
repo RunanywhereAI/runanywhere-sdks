@@ -65,8 +65,11 @@ jobs:
           ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
           tar=$(echo dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz)
           python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --forbid-private-engines
-          shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
-            | tee "dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256"
+          (
+            cd dist
+            name="RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < ../core/VERSION).tar.gz"
+            shasum -a 256 "$name" | tee "$name.sha256"
+          )
       - uses: actions/upload-artifact@v4
         with:
           name: cpp-desktop-macos-arm64
