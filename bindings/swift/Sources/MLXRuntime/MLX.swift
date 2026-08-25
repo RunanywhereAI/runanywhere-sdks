@@ -925,97 +925,118 @@ private final class MLXSession: @unchecked Sendable {
         let events = try await container.generate(input: prepared, parameters: parameters)
         var metrics = MLXGenerationMetrics()
         var repetitionGuard = RepetitionRunGuard()
-        var shouldFlushHeldTokens = true
         let started = Date()
 
-        generationLoop: for await event in events {
-            if isCancelled {
-                throw CancellationError()
-            }
-            switch event {
-            case .chunk(let token):
-                switch repetitionGuard.consume(token) {
-                case .emit(let tokens):
-                    for outputToken in tokens where !outputToken.isEmpty {
-                        if !onToken(outputToken) {
-                            shouldFlushHeldTokens = false
-                            cancel()
-                            break generationLoop
-                        }
-                    }
-                case .hold:
-                    continue
-                case .stop:
-                    mlxRuntimeLogger.warning("Stopping MLX VLM generation after repeated token runaway")
-                    shouldFlushHeldTokens = false
-                    cancel()
-                    break generationLoop
-                }
-            case .info(let info):
-                // Prompt vs generated token counts, which is what separates "the
-                // image never reached the model" from "the model decoded badly":
-                // a Qwen2-VL turn that answered with one token repeated 23 times
-                // still showed a correctly sized 418-token prompt here, and that
-                // is what ruled the image pipeline out.
-                mlxRuntimeLogger.debug(
-                    "MLX VLM turn: prompt=\(info.promptTokenCount) generated=\(info.generationTokenCount)"
-                )
-                metrics.promptTokens = info.promptTokenCount
-                metrics.completionTokens = info.generationTokenCount
-                metrics.tokensPerSecond = Float(info.tokensPerSecond)
-                metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
-            case .toolCall(let call):
-                // MLX-LM's processor swallows the `<tool_call>` text it parsed,
-                // so commons' run loop saw output with no call in it and failed
-                // the turn. Re-emit the wire form it expects; commons owns the
-                // parse for every other engine and now owns it here too.
-                //
-                // The return value is the consumer's stop signal, honored the
-                // same way `.chunk` honors it: a caller that has stopped reading
-                // must not keep the model generating.
-                //
-                // Held tokens go first. The repetition guard withholds chunks
-                // produced BEFORE this call, and they are only flushed after the
-                // loop, so emitting the call now would hand commons the text out
-                // of the order the model wrote it.
-                flushHeldTokens(from: &repetitionGuard, onToken: onToken)
-                if !onToken(toolCallWireText(call)) {
-                    shouldFlushHeldTokens = false
-                    cancel()
-                    break generationLoop
-                }
-            case .rejectedToolCall(let rejection):
-                // A rejection only means MLX-LM could not match the call against
-                // tools *it* was told about, and commons never declares them to
-                // MLX: it renders the schema into the prompt instead. When the
-                // raw text survived intact, hand it to commons and let commons
-                // decide. A truncated preview stays fail-closed, because half a
-                // call is worse than none.
-                if !rejection.isPreviewTruncated, !rejection.rawTextPreview.isEmpty {
-                    mlxRuntimeLogger.debug(
-                        "MLX forwarding rejected tool call (\(rejection.reason.rawValue)) to commons"
-                    )
-                    // Same ordering rule as `.toolCall` above.
-                    flushHeldTokens(from: &repetitionGuard, onToken: onToken)
-                    if !onToken(rejection.rawTextPreview) {
-                        shouldFlushHeldTokens = false
-                        cancel()
-                        break generationLoop
-                    }
-                } else {
-                    throw RejectedToolCallError(rejection)
-                }
-            }
-        }
-
+        let shouldFlushHeldTokens = try await consumeVLMEvents(
+            events,
+            metrics: &metrics,
+            repetitionGuard: &repetitionGuard,
+            onToken: onToken
+        )
         if shouldFlushHeldTokens {
             flushHeldTokens(from: &repetitionGuard, onToken: onToken)
         }
+
 
         if metrics.totalTimeMs == 0 {
             metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
         }
         return metrics
+    }
+
+    /// Drains the MLX event stream, classifying each event and forwarding what
+    /// the caller should see.
+    ///
+    /// Split out of `streamVLM` because that function had grown past what one
+    /// reader can hold: the vision setup, the chat assembly and this whole
+    /// switch were one body.
+    private func consumeVLMEvents(
+        _ events: AsyncStream<Generation>,
+        metrics: inout MLXGenerationMetrics,
+        repetitionGuard: inout RepetitionRunGuard,
+        onToken: @escaping @Sendable (String) -> Bool
+    ) async throws -> Bool {
+        var shouldFlushHeldTokens = true
+            generationLoop: for await event in events {
+                if isCancelled {
+                    throw CancellationError()
+                }
+                switch event {
+                case .chunk(let token):
+                    switch repetitionGuard.consume(token) {
+                    case .emit(let tokens):
+                        for outputToken in tokens where !outputToken.isEmpty {
+                            if !onToken(outputToken) {
+                                shouldFlushHeldTokens = false
+                                cancel()
+                                break generationLoop
+                            }
+                        }
+                    case .hold:
+                        continue
+                    case .stop:
+                        mlxRuntimeLogger.warning("Stopping MLX VLM generation after repeated token runaway")
+                        shouldFlushHeldTokens = false
+                        cancel()
+                        break generationLoop
+                    }
+                case .info(let info):
+                    // Prompt vs generated token counts, which is what separates "the
+                    // image never reached the model" from "the model decoded badly":
+                    // a Qwen2-VL turn that answered with one token repeated 23 times
+                    // still showed a correctly sized 418-token prompt here, and that
+                    // is what ruled the image pipeline out.
+                    mlxRuntimeLogger.debug(
+                        "MLX VLM turn: prompt=\(info.promptTokenCount) generated=\(info.generationTokenCount)"
+                    )
+                    metrics.promptTokens = info.promptTokenCount
+                    metrics.completionTokens = info.generationTokenCount
+                    metrics.tokensPerSecond = Float(info.tokensPerSecond)
+                    metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
+                case .toolCall(let call):
+                    // MLX-LM's processor swallows the `<tool_call>` text it parsed,
+                    // so commons' run loop saw output with no call in it and failed
+                    // the turn. Re-emit the wire form it expects; commons owns the
+                    // parse for every other engine and now owns it here too.
+                    //
+                    // The return value is the consumer's stop signal, honored the
+                    // same way `.chunk` honors it: a caller that has stopped reading
+                    // must not keep the model generating.
+                    //
+                    // Held tokens go first. The repetition guard withholds chunks
+                    // produced BEFORE this call, and they are only flushed after the
+                    // loop, so emitting the call now would hand commons the text out
+                    // of the order the model wrote it.
+                    flushHeldTokens(from: &repetitionGuard, onToken: onToken)
+                    if !onToken(toolCallWireText(call)) {
+                        shouldFlushHeldTokens = false
+                        cancel()
+                        break generationLoop
+                    }
+                case .rejectedToolCall(let rejection):
+                    // A rejection only means MLX-LM could not match the call against
+                    // tools *it* was told about, and commons never declares them to
+                    // MLX: it renders the schema into the prompt instead. When the
+                    // raw text survived intact, hand it to commons and let commons
+                    // decide. A truncated preview stays fail-closed, because half a
+                    // call is worse than none.
+                    if !rejection.isPreviewTruncated, !rejection.rawTextPreview.isEmpty {
+                        mlxRuntimeLogger.debug(
+                            "MLX forwarding rejected tool call (\(rejection.reason.rawValue)) to commons"
+                        )
+                        // Same ordering rule as `.toolCall` above.
+                        flushHeldTokens(from: &repetitionGuard, onToken: onToken)
+                        if !onToken(rejection.rawTextPreview) {
+                            shouldFlushHeldTokens = false
+                            cancel()
+                            break generationLoop
+                        }
+                    } else {
+                        throw RejectedToolCallError(rejection)
+                    }
+                }
+            }
+        return shouldFlushHeldTokens
     }
 
     /// Emit whatever the repetition guard was still holding when generation ended.
@@ -2183,11 +2204,18 @@ private let mlxDestroy: rac_mlx_destroy_fn = { handle, _ in
 /// MLX-LM hands back a structured `ToolCall` instead, so this puts it back on
 /// the wire rather than teaching commons a second, MLX-only representation.
 private func toolCallWireText(_ call: ToolCall) -> String {
+    // `Any` is the right type here and a concrete one would be wrong: a tool's
+    // arguments are arbitrary JSON defined by whoever registered the tool, and
+    // this hands them to JSONSerialization unchanged. Naming a struct would mean
+    // commons knowing every tool's argument shape, which is the coupling the
+    // provider registry exists to avoid.
+    // swiftlint:disable:next avoid_any_type prefer_concrete_types
     var payload: [String: Any] = ["tool": call.function.name]
     if let data = try? JSONEncoder().encode(call.function.arguments),
        let arguments = try? JSONSerialization.jsonObject(with: data) {
         payload["arguments"] = arguments
     } else {
+        // swiftlint:disable:next avoid_any_type
         payload["arguments"] = [String: Any]()
     }
     guard let encoded = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
