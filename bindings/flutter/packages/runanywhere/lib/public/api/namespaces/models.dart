@@ -243,28 +243,52 @@ class ModelsApi {
 
   /// Make [id] resident, paying the load cost now rather than on first use.
   ///
-  /// Only [LoadOptions.backendPreferences]'s first entry (equivalently the
-  /// deprecated `framework`) reaches commons today; other placement knobs
-  /// are not yet carried by the native load ABI.
+  /// `contextLength`, `accelerator`/`useGpu`, and the ordered backend framework
+  /// list are forwarded to commons. Engines may treat context length and
+  /// accelerator selection as advisory. `threads` is retired from the load
+  /// ABI, and a required backend preference is rejected because its hard
+  /// fallback boundary has no wire representation.
   ///
-  /// Throws [SDKException] when the model is unknown or fails to load.
+  /// Throws [SDKException] when the model is unknown, the options cannot be
+  /// represented by the load ABI, or the model fails to load.
   Future<LoadedModel> load(String id, {LoadOptions? options}) async {
     final model = await get(id);
     if (model == null) {
       throw SDKException.modelNotFound(id);
     }
-    await ModelGate.ensureLoaded(
+    final result = await ModelGate.ensureLoaded(
       modelId: id,
       category: model.category,
       options: options,
     );
     final preferences = options?.resolvedBackendPreferences ?? const [];
     final requestedBackend = preferences.isEmpty ? null : preferences.first;
+    final resultFramework = result?.framework;
+    final actualBackend =
+        resultFramework == null ||
+            resultFramework ==
+                InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
+        ? model.framework
+        : resultFramework;
+    final resultCategory = result?.category;
+    final actualCategory =
+        resultCategory == null ||
+            resultCategory == ModelCategory.MODEL_CATEGORY_UNSPECIFIED
+        ? model.category
+        : resultCategory;
+    final actualDevice = result?.actualDeviceKind ?? '';
+    final runtimeVersion = result?.runtimeVersion ?? '';
+    final abiVersion = result?.abiVersion ?? '';
+    final fallbackReason = result?.fallbackReason ?? '';
     return LoadedModel(
       id: id,
-      category: model.category,
+      category: actualCategory,
       requestedBackend: requestedBackend,
-      actualBackend: requestedBackend?.backend ?? model.framework,
+      actualBackend: actualBackend,
+      actualDevice: actualDevice.isEmpty ? 'unknown' : actualDevice,
+      runtimeVersion: runtimeVersion.isEmpty ? null : runtimeVersion,
+      abiVersion: abiVersion.isEmpty ? null : abiVersion,
+      fallbackReason: fallbackReason.isEmpty ? null : fallbackReason,
       closeHandler: unload,
     );
   }

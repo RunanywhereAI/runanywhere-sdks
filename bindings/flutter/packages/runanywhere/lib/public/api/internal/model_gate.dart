@@ -20,15 +20,31 @@ import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 final SDKLogger _modelGateLogger = SDKLogger('ModelGate');
 
 /// [LoadOptions] fields `ModelLoadRequest` (`model_types.proto`) has no wire
-/// path for yet. `threads` was retired from the load ABI (reserved tag 7);
-/// every other placement knob — `contextLength`, `accelerator`/`useGpu`, and
-/// `backendPreferences`/`framework` — is carried by the request in [load].
+/// path for yet. `threads` was retired from the load ABI (reserved tag 7).
+/// `contextLength`, `accelerator`/`useGpu`, and the backend framework list are
+/// carried by the request in [load]. `BackendPreference.required` has no wire
+/// representation and is rejected before loading rather than silently ignored.
 ///
 /// Exposed (not private) so `model_gate_load_options_test.dart` can assert on
 /// it directly without driving the full native load path.
 List<String> ignoredLoadOptionKnobs(LoadOptions? options) => <String>[
   if (options?.threads != null) 'threads',
 ];
+
+void _validateLoadOptions(LoadOptions? options) {
+  final hasRequiredBackend =
+      options?.resolvedBackendPreferences.any(
+        (preference) => preference.required,
+      ) ??
+      false;
+  if (hasRequiredBackend) {
+    throw SDKException.invalidConfiguration(
+      'LoadOptions.backendPreferences.required cannot be carried by '
+      'ModelLoadRequest because backend_preferences contains framework enums '
+      'only. Remove required or pass one preferred backend.',
+    );
+  }
+}
 
 /// Map the public [AcceleratorPolicy] enum onto the generated
 /// `ModelLoadRequest.accelerator_policy` values.
@@ -51,10 +67,12 @@ abstract final class ModelGate {
   ///
   /// A null [modelId] leaves whatever is already loaded in place; commons
   /// surfaces a structured error if nothing is.
+  /// A same-model load returns its current lifecycle result unless
+  /// [LoadOptions.forceReload] requests a new engine instance.
   ///
   /// Throws [SDKException] when the model is unknown, cannot be fetched, or
   /// fails to load.
-  static Future<void> ensureLoaded({
+  static Future<model_pb.ModelLoadResult?> ensureLoaded({
     required String? modelId,
     required ModelCategory category,
     LoadOptions? options,
@@ -64,27 +82,38 @@ abstract final class ModelGate {
       throw SDKException.notInitialized();
     }
     if (modelId == null || modelId.isEmpty) {
-      return;
+      return null;
     }
     await DartBridge.ensureServicesReady();
+    _validateLoadOptions(options);
 
     final current = await RunAnywhereModelLifecycle.shared.current(
       model_pb.CurrentModelRequest(category: category),
     );
-    if (current.found && current.modelId == modelId) {
-      return;
+    if (current.found &&
+        current.modelId == modelId &&
+        options?.forceReload != true) {
+      return model_pb.ModelLoadResult(
+        modelId: current.modelId,
+        category: current.category,
+        framework: current.framework,
+        resolvedPath: current.resolvedPath,
+        loadedAtUnixMs: current.loadedAtUnixMs,
+        resolvedArtifacts: current.resolvedArtifacts,
+        alreadyLoaded: true,
+      );
     }
 
     if (downloadIfNeeded) {
       await _downloadIfAbsent(modelId);
     }
-    await load(modelId: modelId, category: category, options: options);
+    return load(modelId: modelId, category: category, options: options);
   }
 
   /// Load [modelId] under [category] through commons lifecycle routing.
   ///
   /// Throws [SDKException] when the load fails.
-  static Future<void> load({
+  static Future<model_pb.ModelLoadResult> load({
     required String modelId,
     required ModelCategory category,
     LoadOptions? options,
@@ -92,7 +121,7 @@ abstract final class ModelGate {
     final request = model_pb.ModelLoadRequest(
       modelId: modelId,
       category: category,
-      forceReload: true,
+      forceReload: options?.forceReload ?? false,
       validateAvailability: true,
     );
     final opts = options;
@@ -130,6 +159,7 @@ abstract final class ModelGate {
             : 'Model lifecycle load failed',
       );
     }
+    return result;
   }
 
   /// Unload whatever is loaded under [category]. No-op when nothing is.
