@@ -36,7 +36,7 @@ public extension RunAnywhere {
                 fallbackCategories: [.vision]
             )
             let result = try await CppBridge.VLM.shared.process(
-                effective.toVLMRequest(prompt: prompt, images: [image.toVLMImage()])
+                effective.toVLMRequest(prompt: prompt, images: [try image.toVLMImage()])
             )
             try RunAnywhere.throwIfVLMFailed(result)
             return GenerationResult(proto: result, requestId: "", model: model)
@@ -58,10 +58,55 @@ public extension RunAnywhere {
                 fallbackCategories: [.vision]
             )
             let events = try await CppBridge.VLM.shared.processStream(
-                effective.toVLMRequest(prompt: prompt, images: [image.toVLMImage()])
+                effective.toVLMRequest(prompt: prompt, images: [try image.toVLMImage()])
             )
 
             return mapVLMStream(events, model: model)
+        }
+
+        /// Answer `prompt` with no image, streaming tokens as they arrive.
+        ///
+        /// A vision model is a language model with a vision tower, so it can
+        /// hold an ordinary text conversation. It loads under the multimodal
+        /// component, which `llm.generateStream` cannot see, so a text turn
+        /// against a loaded VLM has to come through here rather than there.
+        ///
+        /// - Throws: `SDKException` from this call when the model cannot be
+        ///   loaded, and into the returned stream when generation fails.
+        public func generateStream(
+            prompt: String,
+            options: LlmOptions? = nil
+        ) async throws -> AsyncThrowingStream<GenerationEvent, Error> {
+            let effective = options ?? LlmOptions()
+            let model = try await RunAnywhere.ensureLoaded(
+                modelId: effective.model,
+                category: .multimodal,
+                fallbackCategories: [.vision]
+            )
+            let events = try await CppBridge.VLM.shared.processStream(
+                effective.toVLMRequest(prompt: prompt, images: [])
+            )
+
+            return mapVLMStream(events, model: model)
+        }
+
+        /// Answer `prompt` with no image. See `generateStream(prompt:options:)`
+        /// for why a text turn against a vision model comes through here.
+        public func generate(
+            prompt: String,
+            options: LlmOptions? = nil
+        ) async throws -> GenerationResult {
+            let effective = options ?? LlmOptions()
+            let model = try await RunAnywhere.ensureLoaded(
+                modelId: effective.model,
+                category: .multimodal,
+                fallbackCategories: [.vision]
+            )
+            let result = try await CppBridge.VLM.shared.process(
+                effective.toVLMRequest(prompt: prompt, images: [])
+            )
+            try RunAnywhere.throwIfVLMFailed(result)
+            return GenerationResult(proto: result, requestId: "", model: model)
         }
 
         private func mapVLMStream(
