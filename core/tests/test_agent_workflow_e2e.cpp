@@ -10,10 +10,12 @@
 // Only nodes that need no model or network are exercised, so the suite stays
 // hermetic. That still covers the parts most likely to be wrong: per-port input
 // gathering, Condition and Filter branch routing, expression resolution against
-// real upstream output, loop iteration, and run-record persistence.
+// real upstream output, loop iteration, run-record persistence, and which of
+// the two tool paths a Tool Call node takes.
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <thread>
 #include <vector>
@@ -26,6 +28,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/plugin/rac_tool_provider.h"
 
 namespace {
 
@@ -78,6 +81,15 @@ WorkflowNode* add_transform(WorkflowDocument* document, const std::string& id,
     auto* assignment = node->mutable_set_transform()->add_assignments();
     assignment->set_field(field);
     assignment->set_value(value);
+    return node;
+}
+
+WorkflowNode* add_tool_call(WorkflowDocument* document, const std::string& id,
+                            const std::string& name, const std::string& tool_name) {
+    WorkflowNode* node = document->add_nodes();
+    node->set_id(id);
+    node->set_name(name);
+    node->mutable_tool_call()->set_tool_name(tool_name);
     return node;
 }
 
@@ -403,6 +415,148 @@ TEST(an_invalid_document_is_refused_by_save) {
     rac_proto_buffer_free(&buffer);
 }
 
+// --- Tool Call dispatch -----------------------------------------------------
+//
+// A Tool Call node has two ways to reach an implementation: the commons
+// provider registry, and the host callback that carries a binding's own
+// registry across the C ABI. The two tests below pin which one answers, because
+// getting that wrong is invisible until a tool works in chat and not in a
+// workflow.
+
+int g_provider_calls = 0;
+std::string g_provider_arguments;
+
+rac_result_t stub_provider_execute(const char* args_json, const rac_tool_context_t* ctx,
+                                   char** out_result_json, void* user_data) {
+    (void)ctx;
+    (void)user_data;
+    ++g_provider_calls;
+    g_provider_arguments = args_json == nullptr ? "" : args_json;
+
+    const char* payload = R"({"answered_by":"provider"})";
+    const size_t size = std::strlen(payload) + 1;
+    *out_result_json = static_cast<char*>(std::malloc(size));
+    std::memcpy(*out_result_json, payload, size);
+    return RAC_SUCCESS;
+}
+
+const rac_tool_provider_t kStubProvider = {
+    /* name */ "e2e_provider_tool",
+    /* description */ "answers from commons",
+    /* category */ "Test",
+    /* parameters_json */ R"({"type":"object","properties":{"question":{"type":"string"}}})",
+    /* execute */ stub_provider_execute,
+    /* published_keys */ nullptr,
+    /* single_use */ 0,
+    /* grounds_answer */ 0,
+    /* user_data */ nullptr,
+    /* reserved */ {0, 0, 0, 0, 0, 0},
+};
+
+int g_host_calls = 0;
+std::string g_host_tool_name;
+
+rac_result_t recording_host_tool(const uint8_t* bytes, size_t size, rac_proto_buffer_t* out_result,
+                                 void* user_data) {
+    (void)user_data;
+    runanywhere::v1::ToolInvocation invocation;
+    if (!invocation.ParseFromArray(bytes, static_cast<int>(size)))
+        return RAC_ERROR_DECODING_ERROR;
+
+    ++g_host_calls;
+    g_host_tool_name = invocation.tool_name();
+
+    runanywhere::v1::ToolInvocationResult result;
+    result.set_result_json(R"({"answered_by":"host"})");
+    const std::string encoded = result.SerializeAsString();
+    return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(encoded.data()), encoded.size(),
+                                 out_result);
+}
+
+rac_agent_host_callbacks_t recording_callbacks() {
+    rac_agent_host_callbacks_t callbacks{};
+    callbacks.abi_version = RAC_AGENT_HOST_CALLBACKS_ABI_VERSION;
+    callbacks.struct_size = sizeof(callbacks);
+    callbacks.invoke_tool = recording_host_tool;
+    return callbacks;
+}
+
+TEST(a_tool_call_node_is_answered_by_a_commons_provider) {
+    g_provider_calls = 0;
+    g_provider_arguments.clear();
+    g_host_calls = 0;
+    // No host callback at all: if the provider path is not taken, the node
+    // fails with "no tool callback is registered" rather than quietly passing.
+    CHECK(rac_agent_set_host_callbacks(nullptr) == RAC_SUCCESS);
+    CHECK(rac_tool_provider_register(&kStubProvider) == RAC_SUCCESS);
+
+    WorkflowDocument document;
+    document.set_id("e2e-tool-provider");
+    document.set_name("Provider tool");
+    add_trigger(&document, "n1", "Start", R"([{"topic": "eventide"}])");
+    WorkflowNode* tool = add_tool_call(&document, "n2", "Ask", "e2e_provider_tool");
+    auto* port = tool->mutable_tool_call()->add_ports();
+    port->set_name("question");
+    port->set_required(true);
+    (*tool->mutable_tool_call()->mutable_arguments())["question"] = "{{ Start.topic }}";
+    connect(&document, "n1", "out", "n2", "in");
+    CHECK(save(document) == RAC_SUCCESS);
+
+    WorkflowRunRecord record;
+    CHECK(run_to_completion("e2e-tool-provider", &record));
+    CHECK(record.state() == WorkflowRunState::WORKFLOW_RUN_STATE_SUCCEEDED);
+
+    const auto* ask = node_run(record, "n2");
+    CHECK(ask != nullptr);
+    CHECK(ask->state() == NodeRunState::NODE_RUN_STATE_SUCCEEDED);
+    CHECK(ask->output_size() == 1);
+    CHECK(ask->output(0).json().find("provider") != std::string::npos);
+
+    CHECK(g_provider_calls == 1);
+    CHECK(g_host_calls == 0);
+    // The node's resolved arguments reached the provider, so the provider path
+    // carries the same per-port resolution the host path does.
+    CHECK(g_provider_arguments.find("eventide") != std::string::npos);
+
+    CHECK(rac_tool_provider_unregister("e2e_provider_tool") == RAC_SUCCESS);
+}
+
+TEST(a_tool_no_provider_owns_still_reaches_the_host) {
+    g_provider_calls = 0;
+    g_host_calls = 0;
+    g_host_tool_name.clear();
+    const rac_agent_host_callbacks_t callbacks = recording_callbacks();
+    CHECK(rac_agent_set_host_callbacks(&callbacks) == RAC_SUCCESS);
+    // Registered but not named by the node: a non-empty registry must not
+    // divert a tool it does not own.
+    CHECK(rac_tool_provider_register(&kStubProvider) == RAC_SUCCESS);
+
+    WorkflowDocument document;
+    document.set_id("e2e-tool-host");
+    document.set_name("Host tool");
+    add_trigger(&document, "n1", "Start", R"([{"value": 1}])");
+    add_tool_call(&document, "n2", "Ask", "e2e_host_tool");
+    connect(&document, "n1", "out", "n2", "in");
+    CHECK(save(document) == RAC_SUCCESS);
+
+    WorkflowRunRecord record;
+    CHECK(run_to_completion("e2e-tool-host", &record));
+    CHECK(record.state() == WorkflowRunState::WORKFLOW_RUN_STATE_SUCCEEDED);
+
+    const auto* ask = node_run(record, "n2");
+    CHECK(ask != nullptr);
+    CHECK(ask->state() == NodeRunState::NODE_RUN_STATE_SUCCEEDED);
+    CHECK(ask->output_size() == 1);
+    CHECK(ask->output(0).json().find("host") != std::string::npos);
+
+    CHECK(g_host_calls == 1);
+    CHECK(g_host_tool_name == "e2e_host_tool");
+    CHECK(g_provider_calls == 0);
+
+    CHECK(rac_tool_provider_unregister("e2e_provider_tool") == RAC_SUCCESS);
+    CHECK(rac_agent_set_host_callbacks(nullptr) == RAC_SUCCESS);
+}
+
 }  // namespace
 
 int main() {
@@ -438,6 +592,8 @@ int main() {
     run_test_the_run_record_persists_and_reloads();
     run_test_deleting_a_workflow_removes_it_from_the_listing();
     run_test_an_invalid_document_is_refused_by_save();
+    run_test_a_tool_call_node_is_answered_by_a_commons_provider();
+    run_test_a_tool_no_provider_owns_still_reaches_the_host();
 
     std::fprintf(stderr, "\n%d passed / %d failed\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
