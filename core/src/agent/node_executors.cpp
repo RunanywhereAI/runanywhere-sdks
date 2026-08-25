@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "features/llm/tool_provider_dispatch.h"
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -570,10 +571,15 @@ rac_result_t ensure_model_loaded(const std::string& model_id,
     rac_proto_buffer_t load_buffer;
     rac_proto_buffer_init(&load_buffer);
     const rac_result_t result = rac_model_lifecycle_load_proto(
-        nullptr, reinterpret_cast<const uint8_t*>(load_encoded.data()), load_encoded.size(),
-        &load_buffer);
+        rac_get_model_registry(), reinterpret_cast<const uint8_t*>(load_encoded.data()),
+        load_encoded.size(), &load_buffer);
     if (result != RAC_SUCCESS) {
-        *out_error = "could not load model '" + model_id + "'";
+        // The ABI reports argument-level refusals (no registry, unparseable
+        // request) only through the buffer, so dropping that text leaves every
+        // one of them looking like a missing model.
+        *out_error = load_buffer.error_message != nullptr
+                         ? std::string(load_buffer.error_message)
+                         : "could not load model '" + model_id + "'";
         rac_proto_buffer_free(&load_buffer);
         return result;
     }
@@ -852,7 +858,8 @@ rac_result_t run_rerank(const WorkflowNode& node, const ExpressionContext& conte
     runanywhere::v1::ModelLoadResult resolved;
     rac_result_t status = call_proto_abi(
         [](const uint8_t* bytes, size_t size, rac_proto_buffer_t* buffer) {
-            return rac_model_lifecycle_resolve_paths_proto(nullptr, bytes, size, buffer);
+            return rac_model_lifecycle_resolve_paths_proto(rac_get_model_registry(), bytes,
+                                                            size, buffer);
         },
         resolve_request, &resolved, "could not resolve the reranker model", out_error);
     if (status != RAC_SUCCESS)
