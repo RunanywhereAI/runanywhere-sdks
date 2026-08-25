@@ -197,10 +197,14 @@ if [[ -z "$OUT" ]]; then
 fi
 # include/ is present for NeuRT (plugin entry header); QHexRT overlays have none.
 tar -C "$stage" -czf "$OUT" lib bin share include
-if command -v shasum >/dev/null 2>&1; then
-  shasum -a 256 "$OUT" | tee "${OUT}.sha256"
-elif command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$OUT" | tee "${OUT}.sha256"
-fi
+(
+  cd "$(dirname "$OUT")"
+  base="$(basename "$OUT")"
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$base" | tee "$base.sha256"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$base" | tee "$base.sha256"
+  fi
+)
 echo "private overlay: $OUT"
 ls -la "$stage/lib" "$stage/bin"

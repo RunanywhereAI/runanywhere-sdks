@@ -80,6 +80,14 @@ on:
           run's kit artifacts with this run's.
         type: boolean
         default: false
+      reuse_cpp_desktop_run_id:
+        description: >-
+          Run id whose cpp-desktop-* artifacts to attach instead of rebuilding kits
+          (skips the five kit/overlay jobs). Use with publish_from_run_id when a
+          prior rebuild_cpp_desktop run already packaged routable kits but publish
+          itself failed (e.g. sidecar path prefix).
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -411,7 +419,7 @@ jobs:
 
   native_cpp_desktop_macos:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -432,8 +440,13 @@ jobs:
           ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
           tar=$(echo dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz)
           python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --forbid-private-engines
-          shasum -a 256 dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz \
-            | tee "dist/RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < core/VERSION).tar.gz.sha256"
+          # Basename only — `sha256sum -c` in publish runs inside release-flat.
+          # `shasum dist/foo.tar.gz` writes `dist/foo.tar.gz` and fails there.
+          (
+            cd dist
+            name="RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < ../core/VERSION).tar.gz"
+            shasum -a 256 "$name" | tee "$name.sha256"
+          )
       - uses: actions/upload-artifact@v7
         with:
           name: cpp-desktop-macos
@@ -445,7 +458,7 @@ jobs:
 
   native_cpp_desktop_windows:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
@@ -490,7 +503,7 @@ jobs:
 
   native_cpp_desktop_windows_arm64:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
     runs-on: windows-11-arm
     timeout-minutes: 90
     steps:
@@ -541,7 +554,7 @@ jobs:
 
   native_cpp_desktop_macos_neurt_private:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -582,7 +595,7 @@ jobs:
 
   native_cpp_desktop_windows_qhexrt_private:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
     runs-on: windows-11-arm
     timeout-minutes: 120
     steps:
@@ -2045,18 +2058,18 @@ jobs:
           run-id: ${{ inputs.reuse_native_web_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       # Stub kits from the reused candidate must not ship. Drop them, then
-      # take this run's rebuilt tarballs (same artifact names).
+      # take rebuilt tarballs (this run, or reuse_cpp_desktop_run_id).
       - name: Drop stub C++ desktop kits from the reused run
-        if: ${{ inputs.publish_from_run_id != '' && inputs.rebuild_cpp_desktop }}
+        if: ${{ inputs.publish_from_run_id != '' && (inputs.rebuild_cpp_desktop || inputs.reuse_cpp_desktop_run_id != '') }}
         run: rm -rf release-artifacts/cpp-desktop-*
       - name: Replace C++ desktop kits from this run
-        if: ${{ inputs.publish_from_run_id != '' && inputs.rebuild_cpp_desktop }}
+        if: ${{ inputs.publish_from_run_id != '' && (inputs.rebuild_cpp_desktop || inputs.reuse_cpp_desktop_run_id != '') }}
         uses: actions/download-artifact@v8
         with:
           pattern: cpp-desktop-*
           path: release-artifacts
           merge-multiple: false
-          run-id: ${{ github.run_id }}
+          run-id: ${{ inputs.reuse_cpp_desktop_run_id || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Flatten + index assets
         # Collision-detecting flatten. The previous `find ... -exec cp` form
@@ -2209,6 +2222,15 @@ jobs:
           (
             cd release-flat
             for checksum in *.sha256; do
+              # Sidecars must name the basename in this directory. macOS kit
+              # jobs used to write `dist/foo.tar.gz`; rewrite so -c succeeds
+              # and the published sidecar is consumer-usable.
+              tmp="${checksum}.basename"
+              while read -r digest _ path; do
+                [ -n "$digest" ] || continue
+                printf '%s  %s\n' "$digest" "$(basename "$path")"
+              done < "$checksum" > "$tmp"
+              mv "$tmp" "$checksum"
               sha256sum --check "$checksum"
             done
           )
