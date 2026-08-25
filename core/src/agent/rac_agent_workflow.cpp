@@ -8,6 +8,7 @@
 #include "host_callbacks.h"
 #include "pack_store.h"
 #include "workflow_runner.h"
+#include "rac/core/rac_logger.h"
 #include "workflow_store.h"
 #include "workflow_validator.h"
 
@@ -59,8 +60,14 @@ rac_result_t write_message(const google::protobuf::MessageLite& message,
 }
 
 bool parse_request(const uint8_t* bytes, size_t size, google::protobuf::MessageLite* out) {
-    if (bytes == nullptr || size == 0)
+    if (bytes == nullptr && size != 0)
         return false;
+    // A message whose fields are all at their defaults serializes to zero
+    // bytes, so an empty payload is a valid encoding rather than a decode
+    // failure: an export with no workflow_ids, or a validate of a default
+    // WorkflowDocument, both arrive this way.
+    if (size == 0)
+        return true;
     return out->ParseFromArray(bytes, static_cast<int>(size));
 }
 
@@ -250,6 +257,18 @@ void rac_agent_run_destroy(rac_handle_t run) {
     // here keeps that ordering in one place.
     runner->cancel();
     runner->join();
+
+    // A run that never started has no worker thread, and the worker is the only
+    // thing that writes the record. Without this a created-then-destroyed run
+    // leaves nothing on disk, while the header promises the record survives the
+    // handle.
+    if (!runner->started()) {
+        const rac_result_t stored = rac::agent::store_save_run(runner->record());
+        if (stored != RAC_SUCCESS) {
+            RAC_LOG_WARNING("AgentWorkflow", "could not persist unstarted run: %s",
+                            rac_error_message(stored));
+        }
+    }
 }
 
 rac_result_t rac_agent_run_record_load_proto(const char* workflow_id, const char* run_id,

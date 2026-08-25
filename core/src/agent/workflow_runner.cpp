@@ -80,6 +80,11 @@ void WorkflowRunner::join() {
     joined_ = true;
 }
 
+bool WorkflowRunner::started() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return started_;
+}
+
 runanywhere::v1::WorkflowRunRecord WorkflowRunner::record() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return record_;
@@ -273,6 +278,14 @@ void WorkflowRunner::execute_loop(const WorkflowNode& node,
         }
 
         if (body_failed) {
+            {
+                // The run does not stop at a failed node, and leaving the
+                // loop's item in the context makes every later node resolve
+                // `{{ item.* }}` against it instead of against nothing.
+                std::lock_guard<std::mutex> lock(mutex_);
+                context_.has_current_item = false;
+                context_.current_item_json.clear();
+            }
             set_state(node.id(), NodeRunState::NODE_RUN_STATE_FAILED, {},
                       "a node inside the loop failed");
             return;
