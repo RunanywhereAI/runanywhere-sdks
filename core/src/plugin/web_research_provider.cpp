@@ -52,10 +52,11 @@ constexpr int32_t kQueryTokens = 64;
 constexpr int32_t kPageTimeoutMs = 10000;
 constexpr int32_t kSearchTimeoutMs = 15000;
 
-// Deliberately small. A cancel arriving mid-tool is only observed at the next
-// stage boundary, so per-stage token budgets are also the worst case for how
-// long a cancel waits.
-constexpr int32_t kComposeTokens = 640;
+// A cancel arriving mid-tool is only observed at the next stage boundary, so
+// this budget is also the worst case for how long a cancel waits. 640 kept that
+// wait short but cut composed answers mid-sentence, which reads as the model
+// failing rather than as a budget; the longer wait is the better trade.
+constexpr int32_t kComposeTokens = 1536;
 
 // Directive rather than descriptive: under AUTO tool choice this text is the
 // only thing deciding whether the model calls the tool at all.
