@@ -291,6 +291,13 @@ elseif(WIN32)
             string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/libcurl.lib;")
         endif()
     endif()
+    if(NOT EXISTS "${RAC_KIT_OUT}/lib/libcurl.lib")
+        message(FATAL_ERROR
+            "PackageCppDesktop: Windows kit missing libcurl.lib "
+            "(http_transport_curl.cpp.obj needs it; x64-only vcpkg globs miss "
+            "arm64-windows-static). Searched vcpkg installed triplets and "
+            "${RAC_BINARY_DIR}.")
+    endif()
     # rac_commons PUBLIC-links these by bare filename on MSVC. vcpkg zlib.lib
     # does not satisfy a zlibstatic.lib DEFAULTLIB / unresolved reference.
     foreach(_need IN ITEMS zlibstatic.lib bz2_bundled.lib)
