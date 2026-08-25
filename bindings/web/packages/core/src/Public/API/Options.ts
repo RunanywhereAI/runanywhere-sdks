@@ -219,6 +219,7 @@ export interface LoadOptions {
   /** Hardware class to run on. `'npu'` fails preflight — unsupported on Web. */
   accelerator?: AcceleratorPolicy;
   contextLength?: number;
+  /** @deprecated Retired from the load ABI (ModelLoadRequest reserved tag 7). */
   threads?: number;
   /** Reload even when the model is already resident. */
   forceReload?: boolean;

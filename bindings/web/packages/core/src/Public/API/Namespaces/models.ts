@@ -139,6 +139,7 @@ function toRegisterFiles(files: readonly NonNullable<ModelRegistration['files']>
 
 interface ResolvedLoadOptions {
   requestedBackend?: BackendPreference;
+  backendPreferences?: BackendPreference[];
   accelerator?: AcceleratorPolicy;
 }
 
@@ -153,6 +154,7 @@ function resolveLoadOptions(options?: LoadOptions): ResolvedLoadOptions {
     ?? (options?.useGpu !== undefined ? (options.useGpu ? 'gpu' : 'cpu') : undefined);
   return {
     requestedBackend: backendPreferences?.[0],
+    backendPreferences,
     accelerator,
   };
 }
@@ -344,16 +346,16 @@ export const models = {
 
   /**
    * Load a model now instead of paying the cost on the first generation.
-   *
-   * @throws SDKException when the model is absent, `accelerator: 'npu'` is
-   *   requested (unsupported on Web), or the backend rejects the load.
+   * contextLength and backendPreferences are forwarded on ModelLoadRequest.
+   * @throws SDKException when the model is absent, accelerator npu or threads
+   *   is requested (both unsupported on Web), or the backend rejects the load.
    */
   async load(id: string, options?: LoadOptions): Promise<LoadedModel> {
     await ensureReady();
-    if (options?.contextLength !== undefined || options?.threads !== undefined) {
+    if (options?.threads !== undefined) {
       throw SDKException.invalidConfiguration(
-        'contextLength and threads have no field on ModelLoadRequest in the IDL, so the Web SDK '
-          + 'cannot honor them. Remove them or set them on the backend register() call.',
+        'LoadOptions.threads was retired from the load ABI (ModelLoadRequest reserved tag 7) '
+          + 'and is not a hard runtime guarantee. Remove it.'
       );
     }
     if (options?.accelerator === 'npu') {
@@ -376,7 +378,8 @@ export const models = {
       framework,
       forceReload: options?.forceReload ?? false,
       validateAvailability: true,
-      backendPreferences: [],
+      contextLength: options?.contextLength,
+      backendPreferences: resolved.backendPreferences?.map((p) => backendToFramework(p.backend)) ?? [],
     });
     if (!result || result.error) {
       throw result?.error
