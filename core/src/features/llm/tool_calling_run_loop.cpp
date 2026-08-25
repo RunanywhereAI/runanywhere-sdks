@@ -23,6 +23,7 @@
  * a synchronous single-call ABI instead of an outer-driven event stream.
  */
 
+#include <set>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -565,20 +566,22 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     // Doing it here rather than in each binding is the whole point of the
     // provider registry — Kotlin and Web get the same tools with no tool code.
     // A host tool of the same name wins, so an app can still override.
+    // Names the host claimed before commons offered anything. `provider_owns`
+    // answers "is a provider registered under this name", which is true for
+    // these too, so without this set the commons tool would run for a call the
+    // host was meant to own and the override above would decide nothing.
+    std::set<std::string> host_owned_tools;
+    for (const auto& tool : ctx.tool_options.tools()) {
+        host_owned_tools.insert(tool.name());
+    }
+
     for (size_t i = 0; i < rac_tool_provider_count(); ++i) {
         const rac_tool_provider_t* provider = rac_tool_provider_at(i);
         if (provider == nullptr || provider->name == nullptr) {
             continue;
         }
         const std::string name = provider->name;
-        bool already_offered = false;
-        for (const auto& tool : ctx.tool_options.tools()) {
-            if (tool.name() == name) {
-                already_offered = true;
-                break;
-            }
-        }
-        if (already_offered) {
+        if (host_owned_tools.count(name) > 0) {
             continue;
         }
         auto* offered = ctx.tool_options.add_tools();
@@ -853,7 +856,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
             // the provider polls cancellation itself through the context it is
             // handed.
             bool provider_admitted = false;
-            if (rac::llm::tool_calling::provider_owns(parsed_call.name())) {
+            if (host_owned_tools.count(parsed_call.name()) == 0 &&
+                rac::llm::tool_calling::provider_owns(parsed_call.name())) {
                 std::lock_guard<std::recursive_mutex> admission_guard(
                     cancel_state->side_effect_admission_mu);
                 if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
