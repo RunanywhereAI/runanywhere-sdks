@@ -257,17 +257,40 @@ elseif(WIN32)
     # CreateXmlReader.
     set(RUNANYWHERE_KIT_SYSTEM_LIBS "ws2_32;crypt32;bcrypt;secur32;wldap32;normaliz;advapi32;iphlpapi;xmllite;ole32")
     foreach(_root IN ITEMS "$ENV{VCPKG_INSTALLATION_ROOT}" "$ENV{VCPKG_ROOT}")
-        if(_root AND EXISTS "${_root}/installed/x64-windows-static/lib")
-            set(_vlib "${_root}/installed/x64-windows-static/lib")
+        if(NOT _root)
+            continue()
+        endif()
+        foreach(_triplet IN ITEMS
+                "${VCPKG_TARGET_TRIPLET}"
+                "arm64-windows-static"
+                "x64-windows-static")
+            if(NOT _triplet)
+                continue()
+            endif()
+            set(_vlib "${_root}/installed/${_triplet}/lib")
+            if(NOT EXISTS "${_vlib}")
+                continue()
+            endif()
             foreach(_n IN ITEMS libcurl.lib zlib.lib)
-                if(EXISTS "${_vlib}/${_n}")
+                if(EXISTS "${_vlib}/${_n}" AND NOT EXISTS "${RAC_KIT_OUT}/lib/${_n}")
                     file(COPY "${_vlib}/${_n}" DESTINATION "${RAC_KIT_OUT}/lib")
                     string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
                 endif()
             endforeach()
-            break()
-        endif()
+        endforeach()
     endforeach()
+    # Same search as zlibstatic: curl may live in the build tree / vcpkg_installed
+    # even when VCPKG_ROOT is unset. Windows ARM64 kits previously shipped
+    # http_transport_curl.cpp.obj without libcurl.lib (x64-only vcpkg glob).
+    if(NOT EXISTS "${RAC_KIT_OUT}/lib/libcurl.lib")
+        set(_curl_hits "")
+        file(GLOB_RECURSE _curl_hits "${RAC_BINARY_DIR}/**/libcurl.lib")
+        if(_curl_hits)
+            list(GET _curl_hits 0 _curl_found)
+            file(COPY "${_curl_found}" DESTINATION "${RAC_KIT_OUT}/lib")
+            string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/libcurl.lib;")
+        endif()
+    endif()
     # rac_commons PUBLIC-links these by bare filename on MSVC. vcpkg zlib.lib
     # does not satisfy a zlibstatic.lib DEFAULTLIB / unresolved reference.
     foreach(_need IN ITEMS zlibstatic.lib bz2_bundled.lib)
