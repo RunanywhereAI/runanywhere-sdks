@@ -11,7 +11,8 @@ import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show ModelCategory;
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/public/api/types/options.dart' show LoadOptions;
+import 'package:runanywhere/public/api/types/options.dart'
+    show AcceleratorPolicy, LoadOptions;
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
@@ -19,19 +20,30 @@ import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 final SDKLogger _modelGateLogger = SDKLogger('ModelGate');
 
 /// [LoadOptions] fields `ModelLoadRequest` (`model_types.proto`) has no wire
-/// path for yet. Only `framework` reaches commons at load time;
-/// `contextLength`, `threads`, and `useGpu` are accepted for cross-SDK API
-/// parity but are dropped below this call until the native load ABI grows
-/// placement fields (tracked as a follow-up — see PR #605 review follow-up
-/// issue 8).
+/// path for yet. `threads` was retired from the load ABI (reserved tag 7);
+/// every other placement knob — `contextLength`, `accelerator`/`useGpu`, and
+/// `backendPreferences`/`framework` — is carried by the request in [load].
 ///
-/// Exposed (not private) so `model_gate_test.dart` can assert on it directly
-/// without driving the full native load path.
+/// Exposed (not private) so `model_gate_load_options_test.dart` can assert on
+/// it directly without driving the full native load path.
 List<String> ignoredLoadOptionKnobs(LoadOptions? options) => <String>[
-  if (options?.contextLength != null) 'contextLength',
   if (options?.threads != null) 'threads',
-  if (options?.useGpu != null) 'useGpu',
 ];
+
+/// Map the public [AcceleratorPolicy] enum onto the generated
+/// `ModelLoadRequest.accelerator_policy` values.
+model_pb.AcceleratorPolicy _toPbAccelerator(AcceleratorPolicy policy) {
+  switch (policy) {
+    case AcceleratorPolicy.auto:
+      return model_pb.AcceleratorPolicy.ACCELERATOR_POLICY_AUTO;
+    case AcceleratorPolicy.cpu:
+      return model_pb.AcceleratorPolicy.ACCELERATOR_POLICY_CPU;
+    case AcceleratorPolicy.gpu:
+      return model_pb.AcceleratorPolicy.ACCELERATOR_POLICY_GPU;
+    case AcceleratorPolicy.npu:
+      return model_pb.AcceleratorPolicy.ACCELERATOR_POLICY_NPU;
+  }
+}
 
 /// Auto-load coordinator shared by every generation verb.
 abstract final class ModelGate {
@@ -83,14 +95,30 @@ abstract final class ModelGate {
       forceReload: true,
       validateAvailability: true,
     );
-    final framework = options?.framework;
-    if (framework != null) {
-      request.framework = framework;
+    final opts = options;
+    if (opts != null) {
+      final contextLength = opts.contextLength;
+      if (contextLength != null) {
+        request.contextLength = contextLength;
+      }
+      final accelerator = opts.resolvedAccelerator;
+      if (accelerator != null) {
+        request.acceleratorPolicy = _toPbAccelerator(accelerator);
+      }
+      final preferences = opts.resolvedBackendPreferences;
+      if (preferences.isNotEmpty) {
+        // Keep the single-pin compatibility field aligned with the ranked list
+        // so callers that only read `request.framework` still see the winner.
+        request.framework = preferences.first.backend;
+        request.backendPreferences
+            .addAll(preferences.map((preference) => preference.backend));
+      }
     }
     final ignored = ignoredLoadOptionKnobs(options);
     if (ignored.isNotEmpty) {
       _modelGateLogger.warning(
-        'LoadOptions ${ignored.join(", ")} are not carried by the commons load ABI yet',
+        'LoadOptions ${ignored.join(", ")} is not carried by the commons load '
+        'ABI (retired at ModelLoadRequest reserved tag 7)',
       );
     }
     final result = await RunAnywhereModelLifecycle.shared.load(request);
