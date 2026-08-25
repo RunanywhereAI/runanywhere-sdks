@@ -49,6 +49,13 @@ rac_result_t rac_tool_provider_register(const rac_tool_provider_t* provider) {
     if (provider->execute == nullptr || provider->parameters_json == nullptr) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    if (provider->abi_version != RAC_TOOL_PROVIDER_ABI_VERSION) {
+        // Dispatching into a provider built against another layout reads the
+        // function pointers at the wrong offsets, so refuse rather than crash.
+        RAC_LOG_ERROR(kTag, "tool provider '%s' has ABI version %u, expected %u",
+                      provider->name, provider->abi_version, RAC_TOOL_PROVIDER_ABI_VERSION);
+        return RAC_ERROR_ABI_VERSION_MISMATCH;
+    }
 
     const std::lock_guard<std::mutex> guard(registry_mutex());
     auto& storage = entries();

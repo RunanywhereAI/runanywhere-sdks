@@ -109,6 +109,16 @@ struct rac_tool_context {
  * the registry never owns provider storage.
  */
 typedef struct rac_tool_provider {
+    /**
+     * Must equal RAC_TOOL_PROVIDER_ABI_VERSION.
+     *
+     * A provider compiled against a different layout of this struct is
+     * rejected at registration rather than dispatched into: the fields below
+     * are read as function pointers, and a stale layout resolves them to the
+     * wrong offsets. Every engine vtable does the same handshake.
+     */
+    uint32_t abi_version;
+
     /** Stable tool name as the model sees it, e.g. "search_web". MUST NOT be NULL. */
     const char* name;
 
@@ -173,6 +183,13 @@ typedef struct rac_tool_provider {
     /** Reserved; must be zero. */
     uint8_t reserved[6];
 } rac_tool_provider_t;
+
+/**
+ * @brief Layout version of rac_tool_provider_t.
+ *
+ * Bump this whenever a field is added, removed, reordered, or retyped.
+ */
+#define RAC_TOOL_PROVIDER_ABI_VERSION 1u
 
 /**
  * @brief Register a tool provider.
