@@ -106,8 +106,11 @@ enum NativeProtoABI {
     /// appended. It is read immediately after a failed call, the same window
     /// `RunAnywhere+Solutions` and `RunAnywhere+Workflows` already rely on, and
     /// a slightly wrong hint beats none at all.
-    private static func nativeFailureMessage(_ status: rac_result_t, symbolName: String,
-                                             buffer: rac_proto_buffer_t) -> String {
+    private static func nativeFailureMessage(
+        _ status: rac_result_t,
+        symbolName: String,
+        buffer: rac_proto_buffer_t
+    ) -> String {
         let base = buffer.error_message.map { String(cString: $0) }
             ?? "Native proto request failed: \(symbolName) rc=\(status)"
         guard let detailPointer = rac_error_get_details() else { return base }
@@ -129,10 +132,8 @@ enum NativeProtoABI {
             symbol(bytes, size, &outBuffer)
         }
         guard status == RAC_SUCCESS else {
-            throw SDKException(code: .processingFailed,
-                               message: nativeFailureMessage(status, symbolName: symbolName,
-                                                             buffer: outBuffer),
-                               category: .internal)
+            let message = nativeFailureMessage(status, symbolName: symbolName, buffer: outBuffer)
+            throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
         return try decode(responseType, from: outBuffer)
     }
@@ -163,10 +164,8 @@ enum NativeProtoABI {
             symbol(context, bytes, size, &outBuffer)
         }
         guard status == RAC_SUCCESS else {
-            throw SDKException(code: .processingFailed,
-                               message: nativeFailureMessage(status, symbolName: symbolName,
-                                                             buffer: outBuffer),
-                               category: .internal)
+            let message = nativeFailureMessage(status, symbolName: symbolName, buffer: outBuffer)
+            throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
         return try decode(responseType, from: outBuffer)
     }

@@ -72,7 +72,11 @@ public final class KeychainManager: @unchecked Sendable {
                 try SecureStore.write(data, for: key)
                 return
             } catch {
-                throw SDKException(code: .keychainError, message: "Failed to store item in secure file store: \(error.localizedDescription)", category: .auth)
+                throw SDKException(
+                    code: .keychainError,
+                    message: "Failed to store item in secure file store: \(error.localizedDescription)",
+                    category: .auth
+                )
             }
         }
 
@@ -193,7 +197,11 @@ public final class KeychainManager: @unchecked Sendable {
                 try SecureStore.remove(key)
                 return
             } catch {
-                throw SDKException(code: .keychainError, message: "Failed to delete item from secure file store: \(error.localizedDescription)", category: .auth)
+                throw SDKException(
+                    code: .keychainError,
+                    message: "Failed to delete item from secure file store: \(error.localizedDescription)",
+                    category: .auth
+                )
             }
         }
 
@@ -226,7 +234,11 @@ public final class KeychainManager: @unchecked Sendable {
         do {
             return try SecureStore.read(key)
         } catch {
-            throw SDKException(code: .keychainError, message: "Failed to read item from secure file store: \(error.localizedDescription)", category: .auth)
+            throw SDKException(
+                code: .keychainError,
+                message: "Failed to read item from secure file store: \(error.localizedDescription)",
+                category: .auth
+            )
         }
     }
 

@@ -203,10 +203,10 @@ public extension RunAnywhere {
 
 private enum ToolProviderABI {
     typealias Count = @convention(c) () -> Int
-    typealias At = @convention(c) (Int) -> UnsafePointer<rac_tool_provider_t>?
+    typealias AtIndex = @convention(c) (Int) -> UnsafePointer<rac_tool_provider_t>?
 
     static let count = NativeProtoABI.load("rac_tool_provider_count", as: Count.self)
-    static let at = NativeProtoABI.load("rac_tool_provider_at", as: At.self)
+    static let at = NativeProtoABI.load("rac_tool_provider_at", as: AtIndex.self)
 
     static func text(_ pointer: UnsafePointer<CChar>?) -> String? {
         pointer.map { String(cString: $0) }
