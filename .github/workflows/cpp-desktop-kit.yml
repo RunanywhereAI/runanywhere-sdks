@@ -54,6 +54,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install ninja
         run: brew install ninja
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/macos/download-sherpa-onnx.sh
       - name: Configure + package
         run: |
           set -euo pipefail
@@ -87,6 +89,9 @@ jobs:
         run: |
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static zlib:x64-windows-static
           if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
       - name: Configure + package
         shell: pwsh
         run: |
@@ -136,6 +141,13 @@ jobs:
           $ver = (Get-Content core/VERSION -Raw).Trim()
           $tar = "dist/RunAnywhere-cpp-desktop-windows-arm64-v$ver.tar.gz"
           if (-not (Test-Path $tar)) { throw "missing $tar" }
+          $actual = Get-Item $tar
+          $wantName = Split-Path $tar -Leaf
+          if ($actual.Name -cne $wantName) {
+            $tmp = Join-Path $actual.DirectoryName ("tmp-" + [guid]::NewGuid().ToString("n") + ".tar.gz")
+            Rename-Item -LiteralPath $actual.FullName -NewName (Split-Path $tmp -Leaf)
+            Rename-Item -LiteralPath $tmp -NewName $wantName
+          }
           python scripts/ci/verify_cpp_desktop_kit.py $tar --source-root . --windows --allow-missing-onnxruntime --forbid-private-engines
           if ($LASTEXITCODE -ne 0) { throw "kit tarball contents check failed" }
           Get-FileHash $tar -Algorithm SHA256 |

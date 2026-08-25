@@ -176,6 +176,19 @@ if(RAC_BINARY_DIR)
             break()
         endif()
     endforeach()
+    # Windows Sherpa-ONNX is SHARED IMPORTED from
+    # core/third_party/sherpa-onnx-windows/lib, not copied into the build tree.
+    # Without these DLLs a routable rac_backend_sherpa.lib still fails
+    # LoadLibrary at runtime.
+    if(WIN32)
+        set(_sherpa_win "${RAC_SOURCE_DIR}/core/third_party/sherpa-onnx-windows/lib")
+        if(EXISTS "${_sherpa_win}")
+            file(GLOB _sherpa_dlls "${_sherpa_win}/*.dll")
+            foreach(_dll IN LISTS _sherpa_dlls)
+                file(COPY "${_dll}" DESTINATION "${RAC_KIT_OUT}/third_party")
+            endforeach()
+        endif()
+    endif()
     if(APPLE AND EXISTS "${RAC_KIT_OUT}/third_party/libonnxruntime.dylib")
         # The real dylib advertises LC_ID_DYLIB @rpath/libonnxruntime.1.dylib.
         # There is no loadable file by that name in the kit, so rewrite the id
@@ -274,6 +287,26 @@ elseif(WIN32)
 else()
     set(RUNANYWHERE_KIT_SYSTEM_LIBS "Threads::Threads;ZLIB::ZLIB;CURL::libcurl;dl;m")
 endif()
+
+# macOS Sherpa-ONNX is STATIC IMPORTED from third_party; `ar` of
+# rac_backend_sherpa does not absorb those objects. Copy them into the kit
+# (skip libonnxruntime.a — the kit already ships the ORT dylib of the same
+# pin). Windows uses SHARED DLLs staged above.
+if(APPLE)
+    set(_sherpa_mac "${RAC_SOURCE_DIR}/core/third_party/sherpa-onnx-macos/lib")
+    if(EXISTS "${_sherpa_mac}")
+        file(GLOB _sherpa_as "${_sherpa_mac}/*.a")
+        foreach(_a IN LISTS _sherpa_as)
+            get_filename_component(_n "${_a}" NAME)
+            if(_n MATCHES "onnxruntime")
+                continue()
+            endif()
+            file(COPY "${_a}" DESTINATION "${RAC_KIT_OUT}/lib")
+            string(APPEND _extra_link "\${RunAnywhere_LIBRARY_DIR}/${_n};")
+        endforeach()
+    endif()
+endif()
+
 set(RUNANYWHERE_KIT_EXTRA_LIBS "${_extra_link}")
 if(NOT RUNANYWHERE_KIT_COMMONS_ARCHIVE)
     set(RUNANYWHERE_KIT_COMMONS_ARCHIVE "${_commons_name}")

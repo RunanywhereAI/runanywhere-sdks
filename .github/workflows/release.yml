@@ -72,6 +72,14 @@ on:
           since that run; a packaging-only re-release is the intended case.
         required: false
         default: ''
+      rebuild_cpp_desktop:
+        description: >-
+          Rebuild C++ desktop kits (and private overlays) even when publish_from_run_id
+          is set. Use when Apple/WASM bytes are good but the kits were packaged without
+          Sherpa-ONNX prebuilts (non-routable stub). Publish then overwrites the reused
+          run's kit artifacts with this run's.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -403,13 +411,18 @@ jobs:
 
   native_cpp_desktop_macos:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
+    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - name: Install ninja
         run: brew install ninja
+      # WITHOUT this, sherpa still BUILDS but as a non-routable stub:
+      # SHERPA_ONNX_AVAILABLE=OFF, RAC_SHERPA_ROUTABLE=0, capability_check
+      # returns BACKEND_UNAVAILABLE. Candidate 32782968974 shipped that kit.
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/macos/download-sherpa-onnx.sh
       - name: Configure + package C++ desktop kit
         run: |
           set -euo pipefail
@@ -432,7 +445,7 @@ jobs:
 
   native_cpp_desktop_windows:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
+    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
@@ -448,6 +461,9 @@ jobs:
         run: |
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static zlib:x64-windows-static
           if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
       - name: Configure + package C++ desktop kit
         shell: pwsh
         run: |
@@ -474,7 +490,7 @@ jobs:
 
   native_cpp_desktop_windows_arm64:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
+    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
     runs-on: windows-11-arm
     timeout-minutes: 90
     steps:
@@ -502,6 +518,13 @@ jobs:
           $ver = (Get-Content core/VERSION -Raw).Trim()
           $tar = "dist/RunAnywhere-cpp-desktop-windows-arm64-v$ver.tar.gz"
           if (-not (Test-Path $tar)) { throw "missing $tar" }
+          $actual = Get-Item $tar
+          $wantName = Split-Path $tar -Leaf
+          if ($actual.Name -cne $wantName) {
+            $tmp = Join-Path $actual.DirectoryName ("tmp-" + [guid]::NewGuid().ToString("n") + ".tar.gz")
+            Rename-Item -LiteralPath $actual.FullName -NewName (Split-Path $tmp -Leaf)
+            Rename-Item -LiteralPath $tmp -NewName $wantName
+          }
           python scripts/ci/verify_cpp_desktop_kit.py $tar --source-root . --windows --allow-missing-onnxruntime --forbid-private-engines
           if ($LASTEXITCODE -ne 0) { throw "kit tarball contents check failed" }
           Get-FileHash $tar -Algorithm SHA256 |
@@ -518,7 +541,7 @@ jobs:
 
   native_cpp_desktop_macos_neurt_private:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
+    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -559,7 +582,7 @@ jobs:
 
   native_cpp_desktop_windows_qhexrt_private:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
+    if: ${{ !inputs.publish_from_run_id || inputs.rebuild_cpp_desktop }}
     runs-on: windows-11-arm
     timeout-minutes: 120
     steps:
@@ -1984,6 +2007,13 @@ jobs:
         needs.sdk_electron.result == 'success' &&
         needs.validate_consumer_web.result == 'success' &&
         needs.validate_consumer_flutter.result == 'success'
+      )) &&
+      (inputs.rebuild_cpp_desktop != true || (
+        needs.native_cpp_desktop_macos.result == 'success' &&
+        needs.native_cpp_desktop_windows.result == 'success' &&
+        needs.native_cpp_desktop_windows_arm64.result == 'success' &&
+        needs.native_cpp_desktop_macos_neurt_private.result == 'success' &&
+        needs.native_cpp_desktop_windows_qhexrt_private.result == 'success'
       ))
     runs-on: ubuntu-latest
     permissions:
@@ -2013,6 +2043,20 @@ jobs:
           name: native-web
           path: release-artifacts/native-web
           run-id: ${{ inputs.reuse_native_web_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      # Stub kits from the reused candidate must not ship. Drop them, then
+      # take this run's rebuilt tarballs (same artifact names).
+      - name: Drop stub C++ desktop kits from the reused run
+        if: ${{ inputs.publish_from_run_id != '' && inputs.rebuild_cpp_desktop }}
+        run: rm -rf release-artifacts/cpp-desktop-*
+      - name: Replace C++ desktop kits from this run
+        if: ${{ inputs.publish_from_run_id != '' && inputs.rebuild_cpp_desktop }}
+        uses: actions/download-artifact@v8
+        with:
+          pattern: cpp-desktop-*
+          path: release-artifacts
+          merge-multiple: false
+          run-id: ${{ github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Flatten + index assets
         # Collision-detecting flatten. The previous `find ... -exec cp` form
@@ -2063,6 +2107,21 @@ jobs:
             echo "::error::Refusing to publish — $collisions filename collision(s) detected during flatten"
             exit 1
           fi
+          # Windows CMAKE_SYSTEM_PROCESSOR is ARM64; kits built before the
+          # TOLOWER fix uploaded that spelling. Sidecars used the lowercase
+          # name. Normalize before the Linux assert_pair.
+          for upper in release-flat/RunAnywhere-cpp-desktop-windows-ARM64-v*.tar.gz; do
+            [[ -e "$upper" ]] || continue
+            lower="${upper/windows-ARM64/windows-arm64}"
+            if [[ "$upper" != "$lower" ]]; then
+              if [[ -e "$lower" ]]; then
+                echo "::error::both windows-ARM64 and windows-arm64 kits present: $upper $lower"
+                exit 1
+              fi
+              mv "$upper" "$lower"
+              echo "normalized $(basename "$upper") -> $(basename "$lower")"
+            fi
+          done
           (cd release-flat && ls -la > MANIFEST.txt)
           cat release-flat/MANIFEST.txt
       - name: Verify complete release asset set and checksums

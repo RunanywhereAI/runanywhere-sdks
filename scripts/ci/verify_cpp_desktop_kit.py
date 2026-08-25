@@ -6,6 +6,10 @@ Public kits:
   - share/runanywhere/SCHEMA_LOCK is present
   - on Windows, zlibstatic.lib / bz2_bundled.lib / onnxruntime.lib + DLL
   - --forbid-private-engines: no neurt/qhexrt paths
+  - if a sherpa backend archive is present, rac_plugin_entry_sherpa must
+    reference g_sherpa_stt_ops (RAC_SHERPA_ROUTABLE=1). Ops symbols in a
+    sibling TU are not enough — that is how 0.20.26/0.20.28 kits looked
+    complete while capability_check returned BACKEND_UNAVAILABLE.
 
 Private overlays (--require-overlay neurt|qhexrt):
   - ENGINE + RECEIPT.json + backend archive + prebuilt core
@@ -16,6 +20,51 @@ import argparse
 import sys
 import tarfile
 from pathlib import Path
+
+
+def _ar_members(data: bytes) -> list[tuple[str, bytes]]:
+    if not data.startswith(b"!<arch>\n"):
+        raise ValueError("not an ar archive")
+    off = 8
+    longnames = b""
+    out: list[tuple[str, bytes]] = []
+    while off + 60 <= len(data):
+        hdr = data[off : off + 60]
+        raw_name = hdr[:16].decode("latin1")
+        try:
+            size = int(hdr[48:58].strip() or b"0")
+        except ValueError:
+            break
+        off += 60
+        body = data[off : off + size]
+        off += size + (size % 2)
+        name = raw_name.strip()
+        if name.startswith("//"):
+            longnames = body
+            continue
+        if name.startswith("#1/"):
+            namelen = int(name[3:])
+            name = body[:namelen].split(b"\0", 1)[0].decode("latin1")
+            body = body[namelen:]
+        elif name.startswith("/") and name[1:2].isdigit():
+            idx = int(name[1:])
+            end = longnames.find(b"\0", idx)
+            if end < 0:
+                end = longnames.find(b"\n", idx)
+            if end < 0:
+                end = len(longnames)
+            name = longnames[idx:end].decode("latin1").strip().rstrip("/")
+        out.append((name, body))
+    return out
+
+
+def sherpa_plugin_entry_is_routable(archive: bytes) -> bool:
+    """True when rac_plugin_entry_sherpa.cpp was compiled with RAC_SHERPA_ROUTABLE=1."""
+    for name, body in _ar_members(archive):
+        n = name.replace("\\", "/").lower()
+        if "rac_plugin_entry_sherpa" in n:
+            return b"g_sherpa_stt_ops" in body
+    return False
 
 
 def main() -> int:
@@ -103,6 +152,42 @@ def main() -> int:
                 n.replace("\\", "/").endswith("third_party/onnxruntime.dll") for n in names
             ):
                 missing.append("third_party/onnxruntime.dll")
+
+    sherpa_member = next(
+        (
+            n
+            for n in names
+            if n.replace("\\", "/").endswith("librac_backend_sherpa.a")
+            or n.replace("\\", "/").endswith("rac_backend_sherpa.lib")
+        ),
+        None,
+    )
+    if sherpa_member:
+        with tarfile.open(tar_path, "r:gz") as tf:
+            extracted = tf.extractfile(sherpa_member)
+            if extracted is None:
+                missing.append("sherpa backend archive unreadable")
+            else:
+                archive = extracted.read()
+                try:
+                    routable = sherpa_plugin_entry_is_routable(archive)
+                except ValueError as exc:
+                    print(f"error: sherpa archive: {exc}", file=sys.stderr)
+                    return 1
+                if not routable:
+                    print(
+                        "sherpa backend is a non-routable stub: "
+                        "rac_plugin_entry_sherpa does not reference g_sherpa_stt_ops "
+                        "(RAC_SHERPA_ROUTABLE=0). Prefetch Sherpa-ONNX before "
+                        "configuring the desktop kit.",
+                        file=sys.stderr,
+                    )
+                    return 1
+        if args.windows:
+            if not any("sherpa-onnx-c-api.dll" in n.replace("\\", "/") for n in canon):
+                missing.append("third_party/sherpa-onnx-c-api.dll")
+        elif not any(n.replace("\\", "/").endswith("libsherpa-onnx-c-api.a") for n in canon):
+            missing.append("lib/libsherpa-onnx-c-api.a")
 
     private_hits = [n for n in canon if "neurt" in n.lower() or "qhexrt" in n.lower()]
     if args.forbid_private_engines and private_hits:
