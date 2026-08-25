@@ -370,6 +370,15 @@ SearchOutcome search(const std::string& query, size_t max_results, int32_t timeo
         return outcome;
     }
 
+    if (response.body_bytes == nullptr) {
+        // std::string(nullptr, n) is undefined, and a 2xx with no body does
+        // happen. fetch_page_text already refuses this case; so does search.
+        outcome.error = "search returned an empty body";
+        rac_http_response_free(&response);
+        rac_http_client_destroy(client);
+        return outcome;
+    }
+
     const std::string body(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
     rac_http_response_free(&response);
     rac_http_client_destroy(client);
