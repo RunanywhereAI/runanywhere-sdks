@@ -188,6 +188,12 @@ def main() -> int:
                 missing.append("third_party/sherpa-onnx-c-api.dll")
         elif not any(n.replace("\\", "/").endswith("libsherpa-onnx-c-api.a") for n in canon):
             missing.append("lib/libsherpa-onnx-c-api.a")
+        if not any(
+            n.replace("\\", "/").endswith("libonnxruntime.a")
+            or n.replace("\\", "/").endswith("third_party/libonnxruntime.dylib")
+            for n in canon
+        ):
+            missing.append("lib/libonnxruntime.a (or third_party/libonnxruntime.dylib)")
 
     private_hits = [n for n in canon if "neurt" in n.lower() or "qhexrt" in n.lower()]
     if args.forbid_private_engines and private_hits:
