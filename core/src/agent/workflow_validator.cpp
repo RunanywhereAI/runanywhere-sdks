@@ -5,6 +5,7 @@
 #include "cron.h"
 
 #include <algorithm>
+#include <cctype>
 #include <deque>
 #include <optional>
 #include <set>
@@ -134,6 +135,11 @@ void collect_expressions(const WorkflowNode& node, std::vector<std::string>* out
 }
 
 }  // namespace
+
+bool is_blank(const std::string& value) {
+    return std::all_of(value.begin(), value.end(),
+                       [](unsigned char ch) { return std::isspace(ch) != 0; });
+}
 
 bool node_has_config(const WorkflowNode& node) {
     return node.config_case() != WorkflowNode::CONFIG_NOT_SET;
@@ -409,21 +415,34 @@ void validate_document(const WorkflowDocument& document,
     }
 
     for (const WorkflowNode& node : document.nodes()) {
-        if (node.config_case() != WorkflowNode::kPackNode)
+        const bool is_pack = node.config_case() == WorkflowNode::kPackNode;
+        const bool is_tool = node.config_case() == WorkflowNode::kToolCall;
+        if (!is_pack && !is_tool)
             continue;
-        const auto& config = node.pack_node();
-        for (const auto& port : config.ports()) {
+
+        // Both configs carry the same {arguments, ports} shape, and a required
+        // argument is unsatisfied the same way in either.
+        const auto& arguments = is_pack ? node.pack_node().arguments() : node.tool_call().arguments();
+        const auto& ports = is_pack ? node.pack_node().ports() : node.tool_call().ports();
+        const char* const kind = is_pack ? "pack argument '" : "tool argument '";
+
+        for (const auto& port : ports) {
             if (!port.required())
                 continue;
             const bool wired = std::any_of(
                 document.edges().begin(), document.edges().end(), [&](const auto& edge) {
                     return edge.to_node() == node.id() && edge.to_port() == port.name();
                 });
-            if (wired || config.arguments().count(port.name()) > 0)
+            if (wired)
+                continue;
+            // A key holding only whitespace is what a template placeholder left
+            // uncleared looks like; it satisfies the map but not the argument.
+            const auto configured = arguments.find(port.name());
+            if (configured != arguments.end() && !is_blank(configured->second))
                 continue;
             const std::string& id = node.id();
             add_issue(out_result,
-                      "pack argument '" + port.name() + "' on node '" + id +
+                      kind + port.name() + "' on node '" + id +
                           "' has no connection and no configured value",
                       &id);
         }

@@ -513,6 +513,64 @@ TEST(required_pack_port_satisfied_by_a_literal_is_not_an_issue) {
     CHECK(result.valid());
 }
 
+TEST(required_tool_argument_without_wiring_or_literal_is_rejected) {
+    WorkflowDocument document;
+    document.set_id("wf");
+    add_trigger(&document, "n1", "Start");
+    WorkflowNode* tool = document.add_nodes();
+    tool->set_id("n2");
+    tool->set_name("Research");
+    tool->mutable_tool_call()->set_tool_name("web_research");
+    auto* port = tool->mutable_tool_call()->add_ports();
+    port->set_name("question");
+    port->set_required(true);
+    connect(&document, "n1", "out", "n2", "in");
+
+    WorkflowValidationResult result;
+    validate_document(document, &result);
+    CHECK(!result.valid());
+    CHECK(has_issue_containing(result, "has no connection and no configured value"));
+}
+
+TEST(required_tool_argument_left_blank_is_rejected) {
+    WorkflowDocument document;
+    document.set_id("wf");
+    add_trigger(&document, "n1", "Start");
+    WorkflowNode* tool = document.add_nodes();
+    tool->set_id("n2");
+    tool->set_name("Research");
+    tool->mutable_tool_call()->set_tool_name("web_research");
+    auto* port = tool->mutable_tool_call()->add_ports();
+    port->set_name("question");
+    port->set_required(true);
+    (*tool->mutable_tool_call()->mutable_arguments())["question"] = "   ";
+    connect(&document, "n1", "out", "n2", "in");
+
+    WorkflowValidationResult result;
+    validate_document(document, &result);
+    CHECK(!result.valid());
+    CHECK(has_issue_containing(result, "has no connection and no configured value"));
+}
+
+TEST(required_tool_argument_satisfied_by_a_literal_is_not_an_issue) {
+    WorkflowDocument document;
+    document.set_id("wf");
+    add_trigger(&document, "n1", "Start");
+    WorkflowNode* tool = document.add_nodes();
+    tool->set_id("n2");
+    tool->set_name("Research");
+    tool->mutable_tool_call()->set_tool_name("web_research");
+    auto* port = tool->mutable_tool_call()->add_ports();
+    port->set_name("question");
+    port->set_required(true);
+    (*tool->mutable_tool_call()->mutable_arguments())["question"] = "why is the sky blue";
+    connect(&document, "n1", "out", "n2", "in");
+
+    WorkflowValidationResult result;
+    validate_document(document, &result);
+    CHECK(result.valid());
+}
+
 PackLoader loader_over(const std::unordered_map<std::string, NodePack>& packs) {
     return [&packs](const std::string& id, NodePack* out) {
         auto found = packs.find(id);
@@ -654,6 +712,9 @@ int main() {
     run_test_missing_pack_node_is_an_issue_but_not_invalid();
     run_test_required_pack_port_without_wiring_or_literal_is_rejected();
     run_test_required_pack_port_satisfied_by_a_literal_is_not_an_issue();
+    run_test_required_tool_argument_without_wiring_or_literal_is_rejected();
+    run_test_required_tool_argument_left_blank_is_rejected();
+    run_test_required_tool_argument_satisfied_by_a_literal_is_not_an_issue();
     run_test_bundle_assembles_packs_referenced_transitively();
     run_test_bundle_assembly_skips_a_pack_it_cannot_load();
     run_test_bundle_assembly_rejects_a_pack_cycle();
