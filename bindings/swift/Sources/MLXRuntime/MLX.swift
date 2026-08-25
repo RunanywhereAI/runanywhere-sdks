@@ -745,11 +745,11 @@ private final class MLXSession: @unchecked Sendable {
     }
 
     func process(
-        image: MLXVLMImageSnapshot,
+        image: MLXVLMImageSnapshot?,
         prompt: String,
         options: MLXVLMOptionsSnapshot
     ) async throws -> (String, MLXGenerationMetrics) {
-        let image = try imageInput(from: image)
+        let image = try image.map(imageInput(from:))
         let params = generateParameters(from: options)
         return try await collectVLM(
             prompt: prompt,
@@ -760,13 +760,13 @@ private final class MLXSession: @unchecked Sendable {
     }
 
     func processStream(
-        image: MLXVLMImageSnapshot,
+        image: MLXVLMImageSnapshot?,
         prompt: String,
         options: MLXVLMOptionsSnapshot,
         callback: rac_vlm_stream_callback_fn?,
         userData: MLXCallbackUserData
     ) async throws -> MLXGenerationMetrics {
-        let image = try imageInput(from: image)
+        let image = try image.map(imageInput(from:))
         let params = generateParameters(from: options)
         return try await streamVLM(
             prompt: prompt,
@@ -836,7 +836,7 @@ private final class MLXSession: @unchecked Sendable {
 
     private func collectVLM(
         prompt: String,
-        image: UserInput.Image,
+        image: UserInput.Image?,
         parameters: GenerateParameters,
         instructions: String?
     ) async throws -> (String, MLXGenerationMetrics) {
@@ -855,7 +855,7 @@ private final class MLXSession: @unchecked Sendable {
 
     private func streamVLM(
         prompt: String,
-        image: UserInput.Image,
+        image: UserInput.Image?,
         parameters: GenerateParameters,
         instructions: String?,
         onToken: @escaping @Sendable (String) -> Bool
@@ -880,7 +880,7 @@ private final class MLXSession: @unchecked Sendable {
         // applied before patchification — caps the patch count. See
         // MLXVLMResolutionPolicy.
         let contextLength = lock.withLock { $0.contextLength }
-        let nativeSize = (try? image.asCIImage().extent.size) ?? CGSize(width: 1024, height: 1024)
+        let nativeSize = (try? image?.asCIImage().extent.size) ?? CGSize(width: 1024, height: 1024)
         let resizeTarget = MLXVLMResolutionPolicy.targetSize(
             forContextLength: contextLength,
             native: nativeSize
@@ -897,7 +897,14 @@ private final class MLXSession: @unchecked Sendable {
         if let instructions {
             chat.append(.system(instructions))
         }
-        chat.append(.user(prompt, images: [image]))
+        // A vision model is a language model with a vision tower, so a turn
+        // with no picture is an ordinary text turn rather than an error. Passing
+        // an empty image list keeps one generation path for both.
+        if let image {
+            chat.append(.user(prompt, images: [image]))
+        } else {
+            chat.append(.user(prompt))
+        }
 
         // The same two calls the text path uses (`stream`), and for the same
         // reason: a turn here is one-shot — commons owns the conversation and
@@ -1526,11 +1533,12 @@ private func generateParameters(from options: MLXLLMOptionsSnapshot) -> Generate
     )
 }
 
+/// Leaving `enable_thinking` undefined is not "let the model decide": Qwen's
+/// template reads an undefined flag as off and emits a pre-closed
+/// `<think>\n\n</think>` pair, so a caller who asked for reasoning got none and
+/// no way to tell why. Both intents are stated rather than only the negative one.
 private func llmAdditionalContext(from options: MLXLLMOptionsSnapshot) -> [String: any Sendable]? {
-    guard options.disableThinking else {
-        return nil
-    }
-    return ["enable_thinking": false]
+    ["enable_thinking": !options.disableThinking]
 }
 
 /// Build the MLX `UserInput` for an LLM turn. Reconstructs the full conversation
@@ -1871,14 +1879,16 @@ private let mlxLLMGenerateStream: rac_mlx_llm_generate_stream_fn = { handle, pro
 }
 
 private let mlxVLMProcess: rac_mlx_vlm_process_fn = { handle, image, promptPtr, options, outResult, _ in
-    guard let session = session(from: handle), let image, let promptPtr, let outResult else {
+    // A null image is the text-only turn commons forwards when the caller sent
+    // no picture; only the session, prompt and result slot are mandatory.
+    guard let session = session(from: handle), let promptPtr, let outResult else {
         return RAC_ERROR_INVALID_PARAMETER
     }
     let prompt = String(cString: promptPtr)
     let options = MLXVLMOptionsSnapshot(options)
-    let imageSnapshot: MLXVLMImageSnapshot
+    let imageSnapshot: MLXVLMImageSnapshot?
     do {
-        imageSnapshot = try MLXVLMImageSnapshot(image.pointee)
+        imageSnapshot = try image.map { try MLXVLMImageSnapshot($0.pointee) }
     } catch {
         recordMLXFailure("MLX vision generation", error: error)
         return RAC_ERROR_GENERATION_FAILED
@@ -1902,15 +1912,16 @@ private let mlxVLMProcess: rac_mlx_vlm_process_fn = { handle, image, promptPtr, 
 }
 
 private let mlxVLMProcessStream: rac_mlx_vlm_process_stream_fn = { handle, image, promptPtr, options, callback, callbackUserData, _ in
-    guard let session = session(from: handle), let image, let promptPtr else {
+    // See mlxVLMProcess: a null image means a text-only turn, not a bad call.
+    guard let session = session(from: handle), let promptPtr else {
         return RAC_ERROR_INVALID_PARAMETER
     }
     let prompt = String(cString: promptPtr)
     let options = MLXVLMOptionsSnapshot(options)
     let callbackUserData = MLXCallbackUserData(rawValue: callbackUserData)
-    let imageSnapshot: MLXVLMImageSnapshot
+    let imageSnapshot: MLXVLMImageSnapshot?
     do {
-        imageSnapshot = try MLXVLMImageSnapshot(image.pointee)
+        imageSnapshot = try image.map { try MLXVLMImageSnapshot($0.pointee) }
     } catch {
         recordMLXFailure("MLX streaming vision generation", error: error)
         return RAC_ERROR_GENERATION_FAILED
