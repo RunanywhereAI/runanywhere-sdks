@@ -489,7 +489,11 @@ std::vector<std::string> quoted_spans(const std::string& sentence) {
     std::vector<std::string> spans;
     for (size_t at = 0; at < sentence.size(); ++at) {
         const char c = sentence[at];
-        if (c != '"' && c != '\'') {
+        // Double quotes only. An apostrophe opens no span: in "Apple's outlook
+        // improved and the company's revenue rose" the first one would pair
+        // with the second and offer "s outlook improved and the company" as a
+        // distinctive term to check a source for.
+        if (c != '"') {
             continue;
         }
         const size_t close = sentence.find(c, at + 1);
@@ -573,6 +577,27 @@ bool claim_supported(const std::string& sentence, const std::string& source_text
     return false;
 }
 
+/// The next sentence-ending punctuation at or after @p from, skipping a full
+/// stop between two digits. Splitting on that turned "revenue of 94.9 billion"
+/// into "revenue of 94." plus a fragment, and the fragment carried neither the
+/// figure nor the citation the grounding check needs.
+size_t sentence_end(const std::string& text, size_t from) {
+    for (size_t at = from; at < text.size(); ++at) {
+        const char c = text[at];
+        if (c != '.' && c != '!' && c != '?') {
+            continue;
+        }
+        const bool between_digits =
+            c == '.' && at > 0 && at + 1 < text.size() &&
+            std::isdigit(static_cast<unsigned char>(text[at - 1])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(text[at + 1])) != 0;
+        if (!between_digits) {
+            return at;
+        }
+    }
+    return std::string::npos;
+}
+
 std::string drop_unsupported_claims(const std::string& answer,
                                     const std::vector<SearchResult>& sources, size_t* out_dropped) {
     std::string kept;
@@ -580,7 +605,7 @@ std::string drop_unsupported_claims(const std::string& answer,
     size_t start = 0;
 
     while (start < answer.size()) {
-        size_t end = answer.find_first_of(".!?", start);
+        size_t end = sentence_end(answer, start);
         end = end == std::string::npos ? answer.size() : end + 1;
         const std::string sentence = answer.substr(start, end - start);
         start = end;
@@ -743,8 +768,12 @@ std::string normalize_query_line(const std::string& line) {
     }
     if (at > 0 && at < out.size() && (out[at] == '.' || out[at] == ')')) {
         out = trim(out.substr(at + 1));
-    } else if (!out.empty() && (out[0] == '-' || out[0] == '*' || out[0] == 0x2022)) {
+    } else if (!out.empty() && (out[0] == '-' || out[0] == '*')) {
         out = trim(out.substr(1));
+    } else if (out.rfind("\xE2\x80\xA2", 0) == 0) {
+        // U+2022 as the three bytes it actually arrives as. Comparing a char
+        // against 0x2022 never matched, so a bulleted query kept its bullet.
+        out = trim(out.substr(3));
     }
     if (out.size() > 2 && (out.rfind("Q:", 0) == 0 || out.rfind("q:", 0) == 0)) {
         out = trim(out.substr(2));
@@ -785,7 +814,7 @@ bool query_is_usable(const std::string& line) {
     // rather than a query, and unlike a heading it can still end in a full
     // stop: "Task: Write 4 different search queries." reads as a sentence.
     const size_t first_space = line.find(' ');
-    if (first_space != std::string::npos && line[first_space - 1] == ':') {
+    if (first_space != std::string::npos && first_space > 0 && line[first_space - 1] == ':') {
         return false;
     }
     size_t words = 1;
