@@ -122,6 +122,7 @@ rac_result_t silent_execute(const char* args_json, const rac_tool_context_t* ctx
 }
 
 const rac_tool_provider_t kStagedProvider = {
+    /* abi_version */ RAC_TOOL_PROVIDER_ABI_VERSION,
     /* name */ "staged_tool",
     /* description */ "emits stages",
     /* category */ "Test",
@@ -135,8 +136,17 @@ const rac_tool_provider_t kStagedProvider = {
 };
 
 const rac_tool_provider_t kSilentProvider = {
-    "silent_tool", "emits nothing",    "Test", "{}", silent_execute, nullptr, 0, 0,
-    nullptr,       {0, 0, 0, 0, 0, 0},
+    /* abi_version */ RAC_TOOL_PROVIDER_ABI_VERSION,
+    /* name */ "silent_tool",
+    /* description */ "emits nothing",
+    /* category */ "Test",
+    /* parameters_json */ "{}",
+    /* execute */ silent_execute,
+    /* published_keys */ nullptr,
+    /* single_use */ 0,
+    /* grounds_answer */ 0,
+    /* user_data */ nullptr,
+    /* reserved */ {0, 0, 0, 0, 0, 0},
 };
 
 runanywhere::v1::ToolCall make_call(const char* name) {
