@@ -1468,7 +1468,13 @@ rac_result_t run_http_request(const WorkflowNode& node, const ExpressionContext&
     request.header_count = headers.size();
     request.body_bytes = body.empty() ? nullptr : reinterpret_cast<const uint8_t*>(body.data());
     request.body_len = body.size();
-    request.timeout_ms = static_cast<int32_t>(config.timeout_ms());
+    // `timeout_ms` is optional, and an unset one arrives as 0. Whether a
+    // transport reads 0 as "no timeout" is platform-specific, and a workflow
+    // node that never returns hangs the whole run with no way to cancel it, so
+    // an unset value gets a bounded default rather than the transport's guess.
+    constexpr uint32_t kDefaultHttpTimeoutMs = 30000;
+    const uint32_t timeout_ms = config.timeout_ms() > 0 ? config.timeout_ms() : kDefaultHttpTimeoutMs;
+    request.timeout_ms = static_cast<int32_t>(timeout_ms);
     request.follow_redirects = RAC_TRUE;
 
     rac_http_response_t response{};
@@ -1909,10 +1915,37 @@ bool pack_recursion_would_occur(const std::vector<std::string>& pack_stack,
     return std::find(pack_stack.begin(), pack_stack.end(), pack_id) != pack_stack.end();
 }
 
+rac_result_t execute_node_dispatch(const WorkflowNode& node, const NodeInputs& inputs,
+                                   const ExpressionContext& context, const std::string& run_id,
+                                   const std::atomic<bool>* cancelled,
+                                   NodeExecution* out_execution, std::string* out_error,
+                                   std::vector<std::string>* pack_stack);
+
 rac_result_t execute_node(const WorkflowNode& node, const NodeInputs& inputs,
                           const ExpressionContext& context, const std::string& run_id,
                           const std::atomic<bool>* cancelled, NodeExecution* out_execution,
                           std::string* out_error, std::vector<std::string>* pack_stack) {
+    // Several executors parse user-supplied strings with nlohmann, which throws
+    // rather than returning. Every caller of this function reports failure
+    // through the return code and `out_error`, so a throw crossing this
+    // boundary would take the run loop down instead of failing one node.
+    try {
+        return execute_node_dispatch(node, inputs, context, run_id, cancelled, out_execution,
+                                     out_error, pack_stack);
+    } catch (const nlohmann::json::exception& error) {
+        *out_error = std::string("node produced JSON it could not parse: ") + error.what();
+        return RAC_ERROR_DECODING_ERROR;
+    } catch (const std::exception& error) {
+        *out_error = std::string("node failed: ") + error.what();
+        return RAC_ERROR_UNKNOWN;
+    }
+}
+
+rac_result_t execute_node_dispatch(const WorkflowNode& node, const NodeInputs& inputs,
+                                   const ExpressionContext& context, const std::string& run_id,
+                                   const std::atomic<bool>* cancelled,
+                                   NodeExecution* out_execution, std::string* out_error,
+                                   std::vector<std::string>* pack_stack) {
     switch (node.config_case()) {
         case WorkflowNode::kManualTrigger:
             return run_manual_trigger(node, out_execution, out_error);
