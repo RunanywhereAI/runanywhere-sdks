@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-npm install @runanywhere/web@0.20.11 @runanywhere/web-llamacpp@0.20.11
+npm install @runanywhere/web@0.20.27 @runanywhere/web-llamacpp@0.20.27
 ```
 
 See the [Web SDK README](../../README.md) for bundler configuration and cross-origin isolation headers.
