@@ -9,7 +9,7 @@
 
 mlx_checksums = {
   'RABackendMLX' => '0802fe58480c3e03e94498d46adb50fda7b9ade491807c7e0392a7fd68b83b59',
-  'RunAnywhereMLXRuntime' => '99678b329a456d0529d2f6e8a051639537cc8dc79346591d2ae9f91ce279c308',
+  'RunAnywhereMLXRuntime' => 'd942788f1d8f08a9c0c8cc9b7d4c212c9b35382aa90978615eccf8a7e72eac5b',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
   'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
 }.freeze
@@ -31,9 +31,9 @@ Pod::Spec.new do |s|
   # scripts/release/sync-versions.sh rewrites it and
   # check_release_version_coherence.sh requires the exact string. It only
   # diverges when a version republishes non-iOS packages without cutting iOS
-  # archives (0.20.20, and now 0.20.29, did that) -- then pin the last
+  # archives (0.20.20 did that) -- then pin the last
   # release that has them.
-  asset_version      = '0.20.28'
+  asset_version      = '0.20.29'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

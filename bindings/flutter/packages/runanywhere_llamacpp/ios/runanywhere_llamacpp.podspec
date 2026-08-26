@@ -26,9 +26,9 @@ Pod::Spec.new do |s|
   # scripts/release/sync-versions.sh rewrites it and
   # check_release_version_coherence.sh requires the exact string. It only
   # diverges when a version republishes non-iOS packages without cutting iOS
-  # archives (0.20.20, and now 0.20.29, did that) -- then pin the last
+  # archives (0.20.20 did that) -- then pin the last
   # release that has them.
-  asset_version      = '0.20.28'
+  asset_version      = '0.20.29'
   s.summary          = 'RunAnywhere LlamaCPP: LLM text generation for Flutter'
   s.description      = <<-DESC
 LlamaCPP backend for RunAnywhere Flutter SDK. Provides LLM text generation
