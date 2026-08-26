@@ -10,8 +10,8 @@
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.28
-  runanywhere_llamacpp: 0.20.28
+  runanywhere: 0.20.29
+  runanywhere_llamacpp: 0.20.29
 ```
 
 Platform setup (Podfile, permissions) is documented in the [Flutter SDK README](../../README.md).

@@ -1,3 +1,11 @@
+## [0.20.29] - 2026-08-26
+
+### Changed
+
+- Re-pinned NeuRT and QHexRT engine archives to neurun v0.20.29. QHexRT win-arm64
+  now ships with the Bonsai fully-on-NPU 1-bit decoder (`qwen38_generate`)
+  enabled, fixing `PlanStepFailed` when running `qwen3.8-27b-1bit-npu`.
+
 ## [0.20.28] - 2026-08-24
 
 ### Changed
