@@ -426,9 +426,14 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     model_params.load_mode = LLAMA_LOAD_MODE_NONE;
 #endif
 
-    // If common_fit_params aborts, use the user-provided value
-    int user_gpu_layers = -1;  // -1 = not set by user
-    if (config.contains("gpu_layers")) {
+    // If common_fit_params aborts, use the user-provided value.
+    // Presence of the key is the signal, not a sentinel value: -1 is a real
+    // request ("offload every layer"), which is what rac_llm_llamacpp_create
+    // emits for ACCELERATOR_POLICY_GPU. It omits the key entirely when the
+    // caller has no opinion, so `contains` is exactly "the caller asked".
+    const bool have_user_gpu_layers = config.contains("gpu_layers");
+    int user_gpu_layers = 0;
+    if (have_user_gpu_layers) {
         user_gpu_layers = config["gpu_layers"].get<int>();
         RAC_LOG_INFO("LLM.LlamaCpp", "User-provided GPU layers: %d (will apply after fit)",
                      user_gpu_layers);
@@ -558,7 +563,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
                      "GPU memory but no GPU backend active. "
                      "Applying conservative CPU defaults.");
     }
-    if (user_gpu_layers > 0) {
+    if (have_user_gpu_layers && user_gpu_layers != 0) {
         RAC_LOG_INFO("LLM.LlamaCpp",
                      "CPU-only build: ignoring user gpu_layers=%d (no GPU backend "
                      "available)",
@@ -570,7 +575,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
         RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only: capping context to %u", ctx_params.n_ctx);
     }
 #else
-    if (user_gpu_layers >= 0) {
+    if (have_user_gpu_layers) {
         // common_fit_params fell back to n_gpu_layers=0 for non-SUCCESS outcomes;
         // honouring the user override here reinstates the OOM risk the fit call
         // was supposed to prevent. Log a warning so it's visible in the event of
