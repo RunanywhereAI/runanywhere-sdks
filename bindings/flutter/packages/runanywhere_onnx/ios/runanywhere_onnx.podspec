@@ -24,7 +24,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_onnx'
-  s.version          = '0.20.28'
+  s.version          = '0.20.29'
   # iOS archives are downloaded from the v#{asset_version} GitHub release.
   # Normally identical to s.version, and a literal on purpose:
   # scripts/release/sync-versions.sh rewrites it and
