@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.28")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.29")
 //
 //   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
 //   the first one is fatal:
@@ -115,12 +115,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-// TEMP: pin to 0.20.28 until the v0.20.29 GitHub release assets are published.
-// This release is a Windows QHexRT engine fix (see knowledge/findings/
-// win-arm64-release-never-enabled-bonsai.yaml in the neurun repo); no new iOS
-// archives were built for it, so the remote binaryTargets must keep resolving
-// 0.20.28 until a release that actually publishes v0.20.29 iOS archives lands.
-let sdkVersion = "0.20.28"
+let sdkVersion = "0.20.29"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -569,7 +564,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "f7f58b1b8cf1274268046b5dbf4d805ce3fd11a5e6b11f21b74a3ca87f424aa1"
+                checksum: "a6c0d53f0a2ccf209d1d6354b3c5e1380d6d8a00877e44013328df80c82dcc4b"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
