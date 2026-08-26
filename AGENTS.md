@@ -233,6 +233,56 @@ improvising the steps: **sdk-release** (version bump through published GitHub Re
 **sdk-publish** (registry publishing + the `runanywhere-swift` dist repo cut), and
 **sdk-test-starters** (post-release device/app smoke tests).
 
+### Release pipeline lessons (v0.20.29 — read before cutting a release by hand)
+
+- **`native_ios` and `native_android` always rebuild fresh archives on every `release.yml`
+  run — there is no reuse/skip mechanism for either job** (unlike `native_web`'s
+  `reuse_native_web_run_id` or the cpp-desktop kits' `reuse_cpp_desktop_run_id`). This makes
+  the Apple/Android TEMP-pin convention (Package.swift's `sdkVersion`, the Flutter podspecs'
+  `asset_version`, Kotlin's `nativeLibVersion` pinned to an old version "because this release
+  ships no new iOS/Android archives") **structurally unsound for any release where those two
+  jobs actually run — which is every release.** It surfaced as three separate bugs
+  (`auto-tag.yml`'s coherence check, `package-sdk.sh`'s podspec check, and `sync-checksums.sh`'s
+  publish-time verification) before the pattern was recognized. If a release genuinely ships
+  no new Apple/Android bytes, that has to be proven by diffing the actual built artifacts
+  against the previous release, not assumed from what changed in the diff.
+- **`RunAnywhereMLXRuntime`'s stripped Mach-O is not byte-reproducible across builds**
+  (`RAC_CHECKSUM_SKIP=RunAnywhereMLXRuntime` in `release.yml`'s publish job exists because of
+  this, and is the ONLY archive exempted from the publish-time checksum gate). The corollary
+  that bit v0.20.29: **the checksum committed to `Package.swift` / the Flutter MLX podspec
+  can only be computed from a build that already happened, but the tag that freezes those
+  files has to be pushed before `native_ios` (which produces that exact artifact) even runs**
+  — so re-syncing checksums against an EARLIER, superseded build (e.g. after a tag had to be
+  moved and re-dispatched to fix an unrelated bug) commits a value that does not match what
+  the FINAL successful run actually publishes, and the skip means nothing catches it. v0.20.29
+  shipped this way (committed `d942788f...`, actually published `fc4b23a0...`) — caught only
+  because the Flutter `runanywhere_mlx` package hadn't been published to pub.dev yet for that
+  version. Before publishing any package that ships `RunAnywhereMLXRuntime`, re-run
+  `bindings/swift/scripts/sync-checksums.sh` against the artifacts from the SPECIFIC run whose
+  tag is being published — never reuse a checksum computed against an earlier attempt.
+- **The Electron QHexRT backend never set `ADSP_LIBRARY_PATH`, and one comment in the
+  codebase confidently asserted Windows doesn't need it.** It does, for exactly one decode
+  path: `QHexRT/src/bonsai/fastrpc_win.cpp`'s custom FastRPC skel (the ternary/Bonsai
+  decoder, e.g. `qwen3.8-27b-1bit-npu`) resolves through `ADSP_LIBRARY_PATH ∪ cwd`, separately
+  from the standard QNN HTP graph path's `LoadLibraryW` + PATH search that `bridge.ts`'s
+  `addSidecarDirToDllSearch` already handled. Every OTHER QHexRT model worked fine in the
+  packaged app, which is exactly what let this ship undetected — validate the Bonsai/ternary
+  path specifically, not just "some NPU model works." Fixed in `bridge.ts`'s
+  `addSidecarDirToDspSearchPath` (#803).
+- **`package-private-engine-overlay.sh`'s QAIRT-runtime copy step filtered on `{".dll",
+  ".lib"}` only**, silently dropping every `.so`/`.cat` skel file (both the standard HTP skel
+  and, since it never read `engines/qhexrt/prebuilt/current/dsp/win-arm64/` at all, the
+  Bonsai skel too). This meant **RCLI could not have run any QHexRT model** — standard or
+  ternary — from a fresh private overlay, a gap invisible until someone actually tried to run
+  inference rather than just building. `bindings/electron/scripts/bundle-native.ts` already
+  had the correct pattern (copy `dsp/win-arm64/` flat, no extension filter); the overlay
+  script just never matched it. Fixed in #804.
+- **General pattern across all four of the above**: each one was invisible to the checks that
+  existed (a version-coherence check, a checksum-skip escape hatch, a "the model loaded"
+  smoke test, a "the build succeeded" CI job) because none of those checks actually ran the
+  specific thing that was broken. When validating a release, run the SPECIFIC flagship/hardest
+  model end-to-end on-device, not just confirm the pipeline completed.
+
 ---
 
 ## CI/CD workflows (`.github/workflows/`)
