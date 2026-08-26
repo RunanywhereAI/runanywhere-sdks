@@ -26,12 +26,14 @@ end
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
   s.version          = '0.20.29'
-  # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
-  # s.version leads the published release because 0.20.20 republished only the
-  # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
-  # the checksums below are still the 0.20.19 ones. Bump this back to
-  # s.version once a matching release exists.
-  asset_version      = '0.20.29'
+  # iOS archives are downloaded from the v#{asset_version} GitHub release.
+  # Normally identical to s.version, and a literal on purpose:
+  # scripts/release/sync-versions.sh rewrites it and
+  # check_release_version_coherence.sh requires the exact string. It only
+  # diverges when a version republishes non-iOS packages without cutting iOS
+  # archives (0.20.20, and now 0.20.29, did that) -- then pin the last
+  # release that has them.
+  asset_version      = '0.20.28'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

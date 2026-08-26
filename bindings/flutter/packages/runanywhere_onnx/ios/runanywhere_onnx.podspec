@@ -31,7 +31,7 @@ Pod::Spec.new do |s|
   # check_release_version_coherence.sh requires the exact string. It only
   # diverges when a version republishes non-iOS packages without cutting iOS
   # archives (0.20.20 did that) -- then pin the last release that has them.
-  asset_version      = '0.20.29'
+  asset_version      = '0.20.28'
   s.summary          = 'RunAnywhere ONNX: STT, TTS, VAD for Flutter'
   s.description      = <<-DESC
 ONNX Runtime backend for RunAnywhere Flutter SDK. Provides speech-to-text (STT),

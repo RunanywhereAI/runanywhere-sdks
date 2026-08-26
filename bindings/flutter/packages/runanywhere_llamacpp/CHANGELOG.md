@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Re-pinned NeuRT and QHexRT engine archives to neurun v0.20.29. QHexRT win-arm64
   now ships with the Bonsai fully-on-NPU 1-bit decoder (`qwen38_generate`)
-  enabled, fixing `PlanStepFailed` when running `qwen3.8-27b-1bit-npu`.
+  enabled, intended to address `PlanStepFailed` when running
+  `qwen3.8-27b-1bit-npu` -- Windows ARM64 device validation of this exact
+  pin is in progress.
 
 ## [0.20.28] - 2026-08-24
 
