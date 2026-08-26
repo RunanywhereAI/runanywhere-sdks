@@ -137,8 +137,8 @@ rac_result_t win_file_write(const char* path, const void* data, size_t size, voi
     FILE* f = wfopen_utf8(utf8_path(path), L"wb");
     if (!f) return RAC_ERROR_FILE_WRITE_FAILED;
     size_t put = size ? fwrite(data, 1, size, f) : 0;
-    fclose(f);
-    return (put == size) ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
+    int close_rc = fclose(f);
+    return (put == size && close_rc == 0) ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
 }
 
 rac_result_t win_file_delete(const char* path, void*) {
