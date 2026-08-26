@@ -398,12 +398,18 @@ $ rcli serve qwen3        # OpenAI-compatible API on :8080
 
 Also: `rcli run --image photo.jpg` (VLM), `rcli vad`, `rcli embed`, `rcli image` (diffusion, Apple), `rcli lora`, and `--json` on everything.
 
-Install (macOS Apple Silicon, Linux x86_64/aarch64, Windows x86_64):
+Install (macOS Apple Silicon, Linux x86_64/aarch64):
 
 ```bash
 brew install runanywhereai/tap/rcli
 # or
 curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.sh | sh
+```
+
+Windows (x64):
+
+```powershell
+irm https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.ps1 | iex
 ```
 
 [CLI README](https://github.com/RunanywhereAI/RCLI)
@@ -425,7 +431,7 @@ curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.sh 
 | **Python** | Windows, macOS, Linux | Alpha | pip (`runanywhere`) | [SDK README](bindings/python/) |
 | **rcli** | macOS, Linux, Windows | Stable | Homebrew / install script | [RCLI](https://github.com/RunanywhereAI/RCLI) |
 
-All SDKs ship on one version line, currently **0.20.11**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
+All SDKs ship on one version line, currently **0.20.28**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
 
 ---
 
