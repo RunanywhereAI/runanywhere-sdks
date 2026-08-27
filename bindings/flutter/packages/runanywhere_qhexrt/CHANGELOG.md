@@ -5,6 +5,20 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.30] - 2026-08-27
+
+### Fixed
+
+- The Electron packaging never set `ADSP_LIBRARY_PATH`, so the Bonsai/Maple
+  ternary decoder (`qwen3.8-27b-1bit-npu`) failed every generation in the
+  packaged Windows app with `HostOpFailed` -- confirmed on a real Snapdragon
+  X2 Elite device. Every other QHexRT model was unaffected, which is why this
+  slipped through. Fixed by extending `ADSP_LIBRARY_PATH` the same way `PATH`
+  was already extended for the standard QNN HTP path.
+- The private QHexRT overlay used to build RCLI silently dropped every skel
+  file (`.so`/`.cat`), so a fresh RCLI build could not run any QHexRT model,
+  standard or ternary, without hand-copying files in. Fixed.
+
 ## [0.20.29] - 2026-08-26
 
 ### Changed

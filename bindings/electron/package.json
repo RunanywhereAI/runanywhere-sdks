@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/electron",
-  "version": "0.20.29",
+  "version": "0.20.30",
   "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (prebuilds: darwin-arm64, win32-x64; win32-arm64 QHexRT/Hexagon NPU).",
   "publishConfig": {
     "access": "public"
@@ -75,7 +75,7 @@
     "@runanywhere/proto-ts": "file:../proto-ts"
   },
   "peerDependencies": {
-    "@runanywhere/proto-ts": "^0.20.29"
+    "@runanywhere/proto-ts": "^0.20.30"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

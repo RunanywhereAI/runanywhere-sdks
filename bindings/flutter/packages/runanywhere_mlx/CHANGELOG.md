@@ -1,3 +1,10 @@
+## [0.20.30] - 2026-08-27
+
+### Changed
+
+- No Flutter-facing API change. Electron and RCLI's QHexRT Windows packaging fixed
+  (see the `runanywhere_qhexrt` changelog); this bump keeps versions in lockstep.
+
 ## [0.20.29] - 2026-08-26
 
 ### Changed
