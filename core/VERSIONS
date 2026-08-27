@@ -14,7 +14,7 @@
 # =============================================================================
 
 # Project version (read from VERSION file, but also defined here for scripts)
-PROJECT_VERSION=0.20.29
+PROJECT_VERSION=0.20.30
 
 # =============================================================================
 # Platform Deployment Targets
