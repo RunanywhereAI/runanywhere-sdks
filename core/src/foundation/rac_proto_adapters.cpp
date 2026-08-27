@@ -342,6 +342,10 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
         return false;
     rac_vlm_options_t defaults = RAC_VLM_OPTIONS_DEFAULT;
     *out = defaults;
+    auto fail = [&]() {
+        rac_vlm_options_free_owned(out);
+        return false;
+    };
     // LLMGenerationOptions has explicit presence on every knob: ABSENT means
     // the annotated default applies (already loaded via RAC_VLM_OPTIONS_DEFAULT
     // above), and any value the caller sets -- including 0 -- is honoured
@@ -394,22 +398,35 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
             const auto& proto_tpl = vision->custom_chat_template();
             auto* tpl =
                 static_cast<rac_vlm_chat_template_t*>(rac_alloc(sizeof(rac_vlm_chat_template_t)));
-            if (tpl) {
-                tpl->template_str = proto_tpl.template_text().empty()
-                                        ? nullptr
-                                        : rac_strdup(proto_tpl.template_text().c_str());
-                tpl->image_marker = proto_tpl.has_image_marker()
-                                        ? rac_strdup(proto_tpl.image_marker().c_str())
-                                        : nullptr;
-                tpl->default_system_prompt =
-                    proto_tpl.has_default_system_prompt()
-                        ? rac_strdup(proto_tpl.default_system_prompt().c_str())
-                        : nullptr;
-                out->custom_chat_template = tpl;
+            if (!tpl) {
+                return fail();
+            }
+            *tpl = {};
+            out->custom_chat_template = tpl;
+            if (!proto_tpl.template_text().empty()) {
+                tpl->template_str = rac_strdup(proto_tpl.template_text().c_str());
+                if (!tpl->template_str) {
+                    return fail();
+                }
+            }
+            if (proto_tpl.has_image_marker()) {
+                tpl->image_marker = rac_strdup(proto_tpl.image_marker().c_str());
+                if (!tpl->image_marker) {
+                    return fail();
+                }
+            }
+            if (proto_tpl.has_default_system_prompt()) {
+                tpl->default_system_prompt = rac_strdup(proto_tpl.default_system_prompt().c_str());
+                if (!tpl->default_system_prompt) {
+                    return fail();
+                }
             }
         }
         if (vision->has_image_marker_override() && !vision->image_marker_override().empty()) {
             out->image_marker_override = rac_strdup(vision->image_marker_override().c_str());
+            if (!out->image_marker_override) {
+                return fail();
+            }
         }
     } else {
         out->model_family = RAC_VLM_MODEL_FAMILY_AUTO;
@@ -422,29 +439,37 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
     // enforcement parity with LLM.
     if (in.has_system_prompt() && !in.system_prompt().empty()) {
         out->system_prompt = rac_strdup(in.system_prompt().c_str());
+        if (!out->system_prompt) {
+            return fail();
+        }
     }
     const int stop_count = in.stop_sequences_size();
     if (stop_count > 0) {
         auto** arr =
-            static_cast<const char**>(std::malloc(static_cast<size_t>(stop_count) * sizeof(char*)));
-        if (arr) {
-            size_t written = 0;
-            for (int i = 0; i < stop_count; ++i) {
-                const auto& seq = in.stop_sequences(i);
-                if (seq.empty()) {
-                    continue;
-                }
-                arr[written] = rac_strdup(seq.c_str());
-                if (arr[written] != nullptr) {
-                    ++written;
-                }
+            static_cast<const char**>(std::calloc(static_cast<size_t>(stop_count), sizeof(char*)));
+        if (!arr) {
+            return fail();
+        }
+        out->stop_sequences = arr;
+        out->num_stop_sequences = static_cast<size_t>(stop_count);
+        size_t written = 0;
+        for (int i = 0; i < stop_count; ++i) {
+            const auto& seq = in.stop_sequences(i);
+            if (seq.empty()) {
+                continue;
             }
-            if (written > 0) {
-                out->stop_sequences = arr;
-                out->num_stop_sequences = written;
-            } else {
-                std::free(static_cast<void*>(arr));
+            arr[written] = rac_strdup(seq.c_str());
+            if (!arr[written]) {
+                return fail();
             }
+            ++written;
+        }
+        if (written > 0) {
+            out->num_stop_sequences = written;
+        } else {
+            std::free(static_cast<void*>(arr));
+            out->stop_sequences = nullptr;
+            out->num_stop_sequences = 0;
         }
     }
 
