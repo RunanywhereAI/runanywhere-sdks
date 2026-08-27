@@ -5,6 +5,26 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.31] - 2026-08-27
+
+### Fixed
+
+- `HostOpFailed` still reproduced on `qwen3.8-27b-1bit-npu` after v0.20.30's
+  `ADSP_LIBRARY_PATH` fix, even with the environment variable confirmed
+  correctly set. Root cause: `qhx_runtime_device()` (used to pick the
+  `v75`/`v79`/`v81` manifest directory, before the manifest is even parsed)
+  shared its device query with the code path that creates a live QNN HTP
+  device -- so every model, including the Bonsai/Maple ternary decoder's
+  `host_only` manifest, opened a real QNN device before the manifest was
+  read. That device then contended with the decoder's own direct FastRPC
+  session for the same Hexagon cDSP: traced live on a Snapdragon X2 Elite,
+  the FastRPC `SET_PATH`/`GET_PATH` session controls both returned a
+  non-zero rc once the QNN device was up, and the skel open that followed
+  failed `0x80000406`. Neither `ADSP_LIBRARY_PATH` nor a QAIRT-version
+  mismatch (also investigated) was the actual cause. Fixed in neurun
+  v0.20.31 (`qnn::Backend::profile()` now queries device info without
+  creating a live device) and re-pinned here.
+
 ## [0.20.30] - 2026-08-27
 
 ### Fixed

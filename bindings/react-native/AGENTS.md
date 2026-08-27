@@ -217,5 +217,5 @@ The example sets `installConfig.hoistingLimits: "workspaces"`, so its deps stay 
 - **ESLint**: `@typescript-eslint/recommended` + `prettier`, `no-console: error`, `no-explicit-any: error`
 - **Prettier**: single quotes, 2-space indent, es5 trailing commas
 - **SwiftLint** (`.swiftlint.yml`, `packages/{core,llamacpp,onnx}/ios` only — mlx/qhexrt have no iOS side): `print()`, `NSLog()`, `os_log()`, `debugPrint()`, `Logger` are all banned as lint errors; use `SDKLogger`
-- **Versioning**: core + backend packages share one semver (currently `0.20.30`), managed by Lerna with conventional commits
+- **Versioning**: core + backend packages share one semver (currently `0.20.31`), managed by Lerna with conventional commits
 - **Package naming**: Kotlin Nitro-generated code uses namespace `com.margelo.nitro.runanywhere.*`

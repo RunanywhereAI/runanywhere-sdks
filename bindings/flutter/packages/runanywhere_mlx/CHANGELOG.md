@@ -1,3 +1,11 @@
+## [0.20.31] - 2026-08-27
+
+### Changed
+
+- No Flutter-facing API change. QHexRT's `HostOpFailed` regression on
+  `qwen3.8-27b-1bit-npu` fixed (see the `runanywhere_qhexrt` changelog);
+  this bump keeps versions in lockstep.
+
 ## [0.20.30] - 2026-08-27
 
 ### Changed
