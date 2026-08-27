@@ -274,6 +274,170 @@ void test_session_cap_and_cancel_validation() {
     stop_host();
 }
 
+void test_cluster_orchestration() {
+    // Reset cluster runtime state to ensure clean test isolation
+    {
+        v1::ClusterStopRequest reset_request;
+        v1::ClusterState reset_state;
+        call_proto(rac_connect_cluster_stop_proto, reset_request, &reset_state);
+    }
+
+    // 1. Invalid cluster start (empty cluster id)
+    v1::ClusterStartRequest invalid_request;
+    v1::ClusterState invalid_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, invalid_request, &invalid_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects empty request");
+
+    // 2. Invalid cluster start (duplicate instance_id)
+    v1::ClusterStartRequest dup_request;
+    dup_request.set_cluster_id("test-cluster-dup");
+    dup_request.mutable_model()->set_model_id("llama-3-70b");
+    dup_request.mutable_model()->set_display_name("Llama 3 70B");
+    auto* d1 = dup_request.add_assignments();
+    d1->set_instance_id("peer-1");
+    d1->set_layer_start(0);
+    d1->set_layer_end(16);
+    auto* d2 = dup_request.add_assignments();
+    d2->set_instance_id("peer-1");
+    d2->set_layer_start(16);
+    d2->set_layer_end(32);
+
+    v1::ClusterState dup_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, dup_request, &dup_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects duplicate peer instance_id");
+
+    // 3. Invalid cluster start (layer gap: [0, 10) and [15, 30))
+    v1::ClusterStartRequest gap_request;
+    gap_request.set_cluster_id("test-cluster-gap");
+    gap_request.mutable_model()->set_model_id("llama-3-70b");
+    gap_request.mutable_model()->set_display_name("Llama 3 70B");
+    auto* a1 = gap_request.add_assignments();
+    a1->set_instance_id("mac-coord");
+    a1->set_layer_start(0);
+    a1->set_layer_end(10);
+    a1->set_is_coordinator(true);
+    auto* a2 = gap_request.add_assignments();
+    a2->set_instance_id("android-peer");
+    a2->set_layer_start(15);
+    a2->set_layer_end(30);
+
+    v1::ClusterState gap_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, gap_request, &gap_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects layer assignment gap");
+
+    // 4. Valid cluster start with unordered assignments: [16, 32) then [0, 16)
+    v1::ClusterStartRequest valid_request;
+    valid_request.set_cluster_id("cluster-alpha");
+    valid_request.mutable_model()->set_model_id("llama-3-70b");
+    valid_request.mutable_model()->set_display_name("Llama 3 70B");
+    auto* v2_assign = valid_request.add_assignments();
+    v2_assign->set_instance_id("android-snapdragon");
+    v2_assign->set_layer_start(16);
+    v2_assign->set_layer_end(32);
+
+    auto* v1_assign = valid_request.add_assignments();
+    v1_assign->set_instance_id("mac-coordinator");
+    v1_assign->set_layer_start(0);
+    v1_assign->set_layer_end(16);
+    v1_assign->set_is_coordinator(true);
+
+    v1::ClusterState active_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, valid_request, &active_state) == RAC_SUCCESS,
+          "Cluster coordinator starts with valid layer sharding");
+    CHECK(active_state.is_active(), "Cluster state is marked active");
+    CHECK(active_state.peer_count() == 2, "Cluster state tracks 2 participating devices");
+    CHECK(active_state.cluster_id() == "cluster-alpha", "Cluster ID matches request");
+
+    // 5. Idempotent cluster start with same cluster_id
+    v1::ClusterState idempotent_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, valid_request, &idempotent_state) == RAC_SUCCESS,
+          "Repeated cluster start with same ID is idempotent");
+    CHECK(idempotent_state.is_active(), "Idempotent start returns active state");
+
+    // 6. Conflicting cluster start with different cluster_id while active is rejected
+    v1::ClusterStartRequest conflict_request = valid_request;
+    conflict_request.set_cluster_id("cluster-beta");
+    v1::ClusterState conflict_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, conflict_request, &conflict_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Starting a different cluster while one is active is rejected");
+
+    // 7. Peer joins cluster with ClusterJoinRequest
+    v1::ClusterJoinRequest join_request;
+    join_request.set_cluster_id("cluster-alpha");
+    join_request.set_instance_id("android-snapdragon");
+    join_request.mutable_peer_capability()->set_instance_id("android-snapdragon");
+    join_request.mutable_peer_capability()->set_available_memory_bytes(8589934592ULL);
+    join_request.mutable_peer_capability()->set_acceleration(v1::ACCELERATION_PREFERENCE_NPU);
+
+    v1::ClusterStartResponse join_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, join_request, &join_response) == RAC_SUCCESS,
+          "Peer join request is validated successfully against active cluster");
+    CHECK(join_response.accepted(), "Peer join response is accepted");
+    CHECK(join_response.peer_capability().available_memory_bytes() == 8589934592ULL,
+          "Peer capability is populated in join response");
+
+    // 8. Peer join with unknown instance_id is rejected
+    v1::ClusterJoinRequest unknown_peer_join = join_request;
+    unknown_peer_join.set_instance_id("unknown-device");
+    unknown_peer_join.mutable_peer_capability()->set_instance_id("unknown-device");
+    v1::ClusterStartResponse unknown_peer_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, unknown_peer_join, &unknown_peer_response) == RAC_SUCCESS,
+          "Unknown peer join returns typed validation response");
+    CHECK(!unknown_peer_response.accepted(), "Unknown peer instance_id is rejected");
+
+    // 9. Activation validation between pipeline stages
+    v1::ClusterActivation valid_activation;
+    valid_activation.set_cluster_id("cluster-alpha");
+    valid_activation.set_request_id("req-token-101");
+    valid_activation.set_from_layer(16);
+    valid_activation.set_tensor_data(std::string(4096 * 2, 'A'));
+    valid_activation.set_seq_len(1);
+    valid_activation.set_hidden_size(4096);
+
+    v1::ConnectInvocationValidation activation_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, valid_activation, &activation_validation) == RAC_SUCCESS,
+          "Valid intermediate activation tensor is validated");
+    CHECK(activation_validation.accepted(), "Activation tensor passes validation");
+
+    // 10. Activation validation rejection on mismatched cluster ID
+    v1::ClusterActivation wrong_cluster_activation = valid_activation;
+    wrong_cluster_activation.set_cluster_id("cluster-wrong");
+    v1::ConnectInvocationValidation wrong_cluster_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, wrong_cluster_activation, &wrong_cluster_validation) == RAC_SUCCESS,
+          "Mismatched cluster activation returns typed validation");
+    CHECK(!wrong_cluster_validation.accepted(), "Mismatched cluster ID activation is rejected");
+
+    // 11. Activation validation rejection on invalid layer boundary
+    v1::ClusterActivation invalid_boundary_activation = valid_activation;
+    invalid_boundary_activation.set_from_layer(7); // not a boundary in [0, 16) or [16, 32)
+    v1::ConnectInvocationValidation invalid_boundary_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, invalid_boundary_activation, &invalid_boundary_validation) == RAC_SUCCESS,
+          "Invalid layer boundary activation returns typed validation");
+    CHECK(!invalid_boundary_validation.accepted(), "Invalid layer boundary is rejected");
+
+    // 12. Stop cluster with mismatched cluster ID is rejected
+    v1::ClusterStopRequest wrong_stop_request;
+    wrong_stop_request.set_cluster_id("cluster-different");
+    v1::ClusterState wrong_stop_state;
+    CHECK(call_proto(rac_connect_cluster_stop_proto, wrong_stop_request, &wrong_stop_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Stopping with mismatched cluster_id is rejected");
+
+    // 13. Stop active cluster cleanly
+    v1::ClusterStopRequest stop_request;
+    stop_request.set_cluster_id("cluster-alpha");
+    v1::ClusterState stopped_state;
+    CHECK(call_proto(rac_connect_cluster_stop_proto, stop_request, &stopped_state) == RAC_SUCCESS,
+          "Cluster stop terminates active cluster");
+    CHECK(!stopped_state.is_active(), "Cluster state is marked inactive after stop");
+    CHECK(stopped_state.cluster_id() == "cluster-alpha", "Stopped cluster ID is preserved in response");
+
+    // 14. Activation rejected after stop
+    v1::ConnectInvocationValidation stopped_activation_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, valid_activation, &stopped_activation_validation) == RAC_SUCCESS,
+          "Activation check after stop returns typed validation");
+    CHECK(!stopped_activation_validation.accepted(), "Activation tensor is rejected when cluster is inactive");
+}
+
 #endif
 
 }  // namespace
@@ -288,6 +452,7 @@ int main() {
     test_client_admission();
     test_host_handshake_and_reconnect_deduplication();
     test_session_cap_and_cancel_validation();
+    test_cluster_orchestration();
     std::fprintf(stdout, "  %d checks, %d failures\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
 #endif

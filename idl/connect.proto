@@ -9,6 +9,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "hardware_profile.proto";
 import "llm_service.proto";
 
 option cc_enable_arenas      = true;
@@ -223,3 +224,69 @@ message ConnectHostFrame {
         ConnectHeartbeatResponse heartbeat = 2;
     }
 }
+
+// -----------------------------------------------------------------------------
+// Cluster-Specific Schemas (Issue #541: Local AI Cluster / Pipeline Sharding)
+// -----------------------------------------------------------------------------
+
+// Compute and memory capacity advertised by a peer participating in a cluster.
+message ClusterPeerCapability {
+    string instance_id = 1;
+    ConnectPlatform platform = 2;
+    uint64 available_memory_bytes = 3;
+    AccelerationPreference acceleration = 4;
+    NpuCapability npu = 5;
+    uint32 max_layers = 6;
+}
+
+// Layer range assigned to a peer by the coordinator.
+message ClusterLayerAssignment {
+    string instance_id = 1;
+    // Half-open range: this peer owns layers [layer_start, layer_end), with layer_end excluded.
+    uint32 layer_start = 2;
+    uint32 layer_end   = 3;
+    bool   is_coordinator = 4;
+}
+
+// Coordinator starts cluster and sends assignments to all peers.
+message ClusterStartRequest {
+    string cluster_id = 1;
+    ConnectModelDescriptor model = 2;
+    repeated ClusterLayerAssignment assignments = 3;
+}
+
+// Sent by a peer device when joining a cluster to validate its assignment and register capabilities.
+message ClusterJoinRequest {
+    string cluster_id = 1;
+    string instance_id = 2;
+    ClusterPeerCapability peer_capability = 3;
+}
+
+message ClusterStartResponse {
+    bool accepted = 1;
+    string rejection_reason = 2;
+    ClusterPeerCapability peer_capability = 3;
+}
+
+// Intermediate activation tensor passed between pipeline stages.
+message ClusterActivation {
+    string cluster_id = 1;
+    string request_id = 2;
+    uint32 from_layer  = 3;
+    bytes  tensor_data = 4;
+    uint32 seq_len     = 5;
+    uint32 hidden_size = 6;
+}
+
+message ClusterStopRequest {
+    string cluster_id = 1;
+}
+
+message ClusterState {
+    bool   is_active = 1;
+    string cluster_id = 2;
+    ConnectModelDescriptor model = 3;
+    repeated ClusterLayerAssignment assignments = 4;
+    uint32 peer_count = 5;
+}
+
