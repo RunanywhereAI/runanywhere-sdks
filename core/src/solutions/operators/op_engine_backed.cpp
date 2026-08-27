@@ -48,6 +48,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/graph/pipeline_node.hpp"
+#include "rac/rac_defaults_generated.h"
 #include "rac/solutions/operator_registry.hpp"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -192,7 +193,10 @@ class GenerateTextNode final : public OperatorNode {
         : PipelineNode(std::move(name), /*input*/ 8, /*output*/ 8, OverflowPolicy::BlockProducer),
           model_id_(spec.model_id()),
           max_tokens_(param_int_or(spec, "max_tokens", 0)),
-          temperature_(param_float_or(spec, "temperature", 0.0f)) {
+          // param_float_or already supplies this when the key is absent, so an
+          // explicit "0" in the spec stays 0 (greedy) instead of being re-read as unset.
+          temperature_(param_float_or(spec, "temperature",
+                                      RAC_DEFAULT_LLM_GENERATION_OPTIONS_TEMPERATURE)) {
         if (const std::string* p = find_param(spec, "system_prompt"); p) {
             system_prompt_ = *p;
         }
@@ -214,7 +218,7 @@ class GenerateTextNode final : public OperatorNode {
         message->set_role(runanywhere::v1::MESSAGE_ROLE_USER);
         message->set_content(item.text());
         auto* options = request.mutable_options();
-        options->set_temperature(temperature_ > 0.0f ? temperature_ : 0.8f);
+        options->set_temperature(temperature_);
         options->set_top_p(1.0f);
         if (!system_prompt_.empty()) {
             options->set_system_prompt(system_prompt_);
