@@ -1280,7 +1280,12 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
                                : RAC_VAD_DEFAULT_ENERGY_THRESHOLD);
     }
 
-    const bool has_override = options.activation_threshold() > 0.0f;
+    // Presence, not value: VADOptions.activation_threshold is `optional` and
+    // documented as "Unset = keep the loaded detector's calibrated value" on a
+    // normalized [0,1] scale. 0.0 is inside that range and
+    // rac_vad_component_set_energy_threshold accepts it, so an explicit 0.0 has to
+    // override rather than read as "no override".
+    const bool has_override = options.has_activation_threshold();
 
     // Serialize the get→set(override)→process→
     // restore window on the same per-handle mutex used by the streaming
@@ -1636,7 +1641,7 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     }
 
     float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
-    if (request.has_options() && request.options().activation_threshold() > 0.0f) {
+    if (request.has_options() && request.options().has_activation_threshold()) {
         threshold = request.options().activation_threshold();
     }
     const int32_t sample_rate = request.audio().sample_rate() > 0 ? request.audio().sample_rate()
@@ -1648,7 +1653,7 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
 
     if (have_model) {
         if (ref.ops->set_threshold && request.has_options() &&
-            request.options().activation_threshold() > 0.0f) {
+            request.options().has_activation_threshold()) {
             (void)ref.ops->set_threshold(ref.impl, threshold);
         }
         if (!ref.ops->process) {
