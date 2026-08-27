@@ -23,7 +23,7 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let raCommonsTarget = runAnywhereBinaryTarget(
     name: "RACommons",
-    checksum: "81c630305557f189df2d428dbbee167061d51c9832c5b348bde3f430b1c3fb5b"
+    checksum: "3be93cb36b5ea3a8ecfa3db93918fbce3b81165d41865bd9871e11949b903790"
 )
 
 let package = Package(
