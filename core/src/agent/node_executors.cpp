@@ -650,6 +650,47 @@ rac_result_t run_llm_generate(const WorkflowNode& node, const ExpressionContext&
     return RAC_SUCCESS;
 }
 
+/// The JSON in a model's answer, which is not always the whole of it.
+///
+/// A schema is sent with the request, and a model that honours it returns bare
+/// JSON. Plenty do not: they fence it as ```json, or introduce it with a line
+/// of prose, and `json::parse` then rejects an answer that is correct in every
+/// way that matters. Rather than fail the node — and with it the run — the
+/// fence is removed and, failing that, the outermost balanced object or array
+/// is taken.
+///
+/// Deliberately not a repair of malformed JSON. If what sits inside the fence
+/// is broken, that is a real failure and stays one.
+std::string json_payload(const std::string& answer) {
+    std::string text = answer;
+
+    const size_t first = text.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+        return text;
+    text.erase(0, first);
+
+    if (text.rfind("```", 0) == 0) {
+        const size_t newline = text.find('\n');
+        if (newline != std::string::npos)
+            text.erase(0, newline + 1);
+        const size_t close = text.rfind("```");
+        if (close != std::string::npos)
+            text.erase(close);
+    }
+
+    if (!json::parse(text, nullptr, false).is_discarded())
+        return text;
+
+    // Prose on either side of the JSON. Take the outermost brackets and let the
+    // parser judge what is between them.
+    const size_t open = text.find_first_of("{[");
+    const size_t shut = text.find_last_of("}]");
+    if (open != std::string::npos && shut != std::string::npos && shut > open)
+        return text.substr(open, shut - open + 1);
+
+    return text;
+}
+
 rac_result_t run_llm_structured(const WorkflowNode& node, const ExpressionContext& context,
                                 NodeExecution* out, std::string* out_error) {
     const auto& config = node.llm_structured();
@@ -677,6 +718,18 @@ rac_result_t run_llm_structured(const WorkflowNode& node, const ExpressionContex
         *request.mutable_options() = config.generation();
     request.mutable_options()->mutable_structured_output()->set_schema(config.json_schema());
 
+    // Reasoning off unless the workflow asked for it. A thinking model spends
+    // its budget narrating before it answers, and what comes back is a
+    // `<think>` block with the JSON somewhere after it — or, on a short budget,
+    // no JSON at all. The node then reports the model's answer as invalid,
+    // which is true and entirely unhelpful. Structured output is the one place
+    // where the visible reasoning is never what was asked for.
+    if (!request.options().has_reasoning()) {
+        request.mutable_options()->mutable_reasoning()->set_mode(
+            runanywhere::v1::REASONING_MODE_OFF);
+        request.mutable_options()->mutable_reasoning()->set_include_in_output(false);
+    }
+
     if (config.has_system_prompt()) {
         std::string system_prompt;
         if (!resolve(config.system_prompt(), context, &system_prompt, out_error))
@@ -698,7 +751,7 @@ rac_result_t run_llm_structured(const WorkflowNode& node, const ExpressionContex
     // its fields directly instead of digging through a wrapper.
     const std::string& raw =
         generation.json_output().empty() ? generation.text() : generation.json_output();
-    json parsed = json::parse(raw, nullptr, false);
+    json parsed = json::parse(json_payload(raw), nullptr, false);
     if (parsed.is_discarded()) {
         *out_error = "the model's answer is not valid JSON";
         return RAC_ERROR_DECODING_ERROR;
