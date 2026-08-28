@@ -45,11 +45,18 @@ enum WorkflowFileStore {
 
     // MARK: - Locations
 
+    /// Where workflows live.
+    ///
+    /// Under the RunAnywhere root, not the host's base directory. Commons
+    /// resolves the same folder from `rac_model_paths_get_base_directory`,
+    /// which appends `RunAnywhere/`, so reading the raw base put this store one
+    /// directory above everything the runner looks in and every run failed as
+    /// Not found.
     static func directory() throws -> URL {
-        guard let base = CppBridge.ModelPaths.baseDirectory else {
+        guard let root = try? CppBridge.ModelPaths.runAnywhereRoot() else {
             throw Failure.noBaseDirectory
         }
-        return base.appendingPathComponent(root, isDirectory: true)
+        return root.appendingPathComponent(WorkflowFileStore.root, isDirectory: true)
     }
 
     static func directory(for id: String) throws -> URL {
