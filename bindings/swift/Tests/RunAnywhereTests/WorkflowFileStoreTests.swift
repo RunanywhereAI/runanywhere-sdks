@@ -23,6 +23,14 @@ final class WorkflowFileStoreTests: XCTestCase {
         try? FileManager.default.removeItem(at: base)
     }
 
+    /// Where commons files a workflow, which is under the RunAnywhere root
+    /// rather than the base directory the host handed over.
+    private func commonsFolder(for id: String) throws -> URL {
+        try CppBridge.ModelPaths.runAnywhereRoot()
+            .appendingPathComponent("Workflows", isDirectory: true)
+            .appendingPathComponent(id, isDirectory: true)
+    }
+
     private func document(id: String, name: String, nodes: Int = 0) -> RAWorkflowDocument {
         var document = RAWorkflowDocument()
         document.id = id
@@ -67,12 +75,15 @@ final class WorkflowFileStoreTests: XCTestCase {
     // MARK: - The layout commons wrote
 
     func testItReadsAFileWrittenByTheCppStore() throws {
-        // The whole point of keeping the layout: <base>/Workflows/<id>/
-        // workflow.json holding the document as protobuf JSON. Written here by
-        // hand, exactly as the C++ would, and it must load.
-        let folder = base
-            .appendingPathComponent("Workflows", isDirectory: true)
-            .appendingPathComponent("legacy", isDirectory: true)
+        // The whole point of keeping the layout: <base>/RunAnywhere/Workflows/
+        // <id>/workflow.json holding the document as protobuf JSON. Written
+        // here by hand, exactly as the C++ would, and it must load.
+        //
+        // The RunAnywhere segment is not decoration. Commons resolves this
+        // folder from rac_model_paths_get_base_directory, which appends it;
+        // reading the raw base instead put the store one directory above every
+        // file the runner looks for.
+        let folder = try commonsFolder(for: "legacy")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let json = #"{"id":"legacy","name":"From C++","schemaVersion":1,"createdAtMs":"42"}"#
         try Data(json.utf8).write(to: folder.appendingPathComponent("workflow.json"))
@@ -83,9 +94,7 @@ final class WorkflowFileStoreTests: XCTestCase {
     }
 
     func testADocumentFromANewerBuildIsRefused() throws {
-        let folder = base
-            .appendingPathComponent("Workflows", isDirectory: true)
-            .appendingPathComponent("future", isDirectory: true)
+        let folder = try commonsFolder(for: "future")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let json = #"{"id":"future","name":"Later","schemaVersion":99}"#
         try Data(json.utf8).write(to: folder.appendingPathComponent("workflow.json"))
@@ -108,9 +117,7 @@ final class WorkflowFileStoreTests: XCTestCase {
     func testOneUnreadableWorkflowDoesNotHideTheRest() throws {
         try WorkflowFileStore.save(document(id: "good", name: "Good"))
 
-        let broken = base
-            .appendingPathComponent("Workflows", isDirectory: true)
-            .appendingPathComponent("broken", isDirectory: true)
+        let broken = try commonsFolder(for: "broken")
         try FileManager.default.createDirectory(at: broken, withIntermediateDirectories: true)
         try Data("not json at all".utf8).write(to: broken.appendingPathComponent("workflow.json"))
 

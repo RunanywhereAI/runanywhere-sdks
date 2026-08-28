@@ -138,6 +138,20 @@ private enum WorkflowErrors {
         }
         return SDKException(code: .processingFailed, message: message, category: .internal)
     }
+
+    /// A document that failed validation, named issue by issue.
+    ///
+    /// Core used to refuse the write itself, so moving storage here means
+    /// carrying the refusal across too. Saving an invalid workflow would leave
+    /// a file the runner cannot start, which is worse than a failed save.
+    static func invalidDocument(_ validation: RAWorkflowValidationResult) -> SDKException {
+        let reasons = validation.issues.map(\.message).joined(separator: "; ")
+        return SDKException(
+            code: .validationFailed,
+            message: reasons.isEmpty ? "workflow is not valid" : "workflow is not valid: \(reasons)",
+            category: .validation
+        )
+    }
 }
 
 // MARK: - Host callbacks
@@ -333,56 +347,39 @@ public extension RunAnywhere {
 
         /// Store a workflow. Validated first, so an invalid document is
         /// rejected rather than written.
+        ///
+        /// Storage is this layer's, not core's. `WorkflowFileStore` writes the
+        /// same file, in the same place, in the same encoding that core reads:
+        /// `<base>/Workflows/<id>/workflow.json` as proto JSON, with the schema
+        /// version and modification time stamped on the way out. That is what
+        /// lets the two coexist while the runner is still core's, because a
+        /// workflow saved here is one core can load by id.
         public func save(_ document: RAWorkflowDocument) async throws {
             try await ensureReady()
-            let encoded = try document.serializedData()
-            let result = encoded.withUnsafeBytes { raw -> rac_result_t in
-                rac_agent_workflow_save_proto(
-                    raw.bindMemory(to: UInt8.self).baseAddress, encoded.count
-                )
+            let validation = try await validate(document)
+            guard validation.valid else {
+                throw WorkflowErrors.invalidDocument(validation)
             }
-            guard result == RAC_SUCCESS else {
-                throw WorkflowErrors.failure(op: "rac_agent_workflow_save_proto", rc: result)
-            }
+            try WorkflowFileStore.save(document)
         }
 
         public func load(id: String) async throws -> RAWorkflowDocument {
             try await ensureReady()
-            var buffer = rac_proto_buffer_t()
-            rac_proto_buffer_init(&buffer)
-            defer { rac_proto_buffer_free(&buffer) }
-
-            let result = id.withCString { rac_agent_workflow_load_proto($0, &buffer) }
-            guard result == RAC_SUCCESS, let data = buffer.data else {
-                throw WorkflowErrors.failure(op: "rac_agent_workflow_load_proto", rc: result)
-            }
-            return try RAWorkflowDocument(serializedBytes: Data(bytes: data, count: buffer.size))
+            return try WorkflowFileStore.load(id: id)
         }
 
         /// Summaries of every stored workflow. An unreadable document is
         /// skipped rather than failing the listing.
         public func list() async throws -> [RAWorkflowSummary] {
             try await ensureReady()
-            var buffer = rac_proto_buffer_t()
-            rac_proto_buffer_init(&buffer)
-            defer { rac_proto_buffer_free(&buffer) }
-
-            let result = rac_agent_workflow_list_proto(&buffer)
-            guard result == RAC_SUCCESS, let data = buffer.data else {
-                throw WorkflowErrors.failure(op: "rac_agent_workflow_list_proto", rc: result)
-            }
-            let list = try RAWorkflowList(serializedBytes: Data(bytes: data, count: buffer.size))
-            return list.workflows
+            return try WorkflowFileStore.list()
         }
 
         /// Delete a workflow and its run records. Deleting an id that is not
         /// stored succeeds.
         public func delete(id: String) async throws {
             try await ensureReady()
-            let result = id.withCString { rac_agent_workflow_delete($0) }
-            guard result == RAC_SUCCESS else {
-                throw WorkflowErrors.failure(op: "rac_agent_workflow_delete", rc: result)
-            }
+            try WorkflowFileStore.delete(id: id)
         }
 
         /// Check a document without storing it. An invalid document is a normal

@@ -52,6 +52,24 @@ extension CppBridge {
 
         // MARK: - Directory Paths
 
+        /// The root everything the SDK owns is filed under.
+        /// Returns: `{base_dir}/RunAnywhere/`
+        ///
+        /// Not the same as `baseDirectory`, which is the enclosing directory the
+        /// host chose. Anything that has to agree with commons about where a
+        /// file lives belongs under this one, because commons resolves its own
+        /// paths from here.
+        public static func runAnywhereRoot() throws -> URL {
+            var buffer = [CChar](repeating: 0, count: pathBufferSize)
+            let result = rac_model_paths_get_base_directory(&buffer, buffer.count)
+
+            guard result == RAC_SUCCESS else {
+                throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
+            }
+
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
+        }
+
         /// Get the models directory
         /// Returns: `{base_dir}/RunAnywhere/Models/`
         public static func getModelsDirectory() throws -> URL {
