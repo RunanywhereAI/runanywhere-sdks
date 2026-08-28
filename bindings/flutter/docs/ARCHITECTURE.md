@@ -51,7 +51,7 @@ bindings/flutter/
     └── runanywhere_qhexrt/          # Qualcomm Hexagon NPU (Android-only)
 ```
 
-Backend packages depend on `runanywhere ^0.20.24`. Source checkouts prefer
+Backend packages depend on `runanywhere ^0.20.31`. Source checkouts prefer
 package-owned XCFramework/JNI staging, while public pub archives omit those
 large binaries and resolve versioned, checksum-verified release archives through
 CocoaPods/SwiftPM on iOS and Gradle on Android. MLX is CocoaPods-only because
@@ -385,6 +385,49 @@ RunAnywhere.events.allEvents.listen((event) {
 });
 ```
 
+### 10.3 Adding a New Streaming Callback (Native-Port Helpers)
+
+*Added 2026-07; verified against source 2026-08-17.*
+
+High-risk proto streams (LLM, VLM, STT, TTS, voice-agent turns/handle callbacks) do not
+read borrowed C callback bytes asynchronously from Dart. This exists because
+`NativeCallable.isolateLocal` is only safe when native invokes the callback on the
+registering isolate thread, while MLX/Swift-async and other native runtimes may emit
+from worker threads; `NativeCallable.listener` is cross-thread safe but runs later on the
+Dart event loop, which is too late for borrowed buffers that commons may reuse
+immediately after the callback returns.
+
+The fix is a bridge-layer native-port helper that preserves the rest of the
+architecture (examples keep calling SDK APIs directly, Flutter keeps using FFI rather
+than platform channels, C++ commons keeps owning orchestration):
+
+1. `rac_native.dart` looks up optional `ra_flutter_*_native_port` symbols exported by the
+   Flutter iOS pod or the Android helper library.
+2. Dart bridge slices prefer the native-port helper when present.
+3. The native helper copies bytes synchronously during the C callback.
+4. Dart receives owned bytes on a `ReceivePort`, decodes the generated protobuf type, and
+   emits a normal SDK stream.
+5. Older or unsupported binaries fall back to same-thread `isolateLocal` paths only where
+   explicitly documented.
+
+Implementations: iOS helpers live under
+`packages/runanywhere/ios/runanywhere/Sources/runanywhere_native/*StreamNativePort.mm`
+(one per stream: Llm/Vlm/Stt/Tts/VoiceAgent/RagQuery — SwiftPM package, not a CocoaPods
+`Classes/` layout); Android's is
+`packages/runanywhere/android/src/main/cpp/NativePortHelpers.cpp`, built into
+`librunanywhere_flutter_helpers.so`. On Android, `DartBridge.initialize()` warm-loads the
+optional helper through `PlatformLoader.tryLoadFlutterNativePortHelpers()`; `RacBindings`
+then searches that helper library before RACommons for `ra_flutter_*_native_port`
+symbols. The helper links against the packaged `librac_commons.so`; local builds filter
+helper ABIs to the staged RACommons ABI directories, while remote/release mode targets
+the full supported ABI set after `downloadNativeLibs`.
+
+**To add a new stream callback**: add a small native-port helper at the platform SDK
+layer, copy bytes before returning to commons, expose it as an optional FFI symbol in
+`rac_native.dart`, and keep example apps thin. Do this before moving model lifecycle or
+stream feeding to worker isolates — especially for qhexrt or other backends that may
+call back from native worker threads.
+
 ---
 
 ## 11. Trade-offs
@@ -420,11 +463,11 @@ lives in the bundled native backend (C++ engines or the Swift MLX runtime).
 
 | Component | Version |
 |-----------|---------|
-| `runanywhere` (Dart) | 0.20.24 |
-| `runanywhere_llamacpp` | 0.20.24 |
-| `runanywhere_mlx` | 0.20.24 |
-| `runanywhere_onnx` | 0.20.24 |
-| `runanywhere_qhexrt` | 0.20.24 |
+| `runanywhere` (Dart) | 0.20.31 |
+| `runanywhere_llamacpp` | 0.20.31 |
+| `runanywhere_mlx` | 0.20.31 |
+| `runanywhere_onnx` | 0.20.31 |
+| `runanywhere_qhexrt` | 0.20.31 |
 | `RACommons` native | 0.1.6 |
 | llama.cpp engine | runanywhere-b10453.4 |
 | ONNX Runtime | 1.28.0 |
@@ -450,7 +493,7 @@ lives in the bundled native backend (C++ engines or the Swift MLX runtime).
 
 | Package | Libraries |
 |---------|-----------|
-| `runanywhere` | `librac_commons.so`, `librunanywhere_jni.so`, `libc++_shared.so`, `libomp.so` |
-| `runanywhere_llamacpp` | `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `libc++_shared.so` |
+| `runanywhere` | `librac_commons.so`, `librunanywhere_jni.so`, `librac_backend_cloud.so`, `libc++_shared.so`, `libomp.so` |
+| `runanywhere_llamacpp` | `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `librunanywhere_llamacpp.so`, `libc++_shared.so` |
 | `runanywhere_onnx` | `libonnxruntime.so`, `libsherpa-onnx-c-api.so`, `libsherpa-onnx-jni.so`, `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `librac_backend_sherpa.so`, `librunanywhere_onnx.so`, `librunanywhere_sherpa.so`, `libc++_shared.so` |
 | `runanywhere_qhexrt` | `librac_backend_qhexrt*.so`, QAIRT/QNN libs, `libc++_shared.so` (private natives staged separately) |

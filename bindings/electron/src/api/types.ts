@@ -128,6 +128,14 @@ export const InferenceFramework = {
    * with a single engine built in, the router picks it without this.
    */
   QHEXRT: 'QHEXRT',
+  /**
+   * COREML — the engine name is `neurt` (prebuilt Core ML graphs on the Apple
+   * Neural Engine), but the FRAMEWORK is Core ML, matching iOS's `.coreml` and
+   * every other SDK's catalog rows for the same ANE bundles. Never rename this
+   * to NEURT: the proto's `InferenceFramework` enum has no such value, only
+   * `INFERENCE_FRAMEWORK_COREML`.
+   */
+  COREML: 'COREML',
 } as const;
 export type InferenceFramework =
   (typeof InferenceFramework)[keyof typeof InferenceFramework];

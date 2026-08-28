@@ -11,6 +11,8 @@
 #ifndef RAC_LLM_LLAMACPP_H
 #define RAC_LLM_LLAMACPP_H
 
+#include <stdint.h>
+
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
@@ -52,6 +54,9 @@ extern "C" {
  *
  * Mirrors Swift's LlamaCPPGenerationConfig.
  */
+/** `gpu_layers` value meaning "let llama.cpp decide" (see the field docs). */
+#define RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO INT32_MIN
+
 typedef struct rac_llm_llamacpp_config {
     /** Context size (0 = auto-detect from model) */
     int32_t context_size;
@@ -59,7 +64,15 @@ typedef struct rac_llm_llamacpp_config {
     /** Number of threads (0 = auto-detect) */
     int32_t num_threads;
 
-    /** Number of layers to offload to GPU (Metal on iOS/macOS) */
+    /**
+     * Number of layers to offload to GPU (Metal on iOS/macOS).
+     *
+     * `RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO` leaves the decision to llama.cpp's own
+     * fitting pass; `-1` offloads every layer; `0` pins the model to the CPU.
+     * Zero used to double as "unspecified", which made pinning to CPU
+     * impossible to express: the value was indistinguishable from a caller who
+     * had simply left the field alone.
+     */
     int32_t gpu_layers;
 
     /** Batch size for prompt processing */

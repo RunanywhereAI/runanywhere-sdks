@@ -80,8 +80,6 @@ line in this file.
 
 ## Best practices (Electron)
 
-Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package:
-
 ### Typed contracts
 
 - Prefer typed `SDKException` / `ErrorCode` / `ErrorCategory` on every JS-facing path.

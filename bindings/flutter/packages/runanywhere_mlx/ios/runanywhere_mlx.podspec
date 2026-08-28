@@ -9,7 +9,7 @@
 
 mlx_checksums = {
   'RABackendMLX' => '0802fe58480c3e03e94498d46adb50fda7b9ade491807c7e0392a7fd68b83b59',
-  'RunAnywhereMLXRuntime' => 'a92ce648106304e83d025503e7d21bfffe7c5c50fe540d71c43ce37bd2aa11d3',
+  'RunAnywhereMLXRuntime' => 'e2badb28a4496542a502fbfc5e019c784ed3cc109ac381586ec13c771bd0b3b5',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
   'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
 }.freeze
@@ -25,13 +25,15 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
-  s.version          = '0.20.24'
-  # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
-  # s.version leads the published release because 0.20.20 republished only the
-  # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
-  # the checksums below are still the 0.20.19 ones. Bump this back to
-  # s.version once a matching release exists.
-  asset_version      = '0.20.24'
+  s.version          = '0.20.31'
+  # iOS archives are downloaded from the v#{asset_version} GitHub release.
+  # Normally identical to s.version, and a literal on purpose:
+  # scripts/release/sync-versions.sh rewrites it and
+  # check_release_version_coherence.sh requires the exact string. It only
+  # diverges when a version republishes non-iOS packages without cutting iOS
+  # archives (0.20.20 did that) -- then pin the last
+  # release that has them.
+  asset_version      = '0.20.31'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

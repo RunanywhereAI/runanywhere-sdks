@@ -312,6 +312,21 @@ rac_result_t HttpServer::loadModel(const std::string& modelPath) {
         return RAC_ERROR_SERVER_MODEL_LOAD_FAILED;
     }
 
+    // rac_llm_create() only routes to the plugin and calls its `create` op
+    // (session/impl construction). Some backends (e.g. MLX, whose `create`
+    // just registers a session and defers the actual weight load to
+    // `initialize`) do not finish loading until `rac_llm_initialize()` is
+    // called explicitly. llama.cpp's `create` happens to load synchronously,
+    // which made this omission invisible until an MLX model hit `generate`
+    // here and failed with "model is not loaded".
+    rc = rac_llm_initialize(llmHandle_, modelPath.c_str());
+    if (RAC_FAILED(rc)) {
+        RAC_LOG_ERROR("Server", "Failed to initialize LLM handle: %d", rc);
+        rac_llm_destroy(llmHandle_);
+        llmHandle_ = nullptr;
+        return RAC_ERROR_SERVER_MODEL_LOAD_FAILED;
+    }
+
     RAC_LOG_INFO("Server", "Model loaded successfully");
     return RAC_SUCCESS;
 }

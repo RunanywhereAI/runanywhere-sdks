@@ -1,17 +1,23 @@
 # AGENTS.md — RunAnywhere Flutter SDK
 
-Package architecture below was last verified 2026-07-12; it is unchanged as of 0.20.24.
+Re-verified against source 2026-08-17; corrects drift from the 2026-07-12 pass (see
+inline notes). Deeper reference: `docs/ARCHITECTURE.md` (data flow, extensibility,
+trade-offs, native binary inventory — trust *this* file over it for exact counts, it
+lags), `docs/Documentation.md` (public API reference, same caveat), `docs/DEVELOPMENT.md`
+(platform setup, first build, troubleshooting).
 
 ## Repository Structure
 
-Melos-managed monorepo with 5 Flutter plugin packages that wrap the shared C++ core (`runanywhere-commons` / `RACommons`) via Dart FFI. No Flutter platform channels are used for AI operations — all inference routes through direct FFI calls.
+Melos-managed monorepo, 5 Flutter plugin packages wrapping the shared C++ core
+(`runanywhere-commons` / `RACommons`) via Dart FFI — no platform channels for AI, all
+inference is direct FFI.
 
 ```
 bindings/flutter/
 ├── pubspec.yaml                # Dart workspace + Melos config
 ├── analysis_options.yaml       # Strict lint rules
 ├── scripts/package-sdk.sh      # Packaging/validation script
-├── docs/                       # ARCHITECTURE.md, Documentation.md
+├── docs/                       # ARCHITECTURE.md, Documentation.md, DEVELOPMENT.md
 └── packages/
     ├── runanywhere/            # Core SDK (FFI bridge, public API, events, models)
     ├── runanywhere_llamacpp/   # LlamaCpp backend (LLM + VLM)
@@ -20,18 +26,14 @@ bindings/flutter/
     └── runanywhere_qhexrt/     # QHexRT Qualcomm Hexagon NPU backend (Android-only)
 ```
 
-Example app: `bindings/flutter/example/`.
+All four backend packages depend on `runanywhere ^0.20.31`; the core package vendors
+`RACommons`, each backend vendors its own XCFrameworks/`.so` files. Example app:
+`bindings/flutter/example/` (setup/troubleshooting in `docs/DEVELOPMENT.md`;
+`example/scripts/verify.sh` is the clean-clone build gate).
 
-## Package Dependency Graph
-
-```
-runanywhere_llamacpp ──┐
-runanywhere_mlx     ───┤
-runanywhere_onnx    ───┼──→ runanywhere (core)
-runanywhere_qhexrt  ───┘
-```
-
-All four backend packages depend on `runanywhere ^0.20.24`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
+Toolchain: Flutter 3.44.6 · Dart `>=3.12.0 <4.0.0` · iOS 17.5+ · Android minSdk 24 /
+compile+target SDK 36 · NDK **28.2.13676358** (`racFlutterNdkVersion` override) · AGP
+9.0.1 / Gradle 9.1.0 · Xcode/Swift 26+ / 6.2.
 
 ## Development Commands
 
@@ -44,144 +46,111 @@ melos run test         # flutter test in all 5 packages
 melos run clean        # flutter clean in all 5 packages
 melos version          # Bump versions + generate workspace CHANGELOG
 
-./scripts/package-sdk.sh                      # Validate all packages (pub publish --dry-run)
-./scripts/package-sdk.sh --natives-from PATH  # Stage native binaries then validate
-
-# Example app (from bindings/flutter/example/)
-flutter pub get
-flutter run                    # Run on connected device/emulator
-flutter run -d <device-id>     # Run on specific device
-flutter build apk | ios        # Build per-platform artifacts
+./scripts/package-sdk.sh                          # pub publish --dry-run, all packages
+./scripts/package-sdk.sh --natives-from PATH      # stage natives (xcframeworks + .so), then validate
+./scripts/package-sdk.sh --include-private-qhexrt # requires --natives-from; stages private QHexRT natives too
 ```
 
-## System Requirements
+Example-app commands (`flutter pub get`/`run`, `scripts/verify.sh`) are in
+`docs/DEVELOPMENT.md`.
 
-| Tool | Version |
-|---|---|
-| Flutter | 3.44.6 |
-| Dart | 3.12.2+ |
-| iOS deployment target | 17.5+ |
-| Android minSdk / compileSdk / targetSdk | 24 / 36 / 36 |
-| Android Gradle Plugin / Gradle | 9.0.1 / 9.1.0 |
-| Xcode / Swift | 26+ / 6.2 |
-| Android NDK | **28.2.13676358** (`racFlutterNdkVersion` override) |
+## Architecture
 
-## Architecture Overview
+Flutter App → `RunAnywhere` static namespace (17 capability-namespace getters, see
+below) → `lib/native/dart_bridge_*.dart` (38 FFI slices, one per C++ subsystem) →
+`NativeFunctions`/`PlatformLoader` (cached lookups + `DynamicLibrary` load) → RACommons
+C++ core (registries, events, router) → backend engine vtables (LlamaCpp, Sherpa/ONNX,
+QHexRT). Full diagram + per-pattern rationale: `docs/ARCHITECTURE.md` §2.2, §4.
 
-### Layer Stack
+Gotchas not obvious from that diagram:
 
-```
-Flutter Application
-    ↓
-RunAnywhere              (Public static namespace; capability accessors)
-    ↓
-public/capabilities/* (18 classes)   (RunAnywhereLLM, RunAnywhereSTT, etc.)
-    ↓
-lib/native/dart_bridge_*.dart (33)   (DartBridge slice per C++ subsystem)
-    ↓
-NativeFunctions + PlatformLoader     (Cached FFI lookups + DynamicLibrary load)
-    ↓
-RACommons (C++ core)                 (ModuleRegistry, ServiceRegistry, EventPublisher)
-    ↓
-LlamaCpp | Sherpa/ONNX | QHexRT HNPU (Backend engines registered via vtable v4)
-```
-
-### Key Architectural Patterns
-
-1. **Proto-driven public surface.** All public API types (LLM/STT/TTS/VAD/VLM/voice/RAG/tools/etc.) are protobuf-generated. 58 runtime `.pb.dart` / `.pbenum.dart` files live under `lib/generated/`. Never hand-edit generated output.
-2. **FFI scheduling discipline.** Blocking calls stay on the main isolate unless their C++ path is known not to publish back through a Dart callback, or unless the callback path is proven safe with `NativeCallable.listener`. Streaming and SDK event fan-out use **`NativeCallable.listener`** with broadcast `StreamController`s (`dart:async`, never rxdart).
-3. **Two-phase SDK init.** Phase 1 (sync): library load → register `rac_platform_adapter_t` → `rac_sdk_init` → configure logging → register events/device/file-manager/telemetry callbacks. Phase 2 (async, fire-and-forget): device registration + authentication + model assignment + telemetry flush. Offline inference works without Phase 2. This is truly fire-and-forget — Phase 2 is now assigned to `_servicesInitFuture` without awaiting (Swift `Task.detached` parity); previously the implementation eagerly awaited despite the doc claim.
-4. **Platform HTTP transport injection.** iOS registers a URLSession-backed `rac_http_transport_ops_t` vtable from ObjC++; Android registers an OkHttp-backed vtable via JNI. C++ uses the installed transport for all HTTP.
-5. **EventBus = pure `dart:async`.** `lib/public/events/event_bus.dart` is a `StreamController.broadcast()` singleton. rxdart is **not** a dependency.
-6. **Secure storage vtable.** C++ platform/auth managers call Dart callbacks synchronously. Flutter delegates those callbacks to plugin-owned native helpers: Keychain on Apple and Android Keystore AES-GCM with atomic no-backup ciphertext files on Android. A callback returns success only after the mutation completes.
-7. **Hand-written FFI bindings.** No `ffigen` is used. `lib/core/native/rac_native.dart` (~2.1K LOC) plus `lib/native/native_functions.dart` (~380 LOC cached lookup registry) define every C ABI binding.
-
-### Native Library Loading
-
-| Platform | Mechanism |
-|---|---|
-| iOS | `RACommons.xcframework` (static); `DynamicLibrary.process()` → symbols in main binary |
-| Android | `DynamicLibrary.open('librac_commons.so')`; fallback `librunanywhere_jni.so` |
-| macOS | `process()` → `executable()` → explicit dylib path (3rd `RACommons.xcframework` slice supports unit tests) |
-
-iOS requires `use_frameworks! :linkage => :static` in the Podfile and `-all_load` / `DEAD_CODE_STRIPPING=NO` linker flags (set in each podspec).
+1. **FFI scheduling is gated on callback safety**, not just "is this slow." A blocking
+   call may only move to a worker isolate when its C++ path cannot publish back through
+   an isolate-local Dart callback, or when the callback is proven safe with
+   `NativeCallable.listener`. SDK event fan-out and low-risk callbacks use
+   `NativeCallable.listener` with broadcast `StreamController`s (`dart:async`, never
+   rxdart — it is not a dependency); high-risk proto streams (LLM/VLM/STT/TTS/voice-agent)
+   do NOT — see "Streaming Callbacks: Native-Port Helpers" below for why and how.
+2. **Two-phase init, Phase 2 is genuinely fire-and-forget.** It's assigned to
+   `_servicesInitFuture` without awaiting (Swift `Task.detached` parity). A prior
+   implementation eagerly awaited despite a doc comment claiming otherwise — don't trust
+   a doc comment on this over the call site.
+3. **Secure storage vtable**: C++ calls Dart callbacks synchronously; Flutter delegates
+   to native helpers (Keychain on Apple, Android Keystore AES-GCM + atomic no-backup
+   ciphertext files). A callback returns success only after the mutation completes.
+4. **No `ffigen`.** `lib/core/native/rac_native.dart` + `lib/native/native_functions.dart`
+   (cached lookup registry) hand-define every C ABI binding.
+5. **Native library loading** differs per platform: iOS `DynamicLibrary.process()`
+   resolves symbols in the main binary (static `RACommons.xcframework`, requires
+   `use_frameworks! :linkage => :static` + `-all_load`/`DEAD_CODE_STRIPPING=NO`); Android
+   `DynamicLibrary.open('librac_commons.so')` with `librunanywhere_jni.so` fallback;
+   macOS tries `process()` → `executable()` → an explicit dylib path for unit tests.
 
 ## Core Package (`packages/runanywhere/`)
 
-### Entry Point
+### Public API Surface
 
-```dart
-// lib/public/runanywhere.dart  (static entry point)
-await RunAnywhere.initialize(
-  apiKey: 'optional',
-  baseURL: 'optional',
-  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT, // or SDK_ENVIRONMENT_PRODUCTION
-);
+`RunAnywhere` (`lib/public/runanywhere.dart`) is the entry point and the only source of
+truth for the current namespace set — treat any other list, including this one, as a
+snapshot. It currently exposes **17 capability-namespace getters**: 15 "v3 spec"
+namespaces (`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rerank`, `images`,
+`diarization`, `segmentation`, `voice`, `rag`, `models`, `lora`, `cua`) plus 2
+"beyond v3 spec" namespaces kept for shipped features the spec doesn't cover yet
+(`solutions`, `hybrid`). Most v3 namespaces are stateless `const <Name>Api` classes under
+`lib/public/api/namespaces/`; `cua`/`solutions`/`hybrid` are `RunAnywhere<Name>`
+singletons (`.shared`) under the older `lib/public/capabilities/` layout.
 
-// Capability accessors (shared capability instances)
-RunAnywhere.llm       // RunAnywhereLLM
-RunAnywhere.stt       // RunAnywhereSTT
-RunAnywhere.tts       // RunAnywhereTTS
-RunAnywhere.vad       // RunAnywhereVAD
-RunAnywhere.vlm       // RunAnywhereVLM
-RunAnywhere.voice     // RunAnywhereVoice
-RunAnywhere.visionLanguage // RunAnywhereVLM
-RunAnywhere.models    // RunAnywhereModels
-RunAnywhere.modelLifecycle // RunAnywhereModelLifecycle
-RunAnywhere.downloads // RunAnywhereDownloads
-RunAnywhere.tools     // RunAnywhereTools
-RunAnywhere.rag       // RunAnywhereRAG
-RunAnywhere.solutions // RunAnywhereSolutions
-RunAnywhere.embeddings // RunAnywhereEmbeddings
-RunAnywhere.lora      // RunAnywhereLoRACapability
-// + RunAnywherePluginLoader
-```
+**Retired as top-level accessors — don't assume these exist:** `downloads`, `tools`,
+`modelLifecycle`, `pluginLoader`, `diffusion`, `hardware`. Tool calling folded into
+`llm`; `images` replaced `diffusion`; `models` absorbs registry/lifecycle/download
+concerns.
 
 ### Source Layout
 
 ```
 packages/runanywhere/lib/
-├── runanywhere.dart              # Barrel (271 LOC, ~150 re-exports)
+├── runanywhere.dart              # Barrel (~150 re-exports)
 ├── runanywhere_protos.dart       # Proto re-export hub
-├── adapters/                     # http_client_adapter, voice_agent_stream_adapter
-├── core/
-│   ├── module/runanywhere_module.dart  # Module interface implemented by backends
-│   └── native/rac_native.dart    # Hand-written FFI bindings (~2.1K LOC)
+├── core/native/rac_native.dart   # Hand-written FFI bindings (~2.1K LOC)
 ├── features/
-│   ├── stt/services/audio_capture_manager.dart   # SDK-owned mic capture (PCM16 chunks via package:record)
+│   ├── stt/services/audio_capture_manager.dart   # SDK-owned mic capture (PCM16 via package:record)
 │   └── tts/services/audio_playback_manager.dart  # SDK-owned speak() playback via audioplayers
-├── foundation/
-│   ├── constants/                # sdk_constants.dart
-│   ├── errors/                   # sdk_exception.dart (40+ factory constructors)
-│   └── logging/                  # sdk_logger.dart
+├── foundation/                    # constants/, errors/ (sdk_exception.dart), logging/
 ├── generated/                    # runtime proto files (DO NOT EDIT)
-├── native/                       # 33 dart_bridge_*.dart slices + native_functions + platform_loader + types/ + type_conversions/
+├── native/                       # dart_bridge_*.dart slices + native_functions + platform_loader + types/ + type_conversions/
 └── public/
     ├── runanywhere.dart          # RunAnywhere static entry point
-    ├── capabilities/             # 17 capability classes (flat layout)
-    ├── configuration/            # sdk_environment.dart
-    ├── events/                   # event_bus.dart (dart:async)
-    ├── extensions/               # audio/, stt/, format_framework, model_category_extensions, rag_module, runanywhere_logging, _storage, _structured_output
-    └── hybrid/                   # hybrid_stt_router.dart + cloud registry
+    ├── api/                      # namespaces/ (<Name>Api classes) + types/ + internal/ — the newer v3-spec layer
+    ├── capabilities/             # older RunAnywhere<Name> singleton classes (cua, solutions, hybrid + internals)
+    └── events/                   # event_bus.dart (dart:async)
 ```
 
-**Not present (do not search for):** no top-level `lib/capabilities/`, no `lib/infrastructure/`, no `lib/internal/`, no `lib/data/`, no `core/types/model_types.dart`, no `dart_bridge_hardware.dart` / `RunAnywhere.hardware`, no `dart_bridge_llm_streaming.dart`, no `native_backend.dart`.
+**Not present (do not search for):** no top-level `lib/capabilities/`, no
+`lib/infrastructure/`, no `dart_bridge_hardware.dart`, no `dart_bridge_llm_streaming.dart`,
+no `native_backend.dart`.
 
-### DartBridge Slices (`lib/native/`)
+`lib/native/` has 41 `.dart` files: 38 one-per-C++-subsystem `dart_bridge_*.dart` slices,
+the `dart_bridge.dart` coordinator, and 2 supporting modules (`native_functions.dart`,
+`platform_loader.dart`). The slice set has grown past the historical "33 slices" figure —
+`diarization`, `segmentation`, `rerank`, `secure_storage`, `hf_auth`, and `cua` are newer
+additions matching ABI v9's primitive set; `ls lib/native/` for the current list rather
+than trusting an enumeration here.
 
-34 files total: 33 bridge slices + 1 coordinator (`dart_bridge.dart`). Slices for: **audio, auth, device, diffusion, download, embeddings, environment, events, file_manager, http, hybrid_stt, llm, lora, model_assignment, model_lifecycle, model_paths, model_registry, platform, plugin_loader, proto_utils, rag, sdk_init, solutions, state, storage, stt, structured_output, telemetry, tool_calling, tts, vad, vlm, voice_agent**.
+### iOS Native Layer (`packages/runanywhere/ios/`)
 
-Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.dart` (per-platform `DynamicLibrary`), `types/` (8 struct/typedef bundles imported directly), `type_conversions/` (proto ↔ C struct mappers).
+A local SwiftPM package (`ios/runanywhere/Package.swift`, tools-version 6.2) — **not** a
+flat CocoaPods `Classes/` layout (an older revision of this doc described one; it no
+longer exists).
 
-### iOS Plumbing (`packages/runanywhere/ios/`)
-
-| File | Role |
+| Path | Role |
 |---|---|
-| `Classes/RunAnywherePlugin.swift` | Flutter plugin entry; calls `URLSessionHttpTransport.register()` before Dart FFI fires HTTP |
-| `Classes/URLSessionHttpTransport.swift` | Swift façade; `@_silgen_name("ra_flutter_register_urlsession_transport")`, idempotent |
-| `Classes/URLSessionHttpTransport.mm` | ObjC++ vtable wiring; owns static `rac_http_transport_ops_t` + URLSession machinery |
-| `Classes/RACommons.exports` | Symbol exports list controlling linker visibility from `RACommons.xcframework` |
-| `Frameworks/RACommons.xcframework` | Vendored static archive — **3 slices**: `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
+| `Package.swift` | 3 targets: binary `RACommons`, ObjC++ `runanywhere_native`, Swift `runanywhere` (the Flutter plugin) |
+| `Sources/runanywhere/RunAnywherePlugin.swift` | Flutter plugin entry; calls `URLSessionHttpTransport.register()` before Dart FFI fires HTTP |
+| `Sources/runanywhere/URLSessionHttpTransport.swift` | Swift façade; `@_silgen_name("ra_flutter_register_urlsession_transport")`, idempotent |
+| `Sources/runanywhere_native/URLSessionHttpTransport.mm` | ObjC++ vtable wiring; owns static `rac_http_transport_ops_t` |
+| `Sources/runanywhere_native/*StreamNativePort.mm` | 6 native-port stream-callback helpers — see `docs/ARCHITECTURE.md` §10.3 |
+| `Sources/runanywhere_native/SecureStorageBridge.mm` | Keychain bridge for the secure-storage vtable |
+| `Frameworks/RACommons.xcframework` | Vendored static archive, 3 slices: `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere.podspec` | iOS 17.5+; `-lc++ -larchive -lbz2 -lz -ObjC -all_load -Wl,-export_dynamic`; `DEAD_CODE_STRIPPING=NO` |
 
 ### Android Plumbing (`packages/runanywhere/android/`)
@@ -190,170 +159,83 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 |---|---|
 | `src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt` | Flutter plugin; static `init {}` registers OkHttp transport via JNI before FFI HTTP fires |
 | `src/main/kotlin/com/runanywhere/sdk/native/bridge/RunAnywhereBridge.kt` | JNI shim; `System.loadLibrary("runanywhere_jni")` |
-| `src/main/kotlin/com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt` | OkHttp 4.12 vtable backing `rac_http_request_send`/`_stream`/`_resume` — canonical Kotlin-SDK-aligned FQN required by JNI shim (`okhttp_transport_adapter.cpp:557` `FindClass`); 30s/24h/60s timeouts on streams, 32 KB chunks, range-honored 206 disclosure, in-flight registry for `cancelAllStreams()` |
-| `build.gradle` | AGP 9 built-in-Kotlin-ready, Java 17, NDK `28.2.13676358`; ABIs: arm64-v8a, armeabi-v7a, x86_64 |
-| `binary_config.gradle` | `testLocal` toggle + GitHub-release URL + checksum |
+| `src/main/kotlin/com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt` | OkHttp 4.12 vtable backing `rac_http_request_send`/`_stream`/`_resume`; 30s/24h/60s timeouts, 32 KB chunks, range-honored 206, in-flight registry for `cancelAllStreams()` |
+| `src/main/cpp/NativePortHelpers.cpp` | Builds `librunanywhere_flutter_helpers.so` — see `docs/ARCHITECTURE.md` §10.3 |
+| `build.gradle` | AGP 9, Java 17, NDK `28.2.13676358`; ABIs: arm64-v8a, armeabi-v7a, x86_64 |
+| `binary_config.gradle` | `useLocalNatives` toggle + GitHub-release URL + checksum |
 
 ## Backend Packages
 
-### `runanywhere_llamacpp` — LLM + VLM
+Full native-binary inventory (which `.so`/`.xcframework` each package ships) is in
+`docs/ARCHITECTURE.md` §13 — don't re-derive or duplicate it here.
 
-- `LlamaCpp.register()` → FFI `rac_backend_llamacpp_register()` + `rac_backend_llamacpp_vlm_register()`
-- Model format: `.gguf` extension
-- Constants: `version='2.0.0'`, `llamaCppVersion='runanywhere-b10453.4'`
-- iOS: `RABackendLLAMACPP.xcframework` (static `.a`); weak-links Metal/MetalKit/MetalPerformanceShaders
-- Android: ships `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `libc++_shared.so` per ABI
+- **`runanywhere_llamacpp`** (LLM + VLM, `.gguf`): `LlamaCpp.register()` → FFI
+  `rac_backend_llamacpp_register()` + `..._vlm_register()`. One call fills both
+  `llm_ops` and `vlm_ops` on a single vtable — there is no separate `registerVlm()`.
+- **`runanywhere_onnx`** (STT + TTS + VAD): `await Onnx.register()` registers both the
+  generic ONNX engine and the Sherpa STT/TTS/VAD engine — two engines in one package
+  because both share the underlying ONNX Runtime and splitting them would double-ship
+  it. Custom downloader `OnnxDownloadStrategy` handles `.tar.bz2` via
+  `rac_extract_archive_native`.
+- **`runanywhere_mlx`** (Apple MLX, physical iOS only): `await MLX.register()` → FFI
+  `ra_mlx_register_runtime()`. Canonical implementation is the Swift `RunAnywhereMLX`
+  product, no inference logic in Dart. CocoaPods-only (Hub/Crypto need app-root bundles
+  Flutter SwiftPM can't provide). Simulator slices build/link/start only — registration
+  reports unavailable there. Android: unsupported, not in the manifest.
+- **`runanywhere_qhexrt`** (Qualcomm Hexagon NPU, Android-only): `await
+  QHexRT.register()` → FFI `rac_backend_qhexrt_register()`, registers only on supported
+  Snapdragon Hexagon NPUs. Private backend — natives are staged separately and are not
+  present in a checkout.
 
-### `runanywhere_onnx` — STT + TTS + VAD
-
-- `await Onnx.register()` explicitly registers both the generic ONNX engine and the Sherpa STT/TTS/VAD engine
-- Model detection: `whisper`/`zipformer`/`paraformer` (STT), `piper`/`vits` (TTS), always handles VAD
-- Constants: `version='2.0.0'`, `onnxRuntimeVersion='1.28.0'`
-- Custom downloader: `OnnxDownloadStrategy` handles `.tar.bz2` archives via `rac_extract_archive_native`
-- iOS: `RABackendONNX.xcframework` and `RABackendSherpa.xcframework` are both vendored by the podspec
-- Android: 9 `.so` per ABI (`libonnxruntime`, `libsherpa-onnx-{c-api,jni}`, `librac_backend_{onnx,onnx_jni,sherpa}`, `librunanywhere_{onnx,sherpa}`, `libc++_shared`); declares `RECORD_AUDIO` permission; load order: `onnxruntime` → `sherpa-onnx-c-api` → backends
-
-### `runanywhere_mlx` — Apple MLX (physical iOS devices)
-
-- `await MLX.register()` → FFI `ra_mlx_register_runtime()`
-- Canonical implementation: Swift `RunAnywhereMLX` product; no inference business logic in Dart
-- Capabilities: LLM, VLM, embeddings, STT, and TTS through the shared core router
-- iOS: package-owned `RABackendMLX.xcframework`, `RunAnywhereMLXRuntime.xcframework`, and `RunAnywhereMLXMetal.xcframework`; all three are required
-- Packaging: CocoaPods-only. Hub/Crypto require app-root bundles, which Flutter SwiftPM cannot provide without colliding with the real upstream module identities
-- The arm64 simulator slices are for package, compile, link, and startup validation only; registration reports unavailable and no MLX model is executable there
-- Android: unsupported and not declared in the Flutter package manifest
-
-### `runanywhere_qhexrt` — Qualcomm Hexagon NPU (Android-only)
-
-- `await QHexRT.register()` → FFI `rac_backend_qhexrt_register()`
-- Capabilities dynamic; only registers on supported Snapdragon Hexagon NPUs
-- iOS: unsupported and not declared in the Flutter package manifest
-- Android: ships/stages private QHexRT `.so` files plus QAIRT/QNN runtime libraries for arm64-v8a
-- Private backend; only the public package wrapper and C ABI surface live in this repo
+**`libc++_shared.so` duplication across all four Android packages is intentional — do
+not dedup at the package level.** Each Flutter plugin must be a self-contained AAR (a
+consumer may add only `runanywhere` + `runanywhere_llamacpp`, and every transitive
+closure needs the lib); Gradle `packaging { jniLibs.pickFirsts += "**/libc++_shared.so"
+}` resolves the merge at APK time. Plugin packages can't transitively depend on another
+plugin's `jniLibs`, so factoring this into a shared sub-package would break standalone
+consumption.
 
 ## Generated Code
 
-`packages/runanywhere/lib/generated/` contains **58 runtime proto files** generated by `protoc` + `protoc-gen-dart` from `idl/*.proto`. Excluded from analyzer. Do not hand-edit.
-
-29 proto schemas with runtime codegen (2 files each — `.pb.dart`, `.pbenum.dart`): `chat`, `component_types`, `diffusion_options`, `download_service`, `embeddings_options`, `errors`, `hardware_profile`, `lifecycle_service`, `llm_options`, `llm_service`, `lora_options`, `model_types`, `pipeline`, `rac_options`, `rag`, `router`, `sdk_events`, `sdk_init`, `solutions`, `storage_types`, `structured_output`, `stt_options`, `thinking_tag_pattern`, `tool_calling`, `tts_options`, `vad_options`, `vlm_options`, `voice_agent_service`, `voice_events`. `*.pbjson.dart`, `*.pbserver.dart`, and `*.pbgrpc.dart` are stripped by `idl/codegen/generate_dart.sh` because Flutter does not use descriptor/server/gRPC stubs.
-
-## Data Flows
-
-### LLM Generation
-1. `RunAnywhere.llm.generate(prompt, options)` → `RunAnywhereLLM.shared.generate()`
-2. Validates `SdkState.isInitialized`, `DartBridge.llm.isLoaded`
-3. `RunAnywhereLLM.generateRequest()` calls the generated `rac_llm_generate_proto` ABI; heavy isolate wrapping must remain gated on callback/event-publish safety.
-4. Returns `LLMGenerationResult` proto
-
-### LLM Streaming
-1. `RunAnywhere.llm.generateStream(prompt, options)` registers a `NativeCallable.listener` for C++ token callbacks
-2. Tokens land in a `StreamController` (one per generateStream call) emitting `LLMStreamEvent` protos
-
-### Model Download
-1. `RunAnywhere.downloads.start(modelId)` → `RunAnywhere.downloads.start()`
-2. `DartBridgeDownload.orchestrateDownload()` returns a `taskId`
-3. Polls `DartBridgeDownload.getProgress(taskId)` every 250 ms
-4. On completion: resolves model path via `rac_model_paths_get_model_folder`; updates registry
-
-### SDK Initialization
-1. `RunAnywhere.initialize()` runs Phase 1: load native lib → register platform adapter → configure logging → `rac_sdk_init_phase1_proto` → register events / device / file-manager / telemetry callbacks → `DartBridge.modelPaths.setBaseDirectory()` (model storage root, set BEFORE initialize() returns so registerModel() can reconcile on-disk folders — Swift ordering)
-2. Phase 2 (detached): HTTP client config → telemetry → model registry → commons `rac_sdk_init_phase2_proto` (auth, device registration, model assignments, downloaded-model discovery)
+`packages/runanywhere/lib/generated/` holds **~79 files** across **~39 proto schemas**
+(2 files each: `.pb.dart`, `.pbenum.dart`), generated by `protoc` + `protoc-gen-dart`
+from `idl/*.proto` — up from an older 58-file/29-schema count as `diarization`,
+`segmentation`, `rerank`, `cua`, and others landed alongside the ABI v9 primitive set.
+Excluded from the analyzer; do not hand-edit.
+`*.pbjson.dart`/`*.pbserver.dart`/`*.pbgrpc.dart` are stripped by
+`idl/codegen/generate_dart.sh` — Flutter doesn't use descriptor/server/gRPC stubs.
 
 ## Lint Rules
 
-Extends `package:flutter_lints/flutter.yaml` with:
-- Strict mode: `strict-casts`, `strict-inference`, `strict-raw-types`
-- Errors: `dead_code`, `unused_import`, `unused_local_variable`, `unused_element`, `unused_field`
-- Warnings: `avoid_dynamic_calls`, `avoid_print`, `prefer_const_constructors`, `prefer_final_locals`
-- Excluded: `**/*.g.dart`, `**/*.freezed.dart`, `lib/generated/**`
-
-## Native Binary Inventory
-
-### iOS XCFrameworks (static archives)
-
-| Package | Framework | Slices |
-|---|---|---|
-| `runanywhere` | `RACommons.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
-| `runanywhere_llamacpp` | `RABackendLLAMACPP.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
-| `runanywhere_mlx` | `RABackendMLX.xcframework`, `RunAnywhereMLXRuntime.xcframework`, `RunAnywhereMLXMetal.xcframework` | `ios-arm64`, `ios-arm64-simulator` (validation only) |
-| `runanywhere_onnx` | `RABackendONNX.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
-| `runanywhere_onnx` | `RABackendSherpa.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
-| `runanywhere_qhexrt` | — | none |
-
-### Android Shared Libraries (per ABI: arm64-v8a, armeabi-v7a, x86_64)
-
-| Package | Libraries |
-|---|---|
-| `runanywhere` | `librac_commons.so`, `librunanywhere_jni.so`, `libc++_shared.so`, `libomp.so` |
-| `runanywhere_llamacpp` | `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `libc++_shared.so` |
-| `runanywhere_onnx` | `libonnxruntime.so`, `libsherpa-onnx-c-api.so`, `libsherpa-onnx-jni.so`, `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `librac_backend_sherpa.so`, `librunanywhere_onnx.so`, `librunanywhere_sherpa.so`, `libc++_shared.so` |
-| `runanywhere_qhexrt` | `librac_backend_qhexrt*.so`, QAIRT/QNN libs, `libc++_shared.so` (private natives staged separately) |
-
-## Package Architecture Notes
-
-### `libc++_shared.so` Duplication Is Intentional
-
-Each Flutter plugin package (`runanywhere`, `runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_qhexrt`) bundles its own `libc++_shared.so` in `android/src/main/jniLibs/{abi}/`. This duplication is **by design**, not a bug to dedup.
-
-| Concern | Resolution |
-|---|---|
-| Why each package ships its own copy | Each Flutter plugin must be a **self-contained AAR**. A consumer app may add only `runanywhere` + `runanywhere_llamacpp` without `runanywhere_onnx`; every transitive dependency closure must include `libc++_shared.so`. |
-| How merge conflicts are resolved at app build | Gradle `packaging { jniLibs.pickFirsts += "**/libc++_shared.so" }` in the consumer app (and in each plugin's `build.gradle`) tells AGP to pick one copy at APK packaging time. |
-| Why not factor into a shared sub-package | Flutter plugin packages cannot transitively depend on another plugin's `jniLibs` — Gradle resolves AARs, not raw `.so` bundles. The self-contained AAR contract is what makes `flutter pub add runanywhere_llamacpp` work in isolation. |
-
-**Do not try to dedup at the package level.** Removing `libc++_shared.so` from any one package will break that package when consumed standalone.
-
-### LlamaCPP Is One Package; LLM + VLM Are Two Modalities of the Same Engine
-
-`runanywhere_llamacpp` exposes a **single registration call** that registers a unified plugin vtable with both `llm_ops` and `vlm_ops` slots filled:
-
-```dart
-await LlamaCpp.register();   // Registers a single vtable: llm_ops + vlm_ops both populated
-// No separate registerVlm() exists.
-```
-
-The underlying FFI symbol(s) are encapsulated by `LlamaCpp.register()` — Dart consumers see one engine that supports two modalities, not two engines. Router scoring treats LLM and VLM requests against the same plugin entry.
-
-### ONNX + Sherpa Are Bundled in One Package (Two Engines, One Distribution)
-
-`runanywhere_onnx` vendors **both** `RABackendONNX.xcframework` and `RABackendSherpa.xcframework`, and ships **both** engines' native libraries in its `jniLibs/`. This is two engines in one distribution package, intentionally:
-
-| Engine | Native artifact (iOS) | Native artifact (Android) | Modalities |
-|---|---|---|---|
-| ONNX Runtime backend | `RABackendONNX.xcframework` | `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `libonnxruntime.so` | Embeddings + generic ORT services |
-| Sherpa-ONNX backend | `RABackendSherpa.xcframework` | `librac_backend_sherpa.so`, `librunanywhere_sherpa.so`, `libsherpa-onnx-{c-api,jni}.so` | STT + TTS + VAD |
-
-Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equivalent inside the ORT xcframework) — splitting them would double-ship the ORT shared library. They are co-distributed as `runanywhere_onnx` for that reason. `await Onnx.register()` explicitly registers the ONNX engine and the Sherpa STT/TTS/VAD engine.
+Extends `package:flutter_lints/flutter.yaml` with strict-casts/strict-inference/
+strict-raw-types, error-level `dead_code`/`unused_import`/`unused_local_variable`/
+`unused_element`/`unused_field`, warning-level `avoid_dynamic_calls`/`avoid_print`/
+`prefer_const_constructors`/`prefer_final_locals` (full rule set in
+`analysis_options.yaml`). Excludes `**/*.g.dart`, `**/*.freezed.dart`,
+`**/lib/generated/**`.
 
 ## Versions
 
 | Package / Artifact | Version |
 |---|---|
-| `runanywhere` (Dart package) | 0.20.24 |
-| `runanywhere_llamacpp` | 0.20.24 |
-| `runanywhere_mlx` | 0.20.24 |
-| `runanywhere_onnx` | 0.20.24 |
-| `runanywhere_qhexrt` | 0.20.24 |
+| `runanywhere`, `runanywhere_llamacpp`, `runanywhere_mlx`, `runanywhere_onnx`, `runanywhere_qhexrt` | 0.20.31 (all 5, confirmed identical) |
 | `RACommons` native | 0.1.6 |
-| QHexRT native | private staged artifact |
 | llama.cpp engine | runanywhere-b10453.4 |
 | ONNX Runtime | 1.28.0 |
-| Canonical version source | `core/VERSION` (0.20.24) |
+| Canonical version source | `core/VERSION` |
 
-## 2026-07 Callback Architecture Update
+## Streaming Callbacks: Native-Port Helpers
 
-Flutter streaming callbacks now use plugin-owned native-port helpers for every high-risk proto stream path: LLM, VLM, STT, TTS, and voice-agent turns/handle callbacks. iOS helpers live under `packages/runanywhere/ios/Classes/*NativePort.mm`; Android helpers live in `packages/runanywhere/android/src/main/cpp/NativePortHelpers.cpp` and build into `librunanywhere_flutter_helpers.so`. Both implementations copy borrowed C++ proto bytes inside the native callback and post owned `Uint8List` messages to Dart `ReceivePort`s with `Dart_PostCObject`.
+**Never read borrowed C callback bytes asynchronously from Dart.** High-risk streams
+(LLM/VLM/STT/TTS, voice-agent) copy bytes synchronously inside the native callback via a
+plugin-owned native-port helper and post owned `Uint8List`s to a Dart `ReceivePort`,
+because `NativeCallable.isolateLocal` is only safe on the registering isolate thread and
+`NativeCallable.listener` runs too late on the event loop for buffers commons may reuse
+immediately. `rac_native.dart` prefers the optional `ra_flutter_*_native_port` symbols
+when present, falling back to same-thread `isolateLocal` only where documented.
 
-This exists because Dart `NativeCallable.isolateLocal` is only safe when native invokes the callback on the registering isolate thread, while MLX/Swift async and other native runtimes may emit from worker threads. `NativeCallable.listener` is cross-thread safe but runs later on the Dart event loop, which is too late for borrowed buffers that commons may reuse immediately after the callback returns. The native-port helper is the bridge-layer fix that preserves the existing architecture: examples keep calling SDK APIs directly, the Flutter SDK still uses FFI rather than platform channels for inference, and C++ commons remains the owner of inference/model orchestration.
-
-Current pattern:
-
-1. `rac_native.dart` looks up optional `ra_flutter_*_native_port` symbols exported by the Flutter iOS pod or Android helper library.
-2. Dart bridge slices prefer the native-port helper when present.
-3. Native helper copies bytes synchronously during the C callback.
-4. Dart receives owned bytes on a `ReceivePort`, decodes generated protobuf types, and emits normal SDK streams.
-5. Older or unsupported binaries may fall back to same-thread `isolateLocal` paths only where explicitly documented.
-
-On Android, `DartBridge.initialize()` warm-loads optional helpers through `PlatformLoader.tryLoadFlutterNativePortHelpers()`, which opens `librunanywhere_flutter_helpers.so`; `RacBindings` then searches that helper library before RACommons for `ra_flutter_*_native_port` symbols. The helper library links against the packaged `librac_commons.so`; local builds filter helper ABIs to the staged RACommons ABI directories, while remote/release mode targets the full supported ABI set after `downloadNativeLibs`.
-
-When adding a new Flutter stream callback, do not read borrowed C callback bytes asynchronously from Dart. Add a small native-port helper at the platform SDK layer, copy bytes before returning to commons, expose it as an optional FFI symbol in `rac_native.dart`, and keep example apps thin. Do this before moving model lifecycle or stream feeding back to worker isolates, especially for qhexrt or other backends that may call from native worker threads.
+**When adding a new stream callback**, follow the same pattern rather than reading
+borrowed bytes from Dart directly: add a native-port helper at the platform SDK layer,
+copy bytes before returning to commons, expose it as an optional FFI symbol in
+`rac_native.dart`, keep example apps thin. Full rationale, file map, and the Android
+warm-load sequence: `docs/ARCHITECTURE.md` §10.3.

@@ -7,6 +7,11 @@ name: Release
 # every client SDK package, computes SHA-256 checksums, and attaches the lot
 # to a single GitHub Release named v1.2.3.
 #
+# That asset set includes the C++ desktop kits
+# (RunAnywhere-cpp-desktop-{macos-arm64,windows-x64}-v1.2.3.tar.gz).
+# Official CLI bottles (rcli) are NOT produced here — they ship from
+# RunanywhereAI/RCLI, which consumes those kits via find_package(RunAnywhere).
+#
 # This workflow does NOT publish to npm / Maven Central / pub.dev /
 # Swift Package Registry / GitHub Packages. GitHub Releases is the only
 # distribution channel.
@@ -65,6 +70,22 @@ on:
           Run id whose native-web artifact to reuse instead of rebuilding (skips native_web).
           Only safe when nothing under bindings/web/wasm, engines, or commons changed
           since that run; a packaging-only re-release is the intended case.
+        required: false
+        default: ''
+      rebuild_cpp_desktop:
+        description: >-
+          Rebuild C++ desktop kits (and private overlays) even when publish_from_run_id
+          is set. Use when Apple/WASM bytes are good but the kits were packaged without
+          Sherpa-ONNX prebuilts (non-routable stub). Publish then overwrites the reused
+          run's kit artifacts with this run's.
+        type: boolean
+        default: false
+      reuse_cpp_desktop_run_id:
+        description: >-
+          Run id whose cpp-desktop-* artifacts to attach instead of rebuilding kits
+          (skips the five kit/overlay jobs). Use with publish_from_run_id when a
+          prior rebuild_cpp_desktop run already packaged routable kits but publish
+          itself failed (e.g. sidecar path prefix).
         required: false
         default: ''
 
@@ -156,8 +177,7 @@ jobs:
   native_ios:
     needs: validate
     # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
-    # Use the macOS 26 runner line for Xcode 26 while keeping the desktop rcli
-    # lane on its existing macos-14 llama.cpp Metal pin.
+    # Use the macOS 26 runner line for Xcode 26 (mlx-audio-swift needs Swift 6.2+).
     if: ${{ !inputs.publish_from_run_id }}
     runs-on: macos-26
     # The Apple build compiles all XCFramework slices + the heavy mlx-swift/MLX
@@ -166,39 +186,34 @@ jobs:
     # skipping publish). Raised to 150 to absorb runner variance.
     timeout-minutes: 150
     steps:
+      # This job holds NEURUN_TOKEN and runs gh plus build scripts; do not leave
+      # GITHUB_TOKEN in .git/config for every later step.
       - uses: actions/checkout@v7
-      # The NeuRT (Apple ANE) engine is implemented in the sibling private
-      # `neurun` repo. Unlike pr-build.yml (which sets RAC_ALLOW_NEURT_STUB=1 to
-      # prove compile/link), the release must build the REAL engine, so we check
-      # neurun out here and point NEURT_ROOT at it. Pinned to a commit so the
-      # published binaries stay reproducible and match the committed checksums.
-      # Requires a NEURUN_TOKEN secret (PAT/app token with read on RunanywhereAI/neurun).
-      - name: Checkout neurun (NeuRT engine source)
-        uses: actions/checkout@v7
         with:
-          repository: RunanywhereAI/neurun
-          # Bumped from 1c44fd15 (2026-08-09), which no longer compiles: commons
-          # widened rac_llm_stream_callback_fn with `tokens_in_delta`, and that
-          # pin still passes 4 arguments. It failed `native_ios` at
-          # rac_llm_ops_neurt.cpp:301 and :325 with "too few arguments to
-          # function call, expected 5, have 4" for v0.20.15, v0.20.16 AND
-          # v0.20.17 — and because every packaging job needs native_ios, all
-          # three releases shipped ONLY the 9 hand-uploaded iOS zips. The
-          # Android/Linux/Windows/WASM commons, the rcli tarballs, the Kotlin
-          # Maven zip and the npm tgz assets were simply absent, which is why
-          # Flutter's `downloadNativeLibs` 404s on RACommons-android-*.zip.
-          # Verify a bump with a syntax-only compile before changing this:
-          #   clang++ -std=c++20 -fsyntax-only -DNEURT_WITH_RAC_HEADERS \
-          #     -Icore/include -I<neurun>/NeuRT/include -I<neurun>/NeuRT/src \
-          #     <neurun>/NeuRT/src/sdk/rac_llm_ops_neurt.cpp
-          # NEURT_WITH_RAC_HEADERS is required: without it the file compiles
-          # against its own mirrored typedefs and passes even when broken.
-          # Includes the NeuRT STT op table paired with SDK PR #710. Keeping
-          # the older LLM-only pin would make the release build fall back to a
-          # non-routable shell for TRANSCRIBE even though the SDK advertises it.
-          ref: 3b322bf27d26ddb90c0059f2cb83b70511a0d88c
-          token: ${{ secrets.NEURUN_TOKEN }}
-          path: neurun
+          persist-credentials: false
+      # NeuRT arrives as prebuilt archives pinned in core/VERSIONS. Exit 3 means
+      # "no token", which is right for a fork PR and catastrophic for a release:
+      # a stub registers, claims Apple availability and serves nothing.
+      - name: Download prebuilt NeuRT archives (all Apple slices)
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The downloader exits 3 when no token is present, so a public/fork build
+          # degrades to the non-routable shell. A RELEASE must never do that: a
+          # stub would ship an engine that registers, claims Apple availability and
+          # serves nothing. Treat 3 as fatal here specifically.
+          # Capture the status directly. Inside `if ! cmd`, $? is the status of the
+          # NEGATION, so it is always 0 and the exit-3 branch was dead code -- the
+          # job failed but never printed why.
+          rc=0
+          bash scripts/build/download-neurt.sh --all || rc=$?
+          if [[ "$rc" -eq 3 ]]; then
+            echo "::error::NEURUN_TOKEN is unavailable, so NeuRT would build as a stub."
+            echo "::error::A release must ship the real Apple engine. Refusing."
+            exit 1
+          fi
+          [[ "$rc" -eq 0 ]] || exit "$rc"
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
@@ -216,8 +231,6 @@ jobs:
         # and the Package.swift binary targets expect.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          # Build the real NeuRT engine from the checked-out neurun source.
-          NEURT_ROOT: ${{ github.workspace }}/neurun
         run: bash core/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v7
@@ -252,6 +265,44 @@ jobs:
       # missing it, which failed configure with "Sherpa-ONNX not found".
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash core/scripts/android/download-sherpa-onnx.sh
+      # arm64-v8a is the only Android ABI with a Hexagon NPU, so it is the only
+      # one with a QHexRT payload. build-core-android.sh runs
+      # validate-qhexrt-prebuilt.py and enables the engine only when a valid
+      # payload is selected; exit 3 (nothing selected) leaves it OFF, which is
+      # the correct public-build outcome. Without this fetch that was ALWAYS the
+      # outcome, so released Android artifacts carried the non-routable shell.
+      - name: Download the pinned QHexRT payload (arm64-v8a only)
+        if: matrix.abi == 'arm64-v8a'
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          rc=0
+          bash scripts/build/download-qhexrt.sh --abi arm64-v8a || rc=$?
+          if [[ "$rc" -eq 3 ]]; then
+            echo "::error::No NEURUN_TOKEN, so Android would ship the QHexRT shell."
+            exit 1
+          fi
+          [[ "$rc" -eq 0 ]] || exit "$rc"
+
+      # The QAIRT/QNN runtime the engine dlopens on device. PRIVATE, same token as
+      # the engine payload. Without it build-core-android.sh correctly refuses to
+      # package a routable engine whose runtime is absent -- which is what broke
+      # the first v0.20.26 candidate, since no hosted runner has a licensed QAIRT
+      # install.
+      - name: Download the pinned QAIRT runtime (arm64-v8a only)
+        if: matrix.abi == 'arm64-v8a'
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: bash scripts/build/download-qairt-runtime.sh --platform arm64-v8a
+
+      # Two independent pins CAN drift. A drifted pair passes every other check
+      # and then crashes on a real Hexagon device, which is the one place CI
+      # cannot see.
+      - name: Assert the QAIRT runtime matches the engine's build identity
+        if: matrix.abi == 'arm64-v8a'
+        run: bash scripts/validation/gates/check_qairt_pairing.sh --platform arm64-v8a
+
       - name: Build + package commons for Android (${{ matrix.abi }})
         # build-android.sh delegates the build to build-core-android.sh (the
         # same script pr-build.yml uses), then stages the per-ABI .so set
@@ -260,6 +311,59 @@ jobs:
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: bash core/scripts/build-android.sh ${{ matrix.abi }}
+      # build-core-android.sh stages engine .so files with copy_if_exists, which
+      # SILENTLY no-ops when the lib was never built -- the same guarded-copy pattern
+      # that shipped Windows with zero engines for several releases. A failed QHexRT
+      # fetch would otherwise produce a green Android release with no NPU engine.
+      #
+      # Assert against the KOTLIN MODULE jniLibs, not the public RACommons zip:
+      # QHexRT is deliberately absent from the public asset set (this workflow
+      # hard-fails on any *qhexrt* file reaching release-flat) and ships through the
+      # Maven publication instead.
+      - name: Assert the QHexRT carrier is present and routable (arm64-v8a)
+        if: matrix.abi == 'arm64-v8a'
+        run: |
+          set -euo pipefail
+          jni="bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs/arm64-v8a"
+          # These are the names bindings/kotlin/scripts/package-qhexrt.sh ships, and
+          # they are what build-core-android.sh actually stages. There is NO
+          # librunanywhere_qhexrt.so on Android: qhexrt is built with
+          # TARGET_NAME rac_backend_qhexrt and has no separate carrier, unlike the
+          # llamacpp/onnx/sherpa plugins.
+          for want in librac_backend_qhexrt.so librac_backend_qhexrt_jni.so; do
+            if [[ ! -f "$jni/$want" ]]; then
+              echo "::error::$want is absent from $jni."
+              echo "::error::Android would ship without the Hexagon NPU engine. Check the"
+              echo "::error::QHexRT download step and validate-qhexrt-prebuilt.py's verdict."
+              ls -la "$jni" 2>/dev/null || true
+              exit 1
+            fi
+          done
+          # Presence is not routability: the stub engine has the SAME filename. Use
+          # the marker the engine itself embeds -- the same signal
+          # build-core-android.sh's validate_linked_qhexrt_outputs() checks.
+          #
+          # NOT check_plugin_natives.py here: that tool looks for a carrier
+          # (librunanywhere_<id>) with undefined ops symbols, finds none in this
+          # directory, prints "nothing to verify" and exits 0 -- a vacuous pass that
+          # would let an engine-less Android build through.
+          if ! grep -aFq "qhexrt:engine-available" "$jni/librac_backend_qhexrt.so"; then
+            echo "::error::librac_backend_qhexrt.so is the non-routable STUB."
+            echo "::error::The QHexRT payload or the QAIRT runtime was missing at build time."
+            exit 1
+          fi
+          # The QNN runtime must ship with the engine or it registers at priority
+          # 150 and then fails at model load. build-core-android.sh stages these.
+          for want in libQnnHtp.so libQnnSystem.so libQnnHtpPrepare.so; do
+            [[ -f "$jni/$want" ]] || { echo "::error::$want absent from $jni"; exit 1; }
+          done
+          skels="bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/assets/runanywhere/qhexrt/skels/arm64-v8a"
+          for v in 75 79 81; do
+            [[ -f "$skels/libQnnHtpV${v}Skel.so" ]] || {
+              echo "::error::libQnnHtpV${v}Skel.so absent from $skels"; exit 1; }
+          done
+          echo "QHexRT engine routable, with its QNN runtime and all three DSP skels"
+
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -280,6 +384,16 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: linux
+      # WITHOUT this, sherpa still BUILDS but as a non-routable stub: the
+      # engine prebuilt is absent, so RAC_SHERPA_ROUTABLE=0 and
+      # sherpa_capability_check() returns RAC_ERROR_BACKEND_UNAVAILABLE. The
+      # bundle then ships a ~156 KB librac_backend_sherpa.so with no
+      # libsherpa-onnx-c-api.so beside it, and STT/TTS/VAD cannot work on
+      # Linux at all. Shipped that way through at least 0.20.24 and 0.20.25
+      # (byte-identical carriers) because nothing asserted routability here —
+      # Prefetch sherpa here (no sibling job supplies it).
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: ./core/scripts/linux/download-sherpa-onnx.sh
       - name: Build + package commons for Linux x86_64
         # build-linux.sh drives the linux-release CMake preset (same as PR-time),
         # then stages the .so set + headers and packs the versioned
@@ -287,6 +401,10 @@ jobs:
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: bash core/scripts/build-linux.sh
+      # Fail the build rather than shipping a hollow carrier again. This is the
+      # gate whose absence let the sherpa stub ship silently for two releases.
+      - name: Verify Linux plugin natives are routable
+        run: python3 scripts/validation/gates/check_plugin_natives.py core/dist/linux/lib
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -299,292 +417,94 @@ jobs:
           # publish gate (pass3-syn-007). A missing tarball blocks publish.
           if-no-files-found: error
 
-  native_rcli_macos:
-    needs: [validate, native_ios]
-    # The production rcli is the Swift host that registers the MLX callbacks
-    # before entering the shared C++ CLI. It consumes the exact Apple release
-    # candidates produced above and requires Swift 6.2+ for mlx-audio-swift.
-    # Pull-request smoke keeps the faster CMake-only macos-14 lane.
-    if: ${{ !inputs.publish_from_run_id }}
-    runs-on: macos-26
+  native_cpp_desktop_macos:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ninja
+        run: brew install ninja
+      # WITHOUT this, sherpa still BUILDS but as a non-routable stub:
+      # SHERPA_ONNX_AVAILABLE=OFF, RAC_SHERPA_ROUTABLE=0, capability_check
+      # returns BACKEND_UNAVAILABLE. Candidate 32782968974 shipped that kit.
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/macos/download-sherpa-onnx.sh
+      - name: Configure + package C++ desktop kit
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-macos-arm64
+          cmake --build --preset cpp-desktop-macos-arm64 --target package-cpp-desktop-tarball \
+            -j "$(sysctl -n hw.logicalcpu)"
+          ls -la dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+          tar=$(echo dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --forbid-private-engines
+          # Basename only — `sha256sum -c` in publish runs inside release-flat.
+          # `shasum dist/foo.tar.gz` writes `dist/foo.tar.gz` and fails there.
+          (
+            cd dist
+            name="RunAnywhere-cpp-desktop-macos-arm64-v$(tr -d '[:space:]' < ../core/VERSION).tar.gz"
+            shasum -a 256 "$name" | tee "$name.sha256"
+          )
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-macos
+          path: |
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_cpp_desktop_windows:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
+    runs-on: windows-2022
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # protobuf here is the RUNTIME: Package.swift adds
-      # -I$(brew --prefix)/opt/protobuf/include for RCLIHost. Its protoc is
-      # whatever Homebrew ships and is not the pin; bootstrap_protoc.sh in the
-      # step below resolves the pinned one regardless of what is on PATH.
-      - run: brew install ninja protobuf
-      # `swift build` over the root Package.swift compiles rcli's C++ against
-      # core/include + core/src/generated/proto without ever configuring CMake,
-      # so the configure-time codegen hook does not cover this job. Both are
-      # protoc output and neither is tracked — generate them here.
-      # cpp for the C headers this job reads without configuring CMake, AND
-      # swift because the step below runs `swift build` over the root
-      # Package.swift, which compiles the generated *Swift* bindings
-      # (RALLMStreamEvent, RAVoiceEvent, RADownloadPlanResult, ...). Generating
-      # only cpp left those absent and the build failed with a wall of
-      # "cannot find type 'RA...' in scope", plus cascading "'Any' cannot be
-      # constructed" noise from the resulting bad inference.
-      - uses: ./.github/actions/generate-idl
-        with:
-          languages: cpp,swift
-      - uses: actions/download-artifact@v8
-        with:
-          name: native-ios-macos
-          path: native-ios-staging
-      - name: Stage exact Apple release candidates
-        run: |
-          set -euo pipefail
-          BINARIES="$GITHUB_WORKSPACE/bindings/swift/Binaries"
-          rm -rf "$BINARIES"
-          mkdir -p "$BINARIES"
-          for archive in "$GITHUB_WORKSPACE"/native-ios-staging/*-ios-v*.zip; do
-            [ -f "$archive" ] || continue
-            unzip -qo "$archive" -d "$BINARIES"
-          done
-          for framework in \
-            RACommons \
-            RABackendLLAMACPP \
-            RABackendONNX \
-            RABackendSherpa \
-            RABackendNeuRT \
-            RABackendMLX \
-            RunAnywhereMLXRuntime \
-            RunAnywhereMLXMetal; do
-            [ -d "$BINARIES/${framework}.xcframework" ] || {
-              echo "::error::Missing staged ${framework}.xcframework"
-              exit 1
-            }
-          done
-          [ -d "$BINARIES/RunAnywhereMLXRuntimeResources" ] || {
-            echo "::error::Missing staged RunAnywhereMLXRuntimeResources"
-            exit 1
-          }
-      - name: Build combined rcli Swift/MLX host (macOS arm64)
-        id: mlx-host
-        env:
-          CONFIGURATION: release
-          SWIFT_BUILD_JOBS: 2
-        run: |
-          set -euo pipefail
-          bash rcli/scripts/build-mlx-cli.sh
-          export RUNANYWHERE_USE_LOCAL_NATIVES=1
-          BIN_DIR="$(swift build -c release --show-bin-path)"
-          [ -x "$BIN_DIR/RunAnywhereMLXCLI" ]
-          [ -s "$BIN_DIR/mlx.metallib" ]
-          echo "bin-dir=$BIN_DIR" >> "$GITHUB_OUTPUT"
-      - name: Smoke combined host (modelless — llama.cpp + MLX + Apple secondary engines)
-        env:
-          RCLI_BIN_DIR: ${{ steps.mlx-host.outputs.bin-dir }}
-        run: |
-          set -euo pipefail
-          RCLI="$RCLI_BIN_DIR/RunAnywhereMLXCLI"
-          BACKENDS="$("$RCLI" backends --json)"
-          echo "$BACKENDS"
-          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
-          echo "$BACKENDS" | grep -q '"name":"mlx"'
-          echo "$BACKENDS" | grep -q '"name":"sherpa"'
-          echo "$BACKENDS" | grep -q '"name":"neurt"'
-          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
-          "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
-      - name: Configure ephemeral Developer ID credentials
-        id: signing
-        env:
-          CERTIFICATE_BASE64: ${{ secrets.RCLI_DEVELOPER_ID_CERT_P12_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.RCLI_DEVELOPER_ID_CERT_PASSWORD }}
-          NOTARY_KEY_BASE64: ${{ secrets.RCLI_NOTARY_API_KEY_P8_BASE64 }}
-          NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
-          NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}
-          NOTARY_APPLE_ID: ${{ secrets.RCLI_NOTARY_APPLE_ID }}
-          NOTARY_APP_PASSWORD: ${{ secrets.RCLI_NOTARY_APP_SPECIFIC_PASSWORD }}
-          NOTARY_TEAM_ID: ${{ secrets.RCLI_NOTARY_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          set +x
-          # Soft-skip when org secrets are absent so Release publish is not
-          # blocked on credentials alone. Ship an ad-hoc-signed tarball; restore
-          # RCLI_DEVELOPER_ID_* / notary secrets for Developer ID + notarized DMG.
-          if [ -z "${CERTIFICATE_BASE64:-}" ] || [ -z "${CERTIFICATE_PASSWORD:-}" ]; then
-            echo "::warning::RCLI Developer ID secrets not configured — packaging unsigned (ad-hoc) macOS rcli tarball"
-            {
-              echo "signed=false"
-              echo "identity="
-              echo "keychain="
-              echo "certificate="
-              echo "notary-mode="
-              echo "notary-key="
-              echo "notary-profile="
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          KEYCHAIN="$RUNNER_TEMP/rcli-signing.keychain-db"
-          CERTIFICATE="$RUNNER_TEMP/rcli-developer-id.p12"
-          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
-          NOTARY_KEY=""
-          NOTARY_PROFILE=""
-          NOTARY_MODE=""
-
-          api_key_complete=1
-          for variable in NOTARY_KEY_BASE64 NOTARY_KEY_ID NOTARY_ISSUER_ID; do
-            [ -n "${!variable:-}" ] || api_key_complete=0
-          done
-          apple_id_complete=1
-          for variable in NOTARY_APPLE_ID NOTARY_APP_PASSWORD NOTARY_TEAM_ID; do
-            [ -n "${!variable:-}" ] || apple_id_complete=0
-          done
-
-          if [ "$api_key_complete" -eq 1 ]; then
-            # Preserve the existing App Store Connect API-key authentication
-            # path as the preferred release mode when all three values exist.
-            NOTARY_MODE="api-key"
-            NOTARY_KEY="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
-          elif [ "$apple_id_complete" -eq 1 ]; then
-            # Fallback for teams that already notarize with an Apple ID and an
-            # app-specific password. The run-scoped name and explicit keychain
-            # prevent accidental selection of a profile from the login keychain.
-            NOTARY_MODE="apple-id"
-            NOTARY_PROFILE="rcli-notary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          else
-            echo "::error::Configure either the complete rcli App Store Connect API-key secret set or the complete Apple ID/app-specific-password secret set."
-            exit 1
-          fi
-
-          cleanup_failed_setup() {
-            status=$?
-            trap - ERR
-            security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
-            rm -f "$CERTIFICATE" "$NOTARY_KEY"
-            exit "$status"
-          }
-          trap cleanup_failed_setup ERR
-
-          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE"
-          chmod 600 "$CERTIFICATE"
-          if [ "$NOTARY_MODE" = "api-key" ]; then
-            printf '%s' "$NOTARY_KEY_BASE64" | base64 --decode > "$NOTARY_KEY"
-            chmod 600 "$NOTARY_KEY"
-          fi
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security import "$CERTIFICATE" \
-            -k "$KEYCHAIN" \
-            -P "$CERTIFICATE_PASSWORD" \
-            -A \
-            -t cert \
-            -f pkcs12
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s \
-            -k "$KEYCHAIN_PASSWORD" \
-            "$KEYCHAIN"
-
-          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
-            | awk -F'"' '/Developer ID Application:/ { print $2; exit }')"
-          [ -n "$IDENTITY" ] || {
-            echo "::error::The imported certificate is not a Developer ID Application identity"
-            exit 1
-          }
-
-          if [ "$NOTARY_MODE" = "apple-id" ]; then
-            xcrun notarytool store-credentials "$NOTARY_PROFILE" \
-              --apple-id "$NOTARY_APPLE_ID" \
-              --password "$NOTARY_APP_PASSWORD" \
-              --team-id "$NOTARY_TEAM_ID" \
-              --keychain "$KEYCHAIN" \
-              --validate >/dev/null
-          fi
-
-          {
-            echo "signed=true"
-            echo "identity=$IDENTITY"
-            echo "keychain=$KEYCHAIN"
-            echo "certificate=$CERTIFICATE"
-            echo "notary-mode=$NOTARY_MODE"
-            echo "notary-key=$NOTARY_KEY"
-            echo "notary-profile=$NOTARY_PROFILE"
-          } >> "$GITHUB_OUTPUT"
-          trap - ERR
-      - name: Package, sign, notarize, and staple rcli
-        env:
-          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          RCLI_MACOS_FULL_RELEASE: 1
-          RCLI_MACOS_SWIFT_BIN_DIR: ${{ steps.mlx-host.outputs.bin-dir }}
-          RCLI_CODESIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
-          RCLI_CODESIGN_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
-          # Notarize only when Developer ID secrets were loaded above.
-          RCLI_MACOS_NOTARIZE: ${{ steps.signing.outputs.signed == 'true' && '1' || '0' }}
-          RCLI_NOTARYTOOL_PROFILE: ${{ steps.signing.outputs.notary-profile }}
-          RCLI_NOTARYTOOL_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
-          RCLI_NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary-key }}
-          RCLI_NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
-          RCLI_NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}
-        run: bash rcli/scripts/package-rcli.sh .build macos-arm64
-      - name: Remove ephemeral signing credentials
-        if: always()
-        env:
-          SIGNING_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
-          SIGNING_CERTIFICATE: ${{ steps.signing.outputs.certificate }}
-          SIGNING_NOTARY_KEY: ${{ steps.signing.outputs.notary-key }}
-        run: |
-          set -euo pipefail
-          if [ -n "${SIGNING_KEYCHAIN:-}" ] && [ -f "$SIGNING_KEYCHAIN" ]; then
-            security delete-keychain "$SIGNING_KEYCHAIN"
-          fi
-          rm -f "${SIGNING_CERTIFICATE:-}" "${SIGNING_NOTARY_KEY:-}"
-      - name: Upload rcli macOS artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: rcli-macos
-          path: |
-            rcli/dist/rcli-macos-arm64-v*.tar.gz
-            rcli/dist/rcli-macos-arm64-v*.tar.gz.sha256
-            rcli/dist/rcli-macos-arm64-v*.dmg
-            rcli/dist/rcli-macos-arm64-v*.dmg.sha256
-          retention-days: 7
-          if-no-files-found: error
-
-  native_rcli_linux:
-    needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
         with:
-          platform: linux
-      - run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev patchelf
-      - name: Sherpa-ONNX prebuilts
-        run: ./core/scripts/linux/download-sherpa-onnx.sh
-      - name: Build rcli (Linux x86_64)
+          platform: windows
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: vcpkg curl (static)
+        shell: pwsh
         run: |
-          set -euo pipefail
-          cmake --preset rcli-linux-release
-          cmake --build --preset rcli-linux-release
-      - name: Package rcli tarball
-        env:
-          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
-      - name: Upload rcli Linux artifact
-        uses: actions/upload-artifact@v7
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static zlib:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
+      - name: Configure + package C++ desktop kit
+        shell: pwsh
+        run: |
+          cmake --preset cpp-desktop-windows-x64
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build --preset cpp-desktop-windows-x64 --config Release --target package-cpp-desktop-tarball
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          $ver = (Get-Content core/VERSION -Raw).Trim()
+          $tar = "dist/RunAnywhere-cpp-desktop-windows-x64-v$ver.tar.gz"
+          if (-not (Test-Path $tar)) { throw "missing $tar" }
+          python scripts/ci/verify_cpp_desktop_kit.py $tar --source-root . --windows --forbid-private-engines
+          if ($LASTEXITCODE -ne 0) { throw "kit tarball contents check failed" }
+          Get-FileHash $tar -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content "$tar.sha256"
+      - uses: actions/upload-artifact@v7
         with:
-          name: rcli-linux
+          name: cpp-desktop-windows
           path: |
-            rcli/dist/rcli-linux-x86_64-v*.tar.gz
-            rcli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
-  native_rcli_windows:
+  native_cpp_desktop_windows_arm64:
     needs: validate
-    if: ${{ !inputs.publish_from_run_id }}
-    runs-on: windows-2022
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
+    runs-on: windows-11-arm
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -593,84 +513,137 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: windows
-      - name: Install static libcurl
-        shell: pwsh
-        run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-mingw-static --host-triplet=x64-mingw-static
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
-      - name: Sherpa-ONNX prebuilts
-        shell: cmd
-        run: core\scripts\windows\download-sherpa-onnx.bat
-      - name: Build rcli (Windows x86_64)
-        shell: pwsh
-        run: |
-          cmake --preset rcli-windows-release -DRAC_BUILD_TESTS=ON
-          cmake --build --preset rcli-windows-release
-      - name: Add native runtimes to PATH
-        shell: pwsh
-        run: |
-          $Onnx = Get-ChildItem build/rcli-windows-release -Filter onnxruntime.dll -File -Recurse |
-            Where-Object { $_.FullName -match 'onnxruntime-src[\\/]lib' } |
-            Select-Object -First 1
-          if (-not $Onnx) { throw "onnxruntime.dll not found" }
-          $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          "$env:GITHUB_WORKSPACE\core\third_party\sherpa-onnx-windows\lib" |
-            Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Unit tests
-        shell: pwsh
-        run: >-
-          ctest --test-dir build/rcli-windows-release
-          -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
-      - name: Authenticode sign rcli.exe
-        shell: pwsh
-        env:
-          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_BASE64 }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_PASSWORD }}
-        run: |
-          # Soft-skip when org secrets are absent so Release publish is not
-          # blocked on credentials alone. Restore RCLI_WINDOWS_CODESIGN_PFX_*
-          # for Authenticode-signed Windows rcli.
-          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64) -or
-              [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
-            Write-Host "::warning::RCLI Windows codesign secrets not configured — packaging unsigned rcli.exe"
-            exit 0
-          }
-          $Binary = Get-ChildItem build/rcli-windows-release -Filter rcli.exe -File -Recurse |
-            Where-Object { $_.FullName -match 'runanywhere-cli' } |
-            Select-Object -ExpandProperty FullName -First 1
-          if (-not $Binary) { throw "rcli.exe not found" }
-          $Pfx = Join-Path $env:RUNNER_TEMP "rcli-windows-codesign.pfx"
-          [IO.File]::WriteAllBytes($Pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
-          try {
-            $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
-              -Filter signtool.exe -File -Recurse |
-              Where-Object { $_.DirectoryName -match '\\x64$' } |
-              Sort-Object FullName -Descending |
-              Select-Object -ExpandProperty FullName -First 1
-            if (-not $SignTool) { throw "signtool.exe not found" }
-            & $SignTool sign /f $Pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
-              /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $Binary
-            if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed" }
-            $Signature = Get-AuthenticodeSignature $Binary
-            if ($Signature.Status -ne 'Valid') {
-              throw "Authenticode verification failed: $($Signature.Status)"
-            }
-          } finally {
-            Remove-Item $Pfx -Force -ErrorAction SilentlyContinue
-          }
-      - name: Package rcli ZIP
-        shell: pwsh
-        run: >-
-          ./rcli/scripts/package-rcli-windows.ps1
-          -BuildDir build/rcli-windows-release
-          -Version ${{ needs.validate.outputs.version }}
-      - name: Upload rcli Windows artifact
-        uses: actions/upload-artifact@v7
+      - uses: ilammy/msvc-dev-cmd@v1
         with:
-          name: rcli-windows
+          arch: arm64
+      - name: vcpkg curl (static arm64)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:arm64-windows-static zlib:arm64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Configure + package C++ desktop kit (OSS, no QHexRT)
+        shell: pwsh
+        run: |
+          cmake --preset cpp-desktop-windows-arm64
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build --preset cpp-desktop-windows-arm64 --config Release --target package-cpp-desktop-tarball
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          $ver = (Get-Content core/VERSION -Raw).Trim()
+          $tar = "dist/RunAnywhere-cpp-desktop-windows-arm64-v$ver.tar.gz"
+          if (-not (Test-Path $tar)) { throw "missing $tar" }
+          $actual = Get-Item $tar
+          $wantName = Split-Path $tar -Leaf
+          if ($actual.Name -cne $wantName) {
+            $tmp = Join-Path $actual.DirectoryName ("tmp-" + [guid]::NewGuid().ToString("n") + ".tar.gz")
+            Rename-Item -LiteralPath $actual.FullName -NewName (Split-Path $tmp -Leaf)
+            Rename-Item -LiteralPath $tmp -NewName $wantName
+          }
+          python scripts/ci/verify_cpp_desktop_kit.py $tar --source-root . --windows --allow-missing-onnxruntime --forbid-private-engines
+          if ($LASTEXITCODE -ne 0) { throw "kit tarball contents check failed" }
+          Get-FileHash $tar -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content "$tar.sha256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-windows-arm64
           path: |
-            rcli/dist/rcli-windows-x86_64-v*.zip
-            rcli/dist/rcli-windows-x86_64-v*.zip.sha256
+            dist/RunAnywhere-cpp-desktop-windows-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-arm64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_cpp_desktop_macos_neurt_private:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ninja
+        run: brew install ninja
+      - name: Fetch NeuRT prebuilt
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NEURUN_TOKEN:-}" ]]; then
+            echo "::error::NEURUN_TOKEN is required for the NeuRT overlay (no stubs)."
+            exit 1
+          fi
+          bash scripts/build/download-neurt.sh --slice macos-arm64
+      - name: Build overlay
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-macos-arm64-neurt
+          cmake --build --preset cpp-desktop-macos-arm64-neurt --target rac_backend_neurt \
+            -j "$(sysctl -n hw.logicalcpu)"
+          bash scripts/build/package-private-engine-overlay.sh \
+            --engine neurt \
+            --build-dir build/cpp-desktop-macos-arm64-neurt
+          tar=$(echo dist/RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --require-overlay neurt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-macos-arm64-neurt-private
+          path: |
+            dist/RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-macos-arm64-neurt-private-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_cpp_desktop_windows_qhexrt_private:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+      - name: vcpkg curl (static arm64)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:arm64-windows-static zlib:arm64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+      - name: Fetch QHexRT + QAIRT
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${NEURUN_TOKEN:-}" ]]; then
+            echo "::error::NEURUN_TOKEN is required for the QHexRT overlay (no stubs)."
+            exit 1
+          fi
+          bash scripts/build/download-qhexrt.sh --abi win-arm64
+          bash scripts/build/download-qairt-runtime.sh --platform win-arm64
+      - name: Build overlay
+        env:
+          NEURUN_TOKEN: ${{ secrets.NEURUN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-windows-arm64-qhexrt
+          cmake --build --preset cpp-desktop-windows-arm64-qhexrt --config Release --target rac_backend_qhexrt
+          bash scripts/build/package-private-engine-overlay.sh \
+            --engine qhexrt \
+            --build-dir build/cpp-desktop-windows-arm64-qhexrt
+          tar=$(echo dist/RunAnywhere-cpp-desktop-windows-arm64-qhexrt-private-v*.tar.gz)
+          python scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --require-overlay qhexrt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-windows-arm64-qhexrt-private
+          path: |
+            dist/RunAnywhere-cpp-desktop-windows-arm64-qhexrt-private-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-windows-arm64-qhexrt-private-v*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -687,10 +660,24 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: windows
+      # Sherpa on Windows is a SHA-pinned prebuilt, not a source build. Without
+      # this, sherpa still "builds" but as a non-routable stub
+      # (RAC_SHERPA_ROUTABLE=0), and build-windows.bat now hard-fails instead of
+      # Prefetch sherpa here; a missing prebuilt used to ship a hollow Windows bundle.
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        shell: cmd
+        run: core\scripts\windows\download-sherpa-onnx.bat
       - name: Build commons + backends for Windows x64
         working-directory: core
         shell: cmd
         run: scripts\build-windows.bat
+      # The build script asserts the DLL set exists in its staging dir; this
+      # asserts they are actually ROUTABLE (real op tables, not hollow carriers).
+      # check_plugin_natives.py understands PE. Prefer llvm-nm/dumpbin on PATH:
+      # plain `nm` cannot read PE and the script degrades to a byte scan.
+      - name: Verify Windows plugin natives are routable
+        shell: bash
+        run: python3 scripts/validation/gates/check_plugin_natives.py core/dist/windows/x64/lib
       - name: Package Windows outputs
         working-directory: core
         shell: bash
@@ -715,6 +702,34 @@ jobs:
             sha256sum "RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" \
               > "RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip.sha256"
           )
+          # Assert the SHIPPED ZIP, not just the build tree. Through 0.20.25 this
+          # zip contained only rac_commons.lib + headers — zero engines — and
+          # nothing here noticed, because the only checks were "dir exists" and
+          # "zip exists". Both were true.
+          zip="dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip"
+          # 7z reports Windows paths with BACKSLASHES (x64\lib\rac_commons.dll), so
+          # normalize before matching: the `(^|/)name$` test below can never match a
+          # backslash path, which made this assertion fail a build whose DLLs were
+          # all present and routable.
+          listing="$(7z l -ba -slt "$zip" | sed -n 's/^Path = //p' | tr '\\' '/')"
+          missing=0
+          for want in \
+              rac_commons.dll \
+              rac_backend_llamacpp.dll runanywhere_llamacpp.dll \
+              rac_backend_onnx.dll runanywhere_onnx.dll onnxruntime.dll \
+              onnxruntime_providers_shared.dll \
+              rac_backend_sherpa.dll runanywhere_sherpa.dll sherpa-onnx-c-api.dll; do
+            if ! printf '%s\n' "$listing" | grep -Eqi "(^|/)${want}$"; then
+              echo "::error::shipped Windows zip is missing $want"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::$missing required native(s) absent from the Windows release zip — refusing to ship an engine-less bundle"
+            printf '%s\n' "$listing" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "Windows zip carries commons + all three backend pairs + vendor runtimes."
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -991,6 +1006,92 @@ jobs:
           path: bindings/react-native/dist/sdk-rn/**
           retention-days: 7
           if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Electron: the real multi-backend native build (macOS llamacpp/onnx/sherpa
+  # /neurt, Windows x64 llamacpp/onnx/sherpa, Windows ARM64 QHexRT via the
+  # self-hosted NPU runner) and packaging pipeline lives in
+  # electron-native-package.yml — invoked here as a reusable workflow instead
+  # of duplicated inline so the two files can never drift apart. See that
+  # workflow's own header for why it is a separate file rather than jobs
+  # inlined here.
+  # ---------------------------------------------------------------------------
+  native_electron:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id }}
+    uses: ./.github/workflows/electron-native-package.yml
+    secrets: inherit
+
+  sdk_electron:
+    needs: [validate, native_electron]
+    if: ${{ !inputs.publish_from_run_id && !cancelled() && needs.native_electron.outputs.package_result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Cross-run artifact download needs actions:read; harmless otherwise.
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download packaged Electron tarballs
+        uses: actions/download-artifact@v8
+        with:
+          name: electron-packaged-tarballs
+          path: electron-tarballs
+      - name: Prepublish gate (every Electron tarball, byte-level)
+        # Same script that would catch @runanywhere/electron-sherpa 0.20.17's
+        # NULL-vtable carrier or @runanywhere/qhexrt's workspace:* dependency
+        # (both cited in the script's own header) — run here, not just at
+        # `npm publish` time by hand, so a bad Electron tarball fails the
+        # release build itself rather than shipping and failing later.
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/prepublish_check.py --version "$VERSION" electron-tarballs/*.tgz
+      - name: Checksum every Electron tarball
+        run: |
+          set -euo pipefail
+          cd electron-tarballs
+          for f in *.tgz; do sha256sum "$f" > "$f.sha256"; done
+          ls -la
+      - name: Split public vs. QHexRT-private Electron assets
+        # npm public, GitHub Release private: @runanywhere/electron-qhexrt is
+        # a real, ready-to-publish npm package, but per standing policy it
+        # never becomes a public GitHub Release asset (mirrors the
+        # qhexrt_artifacts check in `publish`, applied here too so nothing
+        # relies on that check alone to keep it out). runanywhere-proto-ts is
+        # excluded from the public set for a different reason: sdk_web
+        # already packs and uploads that exact same tarball, and re-adding
+        # it here would trip the flatten step's collision detector.
+        run: |
+          set -euo pipefail
+          mkdir -p public private
+          shopt -s nullglob
+          for f in electron-tarballs/*.tgz electron-tarballs/*.tgz.sha256; do
+            base="$(basename "$f")"
+            case "$base" in
+              runanywhere-proto-ts-*) ;;
+              *qhexrt*) cp "$f" "private/$base" ;;
+              *) cp "$f" "public/$base" ;;
+            esac
+          done
+          echo "public:"; ls -la public
+          echo "private (QHexRT, not attached to the GitHub Release):"; ls -la private
+      - name: Upload public Electron SDK artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-electron
+          path: public/**
+          retention-days: 7
+          if-no-files-found: error
+      - name: Upload private Electron QHexRT artifact (never flattened into the public release)
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-electron-qhexrt-private
+          path: private/**
+          retention-days: 14
+          if-no-files-found: warn
 
   # ---------------------------------------------------------------------------
   # Consumer validation — clone each starter-app repo in RunanywhereAI org
@@ -1856,14 +1957,18 @@ jobs:
       - native_ios
       - native_android
       - native_linux
-      - native_rcli_macos
-      - native_rcli_linux
-      - native_rcli_windows
+      - native_cpp_desktop_macos
+      - native_cpp_desktop_windows
+      - native_cpp_desktop_windows_arm64
+      - native_cpp_desktop_macos_neurt_private
+      - native_cpp_desktop_windows_qhexrt_private
       - native_windows
       - native_web
+      - native_electron
       - sdk_kotlin
       - sdk_web
       - sdk_react_native
+      - sdk_electron
       - validate_consumer_swift
       - validate_consumer_kotlin
       - validate_consumer_web
@@ -1872,9 +1977,18 @@ jobs:
     # ADVISORY jobs (kept in `needs` so publish waits + still includes their
     # artifacts on success, but deliberately omitted from the success checks
     # below; `!cancelled()` lets publish proceed when only these fail):
-    #   - native_windows / native_rcli_windows: no non-Windows package consumes
+    #   - native_windows: no non-Windows package consumes
     #     these artifacts. Keep both jobs running so their failures remain
     #     visible, but do not block an otherwise complete non-Windows train.
+    #   - native_electron: its own `report` job already makes the one part
+    #     that matters (native_win_x64_and_package, which produces the
+    #     tarballs) a hard requirement of sdk_electron below. native_electron
+    #     itself is omitted here because its overall job result also folds in
+    #     native_win_arm64_qhexrt — a single, personally-owned self-hosted NPU
+    #     runner whose outage should cost only @runanywhere/electron-qhexrt
+    #     for this release, not the whole SDK train. sdk_electron IS a strict
+    #     gate below; it can only have succeeded if the real packaging step
+    #     did.
     #   - validate_consumer_{swift,kotlin,react_native}: these build EXTERNAL
     #     starter repos (RunanywhereAI/{swift,kotlin,react-native}-starter*) that
     #     version-lag the SDK API independently. Per policy, external-starter drift
@@ -1893,18 +2007,26 @@ jobs:
         needs.native_ios.result == 'success' &&
         needs.native_android.result == 'success' &&
         needs.native_linux.result == 'success' &&
-        needs.native_rcli_macos.result == 'success' &&
-        needs.native_rcli_linux.result == 'success' &&
-        (needs.native_rcli_windows.result == 'success' ||
-         needs.native_rcli_windows.result == 'failure' ||
-         needs.native_rcli_windows.result == 'skipped') &&
+        needs.native_cpp_desktop_macos.result == 'success' &&
+        needs.native_cpp_desktop_windows.result == 'success' &&
+        needs.native_cpp_desktop_windows_arm64.result == 'success' &&
+        needs.native_cpp_desktop_macos_neurt_private.result == 'success' &&
+        needs.native_cpp_desktop_windows_qhexrt_private.result == 'success' &&
         (needs.native_web.result == 'success' ||
          (inputs.reuse_native_web_run_id != '' && needs.native_web.result == 'skipped')) &&
         needs.sdk_kotlin.result == 'success' &&
         needs.sdk_web.result == 'success' &&
         needs.sdk_react_native.result == 'success' &&
+        needs.sdk_electron.result == 'success' &&
         needs.validate_consumer_web.result == 'success' &&
         needs.validate_consumer_flutter.result == 'success'
+      )) &&
+      (inputs.rebuild_cpp_desktop != true || (
+        needs.native_cpp_desktop_macos.result == 'success' &&
+        needs.native_cpp_desktop_windows.result == 'success' &&
+        needs.native_cpp_desktop_windows_arm64.result == 'success' &&
+        needs.native_cpp_desktop_macos_neurt_private.result == 'success' &&
+        needs.native_cpp_desktop_windows_qhexrt_private.result == 'success'
       ))
     runs-on: ubuntu-latest
     permissions:
@@ -1935,6 +2057,20 @@ jobs:
           path: release-artifacts/native-web
           run-id: ${{ inputs.reuse_native_web_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      # Stub kits from the reused candidate must not ship. Drop them, then
+      # take rebuilt tarballs (this run, or reuse_cpp_desktop_run_id).
+      - name: Drop stub C++ desktop kits from the reused run
+        if: ${{ inputs.publish_from_run_id != '' && (inputs.rebuild_cpp_desktop || inputs.reuse_cpp_desktop_run_id != '') }}
+        run: rm -rf release-artifacts/cpp-desktop-*
+      - name: Replace C++ desktop kits from this run
+        if: ${{ inputs.publish_from_run_id != '' && (inputs.rebuild_cpp_desktop || inputs.reuse_cpp_desktop_run_id != '') }}
+        uses: actions/download-artifact@v8
+        with:
+          pattern: cpp-desktop-*
+          path: release-artifacts
+          merge-multiple: false
+          run-id: ${{ inputs.reuse_cpp_desktop_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Flatten + index assets
         # Collision-detecting flatten. The previous `find ... -exec cp` form
         # silently overwrote same-basename files coming from different artifact
@@ -1952,6 +2088,17 @@ jobs:
             printf '%s\n' "$loose_android_artifacts" | sed 's/^/  /'
             exit 1
           fi
+          # `Download all artifacts` pulls EVERY artifact this run produced,
+          # which includes intermediate hand-off bundles that are not release
+          # assets. electron-packaged-tarballs is native_win_x64_and_package's
+          # raw output, consumed by sdk_electron, which then re-uploads only the
+          # curated public set as sdk-electron. Flattening both duplicates all 5
+          # public Electron tarballs AND drags in the raw bundle's own
+          # runanywhere-proto-ts tarball, which then collides with sdk_web's
+          # copy of the same file — 6 collisions, no release. Skip the
+          # intermediate bundle; sdk-electron (public) and
+          # sdk-electron-qhexrt-private (never flattened, see the qhexrt
+          # exclusion below) are the artifacts that carry release intent.
           while IFS= read -r -d '' src; do
             dest="release-flat/$(basename "$src")"
             if [ -e "$dest" ]; then
@@ -1960,17 +2107,34 @@ jobs:
               continue
             fi
             cp "$src" "$dest"
-          done < <(find release-artifacts -type f \( \
+          done < <(find release-artifacts \
+            -type d -name "electron-packaged-tarballs" -prune -o \
+            -type f \( \
             -name "*.zip" \
             -o -name "*.tar.gz" \
             -o -name "*.tgz" \
             -o -name "*.dmg" \
             -o -name "*.sha256" \
-          \) -print0)
+          \) -a ! -iname "*qhexrt*" -a ! -iname "*neurt-private*" -print0)
           if [ "$collisions" -ne 0 ]; then
             echo "::error::Refusing to publish — $collisions filename collision(s) detected during flatten"
             exit 1
           fi
+          # Windows CMAKE_SYSTEM_PROCESSOR is ARM64; kits built before the
+          # TOLOWER fix uploaded that spelling. Sidecars used the lowercase
+          # name. Normalize before the Linux assert_pair.
+          for upper in release-flat/RunAnywhere-cpp-desktop-windows-ARM64-v*.tar.gz; do
+            [[ -e "$upper" ]] || continue
+            lower="${upper/windows-ARM64/windows-arm64}"
+            if [[ "$upper" != "$lower" ]]; then
+              if [[ -e "$lower" ]]; then
+                echo "::error::both windows-ARM64 and windows-arm64 kits present: $upper $lower"
+                exit 1
+              fi
+              mv "$upper" "$lower"
+              echo "normalized $(basename "$upper") -> $(basename "$lower")"
+            fi
+          done
           (cd release-flat && ls -la > MANIFEST.txt)
           cat release-flat/MANIFEST.txt
       - name: Verify complete release asset set and checksums
@@ -2016,22 +2180,10 @@ jobs:
             echo "  SKIP: Windows x64 advisory artifact absent (native_windows failed/skipped)"
           fi
           assert_pair "Web WASM"                       "RACommons-web-v${VERSION}.tar.gz"
-          assert_pair "rcli macOS arm64"               "rcli-macos-arm64-v${VERSION}.tar.gz"
-          # The DMG exists only when the Developer ID + notary secrets are set;
-          # without them the packaging step soft-skips it by design and ships the
-          # ad-hoc tarball alone. Asserting it unconditionally made publish
-          # unsatisfiable, which is what blocked every release after v0.20.10.
-          if [ -s "release-flat/rcli-macos-arm64-v${VERSION}.dmg" ]; then
-            assert_pair "rcli macOS notarized disk image" "rcli-macos-arm64-v${VERSION}.dmg"
-          else
-            echo "::warning::no notarized rcli DMG in this release — Developer ID/notary secrets are not configured"
-          fi
-          assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
-          if [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip" ] || [ -s "release-flat/rcli-windows-x86_64-v${VERSION}.zip.sha256" ]; then
-            assert_pair "rcli Windows x86_64 (advisory)" "rcli-windows-x86_64-v${VERSION}.zip"
-          else
-            echo "  SKIP: rcli Windows x86_64 advisory artifact absent (job failed/skipped)"
-          fi
+          assert_pair "C++ desktop kit macOS arm64"    "RunAnywhere-cpp-desktop-macos-arm64-v${VERSION}.tar.gz"
+          assert_pair "C++ desktop kit Windows x64"    "RunAnywhere-cpp-desktop-windows-x64-v${VERSION}.tar.gz"
+          assert_pair "C++ desktop kit Windows arm64"  "RunAnywhere-cpp-desktop-windows-arm64-v${VERSION}.tar.gz"
+          # Official CLI bottles ship from RunanywhereAI/RCLI, not this repo.
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"
           assert_pair "Web proto package"              "runanywhere-proto-ts-${VERSION}.tgz"
           assert_pair "Web core package"               "runanywhere-web-${VERSION}.tgz"
@@ -2041,6 +2193,20 @@ jobs:
           assert_pair "React Native LlamaCPP package"  "runanywhere-llamacpp-${VERSION}.tgz"
           assert_pair "React Native MLX package"       "runanywhere-mlx-${VERSION}.tgz"
           assert_pair "React Native ONNX package"      "runanywhere-onnx-${VERSION}.tgz"
+          assert_pair "Electron core package"          "runanywhere-electron-${VERSION}.tgz"
+          assert_pair "Electron LlamaCPP package"      "runanywhere-electron-llamacpp-${VERSION}.tgz"
+          assert_pair "Electron ONNX package"          "runanywhere-electron-onnx-${VERSION}.tgz"
+          assert_pair "Electron Sherpa package"        "runanywhere-electron-sherpa-${VERSION}.tgz"
+          # NeuRT (Apple Neural Engine) is macOS-only, same shape as the iOS
+          # CoreML XCFramework above — required, not advisory, because
+          # native_macos (GH-hosted) is a hard requirement of sdk_electron.
+          assert_pair "Electron NeuRT package"         "runanywhere-electron-neurt-${VERSION}.tgz"
+          # @runanywhere/electron-qhexrt is deliberately NOT asserted here:
+          # per policy it never becomes a public GitHub Release asset (see
+          # the qhexrt_artifacts check just below, and sdk_electron's own
+          # public/private split). It still gets built and packaged — as the
+          # sdk-electron-qhexrt-private workflow artifact on this run — for
+          # a maintainer to `npm publish` by hand.
           qhexrt_artifacts="$(find release-flat -maxdepth 1 -type f -iname '*qhexrt*' -print)"
           if [ -n "$qhexrt_artifacts" ]; then
             echo "::error::Private QHexRT artifacts must not be present in the public release (any extension)"
@@ -2056,6 +2222,15 @@ jobs:
           (
             cd release-flat
             for checksum in *.sha256; do
+              # Sidecars must name the basename in this directory. macOS kit
+              # jobs used to write `dist/foo.tar.gz`; rewrite so -c succeeds
+              # and the published sidecar is consumer-usable.
+              # macOS kit sidecars used to name dist/foo.tar.gz. Strip a
+              # directory prefix only — GNU sha256sum binary lines are
+              # `hash *file` and must keep the asterisk.
+              if grep -q '  .*/' "$checksum"; then
+                sed -i -E 's|  .+/|  |' "$checksum"
+              fi
               sha256sum --check "$checksum"
             done
           )

@@ -1,10 +1,8 @@
 # AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## What This App Is
 
-A Flutter reference app demonstrating the RunAnywhere on-device AI SDK. It mirrors the native iOS app's feature set: LLM chat (streaming + non-streaming), speech-to-text, text-to-speech, voice assistant pipeline (STT→LLM→TTS), vision/VLM with live camera, tool calling, RAG with PDF ingestion, structured JSON output, and a solutions YAML runner. Eight tabs: Chat, Vision, STT, Speak, Voice, Tools, Solutions, Settings.
+A Flutter reference app demonstrating the RunAnywhere on-device AI SDK. It mirrors the native iOS/Android apps' feature set: LLM chat (streaming + non-streaming), speech-to-text, text-to-speech, a voice assistant pipeline (STT→LLM→TTS), VLM image description (gallery- or camera-app-picked image — no in-app live camera preview), tool calling, RAG with PDF ingestion, and a solutions YAML runner. Five bottom tabs: Chat, Vision, Voice, More, Settings. The More hub pushes Transcribe (STT), Speak (TTS), Document Q&A (RAG), Voice Activity (VAD), Storage, and Solutions.
 
 ## Design System
 
@@ -80,18 +78,17 @@ These packages wrap pre-built native C++ libraries via Dart FFI (`dart:ffi`), no
 - **Android**: `.so` files live in each SDK package's `android/src/main/jniLibs/` dirs. The Gradle property `runanywhere.useLocalNatives=true` (in `android/gradle.properties`) tells the build to use these local files instead of downloading from GitHub releases.
 - **iOS**: xcframeworks (`RACommons`, `RABackendLLAMACPP`, `RABackendMLX`, `RunAnywhereMLXRuntime`, `RunAnywhereMLXMetal`, `RABackendONNX`, `RABackendSherpa`) are staged in each SDK package's `ios/<package>/Frameworks/` directory. MLX intentionally uses CocoaPods so Hub/Crypto are app-root bundles; the other plugins can use SwiftPM. CocoaPods statically links the MLX core/backend archives and embeds the tiny dynamic `RunAnywhereMLXMetal` framework carrying the selected `default.metallib`. The loader uses `DynamicLibrary.process()` with `executable()` fallback. MLX executes only on a physical iOS device; its arm64 simulator slices support package, compile, link, and startup validation.
 
-If native binaries are missing (fresh clone), they must be staged first — see README's "Clean-Clone Bring-Up" or use `scripts/verify.sh` with `REFRESH_ANDROID_NATIVE=1` / `REFRESH_IOS_NATIVE=1`.
+If native binaries are missing (fresh clone), they must be staged first — see README's "Setup" section (step 2, "Build and stage native artifacts") or use `scripts/verify.sh` with `REFRESH_ANDROID_NATIVE=1` / `REFRESH_IOS_NATIVE=1`.
 
 ## Architecture
 
 ### Initialization (runanywhere_ai_app.dart)
 
-App startup runs a multi-phase sequence in `initState` via `addPostFrameCallback`:
+App startup runs `_initializeSDK()` from `initState` via `addPostFrameCallback`. There is no eager native-library preloading step — the SDK's own FFI bridge loads `.so`/xcframework symbols lazily on first use:
 
-1. **Eager .so loading** (Android only) — `DynamicLibrary.open()` on 6 `.so` files to preload before any SDK call
-2. **Backend registration** — guarded by a static flag to survive hot-reload. Registers LlamaCpp, physical-device-only Apple MLX, QHexRT NPU (Android/Snapdragon only), and ONNX/Sherpa; MLX reports unavailable in the iOS Simulator
-3. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
-4. **Catalog registration** — after services initialization, seeds only the successfully registered backends' model catalogs and then registers RAG
+1. **Backend registration** (`_registerBackends()`) — guarded by a static flag to survive hot-reload. Registers LlamaCpp, physical-device-only Apple MLX, ONNX/Sherpa, then QHexRT NPU (`QHexRT.isAvailable` guards Android/Snapdragon only; a no-op elsewhere); MLX reports unavailable in the iOS Simulator
+2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
+3. **Catalog registration** (`ModelCatalogBootstrap.registerAll(mlxRegistered:)`) — seeds the curated model catalog on every cold launch (safe to re-run; commons merges runtime fields). Only the Apple MLX catalog section is gated on `mlxRegistered`; ONNX and QHexRT catalog entries register unconditionally regardless of whether those backends actually registered
 
 ### State Management
 
@@ -102,44 +99,44 @@ Two patterns coexist:
 
 ### Navigation
 
-`ContentView` uses `Scaffold` + `NavigationBar` + `IndexedStack` (all 8 tabs stay mounted). No named routes or GoRouter. Secondary screens (`RagDemoView`, `StructuredOutputView`, `VLMCameraView`) use `Navigator.push(MaterialPageRoute(...))`. Model pickers use `showModalBottomSheet`.
+`ContentView` uses `Scaffold` + `NavigationBar` + `IndexedStack` over 5 tabs (Chat, Vision, Voice, More, Settings). Each tab builds lazily on first visit and then stays mounted (`_visitedTabs`), so a hidden tab's `initState`/event-bus subscriptions don't run until selected. No named routes or GoRouter. `MoreView` is a list hub that pushes secondary screens (`SpeechToTextView`, `TextToSpeechView`, `RagDemoView`, `VADView`, `StorageView`, `SolutionsView`) via `Navigator.push(MaterialPageRoute(...))`; `VisionHubView` similarly pushes `VLMCameraView`. Model pickers use `showModalBottomSheet`.
 
 ### Core Services (singletons in core/services/)
 
-- **AudioRecordingService** — wraps `record` package; 16kHz mono WAV; emits normalized dB levels on a broadcast stream
-- **AudioPlayerService** — wraps `audioplayers`; constructs WAV headers from raw PCM16 bytes; writes temp files for playback
+There is no local audio-recording or audio-playback service in this app — STT capture and TTS playback are fully SDK-owned (`.stt.openStream()` / `.tts.speak()` with `playbackState`/`playbackProgress` streams); see `bindings/flutter/AGENTS.md`.
+
 - **ConversationStore** — file-based JSON persistence under `<documents>/Conversations/<id>.json`; messages carry optional `thinkingContent` and `MessageAnalytics`
 - **KeychainService / KeychainHelper** — wraps `flutter_secure_storage`; iOS Keychain with `first_unlock_this_device`, Android Keystore-backed secure storage; keys prefixed with `com.runanywhere.RunAnywhereAI_`
 - **PermissionService** — wraps `permission_handler`; requests microphone + speech (iOS only) for STT, camera for VLM
+- **DeviceInfoService** — device model/OS/app version via `device_info_plus`/`package_info_plus`. Chip/NPU/total-memory fields are intentionally left empty and hidden by the UI: the SDK's hardware ABI was removed when the routing scorer was retired, so there is nothing to read anymore
 
 ### SDK API Surface Used
 
 All AI calls go through `RunAnywhere`:
-- `.llm.generate()` / `.llm.generateStream()` / `.llm.load()` / `.llm.unload()`
-- `.stt.transcribe()` / `.stt.load()`
-- `.tts.synthesize()` / `.tts.loadVoice()`
-- `.vlm.processImageStream()` / `.vlm.load()`
-- `.voice.eventStream()` / `.voice.initializeWithLoadedModels()`
-- `.tools.register()` / `.tools.generateWithTools()`
-- `.rag.createPipeline()` / `.rag.ingest()` / `.rag.query()` / `.rag.destroyPipeline()`
-- `.solutions.run(yaml:)`
-- `.downloads.start()` / `.downloads.delete()` / `.downloads.list()` / `.downloads.getStorageInfo()`
-- `.models.register()` / `.models.registerMultiFile()` / `.models.available()`
-- `.hardware.getChipEnum()`
+- `.llm.generate()` / `.generateStream()` / `.cancel()`; tool calling nests under `.llm.tools.register()` / `.list()` / `.unregister()` — there is no separate top-level `.tools` capability call site in this app
+- `.stt.transcribe()` (batch) / `.openStream()` (live)
+- `.tts.synthesize()` / `.speak()` / `.stop()`, driven by `.playbackState` / `.playbackProgress` streams
+- `.vlm.generateStream(ImageInput.file(path), prompt, options:)` / `.cancel()`
+- `.voice.createSession(stt:, llm:, tts:)` → session `.events` (a sealed `VoiceEvent` hierarchy) + `.start()` / `.close()`
+- `.rag.open(embeddingModel:, llmModel:)` → session `.ingest(RagDocument(text))` / `.close()`
+- `.models.register()` / `.load()` / `.download()` / `.delete()` / `.list()` / `.state()` / `.unloadAll()`
+- `.lora.register()` / `.list()` / `.apply()` / `.download()` / `.remove()` / `.catalog()`
+- `.solutions.run(yaml:)`; `.hybrid.registerCloud()` / `.createSttRouter()`; `.events.listen()`
+
+There is no `.downloads` or `.hardware` capability in current use: downloads go through `.models.download()`, and the chip/hardware ABI was removed with the routing scorer (see `DeviceInfoService` above).
 
 ### Feature-Specific Notes
 
-- **Chat**: streaming generation appends tokens to a placeholder message at a fixed list index via `setState`. Tool calling detects `lfm2`+`tool` in the model name to select `ToolCallFormatNames.lfm2`. Thinking content comes from the SDK (`thinkingText` / stream thought deltas) — the app does not parse `<think>` tags.
-- **VLM**: `VLMViewModel` (non-singleton, created per view) uses a `Timer.periodic` at 2.5s for auto-streaming mode. Camera frames are BGRA→file→`VLMImage(filePath:)`.
-- **Voice Assistant**: subscribes to `voice.eventStream()` which emits protobuf `VoiceEvent` messages. Event payload types: `state`, `vad`, `userSaid`, `assistantToken`, `audio`, `error`.
-- **RAG**: `DocumentService` uses `syncfusion_flutter_pdf` for PDF text extraction. The RAG model selection flow does NOT pre-load models into memory — it only passes paths to `RAGConfiguration`.
-- **Tools**: three demo tools registered (`get_weather`, `calculate`, `get_current_time`). Weather tool uses Open-Meteo free API via `package:http`.
-- **Structured Output**: uses `LLMGenerationOptions(jsonSchema:)` with predefined schemas.
+- **Chat**: streaming generation appends tokens to a placeholder message at a fixed list index via `setState`. Tool-call format detection (e.g. matching `lfm2`+`tool` in a model name) now lives in the SDK, not this app. Thinking content comes from the SDK (`thinkingText` / stream thought deltas) — the app does not parse `<think>` tags.
+- **VLM**: `VLMViewModel` (non-singleton, created per view) has no in-app camera preview. Mirroring the Android Kotlin `VisionViewModel`, the user picks a gallery or camera-app image via `image_picker`, then `RunAnywhere.vlm.generateStream(ImageInput.file(path), prompt, options: LlmOptions(maxOutputTokens: 300))` streams the description.
+- **Voice Assistant**: `voice_agent_view_model.dart` opens a session with `RunAnywhere.voice.createSession(stt:, llm:, tts:)`, then listens on `session.events` — a sealed `VoiceEvent` hierarchy (`VoiceSpeechStarted`, `VoiceSpeechEnded`, `VoiceUserTranscribed`, …) matched with Dart pattern-matching `switch`, not a `oneof`-style payload field. `session.start()` / `session.close()` bookend the conversation.
+- **RAG**: `DocumentService` uses `syncfusion_flutter_pdf` for PDF text extraction. `RAGViewModel` extracts text first, then opens a session via `RunAnywhere.rag.open(embeddingModel:, llmModel:)` and calls `session.ingest(RagDocument(extractedText))` — extracted text is ingested directly, not a file path passed to a config object.
+- **Tools**: three demo tools registered from the Settings tab's `ToolSettingsViewModel` (`get_weather`, `calculate`, `get_current_time`; there is no standalone Tools tab). Weather tool uses the free Open-Meteo API via `package:http`.
 - **Remaining SDK-owned cleanup**: the large model catalog still lives in app startup because moving it safely requires shared SDK/package ownership beyond this example-app lane.
 
 ## Build Configuration Gotchas
 
-- **Android `packagingOptions`** (`android/app/build.gradle`): `pickFirst '**/libc++_shared.so'` and `pickFirst '**/libomp.so'` — required because multiple SDK plugin packages each bundle these shared libs
+- **Android `packaging` block** (`android/app/build.gradle`, current AGP DSL): `jniLibs.pickFirsts += ['**/libc++_shared.so', '**/libomp.so']` — required because multiple SDK plugin packages each bundle these shared libs. It also sets `jniLibs { useLegacyPackaging = true }`: QHexRT's HTP skel `.so`s (`libQnnHtpV*Skel.so`) must exist as real on-disk files for FastRPC's `fopen()` to reach them — the AGP default (`useLegacyPackaging=false`) page-maps libs straight from the APK with no on-disk file, so the cDSP load fails (`errno 2`). The `.so` set is built 16 KB-aligned, so legacy-extracted files still mmap cleanly on 16 KB-page (Android 15+/16) devices.
 - **Android `extractNativeLibs="true"`** and `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>` in `AndroidManifest.xml` — required for QHexRT/QNN FastRPC
 - **iOS Podfile post_install**: forces `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` on all pods and Runner — locally built xcframeworks only contain arm64 simulator slices
 - **iOS Podfile permission flags**: `PERMISSION_MICROPHONE=1`, `PERMISSION_SPEECH_RECOGNIZER=1`, `PERMISSION_CAMERA=1` must be set for `permission_handler` to compile those capabilities
@@ -155,7 +152,8 @@ All AI calls go through `RunAnywhere`:
 
 ## Platform Requirements
 
-- Flutter `>=3.44.0`, Dart `>=3.12.0 <4.0.0` (validated with Flutter 3.44.6 / Dart 3.12.2)
-- Android: compileSdk 36, targetSdk 36, minSdk 24, JVM 17, NDK 28.2.13676358
-- iOS: deployment target 17.5 (enforced by Podfile), Xcode 26+ / Swift 6.2
-- Physical ARM64 device recommended — native libs are optimized for arm64
+Shared SDK pins (Flutter/Dart/Android/iOS/NDK versions) are identical to `bindings/flutter/AGENTS.md`'s System Requirements table — see that file, not here. App-specific additions:
+
+- `pubspec.yaml` environment constraint: `sdk: '>=3.12.0 <4.0.0'`, `flutter: '>=3.44.0 <4.0.0'`
+- JVM 17 (`compileOptions` + Kotlin `jvmTarget` in `android/app/build.gradle`)
+- Physical ARM64 device recommended — native libs are optimized for arm64, and Apple MLX requires one

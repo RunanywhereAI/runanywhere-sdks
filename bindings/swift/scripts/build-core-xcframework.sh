@@ -56,37 +56,44 @@ if [ "${RAC_BACKEND_SHERPA}" != "ON" ] || [ "${RAC_BACKEND_NEURT}" != "ON" ]; th
     exit 1
 fi
 
-# RAC_BACKEND_NEURT=ON no longer implies a WORKING engine. Without the sibling `neurun` checkout
-# the engine now builds as a non-routable shell (engines/neurt/CMakeLists.txt) instead of failing
-# configure — which is what lets CI build the Apple targets at all, since neurun is a separate
-# PRIVATE repo. But PACKAGING that shell would ship a Swift SDK whose ANE engine refuses every
-# registration, silently and with no build error. That is the one place the old hard failure was
-# genuinely protecting something, so the check moves here rather than disappearing.
+# RAC_BACKEND_NEURT=ON does not imply a WORKING engine: without a prebuilt slice the
+# engine builds as a non-routable shell. Packaging that shell would ship a Swift SDK
+# whose ANE engine refuses every registration, silently and with no build error — so
+# the check lives here, at the packaging step, rather than failing configure.
 #
-# CI sets RAC_ALLOW_NEURT_STUB=1: it only needs to prove the build compiles and links.
+# CI sets RAC_ALLOW_NEURT_STUB=1 when it only needs to prove the build compiles.
 if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
-    _neurt_root_probe="${NEURT_ROOT:-${REPO_ROOT}/../neurun}"
-    _neurt_required_paths=(
-        "${_neurt_root_probe}/CMakeLists.txt"
-        "${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp"
-        "${_neurt_root_probe}/NeuRT/src/sdk/rac_stt_ops_neurt.cpp"
-        "${_neurt_root_probe}/NeuRT/src/sdk/rac_diffusion_coreml.mm"
-    )
-    _neurt_missing_paths=()
-    for _neurt_required_path in "${_neurt_required_paths[@]}"; do
-        [ -f "${_neurt_required_path}" ] || _neurt_missing_paths+=("${_neurt_required_path}")
-    done
-    if [ "${#_neurt_missing_paths[@]}" -ne 0 ]; then
-        echo "error: packaging the Swift SDK requires a complete, routable NeuRT engine checkout." >&2
-        echo "  missing required path(s):" >&2
-        for _neurt_missing_path in "${_neurt_missing_paths[@]}"; do
-            echo "    ${_neurt_missing_path}" >&2
+    # Deliberately per-slice with NO override. NEURT_PREBUILT_ROOT is a SINGLE-slice
+    # root in engines/neurt/CMakeLists.txt, but packaging needs all three slices, so
+    # honouring it here would let one staged slice satisfy the guard for all three
+    # and silently package two non-routable stubs. The two meanings do not compose.
+    #
+    # Probe the COMPLETE set the engine requires, not a sentinel pair: a tree missing
+    # only one archive would otherwise pass here and fail later at link.
+    _neurt_missing=()
+    for _slice in macos-arm64 ios-arm64 ios-arm64-simulator; do
+        _root="${REPO_ROOT}/core/third_party/neurt/${_slice}"
+        for _rel in \
+            RECEIPT.json \
+            include/rac_diffusion_coreml.h \
+            lib/libneurt_core.a \
+            lib/libneurt_rac_llm_ops.a \
+            lib/libneurt_rac_stt_ops.a \
+            lib/libneurt_rac_diffusion.a
+        do
+            [ -f "${_root}/${_rel}" ] || _neurt_missing+=("${_slice}/${_rel}")
         done
-        echo "  Set NEURT_ROOT=/path/to/neurun, or set RAC_ALLOW_NEURT_STUB=1 to package a" >&2
-        echo "  non-routable stub on purpose (build verification only — NOT shippable)." >&2
+    done
+    if [ "${#_neurt_missing[@]}" -ne 0 ]; then
+        echo "error: packaging the Swift SDK requires all three complete NeuRT slices." >&2
+        printf '    missing: %s\n' "${_neurt_missing[@]}" >&2
+        echo "  Run: scripts/build/download-neurt.sh --all   (needs NEURUN_TOKEN)" >&2
+        echo "  Or set RAC_ALLOW_NEURT_STUB=1 to package a non-routable stub on" >&2
+        echo "  purpose (build verification only - NOT shippable)." >&2
         exit 1
     fi
 fi
+
 COMMONS_HEADERS="${REPO_ROOT}/core/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 BUILD_JOBS="${RAC_BUILD_JOBS:-$(sysctl -n hw.logicalcpu)}"
@@ -841,6 +848,37 @@ merge_mlx_backend_macos_slice() {
 # rac_commons — mirrors how the ONNX slice folds in librac_runtime_onnxrt.a.
 # Both are first-party archives (system frameworks only, no third-party host
 # paths), so no path sanitization is required. This keeps
+# Where the NeuRT prebuilt archives for a slice live. Since #766 these are
+# IMPORTED CMake targets whose IMPORTED_LOCATION points into the downloaded
+# prebuilt tree, so they are NOT produced under the build root the way a built
+# target is -- and their filenames differ too (libneurt_rac_llm_ops.a, not
+# librac_neurt_llm_ops.a). Looking for the old built paths silently found
+# nothing, took the "shell slice" branch, and shipped an archive carrying
+# `U _g_neurt_llm_ops`: every target compiled, the xcframework packaged, and only
+# the rcli link failed, naming symbols instead of the cause.
+neurt_prebuilt_root_for_slice() {
+    case "$1" in
+        Release-iphoneos)          echo "${REPO_ROOT}/core/third_party/neurt/ios-arm64" ;;
+        Release-iphonesimulator)   echo "${REPO_ROOT}/core/third_party/neurt/ios-arm64-simulator" ;;
+        *)                         echo "${REPO_ROOT}/core/third_party/neurt/macos-arm64" ;;
+    esac
+}
+
+# The four archives that make the engine routable. Empty output means this is a
+# deliberate shell build (RAC_ALLOW_NEURT_STUB=1); the caller handles that.
+neurt_prebuilt_archives() {
+    local root="$1"
+    local rel
+    for rel in lib/libneurt_core.a lib/libneurt_rac_llm_ops.a \
+               lib/libneurt_rac_stt_ops.a lib/libneurt_rac_diffusion.a; do
+        [ -f "${root}/${rel}" ] || return 1
+    done
+    for rel in lib/libneurt_core.a lib/libneurt_rac_llm_ops.a \
+               lib/libneurt_rac_stt_ops.a lib/libneurt_rac_diffusion.a; do
+        echo "${root}/${rel}"
+    done
+}
+
 # RABackendNeuRT.xcframework self-contained.
 merge_neurt_backend_slice() {
     local build_root="$1"
@@ -855,7 +893,7 @@ merge_neurt_backend_slice() {
     # registers, but the ANE GENERATE_TEXT vtable slot cannot resolve at the
     # consumer's link. Nothing in this build reports it: every CMake target
     # compiles, the xcframework packages, and only an executable link fails.
-    # The two private archives exist ONLY in the routable build: without the neurun checkout
+    # The two private archives exist ONLY in the routable build: without the prebuilt
     # engines/neurt builds a non-routable shell and never creates rac_neurt_llm_ops /
     # rac_neurt_core. Listing them unconditionally makes prepare_archive_input() fail on a
     # missing file, which is precisely the stub build RAC_ALLOW_NEURT_STUB=1 exists to allow.
@@ -865,18 +903,12 @@ merge_neurt_backend_slice() {
     local inputs=(
         "${build_root}/engines/neurt/${slice_dir}/librac_backend_neurt.a"
     )
-    local _neurt_llm_ops="${build_root}/engines/neurt/${slice_dir}/librac_neurt_llm_ops.a"
-    local _neurt_stt_ops="${build_root}/engines/neurt/${slice_dir}/librac_neurt_stt_ops.a"
-    local _neurt_core="${build_root}/engines/neurt/${slice_dir}/librac_neurt_core.a"
-    if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
-        inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
-        # The SPEECH op table, same story as the LLM one above: its own CMake target, so its
-        # objects are not in librac_backend_neurt.a, and omitting it ships an archive carrying
-        # `U _g_neurt_stt_ops`. Measured exactly that — every target compiled, the xcframework
-        # packaged, and the iOS app failed at its own link.
-        [ -f "${_neurt_stt_ops}" ] && inputs+=("${_neurt_stt_ops}")
+    local _prebuilt_root _archive
+    _prebuilt_root="$(neurt_prebuilt_root_for_slice "${slice_dir}")"
+    if _archives="$(neurt_prebuilt_archives "${_prebuilt_root}")"; then
+        while IFS= read -r _archive; do inputs+=("${_archive}"); done <<< "${_archives}"
     else
-        echo "note: NeuRT private archives absent — packaging the non-routable shell slice (${slice_dir})" >&2
+        echo "note: NeuRT prebuilt archives absent — packaging the non-routable shell slice (${slice_dir})" >&2
     fi
     inputs+=("${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a")
 
@@ -898,12 +930,10 @@ merge_neurt_backend_macos_slice() {
     local inputs=(
         "${build_root}/engines/neurt/librac_backend_neurt.a"
     )
-    local _neurt_llm_ops="${build_root}/engines/neurt/librac_neurt_llm_ops.a"
-    local _neurt_stt_ops="${build_root}/engines/neurt/librac_neurt_stt_ops.a"
-    local _neurt_core="${build_root}/engines/neurt/librac_neurt_core.a"
-    if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
-        inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
-        [ -f "${_neurt_stt_ops}" ] && inputs+=("${_neurt_stt_ops}")
+    local _prebuilt_root _archive
+    _prebuilt_root="$(neurt_prebuilt_root_for_slice macos)"
+    if _archives="$(neurt_prebuilt_archives "${_prebuilt_root}")"; then
+        while IFS= read -r _archive; do inputs+=("${_archive}"); done <<< "${_archives}"
     else
         echo "note: NeuRT private archives absent — packaging the non-routable shell slice (macos)" >&2
     fi
