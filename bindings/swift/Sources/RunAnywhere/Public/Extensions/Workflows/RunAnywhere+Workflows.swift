@@ -429,17 +429,13 @@ public extension RunAnywhere {
             after date: Date = Date(),
             timeZone: TimeZone = .current
         ) throws -> Date? {
-            var next: Int64 = 0
-            let offset = Int32(timeZone.secondsFromGMT(for: date))
-            let after = Int64(date.timeIntervalSince1970.rounded(.down))
-            let result = expression.withCString {
-                rac_agent_schedule_next_fire($0, after, offset, &next)
-            }
-            if result == RAC_ERROR_NOT_FOUND { return nil }
-            guard result == RAC_SUCCESS else {
-                throw WorkflowErrors.failure(op: "rac_agent_schedule_next_fire", rc: result)
-            }
-            return Date(timeIntervalSince1970: TimeInterval(next))
+            // Swift, not `rac_agent_schedule_next_fire`. The signature is
+            // unchanged so callers do not notice, but the answer no longer
+            // crosses the C ABI — this is the first piece of the workflow engine
+            // to move out of commons and into this layer.
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
+            return try CronExpression(expression).nextDate(after: date, calendar: calendar)
         }
 
         /// Create a run for a stored workflow.
