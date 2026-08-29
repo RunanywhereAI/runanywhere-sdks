@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.28")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.31")
 //
 //   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
 //   the first one is fatal:
@@ -115,12 +115,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-// TEMP: pin to 0.20.19 until the v0.20.22 GitHub release assets are published.
-// This release bumps the suite version only so the Electron packages can be
-// republished carrying Windows x64 and ARM64 natives, and 0.20.22 fixes their
-// packaging; none of v0.20.20, v0.20.21 or v0.20.22 exists as a tag with
-// release assets, so the remote binaryTargets must keep resolving 0.20.19.
-let sdkVersion = "0.20.28"
+let sdkVersion = "0.20.31"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -569,7 +564,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "f7f58b1b8cf1274268046b5dbf4d805ce3fd11a5e6b11f21b74a3ca87f424aa1"
+                checksum: "3be93cb36b5ea3a8ecfa3db93918fbce3b81165d41865bd9871e11949b903790"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",

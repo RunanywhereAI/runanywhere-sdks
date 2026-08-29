@@ -5,6 +5,50 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.31] - 2026-08-27
+
+### Fixed
+
+- `HostOpFailed` still reproduced on `qwen3.8-27b-1bit-npu` after v0.20.30's
+  `ADSP_LIBRARY_PATH` fix, even with the environment variable confirmed
+  correctly set. Root cause: `qhx_runtime_device()` (used to pick the
+  `v75`/`v79`/`v81` manifest directory, before the manifest is even parsed)
+  shared its device query with the code path that creates a live QNN HTP
+  device -- so every model, including the Bonsai/Maple ternary decoder's
+  `host_only` manifest, opened a real QNN device before the manifest was
+  read. That device then contended with the decoder's own direct FastRPC
+  session for the same Hexagon cDSP: traced live on a Snapdragon X2 Elite,
+  the FastRPC `SET_PATH`/`GET_PATH` session controls both returned a
+  non-zero rc once the QNN device was up, and the skel open that followed
+  failed `0x80000406`. Neither `ADSP_LIBRARY_PATH` nor a QAIRT-version
+  mismatch (also investigated) was the actual cause. Fixed in neurun
+  v0.20.31 (`qnn::Backend::profile()` now queries device info without
+  creating a live device) and re-pinned here.
+
+## [0.20.30] - 2026-08-27
+
+### Fixed
+
+- The Electron packaging never set `ADSP_LIBRARY_PATH`, so the Bonsai/Maple
+  ternary decoder (`qwen3.8-27b-1bit-npu`) failed every generation in the
+  packaged Windows app with `HostOpFailed` -- confirmed on a real Snapdragon
+  X2 Elite device. Every other QHexRT model was unaffected, which is why this
+  slipped through. Fixed by extending `ADSP_LIBRARY_PATH` the same way `PATH`
+  was already extended for the standard QNN HTP path.
+- The private QHexRT overlay used to build RCLI silently dropped every skel
+  file (`.so`/`.cat`), so a fresh RCLI build could not run any QHexRT model,
+  standard or ternary, without hand-copying files in. Fixed.
+
+## [0.20.29] - 2026-08-26
+
+### Changed
+
+- Re-pinned NeuRT and QHexRT engine archives to neurun v0.20.29. QHexRT win-arm64
+  now ships with the Bonsai fully-on-NPU 1-bit decoder (`qwen38_generate`)
+  enabled, intended to address `PlanStepFailed` when running
+  `qwen3.8-27b-1bit-npu` -- Windows ARM64 device validation of this exact
+  pin is in progress.
+
 ## [0.20.28] - 2026-08-24
 
 ### Changed

@@ -20,13 +20,15 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
-  s.version          = '0.20.28'
-  # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
-  # s.version leads the published release because 0.20.20 republished only the
-  # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
-  # the checksums below are still the 0.20.19 ones. Bump this back to
-  # s.version once a matching release exists.
-  asset_version      = '0.20.28'
+  s.version          = '0.20.31'
+  # iOS archives are downloaded from the v#{asset_version} GitHub release.
+  # Normally identical to s.version, and a literal on purpose:
+  # scripts/release/sync-versions.sh rewrites it and
+  # check_release_version_coherence.sh requires the exact string. It only
+  # diverges when a version republishes non-iOS packages without cutting iOS
+  # archives (0.20.20 did that) -- then pin the last
+  # release that has them.
+  asset_version      = '0.20.31'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core

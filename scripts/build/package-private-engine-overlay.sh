@@ -157,12 +157,16 @@ case "$ENGINE" in
       echo "python3/python required to copy QAIRT DLLs off a Windows junction" >&2
       exit 1
     fi
+    # .dll/.lib is the QNN HTP graph path; .so/.cat is the standard HTP skel + its
+    # signing catalog (see docs/MAPLE_WINDOWS_SIGNING.md) — dropping them here left
+    # RCLI's own overlay with no skel at all next to a real DLL set, since exe_dir()
+    # (QHexRT/src/bonsai/fastrpc_win.cpp) only finds a skel that is actually staged.
     "$PY_BIN" -c 'import shutil, sys
 from pathlib import Path
 src, dst = Path(sys.argv[1]), Path(sys.argv[2])
 n = 0
 for p in src.rglob("*"):
-    if p.is_file() and p.suffix.lower() in {".dll", ".lib"}:
+    if p.is_file() and p.suffix.lower() in {".dll", ".lib", ".so", ".cat"}:
         shutil.copy2(p, dst / p.name)
         n += 1
 if n == 0:
@@ -175,6 +179,22 @@ print(f"copied {n} QAIRT runtime files")
     if [[ ${#dlls[@]} -eq 0 ]]; then
       echo "QAIRT runtime at $qairt produced no DLLs; refusing a stub overlay" >&2
       exit 1
+    fi
+    # The Bonsai/Maple ternary decoder's own FastRPC skel (librun_main_on_hexagon_skel.so
+    # + .cat) is a separate artifact from the QAIRT runtime above — staged the same way
+    # bindings/electron/scripts/bundle-native.ts's stageQhexrtDspSkel() already does for
+    # the Electron package, flat into the same directory as the QNN DLLs. Optional: an
+    # older QHexRT prebuilt predating this directory, or a build with no Bonsai payload,
+    # still produces a usable (non-ternary) overlay.
+    dsp_dir="$PRE/dsp/win-arm64"
+    if [[ -d "$dsp_dir" ]]; then
+      dsp_n=0
+      for f in "$dsp_dir"/*; do
+        [[ -f "$f" ]] || continue
+        cp "$f" "$stage/bin/"
+        dsp_n=$((dsp_n + 1))
+      done
+      echo "copied $dsp_n Bonsai DSP skel file(s) from $dsp_dir"
     fi
     printf 'qhexrt\n' > "$stage/share/runanywhere/private/ENGINE"
     OS_ARCH="windows-arm64"
