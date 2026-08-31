@@ -103,6 +103,7 @@ std::atomic<bool> g_dummy_embeddings_started{false};
 std::atomic<bool> g_dummy_embeddings_release{false};
 float g_dummy_llm_last_temperature = -1.0f;
 int32_t g_dummy_llm_last_max_tokens = 0;
+int32_t g_dummy_llm_last_top_k = -1;
 rac_bool_t g_dummy_llm_last_disable_thinking = RAC_FALSE;
 std::string g_dummy_llm_stream_response;
 
@@ -380,6 +381,7 @@ rac_result_t dummy_llm_stream(void* impl, const char*, const rac_llm_options_t* 
     if (options) {
         g_dummy_llm_last_temperature = options->temperature;
         g_dummy_llm_last_max_tokens = options->max_tokens;
+        g_dummy_llm_last_top_k = options->top_k;
         g_dummy_llm_last_disable_thinking = options->disable_thinking;
     }
     if (g_dummy_llm_block_stream.load(std::memory_order_acquire)) {
@@ -1111,6 +1113,30 @@ int test_rag_ingest_query_mocked_path() {
           "RAG query publishes RAG_QUERY_STARTED");
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED),
           "RAG query publishes RAG_QUERY_COMPLETED");
+
+    // temperature and top_k are `optional` in llm_options.proto, so a
+    // generation submessage that sets neither must leave the
+    // RAC_LLM_OPTIONS_DEFAULT values in place rather than collapse to the
+    // proto3 zero -- 0.0f and 0 are both legal explicit settings here
+    // (greedy sampling / top-k disabled), so neither can act as a sentinel.
+    runanywhere::v1::RAGQueryOptions unset_sampling_query;
+    unset_sampling_query.set_query("Where does RAG live?");
+    unset_sampling_query.mutable_generation()->set_max_output_tokens(32);
+    std::vector<uint8_t> unset_sampling_bytes;
+    CHECK(serialize(unset_sampling_query, &unset_sampling_bytes),
+          "RAGQueryOptions with no sampling knobs serializes");
+    g_dummy_llm_last_temperature = -1.0f;
+    g_dummy_llm_last_top_k = -1;
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_query_proto(session, unset_sampling_bytes.data(), unset_sampling_bytes.size(),
+                             &out);
+    CHECK(rc == RAC_SUCCESS, "RAG query with no sampling knobs succeeds");
+    CHECK(g_dummy_llm_last_temperature == RAC_LLM_OPTIONS_DEFAULT.temperature,
+          "RAG query keeps the default temperature when the field is unset");
+    CHECK(g_dummy_llm_last_top_k == RAC_LLM_OPTIONS_DEFAULT.top_k,
+          "RAG query keeps the default top_k when the field is unset");
+    rac_proto_buffer_free(&out);
+    rac_sdk_event_clear_queue();
 
     // A token-limited thinking phase may omit its closing tag. The RAG result
     // must keep that private content out of answer while retaining typed
