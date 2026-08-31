@@ -95,7 +95,9 @@ RULES: list[tuple[str, re.Pattern[str], str]] = [
             # Windows separators are backslashes, so the trailing separator has to
             # live INSIDE each alternative: a shared trailing `/` can never match a
             # Windows path. Any drive letter, and `\\` here is one literal backslash.
-            r"|[A-Za-z]:\\Users\\(?!<)[\w.-]+\\)"
+            # `+` because these files are scanned as raw text: a path written inside
+            # a JSON or shell snippet arrives escaped, as `C:\\Users\\alice\\`.
+            r"|[A-Za-z]:\\+Users\\+(?!<)[\w.-]+\\+)"
         ),
         "use ~ or a <placeholder>; an absolute home path names a person and a machine",
     ),

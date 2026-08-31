@@ -34,6 +34,10 @@ CASES: list[tuple[str, str, bool]] = [
     ("absolute path into a personal home directory", "/home/alice/build/", True),
     ("absolute path into a personal home directory", r"C:\Users\alice\build", True),
     ("absolute path into a personal home directory", r"D:\Users\alice\build", True),
+    # These files are scanned as raw text, so a Windows path written inside a JSON
+    # or shell snippet reaches the rule with its separators already escaped.
+    ("absolute path into a personal home directory", r"C:\\Users\\alice\\build", True),
+    ("absolute path into a personal home directory", r"C:\\Users\\<you>\\x", False),
     # Placeholders are the documented way to write these, on every OS.
     ("absolute path into a personal home directory", "/Users/<you>/x/", False),
     ("absolute path into a personal home directory", r"C:\Users\<you>\x", False),
