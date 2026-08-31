@@ -121,13 +121,15 @@ Most loggers use `com.runanywhere.RunAnywhereAI`; a few use plain
 covers all of them. On a physical device use `idevicesyslog | grep "com.runanywhere"`
 instead.
 
-## 4. macOS/Swift — no separate repo, use the in-tree example or rcli
+## 4. macOS/Swift — no consumer repo, use the in-tree example
 
-There is no `runanywhere-macos` consumer repo. Two in-monorepo options, both inside
+There is no `runanywhere-macos` consumer repo. Use the in-tree example, inside
 `~/development/ODLM/MONOREPOOO/Qualcomm/runanywhere-sdks`:
 
 - `bindings/swift/example/` — a minimal SwiftPM example app/executable.
-- `rcli/` — the C++ core's CLI, `rac_*` C ABI consumer.
+
+The CLI is no longer in this repo; it moved to `RunanywhereAI/RCLI`, so it is not a
+second in-monorepo option any more.
 
 **The critical gotcha**: the repo's own `Package.swift` is fail-closed toward the
 *real published release* — it resolves the remote `binaryTargets` unless you

@@ -384,12 +384,12 @@ gh release view v$VERSION --json assets --jq '.assets[].name' | grep -iE 'rcli-m
 ```
 Baseline expectation is `rcli-macos-arm64-v$VERSION.tar.gz` (+ `.sha256`); a `.dmg` only appears when `RCLI_MACOS_FULL_RELEASE=1` was set for that build (see below). If a plain tarball is already present and its contents pass the general verification discipline, there is usually nothing further to do here.
 
-**If you do need to notarize locally**, everything lives in `rcli/scripts/package-rcli.sh` (read its header comment — it documents its own contract in detail):
+**If you do need to notarize locally**, everything lives in `scripts/package-rcli.sh` in the separate `RunanywhereAI/RCLI` repo (read its header comment — it documents its own contract in detail):
 
 - One-time setup, check before redoing: `xcrun notarytool history --keychain-profile runanywhere-notary` (confirmed configured on this machine — a fresh submission history returns without error). If missing: `xcrun notarytool store-credentials "runanywhere-notary" --apple-id <email> --team-id <team> --password <app-specific-password>`.
 - Codesign identity: `security find-identity -v -p codesigning | grep "Developer ID Application"` — confirmed present on this machine as `"Developer ID Application: RunAnywhere, Inc (<TEAM_ID>)"`. Grep for it fresh rather than hardcoding the team-id suffix, it can rotate.
 - Invocation contract (env vars, from the script header): `RCLI_CODESIGN_IDENTITY`, `RCLI_MACOS_NOTARIZE=1`, `RCLI_MACOS_FULL_RELEASE=1`, `RCLI_MACOS_SWIFT_BIN_DIR=<output of build-mlx-cli.sh>`. `RCLI_MACOS_FULL_RELEASE=1` is what additionally stages `mlx.metallib` and SwiftPM resource bundles and is what causes a notarized, stapled `.dmg` to be emitted alongside the Homebrew-style tarball. `RCLI_CODESIGN_KEYCHAIN` / `RCLI_NOTARYTOOL_KEYCHAIN` matter only if the identity/profile live in a non-default keychain.
-- Call shape: `rcli/scripts/package-rcli.sh <build-dir> macos-arm64` with the env vars above exported.
+- Call shape: `scripts/package-rcli.sh <build-dir> macos-arm64`, run from an `RunanywhereAI/RCLI` checkout, with the env vars above exported.
 
 ## 6. Electron — build AND packaging are now in `release.yml`; publish is still manual
 
