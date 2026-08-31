@@ -375,21 +375,24 @@ This is enforced, not just documented: once `v$VERSION` is tagged on `runanywher
 
 **If you force-move a tag, SwiftPM/Xcode consumers cache the OLD commit in several places — clearing just `Package.resolved` is not enough.** Verifying your own fix (or having a downstream consumer verify it) can silently keep failing even after the fix is correctly pushed, because: (1) any consumer repo's own tracked `*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` pins the exact old resolution and `xcodebuild -resolvePackageDependencies` respects it rather than re-resolving; (2) `~/Library/Caches/org.swift.swiftpm/repositories/<pkg>-<hash>/` is a global shared clone cache keyed by repo, oblivious to a moved tag; (3) `~/Library/org.swift.swiftpm/security/fingerprints/<pkg>-<hash>.json` records the fingerprint SwiftPM saw for that tag and can silently keep using it after a mismatch instead of failing loud. To actually re-resolve after moving a tag: delete the consumer's tracked `Package.resolved`, `rm -rf .build .swiftpm` and any `~/Library/Developer/Xcode/DerivedData/<Scheme>-*`, AND clear the matching entries under both global `org.swift.swiftpm` cache directories for every affected package identity — then resolve fresh.
 
-## 5. macOS rcli notarization
+## 5. rcli ships from RunanywhereAI/RCLI, not from this release
 
-CI (`native_rcli_macos` in `release.yml`) usually already produces a notarized, stapled artifact when Developer ID + notary secrets are configured in repo secrets. **Check the release assets first** before assuming you need to notarize anything yourself locally:
+rcli is not built, versioned, or released here. `release.yml` says so in its own header:
+
+> Official CLI bottles (rcli) are NOT produced here — they ship from
+> RunanywhereAI/RCLI, which consumes those kits via `find_package(RunAnywhere)`.
+
+So when cutting a release of *this* repo:
+
+- **Do not look for rcli assets on `v$VERSION`.** `v0.20.25` was the last release that carried any (`rcli-macos-arm64-v0.20.25.tar.gz` and friends); `v0.20.30` and `v0.20.31` carry none, and there is no `native_rcli_macos` job in `release.yml` to produce them.
+- **RCLI has its own version line and its own asset naming.** It was at `v0.5.2` while this repo was at `0.20.31`, and its assets are `rcli-0.5.2-macos-arm64.tar.gz` (+ `.sha256`) — neither the version nor the filename shape can be derived from `$VERSION` here.
+- **Signing and notarization are RCLI's, and only RCLI's docs describe them.** Read `docs/RELEASING.md` and `scripts/package-rcli.sh` in that repo rather than a copy kept here. The `RCLI_*` names are maintained there and the copy in this file had already drifted: it named `RCLI_MACOS_FULL_RELEASE`, `RCLI_MACOS_SWIFT_BIN_DIR` and a `build-mlx-cli.sh`, none of which appear anywhere in RCLI.
+
+What this repo still owes RCLI is the desktop kit it consumes, so check those assets are present instead:
 
 ```bash
-gh release view v$VERSION --json assets --jq '.assets[].name' | grep -iE 'rcli-macos|\.dmg'
+gh release view v$VERSION --json assets --jq '.assets[].name' | grep cpp-desktop
 ```
-Baseline expectation is `rcli-macos-arm64-v$VERSION.tar.gz` (+ `.sha256`); a `.dmg` only appears when `RCLI_MACOS_FULL_RELEASE=1` was set for that build (see below). If a plain tarball is already present and its contents pass the general verification discipline, there is usually nothing further to do here.
-
-**If you do need to notarize locally**, everything lives in `scripts/package-rcli.sh` in the separate `RunanywhereAI/RCLI` repo (read its header comment — it documents its own contract in detail):
-
-- One-time setup, check before redoing: `xcrun notarytool history --keychain-profile runanywhere-notary` (confirmed configured on this machine — a fresh submission history returns without error). If missing: `xcrun notarytool store-credentials "runanywhere-notary" --apple-id <email> --team-id <team> --password <app-specific-password>`.
-- Codesign identity: `security find-identity -v -p codesigning | grep "Developer ID Application"` — confirmed present on this machine as `"Developer ID Application: RunAnywhere, Inc (<TEAM_ID>)"`. Grep for it fresh rather than hardcoding the team-id suffix, it can rotate.
-- Invocation contract (env vars, from the script header): `RCLI_CODESIGN_IDENTITY`, `RCLI_MACOS_NOTARIZE=1`, `RCLI_MACOS_FULL_RELEASE=1`, `RCLI_MACOS_SWIFT_BIN_DIR=<output of build-mlx-cli.sh>`. `RCLI_MACOS_FULL_RELEASE=1` is what additionally stages `mlx.metallib` and SwiftPM resource bundles and is what causes a notarized, stapled `.dmg` to be emitted alongside the Homebrew-style tarball. `RCLI_CODESIGN_KEYCHAIN` / `RCLI_NOTARYTOOL_KEYCHAIN` matter only if the identity/profile live in a non-default keychain.
-- Call shape: `scripts/package-rcli.sh <build-dir> macos-arm64`, run from an `RunanywhereAI/RCLI` checkout, with the env vars above exported.
 
 ## 6. Electron — build AND packaging are now in `release.yml`; publish is still manual
 
