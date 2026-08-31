@@ -93,6 +93,32 @@ enum NativeProtoABI {
         freeBuffer?(&buffer)
     }
 
+    /// The most specific description the native layer produced for a failure.
+    ///
+    /// The proto buffer usually carries the error code's generic name, while the
+    /// engine that actually failed writes the reason to the thread-local detail
+    /// through `rac_error_set_details`. Reporting only the first throws the
+    /// diagnosis away: an MLX speech model that could not run reported
+    /// "Inference failed" while the reason sat one call away, unread.
+    ///
+    /// The detail is thread-local and not stamped with the call that set it, so
+    /// a stale one from an earlier failure on this thread can in principle be
+    /// appended. It is read immediately after a failed call, the same window
+    /// `RunAnywhere+Solutions` and `RunAnywhere+Workflows` already rely on, and
+    /// a slightly wrong hint beats none at all.
+    private static func nativeFailureMessage(
+        _ status: rac_result_t,
+        symbolName: String,
+        buffer: rac_proto_buffer_t
+    ) -> String {
+        let base = buffer.error_message.map { String(cString: $0) }
+            ?? "Native proto request failed: \(symbolName) rc=\(status)"
+        guard let detailPointer = rac_error_get_details() else { return base }
+        let detail = String(cString: detailPointer).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !detail.isEmpty, !base.contains(detail) else { return base }
+        return "\(base): \(detail)"
+    }
+
     static func invoke<Request: Message, Response: Message>(
         _ request: Request,
         symbol: ProtoRequest?,
@@ -106,8 +132,7 @@ enum NativeProtoABI {
             symbol(bytes, size, &outBuffer)
         }
         guard status == RAC_SUCCESS else {
-            let message = outBuffer.error_message.map { String(cString: $0) }
-                ?? "Native proto request failed: \(symbolName) rc=\(status)"
+            let message = nativeFailureMessage(status, symbolName: symbolName, buffer: outBuffer)
             throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
         return try decode(responseType, from: outBuffer)
@@ -139,8 +164,7 @@ enum NativeProtoABI {
             symbol(context, bytes, size, &outBuffer)
         }
         guard status == RAC_SUCCESS else {
-            let message = outBuffer.error_message.map { String(cString: $0) }
-                ?? "Native proto request failed: \(symbolName) rc=\(status)"
+            let message = nativeFailureMessage(status, symbolName: symbolName, buffer: outBuffer)
             throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
         return try decode(responseType, from: outBuffer)

@@ -9,6 +9,10 @@
 
 import Foundation
 
+#if canImport(AVFoundation)
+import AVFoundation
+#endif
+
 #if canImport(CoreGraphics)
 import CoreGraphics
 import ImageIO
@@ -109,7 +113,7 @@ public struct AudioInput: Sendable {
 
     // MARK: Lowering
 
-    func toSTTAudioSource() -> RASTTAudioSource {
+    func toSTTAudioSource() throws -> RASTTAudioSource {
         var source = RASTTAudioSource()
         source.channels = Int32(max(1, channels))
         if sampleRate > 0 { source.sampleRate = Int32(sampleRate) }
@@ -120,19 +124,34 @@ public struct AudioInput: Sendable {
             // (pcmS16Le implies 16-bit, pcmF32Le implies 32-bit).
             source.audioData = data
             source.encoding = .pcmS16Le
+            source.audioFormat = .pcm
         case .float32:
             source.audioData = data
             source.encoding = .pcmF32Le
-        case .wav:
-            source.audioData = data
-            source.encoding = .container
-            source.audioFormat = .wav
-        case .file:
-            source.fileUri = path ?? ""
-            source.encoding = .container
+            source.audioFormat = .pcm
+        case .file, .wav:
+            // Decoded here rather than passed along as a container, because
+            // nothing downstream decodes one: commons hands `audio_data`
+            // straight to the engine without reading `encoding`, so a WAV
+            // arrived as if its 44-byte header were the first samples. Sherpa
+            // tolerated that (a header is about a millisecond of noise) while
+            // MLX refused the whole call, which is the more honest response to
+            // being handed a file it was told was PCM.
+            let decoded = try Self.decodeToPCM16(self)
+            source.audioData = decoded.samples
+            source.encoding = .pcmS16Le
+            // Stated rather than left to the default. Commons only copies this
+            // into rac_stt_options_t when it is set, and MLX refuses the call
+            // outright unless the options say PCM: an earlier revision that
+            // labelled a read-back file `.wav` here is exactly what made MLX
+            // speech reject audio the sherpa engines accepted.
+            source.audioFormat = .pcm
+            source.sampleRate = Int32(decoded.sampleRate)
+            source.channels = 1
         }
         return source
     }
+
 
     func toVADAudioSource() throws -> RAVADAudioSource {
         var source = RAVADAudioSource()
@@ -350,15 +369,18 @@ public struct ImageInput: Sendable {
 
     // MARK: Lowering
 
-    func toVLMImage() -> RAVLMImage {
-        switch source {
-        case .file(let path):
-            return RAVLMImage.fromFilePath(path)
-        case .encoded(let data):
-            return RAVLMImage.fromEncoded(data, mediaType: ImageInput.mediaType(of: data))
-        case .rawRgb(let data, let width, let height):
-            return RAVLMImage.fromRawRGB(data, width: width, height: height)
-        }
+    /// Always lowered to packed RGB.
+    ///
+    /// Commons refuses a `data` arm outright — the C ABI has no carrier for a
+    /// JPEG/PNG container, and feeding container bytes to a backend expecting
+    /// `width * height * 3` crashes it — so `ImageInput.bytes` reached the
+    /// boundary and came back "failed to convert VLMGenerationRequest". A file
+    /// path is accepted there, but then each engine loads the file its own way.
+    /// Decoding here instead means one path, decoded by the platform that owns
+    /// image I/O, and every engine receives pixels it can use.
+    func toVLMImage() throws -> RAVLMImage {
+        let pixels = try rawPixels()
+        return RAVLMImage.fromRawRGB(pixels.data, width: pixels.width, height: pixels.height)
     }
 
     /// Packed 24-bit RGB pixels, decoding the file or encoded buffer when needed.
@@ -403,78 +425,6 @@ public struct ImageInput: Sendable {
     }
 
     // MARK: Decoding
-
-    /// RAVLMImageFormat was deleted along with the rest of the closed VLM
-    /// image-format enum (idl/vlm_options.proto); `mediaType` is now a plain
-    /// MIME string, so magic-byte sniffing resolves directly to one instead
-    /// of to an enum case.
-    private static func mediaType(of data: Data) -> String {
-        guard data.count >= 4 else { return "application/octet-stream" }
-        let prefix = [UInt8](data.prefix(4))
-        if prefix[0] == 0xFF, prefix[1] == 0xD8 { return "image/jpeg" }
-        if prefix[0] == 0x89, prefix[1] == 0x50 { return "image/png" }
-        if prefix[0] == 0x52, prefix[1] == 0x49 { return "image/webp" }
-        return "application/octet-stream"
-    }
-
-    private static func decode(_ data: Data) throws -> (data: Data, width: Int, height: Int) {
-        #if canImport(CoreGraphics)
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
-              let rgb = packedRGB(from: image) else {
-            throw SDKException(
-                code: .invalidInput,
-                message: "Could not decode the supplied image bytes",
-                category: .validation
-            )
-        }
-        return (rgb, image.width, image.height)
-        #else
-        throw SDKException(
-            code: .featureNotAvailable,
-            message: "Image decoding needs CoreGraphics; supply ImageInput.rawRgb instead",
-            category: .validation
-        )
-        #endif
-    }
-
-    #if canImport(CoreGraphics)
-    private static func packedRGB(from image: CGImage) -> Data? {
-        let width = image.width
-        let height = image.height
-        let bytesPerRow = 4 * width
-        let totalBytes = bytesPerRow * height
-        guard totalBytes > 0 else { return nil }
-
-        var rgba = Data(count: totalBytes)
-        var drew = false
-        rgba.withUnsafeMutableBytes { buffer in
-            guard let context = CGContext(
-                data: buffer.baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: bytesPerRow,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { return }
-            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            drew = true
-        }
-        guard drew else { return nil }
-
-        var rgb = Data(capacity: width * height * 3)
-        rgba.withUnsafeBytes { buffer in
-            let pixels = buffer.bindMemory(to: UInt8.self)
-            for index in stride(from: 0, to: totalBytes, by: 4) {
-                rgb.append(pixels[index])
-                rgb.append(pixels[index + 1])
-                rgb.append(pixels[index + 2])
-            }
-        }
-        return rgb
-    }
-    #endif
 
     /// Encode packed 24-bit RGB pixels as a PNG container, for diffusion's
     /// `image`/`mask_image` fields (which require an encoded container, not

@@ -51,6 +51,9 @@
 // proto-byte LLM stream ABI.
 #include "rac_llm_stream.h"
 #include "rac_tool_calling.h"
+#include "rac_tool_progress.h"
+#include "rac_tool_provider.h"
+#include "rac_web_research.h"
 
 // STT (Speech-to-Text)
 #include "rac_stt.h"
@@ -112,6 +115,10 @@
 
 // Solutions — proto/YAML driven L5 solution runtime
 #include "rac_solution.h"
+
+// Agent workflow runner — document CRUD, validation, and run lifecycle for the
+// node-graph builder. Independent of the Solutions runtime above.
+#include "rac_agent_workflow.h"
 
 // =============================================================================
 // INFRASTRUCTURE - Events, Download, Model Management

@@ -280,6 +280,45 @@ target_compile_features(test_pipeline_executor PRIVATE cxx_std_17)
 rac_test_define_have_solutions(test_pipeline_executor)
 add_test(NAME pipeline_executor_tests COMMAND test_pipeline_executor)
 
+# Drives the public C ABI against real files, so it needs the desktop platform
+# adapter. Without RAC_DESKTOP_ADAPTER there is no adapter to install and every
+# storage call would return RAC_ERROR_ADAPTER_NOT_SET, so the target is simply
+# absent rather than present and failing.
+if(RAC_DESKTOP_ADAPTER)
+    add_executable(test_agent_workflow_e2e test_agent_workflow_e2e.cpp)
+    target_include_directories(test_agent_workflow_e2e PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_agent_workflow_e2e PRIVATE rac_commons)
+    rac_link_archive_deps(test_agent_workflow_e2e)
+    target_compile_features(test_agent_workflow_e2e PRIVATE cxx_std_20)
+    rac_test_define_have_protobuf(test_agent_workflow_e2e)
+    add_test(NAME agent_workflow_e2e_tests COMMAND test_agent_workflow_e2e)
+endif()
+
+add_executable(test_agent_workflow test_agent_workflow.cpp)
+target_include_directories(test_agent_workflow PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_agent_workflow PRIVATE rac_commons)
+rac_link_archive_deps(test_agent_workflow)
+target_compile_features(test_agent_workflow PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_agent_workflow)
+add_test(NAME agent_workflow_tests COMMAND test_agent_workflow)
+
+add_executable(test_cron test_cron.cpp)
+target_include_directories(test_cron PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_cron PRIVATE rac_commons)
+rac_link_archive_deps(test_cron)
+target_compile_features(test_cron PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_cron)
+add_test(NAME cron_tests COMMAND test_cron)
+
 add_executable(test_solution_runner test_solution_runner.cpp)
 target_include_directories(test_solution_runner PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1037,6 +1076,48 @@ rac_link_archive_deps(test_storage_analyzer_proto)
 target_compile_features(test_storage_analyzer_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_storage_analyzer_proto)
 add_test(NAME storage_analyzer_proto_tests COMMAND test_storage_analyzer_proto)
+
+# web_research pipeline: every step asserted against a stub HTTP transport.
+add_executable(test_web_research_pipeline test_web_research_pipeline.cpp)
+target_include_directories(test_web_research_pipeline PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core/include
+    ${CMAKE_SOURCE_DIR}/core/src
+    ${CMAKE_SOURCE_DIR}/core/src/generated/proto
+)
+target_link_libraries(test_web_research_pipeline PRIVATE rac_commons nlohmann_json::nlohmann_json)
+rac_link_archive_deps(test_web_research_pipeline)
+target_compile_features(test_web_research_pipeline PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_web_research_pipeline)
+add_test(NAME web_research_pipeline_tests COMMAND test_web_research_pipeline)
+
+# web_research provider: scrape + degraded-path tests (no network).
+add_executable(test_web_research test_web_research.cpp)
+target_include_directories(test_web_research PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core/include
+    ${CMAKE_SOURCE_DIR}/core/src
+    ${CMAKE_SOURCE_DIR}/core/src/generated/proto
+)
+target_link_libraries(test_web_research PRIVATE rac_commons nlohmann_json::nlohmann_json)
+rac_link_archive_deps(test_web_research)
+target_compile_features(test_web_research PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_web_research)
+add_test(NAME web_research_tests COMMAND test_web_research)
+
+# Tool-provider progress emission (always built — no backend dep).
+add_executable(test_tool_progress test_tool_progress.cpp)
+target_include_directories(test_tool_progress PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core/include
+    ${CMAKE_SOURCE_DIR}/core/src
+    ${CMAKE_SOURCE_DIR}/core/src/generated/proto
+)
+target_link_libraries(test_tool_progress PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_progress)
+target_compile_features(test_tool_progress PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_progress)
+add_test(NAME tool_progress_tests COMMAND test_tool_progress)
 
 # ProviderRegistry<T> template unit tests (always built — no backend dep).
 add_executable(test_provider_registry test_provider_registry.cpp)
