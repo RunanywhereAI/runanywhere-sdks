@@ -335,8 +335,22 @@ RAC_COMMONS_VERSION=0.1.1
 # Never compute these locally — a local build's bytes are never the published ones.
 NEURUN_REPO=RunanywhereAI/neurun
 
+# PIN PENDING -- this branch raised RAC_PLUGIN_API_VERSION to 10 and NeuRT now
+# fills four more vtable slots (embedding, rerank, vlm, image_embedding), which
+# ship as four archives that NO PUBLISHED RELEASE CONTAINS YET.
+#
+# The tag and hashes below are still the ABI-9 v0.20.31 release. They are left in
+# place deliberately, as the record of what the last good pin was -- do NOT treat
+# them as the ABI-10 pin. NEURT_PIN_PENDING makes download-neurt.sh refuse to run
+# rather than let a cached ABI-9 tree satisfy the pin: the cache key is
+# tag:sha256, both unchanged, so the stamp would match and the receipt's ABI
+# would never be re-read.
+#
+# To close this out: cut the ABI-10 neurun release, then replace this whole block
+# with the pin block from its release notes and delete NEURT_PIN_PENDING.
+NEURT_PIN_PENDING=1
 NEURT_RELEASE_TAG=v0.20.31
-NEURT_RAC_ABI_VERSION=9
+NEURT_RAC_ABI_VERSION=10
 NEURT_MACOS_ARM64_SHA256=3ca98f9222a456bef90527be65b3ba33bc9853c4b418aaa23a231c8c43f87b1d
 NEURT_IOS_ARM64_SHA256=98b463d10a920d8473555cb56d4aa6bb948fbc9b2b4e4bfba7fd427e4571060f
 NEURT_IOS_ARM64_SIMULATOR_SHA256=9731bbbf6f3a667fe2a96aabc340c306903ed7bcebaccfd81ea63fbe9b4e9a9d

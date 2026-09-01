@@ -267,6 +267,10 @@ rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
         case RAC_FRAMEWORK_MLX:
+        // Core ML text generation runs on the Apple Neural Engine through the neurt
+        // engine's llm_ops. Omitting it here made every generic capability query claim
+        // a shipped, device-validated ANE LLM could not generate text.
+        case RAC_FRAMEWORK_COREML:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -279,6 +283,10 @@ rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
         case RAC_FRAMEWORK_MLX:
+        // Core ML speech-to-text is served by the neurt engine's stt_ops, which drives
+        // four published bundle shapes (Parakeet TDT/RNNT, Whisper/Moonshine attention
+        // decoders, Parakeet CTC).
+        case RAC_FRAMEWORK_COREML:
             return RAC_TRUE;
         default:
             return RAC_FALSE;

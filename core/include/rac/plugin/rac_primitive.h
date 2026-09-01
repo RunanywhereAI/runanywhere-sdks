@@ -51,7 +51,10 @@ typedef enum rac_primitive {
     /* Reserved primitive slots — added to prevent struct re-layout when new
      * primitives land. Bump RAC_PLUGIN_API_VERSION when promoting any of
      * these. */
-    RAC_PRIMITIVE_RESERVED_12 = 12,
+    /** Image embedding (pixels -> vector). Promoted from RAC_PRIMITIVE_RESERVED_12 in ABI v10.
+     *  Distinct from EMBED (text -> vector) because the input type differs, and from VLM
+     *  (image + prompt -> text) because the output does. */
+    RAC_PRIMITIVE_EMBED_IMAGE = 12,
     RAC_PRIMITIVE_RESERVED_13 = 13,
     RAC_PRIMITIVE_RESERVED_14 = 14,
     RAC_PRIMITIVE_RESERVED_15 = 15,

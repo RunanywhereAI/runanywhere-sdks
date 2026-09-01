@@ -106,6 +106,10 @@
 
 // Embeddings
 #include "rac_embeddings.h"
+// Image embedding (RAC_PRIMITIVE_EMBED_IMAGE). Listed explicitly because rac_embeddings.h does
+// NOT aggregate it: it is a different primitive with a different ops table, and the Swift
+// ImageEmbedding bridge needs rac_image_embedding_input_t by name.
+#include "rac_image_embedding_service.h"
 
 // RAG (Retrieval-Augmented Generation)
 #include "rac_rag.h"

@@ -64,6 +64,16 @@ if [[ "$LOCAL_ABI" != "$NEURT_RAC_ABI_VERSION" ]]; then
     exit 1
 fi
 
+if [[ -n "${NEURT_PIN_PENDING:-}" ]]; then
+    echo "[ERROR] core/VERSIONS sets NEURT_PIN_PENDING=1: the NeuRT pin does not yet" >&2
+    echo "        name a release built against RAC_PLUGIN_API_VERSION=${NEURT_RAC_ABI_VERSION}." >&2
+    echo "        Cut the ABI-${NEURT_RAC_ABI_VERSION} neurun release, paste its pin block into" >&2
+    echo "        core/VERSIONS, and delete NEURT_PIN_PENDING. Refusing to fetch: the" >&2
+    echo "        currently pinned tag/hashes are ABI 9 and lack the new archives, and a" >&2
+    echo "        cached tree would satisfy the tag:sha stamp without re-checking the receipt." >&2
+    exit 1
+fi
+
 TOKEN="${NEURUN_TOKEN:-${GH_TOKEN:-}}"
 if [[ -z "$TOKEN" ]]; then
     echo "[SKIP] No NEURUN_TOKEN/GH_TOKEN — NeuRT prebuilts are private."
@@ -135,7 +145,12 @@ fetch_slice() {
 
     # Fail closed on the archive set; a partial extract fails much later at link.
     local missing=0
-    for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a libneurt_rac_diffusion.a; do
+    # Every archive engines/neurt/CMakeLists.txt links must be present here too;
+    # a partial release otherwise passes the receipt check and fails at configure.
+    for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a \
+               libneurt_rac_diffusion.a libneurt_rac_embedding_ops.a \
+               libneurt_rac_rerank_ops.a libneurt_rac_vlm_ops.a \
+               libneurt_rac_image_embedding_ops.a; do
         [[ -f "${dest}/lib/${lib}" ]] || { echo "[ERROR] ${slice}: missing ${lib}" >&2; missing=1; }
     done
     [[ -f "${dest}/include/rac_diffusion_coreml.h" ]] \
