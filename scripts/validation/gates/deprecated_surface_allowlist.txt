@@ -69,6 +69,10 @@ core/include/rac/features/stt/rac_stt_component.h|cpp:json-param-in-public-api
 core/include/rac/features/segmentation/rac_segmentation_service.h|cpp:json-param-in-public-api
 core/include/rac/features/diarization/rac_diarization_service.h|cpp:json-param-in-public-api
 core/include/rac/features/rerank/rac_rerank_service.h|cpp:json-param-in-public-api
+# Image embedding's ops table carries the SAME `create(model_id, config_json, out_impl)` shape as
+# every sibling above -- it is the uniform vtable contract, not a new JSON surface. Diverging here
+# would make one slot's creator incompatible with the plugin factory that constructs all of them.
+core/include/rac/features/embeddings/rac_image_embedding_service.h|cpp:json-param-in-public-api
 core/include/rac/plugin/rac_onnxrt_runtime_ep.h|cpp:json-param-in-public-api
 core/include/rac/plugin/rac_plugin_entry.h|cpp:json-param-in-public-api
 core/include/rac/cloud/rac_cloud_stt_provider.h|cpp:json-param-in-public-api
