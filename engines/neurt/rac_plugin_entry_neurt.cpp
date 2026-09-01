@@ -339,7 +339,12 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
 #else
     nullptr,
 #endif
-    /* tts_ops          */ &g_neurt_tts_ops,
+/* tts_ops          */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_tts_ops,  // SYNTHESIZE on the Apple Neural Engine, backed by NeuRT
+#else
+    nullptr,
+#endif
     /* vad_ops          */ nullptr,
 /* embedding_ops    */
 #if RAC_NEURT_ROUTABLE
