@@ -5,6 +5,14 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.33] - 2026-09-01
+
+### Changed
+
+- No Flutter-facing API change. The native core fills NeuRT's last null primitive
+  slot: `tts_ops`, backed by Kokoro-82M across three Core ML graphs and two host
+  seams. Flutter does not surface it yet. This bump keeps versions in lockstep.
+
 ## [0.20.32] - 2026-08-31
 
 ### Changed

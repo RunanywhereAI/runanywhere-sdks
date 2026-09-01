@@ -74,7 +74,7 @@ platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control 
 call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings
 for every language.
 
-**Current version**: `0.20.32` (canonical source: `core/VERSION`)
+**Current version**: `0.20.33` (canonical source: `core/VERSION`)
 
 | SDK | Path | Bridge mechanism | Platforms |
 |-----|------|-------------------|-----------|
