@@ -106,7 +106,12 @@ case "$ENGINE" in
     mkdir -p "$stage/include/rac/plugin"
     copy_one "$ROOT/core/include/rac/plugin/rac_plugin_entry_neurt.h" \
       "$stage/include/rac/plugin/rac_plugin_entry_neurt.h"
-    for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a libneurt_rac_diffusion.a; do
+    # Every archive engines/neurt/CMakeLists.txt links. Omitting one does not fail here -- it
+    # fails at the overlay CONSUMER's link with an undefined `_g_neurt_*_ops`, which is the same
+    # shape as the QAIRT skel files this script used to drop by filtering on {.dll,.lib}.
+    for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a \
+               libneurt_rac_embedding_ops.a libneurt_rac_rerank_ops.a libneurt_rac_vlm_ops.a \
+               libneurt_rac_image_embedding_ops.a libneurt_rac_diffusion.a; do
       copy_one "$PRE/lib/$lib" "$stage/lib/"
       min_bytes "$stage/lib/$lib" 8000
     done

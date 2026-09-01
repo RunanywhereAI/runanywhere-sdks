@@ -73,12 +73,19 @@ if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
     _neurt_missing=()
     for _slice in macos-arm64 ios-arm64 ios-arm64-simulator; do
         _root="${REPO_ROOT}/core/third_party/neurt/${_slice}"
+        # Same set as _NEURT_ROUTABLE_ARCHIVES below, plus the receipt and the one public
+        # header. Spelled out rather than referencing that array because this guard runs before
+        # it is defined; if you add an archive, add it in BOTH places.
         for _rel in \
             RECEIPT.json \
             include/rac_diffusion_coreml.h \
             lib/libneurt_core.a \
             lib/libneurt_rac_llm_ops.a \
             lib/libneurt_rac_stt_ops.a \
+            lib/libneurt_rac_embedding_ops.a \
+            lib/libneurt_rac_rerank_ops.a \
+            lib/libneurt_rac_vlm_ops.a \
+            lib/libneurt_rac_image_embedding_ops.a \
             lib/libneurt_rac_diffusion.a
         do
             [ -f "${_root}/${_rel}" ] || _neurt_missing+=("${_slice}/${_rel}")
@@ -864,17 +871,38 @@ neurt_prebuilt_root_for_slice() {
     esac
 }
 
-# The four archives that make the engine routable. Empty output means this is a
+# EVERY archive that makes the engine routable. Empty output means this is a
 # deliberate shell build (RAC_ALLOW_NEURT_STUB=1); the caller handles that.
+#
+# ONE list, iterated twice: it used to be spelled out separately for the check and
+# for the emit, and the two are trivially easy to let drift apart.
+#
+# This list must match engines/neurt/CMakeLists.txt's completeness probe and
+# neurun's package-rac-dist.sh. When ABI v10 filled four more vtable slots, those
+# two were updated and THIS ONE WAS NOT -- and nothing local caught it, because
+# the omission does not break any build here: every CMake target compiles, the
+# xcframework packages, and the failure surfaces only at a CONSUMER's link as
+# `Undefined symbol: _g_neurt_embeddings_ops` (+ rerank, vlm, image_embedding).
+# That is the identical shape as the `U _g_neurt_llm_ops` incident this function's
+# header already records, one ABI bump later.
+_NEURT_ROUTABLE_ARCHIVES=(
+    lib/libneurt_core.a
+    lib/libneurt_rac_llm_ops.a
+    lib/libneurt_rac_stt_ops.a
+    lib/libneurt_rac_embedding_ops.a
+    lib/libneurt_rac_rerank_ops.a
+    lib/libneurt_rac_vlm_ops.a
+    lib/libneurt_rac_image_embedding_ops.a
+    lib/libneurt_rac_diffusion.a
+)
+
 neurt_prebuilt_archives() {
     local root="$1"
     local rel
-    for rel in lib/libneurt_core.a lib/libneurt_rac_llm_ops.a \
-               lib/libneurt_rac_stt_ops.a lib/libneurt_rac_diffusion.a; do
+    for rel in "${_NEURT_ROUTABLE_ARCHIVES[@]}"; do
         [ -f "${root}/${rel}" ] || return 1
     done
-    for rel in lib/libneurt_core.a lib/libneurt_rac_llm_ops.a \
-               lib/libneurt_rac_stt_ops.a lib/libneurt_rac_diffusion.a; do
+    for rel in "${_NEURT_ROUTABLE_ARCHIVES[@]}"; do
         echo "${root}/${rel}"
     done
 }
