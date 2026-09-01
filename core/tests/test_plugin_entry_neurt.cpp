@@ -176,16 +176,20 @@ int main() {
             std::fprintf(stderr, "routable neurt engine has NULL vlm_ops slot\n");
             return 1;
         }
+        if (vt->tts_ops == nullptr) {
+            std::fprintf(stderr, "routable neurt engine has NULL tts_ops slot\n");
+            return 1;
+        }
         if (vt->image_embedding_ops == nullptr) {
             std::fprintf(stderr, "routable neurt engine has NULL image_embedding_ops slot\n");
             return 1;
         }
         // Disjoint-slot invariant: DIFFUSION + GENERATE_TEXT + TRANSCRIBE + EMBED + RERANK + VLM +
-        // EMBED_IMAGE, and nothing else.
+        // EMBED_IMAGE + SYNTHESIZE, and nothing else. VAD is the one still null.
         // Each name here is a capability PROMISE — the SDK treats a non-null pointer as "this engine
         // serves that primitive" — so a slot must stay null until its driver is gated, not be filled
         // speculatively.
-        if (vt->tts_ops != nullptr || vt->vad_ops != nullptr) {
+        if (vt->vad_ops != nullptr) {
             std::fprintf(stderr, "neurt engine advertised an unserved ops slot\n");
             return 1;
         }
@@ -230,7 +234,8 @@ int main() {
         }
         rac_plugin_unregister(vt->metadata.name);
         std::fprintf(stdout,
-                     "  ok: routable neurt engine serves DIFFUSION + GENERATE_TEXT + TRANSCRIBE + EMBED + RERANK + VLM + EMBED_IMAGE and pins\n");
+                     "  ok: routable neurt engine serves DIFFUSION + GENERATE_TEXT + TRANSCRIBE + EMBED + RERANK\n"
+                     "      + VLM + EMBED_IMAGE + SYNTHESIZE and pins\n");
         return 0;
     }
 

@@ -300,6 +300,11 @@ rac_bool_t rac_framework_supports_tts(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
         case RAC_FRAMEWORK_MLX:
+        // COREML is NeuRT, whose tts_ops slot is filled as of this release (Kokoro-82M across
+        // three graphs and two host seams). Deliberately NOT added when the other CoreML
+        // predicates were: the slot was still null then, and claiming a capability the engine
+        // does not serve routes a model to an engine that refuses it.
+        case RAC_FRAMEWORK_COREML:
             return RAC_TRUE;
         default:
             return RAC_FALSE;

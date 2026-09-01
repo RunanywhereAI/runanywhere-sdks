@@ -179,6 +179,8 @@ static const rac_primitive_t k_neurt_primitives[] = {
     // Image -> vector, for retrieval/similarity. Distinct from VLM (which returns text) and from
     // EMBED (which takes text).
     RAC_PRIMITIVE_EMBED_IMAGE,
+    // Text-to-speech on the Neural Engine. The last slot NeuRT left null.
+    RAC_PRIMITIVE_SYNTHESIZE,
     // Speech-to-text on the Neural Engine, backed by NeuRT's ASR drivers. Four bundle shapes are
     // served through one op table: Parakeet TDT and RNNT (transducer), Whisper and Moonshine
     // (attention decoder), and Parakeet CTC.
@@ -309,6 +311,12 @@ extern "C" const struct rac_vlm_service_ops g_neurt_vlm_ops;
 // vector, for retrieval and similarity. The slot it fills was promoted from reserved_slot_3 in
 // ABI v10 — SigLIP2 is the first model to serve it.
 extern "C" const struct rac_image_embedding_service_ops g_neurt_image_embedding_ops;
+// Text-to-speech (neurun/NeuRT/src/sdk/rac_tts_ops_neurt.cpp). Kokoro-82M across three graphs with
+// two host seams -- duration -> [alignment] -> decode -> [harmonic source] -> gen -- plus the
+// grapheme-to-phoneme step the public op needs, since it takes TEXT and the runtime takes ids.
+// Measured on an M4 Max: 3.25 s of 24 kHz audio in 175 ms (18.6x realtime), mel_distance 0.3025
+// against a 0.60 tolerance.
+extern "C" const struct rac_tts_service_ops g_neurt_tts_ops;
 
 static const rac_engine_vtable_t g_neurt_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_neurt_manifest),
@@ -331,7 +339,7 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
 #else
     nullptr,
 #endif
-    /* tts_ops          */ nullptr,
+    /* tts_ops          */ &g_neurt_tts_ops,
     /* vad_ops          */ nullptr,
 /* embedding_ops    */
 #if RAC_NEURT_ROUTABLE

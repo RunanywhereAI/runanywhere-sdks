@@ -225,8 +225,12 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
 //
 // This is not hypothetical. Before COREML was routed to NeuRT unconditionally it mapped
 // to `platform` for the primitives NeuRT did not serve, and `platform` really does serve
-// SYNTHESIZE; without this guard, routing COREML to NeuRT would send a Core ML TTS
-// request to MLX by priority (110 > 100) instead. NeuRT leaves tts_ops null.
+// SYNTHESIZE; without this guard, routing COREML to NeuRT would have sent a Core ML TTS
+// request to MLX by priority (110 > 100) instead.
+//
+// NeuRT now fills tts_ops, so that particular case no longer fires -- but the guard is not
+// therefore obsolete. It is what keeps the NEXT unfilled slot from repeating the pattern,
+// which this engine has already done twice.
 //
 // Only COREML is strict here. The other format-determined frameworks (LLAMACPP, MLX,
 // QHEXRT) have the same argument available to them, but changing their behaviour is
