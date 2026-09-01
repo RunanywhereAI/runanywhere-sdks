@@ -8,8 +8,8 @@
 #
 
 mlx_checksums = {
-  'RABackendMLX' => '0802fe58480c3e03e94498d46adb50fda7b9ade491807c7e0392a7fd68b83b59',
-  'RunAnywhereMLXRuntime' => 'e2badb28a4496542a502fbfc5e019c784ed3cc109ac381586ec13c771bd0b3b5',
+  'RABackendMLX' => 'c0fa8f3b5312e699c0bc37c648a4bcf0ff6b4634af1c874b74daf5aacc18e345',
+  'RunAnywhereMLXRuntime' => '685bd30ab5650d4fd9e3bf4c3b65afdda1bb0e598f3d17d3b75663856251e878',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
   'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
 }.freeze
