@@ -589,7 +589,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
-                checksum: "93b0300bf5bac4fdbf502a8403e366e9d4ca25785a0459fdb2601a501d43002f"
+                checksum: "bc2a0b3286a2da3c4c13947b8a601fbaaca732fd4f448bd1266d07a204d4d964"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
