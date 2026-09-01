@@ -156,9 +156,36 @@ int main() {
                          "not linked in (check that g_neurt_stt_ops is declared `extern`)\n");
             return 1;
         }
-        // Disjoint-slot invariant: DIFFUSION + GENERATE_TEXT + TRANSCRIBE, and nothing else.
-        if (vt->tts_ops != nullptr || vt->vad_ops != nullptr ||
-            vt->vlm_ops != nullptr || vt->embedding_ops != nullptr) {
+        // Same linkage guard for the embedding op table, for the same reason. This slot was null
+        // until the bidirectional-encoder driver landed, which is why docs/BUNDLE_CONTRACT.md
+        // records Nemotron-3-Embed-1B as a bundle that "loads, undrivable".
+        if (vt->embedding_ops == nullptr) {
+            std::fprintf(stderr,
+                         "routable neurt engine has NULL embedding_ops slot — the NeuRT embeddings "
+                         "op-table is not linked in (check that g_neurt_embeddings_ops is declared "
+                         "`extern`)\n");
+            return 1;
+        }
+        if (vt->rerank_ops == nullptr) {
+            std::fprintf(stderr,
+                         "routable neurt engine has NULL rerank_ops slot — the NeuRT rerank op-table "
+                         "is not linked in (check that g_neurt_rerank_ops is declared `extern`)\n");
+            return 1;
+        }
+        if (vt->vlm_ops == nullptr) {
+            std::fprintf(stderr, "routable neurt engine has NULL vlm_ops slot\n");
+            return 1;
+        }
+        if (vt->image_embedding_ops == nullptr) {
+            std::fprintf(stderr, "routable neurt engine has NULL image_embedding_ops slot\n");
+            return 1;
+        }
+        // Disjoint-slot invariant: DIFFUSION + GENERATE_TEXT + TRANSCRIBE + EMBED + RERANK + VLM +
+        // EMBED_IMAGE, and nothing else.
+        // Each name here is a capability PROMISE — the SDK treats a non-null pointer as "this engine
+        // serves that primitive" — so a slot must stay null until its driver is gated, not be filled
+        // speculatively.
+        if (vt->tts_ops != nullptr || vt->vad_ops != nullptr) {
             std::fprintf(stderr, "neurt engine advertised an unserved ops slot\n");
             return 1;
         }
@@ -203,7 +230,7 @@ int main() {
         }
         rac_plugin_unregister(vt->metadata.name);
         std::fprintf(stdout,
-                     "  ok: routable neurt engine serves DIFFUSION + GENERATE_TEXT and pins\n");
+                     "  ok: routable neurt engine serves DIFFUSION + GENERATE_TEXT + TRANSCRIBE + EMBED + RERANK + VLM + EMBED_IMAGE and pins\n");
         return 0;
     }
 
@@ -221,9 +248,14 @@ int main() {
         std::fprintf(stderr, "stub neurt engine advertised routing metadata\n");
         return 1;
     }
+    // EVERY slot, not the ones that existed when this was written. A stub build advertising
+    // rerank_ops or image_embedding_ops used to pass here, because those two were promoted after
+    // this condition was last touched -- which is the same drift that let the CRACommons header
+    // mirror sit a whole ABI behind.
     if (vt->diffusion_ops != nullptr || vt->llm_ops != nullptr || vt->stt_ops != nullptr ||
         vt->tts_ops != nullptr || vt->vad_ops != nullptr || vt->vlm_ops != nullptr ||
-        vt->embedding_ops != nullptr) {
+        vt->embedding_ops != nullptr || vt->rerank_ops != nullptr ||
+        vt->image_embedding_ops != nullptr) {
         std::fprintf(stderr, "stub neurt engine advertised an ops slot\n");
         return 1;
     }

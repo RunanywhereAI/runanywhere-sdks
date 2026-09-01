@@ -363,14 +363,36 @@ public struct VadOptions: Sendable {
 
 /// Normalization and pooling for one embedding batch.
 public struct EmbedOptions: Sendable {
+    /// What an embedding will be used for.
+    ///
+    /// Asymmetric embedders prepend a different prompt for a query than for a document, and the
+    /// difference is not cosmetic: on Nemotron-3-Embed-1B an unprefixed query/passage pair scores
+    /// no better against a relevant passage than an irrelevant one, while the correctly prefixed
+    /// pair separates 0.48 from 0.007. A model that declares no prompt table ignores this and
+    /// returns the same vector either way — it never errors.
+    public enum InputType: Sendable {
+        /// Let the model decide; correct for symmetric embedders.
+        case unspecified
+        /// The short side of a retrieval pair.
+        case query
+        /// The indexed side of a retrieval pair.
+        case document
+    }
+
     /// Apply L2 normalization to each embedding vector.
     public var normalize: Bool = true
     public var pooling: PoolingMode = .mean
+    public var inputType: InputType = .unspecified
 
     /// Build embedding options.
-    public init(normalize: Bool = true, pooling: PoolingMode = .mean) {
+    public init(
+        normalize: Bool = true,
+        pooling: PoolingMode = .mean,
+        inputType: InputType = .unspecified
+    ) {
         self.normalize = normalize
         self.pooling = pooling
+        self.inputType = inputType
     }
 
     func toProto() -> RAEmbeddingsOptions {
@@ -380,6 +402,11 @@ public struct EmbedOptions: Sendable {
         case .mean: proto.pooling = .mean
         case .cls: proto.pooling = .cls
         case .last: proto.pooling = .last
+        }
+        switch inputType {
+        case .unspecified: proto.inputType = .unspecified
+        case .query: proto.inputType = .query
+        case .document: proto.inputType = .document
         }
         return proto
     }

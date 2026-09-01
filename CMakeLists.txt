@@ -690,6 +690,42 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
     endif()
 
+    # EMBED_IMAGE end to end through the PUBLIC C API (rac_image_embedding_create/_embed).
+    # Wired HERE and not in core/tests/CMakeLists.txt for the reason that file already documents:
+    # engines/ is configured after core/, so `TARGET rac_backend_neurt` is still false there.
+    # Skips (exit 0) without RAC_TEST_NEURT_IMAGE_EMBED_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND NOT TARGET test_image_embedding_neurt_e2e)
+        add_executable(test_image_embedding_neurt_e2e
+            core/tests/test_image_embedding_neurt_e2e.cpp)
+        target_include_directories(test_image_embedding_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+        )
+        target_link_libraries(test_image_embedding_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_image_embedding_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME image_embedding_neurt_e2e_tests COMMAND test_image_embedding_neurt_e2e)
+        # 77 = "no bundle configured". Without SKIP_RETURN_CODE the test's own SKIP path exits 0
+        # and CTest reports a PASS, which is how test_stt_neurt_e2e went its whole life reported
+        # green without ever running.
+        set_tests_properties(image_embedding_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
     # NeuRT ASR end to end: a WAV in through the SDK's own stt_ops, a scored transcript out.
     # The seam neither of the other two neurt tests covers — the plugin test stops at the vtable
     # and neurun's own tools stop at the runtime. Skips (exit 0) without RAC_ASR_BUNDLE, because a
