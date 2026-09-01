@@ -719,7 +719,11 @@ if(RAC_BUILD_TESTS)
         endif()
         target_compile_features(test_image_embedding_neurt_e2e PRIVATE cxx_std_17)
         add_test(NAME image_embedding_neurt_e2e_tests COMMAND test_image_embedding_neurt_e2e)
-        set_tests_properties(image_embedding_neurt_e2e_tests PROPERTIES LABELS "neurt")
+        # 77 = "no bundle configured". Without SKIP_RETURN_CODE the test's own SKIP path exits 0
+        # and CTest reports a PASS, which is how test_stt_neurt_e2e went its whole life reported
+        # green without ever running.
+        set_tests_properties(image_embedding_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
     endif()
 
     # NeuRT ASR end to end: a WAV in through the SDK's own stt_ops, a scored transcript out.

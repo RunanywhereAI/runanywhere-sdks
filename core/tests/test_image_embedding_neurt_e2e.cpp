@@ -12,7 +12,14 @@
  *   rac_image_embedding_create -> _initialize -> _embed -> rac_embeddings_result_free.
  *
  * Env-gated on a real bundle because a vision tower is 400 MB of Core ML. When the bundle is
- * absent it SKIPs — but a skip is not a pass, so it prints loudly enough to be noticed in CI logs.
+ * absent it exits 77, which CMakeLists registers as SKIP_RETURN_CODE, so CTest reports the test
+ * as SKIPPED rather than passed.
+ *
+ * That distinction is not pedantry. `test_stt_neurt_e2e` returns 0 on the same condition, so it
+ * has been reported as passing for as long as it has existed while never once running -- and the
+ * first time it was handed a real bundle it failed immediately, because every published ASR
+ * bundle is missing the manifest blocks the runtime requires. A test that cannot fail is not a
+ * test, and a green tick that means "no bundle" is worse than a red one.
  */
 #include <cmath>
 #include <cstdio>
@@ -67,7 +74,7 @@ int main() {
     if (!bundle || bundle[0] == '\0') {
         std::fprintf(stdout,
                      "SKIP: set RAC_TEST_NEURT_IMAGE_EMBED_BUNDLE to a SigLIP2 _ANE bundle\n");
-        return 0;
+        return 77;   // CTest SKIP_RETURN_CODE -- reported as skipped, never as passed
     }
 
     const rac_engine_vtable_t* vt = rac_plugin_entry_neurt();

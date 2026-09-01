@@ -4,7 +4,7 @@
 
 - No API change. Rebuilt against plugin ABI v10.
 - Core ML models are now routed to the NeuRT engine unconditionally and fail
-  closed when it cannot serve the primitive. Previously a Core ML model MLX
+  closed when it cannot serve the primitive. Previously a Core ML model that MLX
   could not read could still be handed to MLX by plugin priority (110 vs
   NeuRT's 100).
 

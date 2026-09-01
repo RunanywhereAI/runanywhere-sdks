@@ -248,9 +248,14 @@ int main() {
         std::fprintf(stderr, "stub neurt engine advertised routing metadata\n");
         return 1;
     }
+    // EVERY slot, not the ones that existed when this was written. A stub build advertising
+    // rerank_ops or image_embedding_ops used to pass here, because those two were promoted after
+    // this condition was last touched -- which is the same drift that let the CRACommons header
+    // mirror sit a whole ABI behind.
     if (vt->diffusion_ops != nullptr || vt->llm_ops != nullptr || vt->stt_ops != nullptr ||
         vt->tts_ops != nullptr || vt->vad_ops != nullptr || vt->vlm_ops != nullptr ||
-        vt->embedding_ops != nullptr) {
+        vt->embedding_ops != nullptr || vt->rerank_ops != nullptr ||
+        vt->image_embedding_ops != nullptr) {
         std::fprintf(stderr, "stub neurt engine advertised an ops slot\n");
         return 1;
     }
