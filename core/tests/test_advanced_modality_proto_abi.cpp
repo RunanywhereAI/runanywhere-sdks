@@ -1138,6 +1138,27 @@ int test_rag_ingest_query_mocked_path() {
     rac_proto_buffer_free(&out);
     rac_sdk_event_clear_queue();
 
+    // The other half of the same contract: 0 is a legal explicit top_k
+    // (top-k filtering disabled), so it has to survive rather than be read as
+    // "unset". This is what stops the bug from being "fixed" with a
+    // value-based sentinel such as `gen.top_k() > 0 ? gen.top_k() : default`,
+    // which would satisfy the unset case above while silently discarding a
+    // caller's explicit 0.
+    runanywhere::v1::RAGQueryOptions explicit_zero_query;
+    explicit_zero_query.set_query("Where does RAG live?");
+    explicit_zero_query.mutable_generation()->set_max_output_tokens(32);
+    explicit_zero_query.mutable_generation()->set_top_k(0);
+    std::vector<uint8_t> explicit_zero_bytes;
+    CHECK(serialize(explicit_zero_query, &explicit_zero_bytes),
+          "RAGQueryOptions with an explicit top_k of 0 serializes");
+    g_dummy_llm_last_top_k = -1;
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_query_proto(session, explicit_zero_bytes.data(), explicit_zero_bytes.size(), &out);
+    CHECK(rc == RAC_SUCCESS, "RAG query with an explicit top_k of 0 succeeds");
+    CHECK(g_dummy_llm_last_top_k == 0, "RAG query honours an explicit top_k of 0");
+    rac_proto_buffer_free(&out);
+    rac_sdk_event_clear_queue();
+
     // A token-limited thinking phase may omit its closing tag. The RAG result
     // must keep that private content out of answer while retaining typed
     // thinking_content for non-UI consumers.
