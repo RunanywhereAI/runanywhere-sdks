@@ -26,7 +26,7 @@ bindings/flutter/
     └── runanywhere_qhexrt/     # QHexRT Qualcomm Hexagon NPU backend (Android-only)
 ```
 
-All four backend packages depend on `runanywhere ^0.20.32`; the core package vendors
+All four backend packages depend on `runanywhere ^0.20.33`; the core package vendors
 `RACommons`, each backend vendors its own XCFrameworks/`.so` files. Example app:
 `bindings/flutter/example/` (setup/troubleshooting in `docs/DEVELOPMENT.md`;
 `example/scripts/verify.sh` is the clean-clone build gate).
@@ -218,7 +218,7 @@ strict-raw-types, error-level `dead_code`/`unused_import`/`unused_local_variable
 
 | Package / Artifact | Version |
 |---|---|
-| `runanywhere`, `runanywhere_llamacpp`, `runanywhere_mlx`, `runanywhere_onnx`, `runanywhere_qhexrt` | 0.20.32 (all 5, confirmed identical) |
+| `runanywhere`, `runanywhere_llamacpp`, `runanywhere_mlx`, `runanywhere_onnx`, `runanywhere_qhexrt` | 0.20.33 (all 5, confirmed identical) |
 | `RACommons` native | 0.1.6 |
 | llama.cpp engine | runanywhere-b10453.4 |
 | ONNX Runtime | 1.28.0 |

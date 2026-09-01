@@ -111,7 +111,8 @@ case "$ENGINE" in
     # shape as the QAIRT skel files this script used to drop by filtering on {.dll,.lib}.
     for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a \
                libneurt_rac_embedding_ops.a libneurt_rac_rerank_ops.a libneurt_rac_vlm_ops.a \
-               libneurt_rac_image_embedding_ops.a libneurt_rac_diffusion.a; do
+               libneurt_rac_image_embedding_ops.a libneurt_rac_tts_ops.a \
+               libneurt_rac_diffusion.a; do
       copy_one "$PRE/lib/$lib" "$stage/lib/"
       min_bytes "$stage/lib/$lib" 8000
     done

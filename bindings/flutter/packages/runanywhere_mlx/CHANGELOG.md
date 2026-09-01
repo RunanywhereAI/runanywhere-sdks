@@ -1,3 +1,13 @@
+## [0.20.33] - 2026-09-01
+
+### Changed
+
+- No API change. Rebuilt against the 0.20.33 core.
+- `rac_framework_supports_tts()` now includes Core ML, because NeuRT actually
+  serves the primitive as of this release. It was deliberately left out while the
+  slot was null: claiming a capability the engine does not serve routes a model to
+  an engine that refuses it.
+
 ## [0.20.32] - 2026-08-31
 
 ### Changed

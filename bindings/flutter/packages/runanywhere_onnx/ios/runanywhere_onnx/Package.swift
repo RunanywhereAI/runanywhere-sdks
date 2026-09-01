@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let sdkVersion = "0.20.32"
+let sdkVersion = "0.20.33"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -36,7 +36,7 @@ let sherpaTarget = runAnywhereBinaryTarget(
 // makes on-device image generation (diffusion.generateImage) routable.
 let coremlTarget = runAnywhereBinaryTarget(
     name: "RABackendNeuRT",
-    checksum: "393221748af1f14a1f5a6faa4546c26bf053aff37cf9737aec3399881a73a412"
+    checksum: "774c885f1961db111a8f9e70ca1ee53e44acb2864ddb9cdf94bfe3a0fd5191c4"
 )
 
 let package = Package(

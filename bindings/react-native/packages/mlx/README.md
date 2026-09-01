@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-npm install @runanywhere/core@0.20.32 @runanywhere/mlx@0.20.32
+npm install @runanywhere/core@0.20.33 @runanywhere/mlx@0.20.33
 cd ios && pod install && cd ..
 ```
 

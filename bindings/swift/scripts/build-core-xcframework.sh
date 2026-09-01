@@ -86,6 +86,7 @@ if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
             lib/libneurt_rac_rerank_ops.a \
             lib/libneurt_rac_vlm_ops.a \
             lib/libneurt_rac_image_embedding_ops.a \
+            lib/libneurt_rac_tts_ops.a \
             lib/libneurt_rac_diffusion.a
         do
             [ -f "${_root}/${_rel}" ] || _neurt_missing+=("${_slice}/${_rel}")
@@ -893,8 +894,36 @@ _NEURT_ROUTABLE_ARCHIVES=(
     lib/libneurt_rac_rerank_ops.a
     lib/libneurt_rac_vlm_ops.a
     lib/libneurt_rac_image_embedding_ops.a
+    lib/libneurt_rac_tts_ops.a
     lib/libneurt_rac_diffusion.a
 )
+
+# An archive the payload ships but this list does not name is force-loaded by nothing, so its
+# ops symbol goes unresolved and ONLY the consumer's link fails -- every CMake target compiles
+# and the xcframework packages cleanly. That has now happened twice: `_g_neurt_embeddings_ops`
+# when NeuRT gained embed/rerank/vlm/image-embed, and `_g_neurt_tts_ops` when it gained TTS,
+# each found by validate_consumer_flutter an hour into a release build. Refuse to package an
+# unknown archive instead, so the next one fails here with its name.
+neurt_assert_no_unlisted_archives() {
+    local root="$1"
+    local found rel base known unlisted=""
+    for found in "${root}"/lib/libneurt_*.a; do
+        [ -f "${found}" ] || continue
+        base="lib/$(basename "${found}")"
+        known=0
+        for rel in "${_NEURT_ROUTABLE_ARCHIVES[@]}"; do
+            [ "${rel}" = "${base}" ] && { known=1; break; }
+        done
+        [ "${known}" -eq 1 ] || unlisted="${unlisted} ${base}"
+    done
+    if [ -n "${unlisted}" ]; then
+        echo "error: NeuRT payload ships archive(s) not in _NEURT_ROUTABLE_ARCHIVES:${unlisted}" >&2
+        echo "       add them there, to the pre-flight guard above, and to" >&2
+        echo "       scripts/build/package-private-engine-overlay.sh -- all three." >&2
+        return 1
+    fi
+    return 0
+}
 
 neurt_prebuilt_archives() {
     local root="$1"
@@ -902,6 +931,7 @@ neurt_prebuilt_archives() {
     for rel in "${_NEURT_ROUTABLE_ARCHIVES[@]}"; do
         [ -f "${root}/${rel}" ] || return 1
     done
+    neurt_assert_no_unlisted_archives "${root}" || return 2
     for rel in "${_NEURT_ROUTABLE_ARCHIVES[@]}"; do
         echo "${root}/${rel}"
     done

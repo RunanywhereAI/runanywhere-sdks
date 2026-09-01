@@ -9,7 +9,7 @@
 
 mlx_checksums = {
   'RABackendMLX' => 'c0fa8f3b5312e699c0bc37c648a4bcf0ff6b4634af1c874b74daf5aacc18e345',
-  'RunAnywhereMLXRuntime' => 'b9b4c3316a0750b56b56ef10794be1d55a45b89e432e7304e4dcdb23f6a0d6ce',
+  'RunAnywhereMLXRuntime' => '39985c3294db0f00014ae5060a272833f8617d78dd7a060a1eeb69ef74acb716',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
   'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
 }.freeze
@@ -25,7 +25,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
-  s.version          = '0.20.32'
+  s.version          = '0.20.33'
   # iOS archives are downloaded from the v#{asset_version} GitHub release.
   # Normally identical to s.version, and a literal on purpose:
   # scripts/release/sync-versions.sh rewrites it and
@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
   # diverges when a version republishes non-iOS packages without cutting iOS
   # archives (0.20.20 did that) -- then pin the last
   # release that has them.
-  asset_version      = '0.20.32'
+  asset_version      = '0.20.33'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

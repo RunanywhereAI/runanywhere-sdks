@@ -726,6 +726,38 @@ if(RAC_BUILD_TESTS)
             LABELS "neurt" SKIP_RETURN_CODE 77)
     endif()
 
+    # SYNTHESIZE end to end through the PUBLIC C API (rac_tts_create/_synthesize). Wired here for
+    # the same reason as the EMBED_IMAGE test above: engines/ is configured after core/.
+    # Skips (77) without RAC_TEST_NEURT_TTS_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND NOT TARGET test_tts_neurt_e2e)
+        add_executable(test_tts_neurt_e2e
+            core/tests/test_tts_neurt_e2e.cpp)
+        target_include_directories(test_tts_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+        )
+        target_link_libraries(test_tts_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_tts_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME tts_neurt_e2e_tests COMMAND test_tts_neurt_e2e)
+        set_tests_properties(tts_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
     # NeuRT ASR end to end: a WAV in through the SDK's own stt_ops, a scored transcript out.
     # The seam neither of the other two neurt tests covers — the plugin test stops at the vtable
     # and neurun's own tools stop at the runtime. Skips (exit 0) without RAC_ASR_BUNDLE, because a
