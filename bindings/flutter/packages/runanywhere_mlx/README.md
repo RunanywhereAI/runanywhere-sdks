@@ -10,8 +10,8 @@
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.31
-  runanywhere_mlx: 0.20.31
+  runanywhere: 0.20.32
+  runanywhere_mlx: 0.20.32
 ```
 
 Requires Xcode 26+ and a physical iOS device for MLX execution. See the [Flutter SDK README](../../README.md) for Podfile setup.

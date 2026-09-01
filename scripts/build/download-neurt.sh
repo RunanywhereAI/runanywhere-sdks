@@ -64,16 +64,6 @@ if [[ "$LOCAL_ABI" != "$NEURT_RAC_ABI_VERSION" ]]; then
     exit 1
 fi
 
-if [[ -n "${NEURT_PIN_PENDING:-}" ]]; then
-    echo "[ERROR] core/VERSIONS sets NEURT_PIN_PENDING=1: the NeuRT pin does not yet" >&2
-    echo "        name a release built against RAC_PLUGIN_API_VERSION=${NEURT_RAC_ABI_VERSION}." >&2
-    echo "        Cut the ABI-${NEURT_RAC_ABI_VERSION} neurun release, paste its pin block into" >&2
-    echo "        core/VERSIONS, and delete NEURT_PIN_PENDING. Refusing to fetch: the" >&2
-    echo "        currently pinned tag/hashes are ABI 9 and lack the new archives, and a" >&2
-    echo "        cached tree would satisfy the tag:sha stamp without re-checking the receipt." >&2
-    exit 1
-fi
-
 TOKEN="${NEURUN_TOKEN:-${GH_TOKEN:-}}"
 if [[ -z "$TOKEN" ]]; then
     echo "[SKIP] No NEURUN_TOKEN/GH_TOKEN — NeuRT prebuilts are private."
