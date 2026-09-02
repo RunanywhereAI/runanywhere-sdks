@@ -49,14 +49,18 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
     return rac::proto::copy_message(message, out, "failed to serialize proto result");
 }
 
-// NOTE on MODEL_CATEGORY coverage: `ModelCategory` (idl/model_types.proto)
-// has NO `MODEL_CATEGORY_RERANK` member by design — rerank models are routed
-// straight to `SDK_COMPONENT_RERANK` / `RAC_PRIMITIVE_RERANK` via the
-// dedicated rerank service factory, never through this category->component
-// mapping. So `rac_model_lifecycle_load_proto` (which resolves the component
-// from `ModelLoadRequest.category`) structurally cannot load a rerank model;
-// that is expected, not a missing `case`. Do not add a rerank arm here
-// without first adding the category to the IDL.
+// NOTE on MODEL_CATEGORY coverage: this switch is deliberately NOT exhaustive.
+// `MODEL_CATEGORY_RERANK` and `MODEL_CATEGORY_OCR` both exist in
+// idl/model_types.proto, and both are absent here on purpose: those models are
+// routed straight to `RAC_PRIMITIVE_RERANK` / `RAC_PRIMITIVE_OCR` by their own
+// service factories (`rac_rerank_create`, `rac_ocr_create`), which take a model
+// path rather than a component. There is no `SDK_COMPONENT_OCR`, and the
+// category is carried only so catalogs and pickers can FILE these models
+// correctly. So `rac_model_lifecycle_load_proto` — which resolves a component
+// from `ModelLoadRequest.category` — structurally cannot load either one; that
+// is expected, not a missing `case`. Adding an arm here without a matching
+// `SDKComponent` and a component-layer implementation would turn a clean
+// UNSPECIFIED into a component that resolves to nothing.
 runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCategory category) {
     switch (category) {
         case runanywhere::v1::MODEL_CATEGORY_LANGUAGE:
@@ -221,6 +225,8 @@ rac_model_category_t c_category_from_proto(runanywhere::v1::ModelCategory catego
             return RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION;
         case runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+        case runanywhere::v1::MODEL_CATEGORY_OCR:
+            return RAC_MODEL_CATEGORY_OCR;
         case runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED:
         default:
             return RAC_MODEL_CATEGORY_UNKNOWN;

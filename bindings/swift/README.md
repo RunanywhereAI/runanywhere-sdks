@@ -3,7 +3,7 @@
 Run large language models, speech recognition, text-to-speech, and voice agents directly on iPhone, iPad, and Mac — with low latency and on-device privacy. The Swift SDK provides a unified API over pluggable backends (llama.cpp, ONNX, Apple MLX) so you can ship AI features without sending user data to the cloud for inference.
 
 [![Swift Package Manager](https://img.shields.io/badge/Swift%20Package%20Manager-compatible-brightgreen.svg)](https://github.com/RunanywhereAI/runanywhere-sdks)
-[![Version](https://img.shields.io/badge/version-0.20.35-blue.svg)](https://github.com/RunanywhereAI/runanywhere-sdks/releases)
+[![Version](https://img.shields.io/badge/version-0.20.36-blue.svg)](https://github.com/RunanywhereAI/runanywhere-sdks/releases)
 [![Platform](https://img.shields.io/badge/Platform-iOS%2017.5%2B%20%7C%20macOS%2014.5%2B-lightgrey)](https://developer.apple.com)
 [![License: RunAnywhere](https://img.shields.io/badge/License-RunAnywhere-blue.svg)](../../LICENSE)
 
@@ -32,7 +32,7 @@ https://github.com/RunanywhereAI/runanywhere-swift.git
 
 Consume the Swift **distribution repo**, never this monorepo. This repo's tags do not compile as a Swift package: the generated protobuf Swift sources are codegen output and are no longer committed, so resolving the monorepo URL by version fails with hundreds of "cannot find type" errors. The distribution repo is generated with those sources and declares the same binary targets, with the same checksums, against the same release assets.
 
-Select version **`0.20.35`** (or `from: "0.20.35"`), then add the products you need. Resolve against the newest tag on the [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) page if `0.20.35` binary assets are not published yet.
+Select version **`0.20.36`** (or `from: "0.20.36"`), then add the products you need. Resolve against the newest tag on the [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) page if `0.20.36` binary assets are not published yet.
 
 | Product | Required | Capabilities |
 |---------|----------|--------------|
@@ -45,7 +45,7 @@ Select version **`0.20.35`** (or `from: "0.20.35"`), then add the products you n
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.35")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.36")
 ],
 targets: [
     .target(

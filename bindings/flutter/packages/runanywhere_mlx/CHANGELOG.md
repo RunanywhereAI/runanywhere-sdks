@@ -1,3 +1,7 @@
+## [0.20.36] - 2026-09-02
+
+- Version bump to keep the backend package in lockstep with the SDK release.
+
 ## [0.20.35] - 2026-09-02
 
 ### Changed

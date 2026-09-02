@@ -5,6 +5,26 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.36] - 2026-09-02
+
+### Added
+
+- **`MODEL_CATEGORY_OCR` (wire value 13).** OCR became reachable through the C API in
+  0.20.35, but no category named it, so an OCR model could only be filed under some other
+  modality in a catalog or picker. The category now exists in `idl/model_types.proto`
+  (IDL 1.2.0) and traverses the C boundary in both directions
+  (`rac_model_category_from_proto` / `_to_proto`), with `RAC_MODEL_CATEGORY_OCR = 11` on
+  the C side and Core ML as its default framework — matching `rac_ocr_service.cpp`, since
+  NeuRT is the only engine that fills `ocr_ops`.
+
+### Fixed
+
+- **A comment in `model_lifecycle_translation.cpp` asserted `ModelCategory` has no
+  `MODEL_CATEGORY_RERANK` member "by design".** It has had one since #605. The switch it
+  described is still correctly non-exhaustive — rerank and OCR models are routed by their
+  own service factories, not by a category→component mapping — but the stated reason was
+  false, and it told the next engineer not to look.
+
 ## [0.20.35] - 2026-09-02
 
 ### Added
