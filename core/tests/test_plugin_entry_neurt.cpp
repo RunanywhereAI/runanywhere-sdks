@@ -180,6 +180,10 @@ int main() {
             std::fprintf(stderr, "routable neurt engine has NULL tts_ops slot\n");
             return 1;
         }
+        if (vt->ocr_ops == nullptr) {
+            std::fprintf(stderr, "routable neurt engine has NULL ocr_ops slot\n");
+            return 1;
+        }
         if (vt->image_embedding_ops == nullptr) {
             std::fprintf(stderr, "routable neurt engine has NULL image_embedding_ops slot\n");
             return 1;
@@ -235,7 +239,7 @@ int main() {
         rac_plugin_unregister(vt->metadata.name);
         std::fprintf(stdout,
                      "  ok: routable neurt engine serves DIFFUSION + GENERATE_TEXT + TRANSCRIBE + EMBED + RERANK\n"
-                     "      + VLM + EMBED_IMAGE + SYNTHESIZE and pins\n");
+                     "      + VLM + EMBED_IMAGE + SYNTHESIZE + OCR and pins\n");
         return 0;
     }
 
@@ -259,6 +263,7 @@ int main() {
     // mirror sit a whole ABI behind.
     if (vt->diffusion_ops != nullptr || vt->llm_ops != nullptr || vt->stt_ops != nullptr ||
         vt->tts_ops != nullptr || vt->vad_ops != nullptr || vt->vlm_ops != nullptr ||
+        vt->ocr_ops != nullptr ||
         vt->embedding_ops != nullptr || vt->rerank_ops != nullptr ||
         vt->image_embedding_ops != nullptr) {
         std::fprintf(stderr, "stub neurt engine advertised an ops slot\n");

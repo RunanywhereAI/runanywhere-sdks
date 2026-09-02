@@ -74,6 +74,7 @@ if(NEURT_PREBUILT_ROOT)
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_vlm_ops.a"
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_image_embedding_ops.a"
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_tts_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_ocr_ops.a"
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_diffusion.a")
         if(NOT EXISTS "${_probe}")
             message(FATAL_ERROR
@@ -151,6 +152,7 @@ if(_neurt_available)
                   "rac_neurt_vlm_ops:libneurt_rac_vlm_ops.a"
                   "rac_neurt_image_embedding_ops:libneurt_rac_image_embedding_ops.a"
                   "rac_neurt_tts_ops:libneurt_rac_tts_ops.a"
+                  "rac_neurt_ocr_ops:libneurt_rac_ocr_ops.a"
                   "rac_neurt_diffusion:libneurt_rac_diffusion.a")
         string(REPLACE ":" ";" _parts "${_pair}")
         list(GET _parts 0 _tgt)
@@ -165,7 +167,7 @@ if(_neurt_available)
     set(_neurt_generate_available 1)
     set(_neurt_extra_links rac_neurt_llm_ops rac_neurt_stt_ops rac_neurt_embedding_ops
                            rac_neurt_rerank_ops rac_neurt_vlm_ops
-                           rac_neurt_image_embedding_ops rac_neurt_tts_ops
+                           rac_neurt_image_embedding_ops rac_neurt_tts_ops rac_neurt_ocr_ops
                            rac_neurt_diffusion)
 else()
     set(_neurt_extra_includes "")
