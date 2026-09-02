@@ -100,6 +100,19 @@ extern "C" {
  *                 Engines compiled against v8 are rejected until rebuilt;
  *                 NULL `get_stream_token_counts` means counts must be marked
  *                 estimated. Engine-vtable reserved_slot_3 is unchanged.
+ *  10u — promoted reserved primitive wire value 12 to image embedding
+ *                 (`RAC_PRIMITIVE_EMBED_IMAGE`) and renamed engine-vtable
+ *                 reserved_slot_3 -> `image_embedding_ops`, same binary
+ *                 offset, exactly as rerank_ops was promoted in v8. Engines
+ *                 compiled against v9 are rejected until rebuilt; a NULL
+ *                 `image_embedding_ops` means the engine does not serve the
+ *                 primitive.
+ *  11u — promoted reserved primitive wire value 13 to optical character
+ *                 recognition (`RAC_PRIMITIVE_OCR`) and renamed engine-vtable
+ *                 reserved_slot_4 -> `ocr_ops`, same binary offset, so the
+ *                 17-pointer tail is unchanged and only the ABI version gates
+ *                 it. Engines compiled against v10 are rejected until
+ *                 rebuilt.
  */
 #define RAC_PLUGIN_API_VERSION 11u
 
