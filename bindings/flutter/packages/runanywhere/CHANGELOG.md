@@ -5,6 +5,15 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.35] - 2026-09-02
+
+### Added
+
+- **ABI v11: `RAC_PRIMITIVE_OCR`.** NeuRT now serves nine of the vtable's ten primitive slots.
+  OCR is a detector+recognizer PAIR, so `read_page` is the required verb and `recognize`
+  returns `NOT_SUPPORTED` — this family's recognizer consumes a grid-sampled crop of the
+  detector's feature map, not a line image. Not yet surfaced in Flutter.
+
 ## [0.20.34] - 2026-09-02
 
 ### Fixed

@@ -21,8 +21,8 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
     companion object {
         private const val TAG = "RunAnywherePlugin"
         private const val CHANNEL_NAME = "runanywhere"
-        private const val SDK_VERSION = "0.20.34"
-        private const val COMMONS_VERSION = "0.20.34"
+        private const val SDK_VERSION = "0.20.35"
+        private const val COMMONS_VERSION = "0.20.35"
 
         init {
             // Load the Flutter-owned helper through the JVM so JNI_OnLoad can

@@ -5,6 +5,12 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.35] - 2026-09-02
+
+### Changed
+
+- No API change and no new QHexRT payload: v0.20.35 rebuilt the Apple lane only.
+
 ## [0.20.34] - 2026-09-02
 
 ### Changed
