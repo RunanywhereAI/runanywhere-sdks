@@ -984,6 +984,7 @@ set(RAC_FEATURES_SOURCES
     src/features/embeddings/rac_embeddings_service.cpp
     src/features/embeddings/rac_image_embedding_service.cpp
     src/features/embeddings/embeddings_module.cpp
+    src/features/ocr/rac_ocr_service.cpp
     # W4: rac_nonllm_lifecycle_proto_abi.cpp removed — every lifecycle verb it
     # owned was folded into the per-feature X_module.cpp TUs. The shared bridge
     # header (rac_nonllm_lifecycle_bridge.h) is retained.
