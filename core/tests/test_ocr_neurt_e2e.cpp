@@ -148,7 +148,14 @@ int main() {
     rac_proto_buffer_free(&load_out);
 
     // ---- 2. Read a page through the proto ABI. -------------------------------------------
-    const uint32_t kW = 1024, kH = 1024;
+    // DELIBERATELY SMALLER THAN THE DETECTOR'S 960x960 INPUT in one axis.
+    //
+    // The first version of this test used 1024x1024 and passed while the driver
+    // was reporting quads in the model's 960-space: those coordinates fit
+    // inside 1024 bounds, so "every quad lies in source-image pixel space" was
+    // true by accident. A page smaller than the model input makes an unmapped
+    // coordinate exceed the bounds and fail the check for real.
+    const uint32_t kW = 700, kH = 500;
     const std::vector<uint8_t> pixels = make_page(kW, kH);
 
     runanywhere::v1::OCRRequest request;
@@ -207,6 +214,31 @@ int main() {
     }
     check(in_bounds, "every quad lies in source-image pixel space");
     check(nondegenerate, "at least one quad has real area (not a collapsed point)");
+
+    // Bounds alone are too weak: a detector reporting everything in a corner,
+    // or at a wrong scale, can still be "in bounds". Require the regions to
+    // actually spread over the page the way text on a page does.
+    float span_x = 0.0f, span_y = 0.0f;
+    {
+        float min_x = static_cast<float>(kW), max_x = 0.0f;
+        float min_y = static_cast<float>(kH), max_y = 0.0f;
+        for (const auto& region : result.regions()) {
+            const auto& q = region.quad();
+            const float xs[4] = {q.x0(), q.x1(), q.x2(), q.x3()};
+            const float ys[4] = {q.y0(), q.y1(), q.y2(), q.y3()};
+            for (int i = 0; i < 4; ++i) {
+                min_x = xs[i] < min_x ? xs[i] : min_x;
+                max_x = xs[i] > max_x ? xs[i] : max_x;
+                min_y = ys[i] < min_y ? ys[i] : min_y;
+                max_y = ys[i] > max_y ? ys[i] : max_y;
+            }
+        }
+        span_x = (max_x - min_x) / static_cast<float>(kW);
+        span_y = (max_y - min_y) / static_cast<float>(kH);
+    }
+    std::fprintf(stdout, "  region spread: %.2f of width, %.2f of height\n", span_x, span_y);
+    check(span_x > 0.3f, "regions spread across the page horizontally");
+    check(span_y > 0.3f, "regions spread across the page vertically");
 
     // model_id must be the lifecycle's, proving the result came from the lifecycle-loaded model
     // and not from some service the test happened to construct.

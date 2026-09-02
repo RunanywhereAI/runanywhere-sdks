@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Platform image decoders hand back four channels (CGImage gives BGRA, a canvas gives
   RGBA), and stripping alpha in each SDK is exactly the per-platform logic that belongs
   one layer down.
+- **KNOWN LIMITATION — OCR transcripts are not yet correct.** The plumbing in this
+  release is verified end to end on the Neural Engine: a model loads through the
+  lifecycle by category, `read_page` returns regions, and their quads are in
+  source-image pixels. The RECOGNIZER's text output is not right yet — on
+  nvidia/nemotron-ocr-v1's own example image it returns single characters at high
+  confidence. Region geometry is usable; the transcript is not. No shipping surface
+  (app screen, CLI verb, catalog entry) exposes OCR in this release for that reason.
+
 - **`recognizeLine` refuses rather than guesses.** The OCR models here are
   detector-coupled: their recognizer consumes a grid-sampled crop of the detector's
   feature map, not pixels, so there is no standalone line form. It returns
