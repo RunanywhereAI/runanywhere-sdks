@@ -1,3 +1,9 @@
+## [0.20.34] - 2026-09-02
+
+### Changed
+
+- No API change. Rebuilt against the 0.20.34 core.
+
 ## [0.20.33] - 2026-09-01
 
 ### Changed

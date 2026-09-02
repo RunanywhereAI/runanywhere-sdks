@@ -39,9 +39,9 @@ public class RunAnywherePlugin: NSObject, FlutterPlugin {
         case "getPlatformVersion":
             result("iOS " + UIDevice.current.systemVersion)
         case "getSDKVersion":
-            result("0.20.33")
+            result("0.20.34")
         case "getCommonsVersion":
-            result("0.20.33")
+            result("0.20.34")
         default:
             result(FlutterMethodNotImplemented)
         }

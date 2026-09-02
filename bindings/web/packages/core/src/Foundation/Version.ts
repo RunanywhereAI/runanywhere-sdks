@@ -10,7 +10,7 @@
  * Do not hand-edit — update `core/VERSION` and run
  * `scripts/release/sync-versions.sh <new_version>`.
  */
-export const SDK_VERSION = '0.20.33';
+export const SDK_VERSION = '0.20.34';
 
 /** SDK display name. Mirrors Swift `SDKConstants.name` (SDKConstants.swift:17). */
 export const SDK_NAME = 'RunAnywhere SDK';
