@@ -50,17 +50,21 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 }
 
 // NOTE on MODEL_CATEGORY coverage: this switch is deliberately NOT exhaustive.
-// `MODEL_CATEGORY_RERANK` and `MODEL_CATEGORY_OCR` both exist in
-// idl/model_types.proto, and both are absent here on purpose: those models are
-// routed straight to `RAC_PRIMITIVE_RERANK` / `RAC_PRIMITIVE_OCR` by their own
-// service factories (`rac_rerank_create`, `rac_ocr_create`), which take a model
-// path rather than a component. There is no `SDK_COMPONENT_OCR`, and the
-// category is carried only so catalogs and pickers can FILE these models
-// correctly. So `rac_model_lifecycle_load_proto` — which resolves a component
-// from `ModelLoadRequest.category` — structurally cannot load either one; that
-// is expected, not a missing `case`. Adding an arm here without a matching
-// `SDKComponent` and a component-layer implementation would turn a clean
-// UNSPECIFIED into a component that resolves to nothing.
+// `MODEL_CATEGORY_RERANK` has no arm because there is no rerank COMPONENT — a
+// rerank model is created straight from a path by `rac_rerank_create`, so
+// `rac_model_lifecycle_load_proto` (which resolves a component from
+// `ModelLoadRequest.category`) structurally cannot load one. That is expected,
+// not a missing `case`; do not add an arm without a component layer behind it,
+// or a clean UNSPECIFIED becomes a component that resolves to nothing.
+//
+// OCR is the counter-example, and the reason this note is worth reading: it
+// started in that same shape and it was WRONG for it to stay there. Every
+// platform SDK reaches a modality through the lifecycle proto ABI, so a
+// modality with no component is a modality no SDK can call — reachable from C
+// and from nothing else. OCR therefore has the full stack (SDK_COMPONENT_OCR,
+// ocr_ops on LoadedModel, acquire_lifecycle_ocr, ocr_module.cpp) and belongs in
+// this switch. `rac_ocr_create` taking a path does not distinguish it;
+// `rac_segmentation_create` takes a path too.
 runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCategory category) {
     switch (category) {
         case runanywhere::v1::MODEL_CATEGORY_LANGUAGE:
@@ -83,6 +87,8 @@ runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCateg
             return runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION;
         case runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION;
+        case runanywhere::v1::MODEL_CATEGORY_OCR:
+            return runanywhere::v1::SDK_COMPONENT_OCR;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -194,6 +200,8 @@ rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component)
             return RAC_PRIMITIVE_DIARIZE;
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION:
             return RAC_PRIMITIVE_SEGMENT;
+        case runanywhere::v1::SDK_COMPONENT_OCR:
+            return RAC_PRIMITIVE_OCR;
         case runanywhere::v1::SDK_COMPONENT_RERANK:
             return RAC_PRIMITIVE_RERANK;
         default:
