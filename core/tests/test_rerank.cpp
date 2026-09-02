@@ -4,7 +4,7 @@
  *
  * Backend-neutral: registers a small in-test fake rerank engine (no model file,
  * no llama.cpp) and asserts:
- *   - RAC_PLUGIN_API_VERSION == 8 and the primitive/vtable-slot wiring.
+ *   - RAC_PLUGIN_API_VERSION == 10 and the primitive/vtable-slot wiring.
  *   - A registered rerank engine routes via rac_plugin_find(RAC_PRIMITIVE_RERANK)
  *     and rac_engine_vtable_slot() resolves rerank_ops.
  *   - Full RerankRequest → RerankResult proto round-trip through the component
