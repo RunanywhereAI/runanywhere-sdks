@@ -75,6 +75,9 @@ rac_add_engine_plugin(cloud
     ${_CLOUD_SHARED_ONLY_ARG}
     SOURCES             ${CLOUD_BACKEND_SOURCES}
     LINK_LIBRARIES      nlohmann_json::nlohmann_json
+    # Export side of RAC_CLOUD_API. Set on this target ONLY: runanywhere_cloud
+    # compiles rac_plugin_entry_cloud.cpp too and must see the dllimport side.
+    COMPILE_DEFINITIONS RAC_CLOUD_BUILDING
     INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}
                         ${CMAKE_CURRENT_SOURCE_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include
