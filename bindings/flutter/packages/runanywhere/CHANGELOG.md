@@ -5,6 +5,15 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.34] - 2026-09-02
+
+### Fixed
+
+- NeuRT's TTS now emits **float32** PCM, matching every other engine. It emitted int16
+  under the same `AUDIO_FORMAT_PCM` enum — which names a container and carries no bit
+  depth — so consumers reading the documented float32 got half the samples and a
+  saturated waveform, with no error anywhere.
+
 ## [0.20.33] - 2026-09-01
 
 ### Changed

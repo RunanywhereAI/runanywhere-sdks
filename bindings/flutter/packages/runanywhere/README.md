@@ -10,7 +10,7 @@
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.33
+  runanywhere: 0.20.34
 ```
 
 Add backend packages as needed (`runanywhere_llamacpp`, `runanywhere_onnx`, etc.). See the [Flutter SDK README](../../README.md) for iOS Podfile, Android permissions, and platform setup.

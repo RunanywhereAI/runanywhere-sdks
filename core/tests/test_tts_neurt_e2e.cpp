@@ -40,32 +40,49 @@ void check(bool ok, const char* what) {
     }
 }
 
-/** Peak absolute amplitude, normalised to 1.0, over an int16 PCM buffer. */
+/** Peak absolute amplitude over a float32 PCM buffer (already normalised to 1.0). */
 double peak_amplitude(const rac_tts_result_t& r) {
-    const size_t n = r.audio_size / sizeof(int16_t);
+    const size_t n = r.audio_size / sizeof(float);
     if (n == 0 || !r.audio_data) {
         return 0.0;
     }
-    const auto* pcm = static_cast<const int16_t*>(r.audio_data);
-    int32_t peak = 0;
+    const auto* pcm = static_cast<const float*>(r.audio_data);
+    double peak = 0.0;
     for (size_t i = 0; i < n; ++i) {
-        const int32_t v = pcm[i] < 0 ? -static_cast<int32_t>(pcm[i]) : pcm[i];
+        const double v = pcm[i] < 0.0f ? -static_cast<double>(pcm[i]) : pcm[i];
         if (v > peak) {
             peak = v;
         }
     }
-    return static_cast<double>(peak) / 32768.0;
+    return peak;
+}
+
+/** Fraction of samples pinned at full scale. Saturation is what an int16 buffer read as
+ *  float32 looks like: plausible duration, plausible rate, and 18.7% of it clipped. */
+double clipped_fraction(const rac_tts_result_t& r) {
+    const size_t n = r.audio_size / sizeof(float);
+    if (n == 0 || !r.audio_data) {
+        return 1.0;
+    }
+    const auto* pcm = static_cast<const float*>(r.audio_data);
+    size_t hot = 0;
+    for (size_t i = 0; i < n; ++i) {
+        if (pcm[i] >= 0.999f || pcm[i] <= -0.999f) {
+            ++hot;
+        }
+    }
+    return static_cast<double>(hot) / static_cast<double>(n);
 }
 
 /** How many distinct sample values the buffer holds, capped -- a DC or constant buffer scores 1. */
 size_t distinct_values(const rac_tts_result_t& r, size_t cap) {
-    const size_t n = r.audio_size / sizeof(int16_t);
+    const size_t n = r.audio_size / sizeof(float);
     if (n == 0 || !r.audio_data) {
         return 0;
     }
-    const auto* pcm = static_cast<const int16_t*>(r.audio_data);
+    const auto* pcm = static_cast<const float*>(r.audio_data);
     // Small fixed set; n is tens of thousands, so a linear scan against a tiny table is fine.
-    int16_t seen[64];
+    float seen[64];
     size_t count = 0;
     for (size_t i = 0; i < n && count < cap && count < 64; ++i) {
         bool known = false;
@@ -140,14 +157,14 @@ int main() {
 
     // --- The buffer is real audio, not a well-formed empty one ------------------------------
     check(longer.audio_size > 0, "audio_size is non-zero");
-    check(longer.audio_size % sizeof(int16_t) == 0, "audio_size is a whole number of int16 samples");
+    check(longer.audio_size % sizeof(float) == 0, "audio_size is a whole number of float32 samples");
     check(longer.audio_format == RAC_AUDIO_FORMAT_PCM, "audio_format is PCM");
 
     // Rule 46: the sample rate is the model's, not a host default. Kokoro is 24 kHz, and
     // resampling silently to 16 kHz would still produce audible speech -- at the wrong pitch.
     check(longer.sample_rate == 24000, "sample_rate is the bundle's 24 kHz");
 
-    const size_t samples = longer.audio_size / sizeof(int16_t);
+    const size_t samples = longer.audio_size / sizeof(float);
     const int64_t expected_ms =
         longer.sample_rate > 0 ? static_cast<int64_t>(samples) * 1000 / longer.sample_rate : 0;
     check(std::llabs(longer.duration_ms - expected_ms) <= 1,
@@ -158,6 +175,15 @@ int main() {
     check(peak > 0.01, "audio is not silence");
     check(peak <= 1.0, "audio does not clip past full scale");
     check(distinct_values(longer, 32) >= 32, "audio is not a constant/DC buffer");
+
+    // The dtype is NOT in the type system: RAC_AUDIO_FORMAT_PCM names a container
+    // (idl/model_types.proto -- pcm/wav/mp3/opus) and carries no bit depth, so an engine can
+    // emit int16 where every consumer assumes float and nothing reports an error. Two checks
+    // pin it. The duration cross-check above already fails on a wrong dtype -- reading int16 as
+    // float halves the sample count while duration_ms still describes the true one. This second
+    // check names the symptom directly, because int16 bit patterns read as float32 saturate.
+    check(clipped_fraction(longer) < 0.01,
+          "audio is not saturated (int16 read as float32 pins ~19% of samples at full scale)");
 
     // A driver returning a fixed-size scratch buffer passes every check above. Length has to
     // track the input.

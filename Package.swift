@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.33")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.34")
 //
 //   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
 //   the first one is fatal:
@@ -115,7 +115,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.20.33"
+let sdkVersion = "0.20.34"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -564,7 +564,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "9eb72dfcfc3dc88c64cf62970c3438671b9c7c8cf8853cd51ddf7321b1595fe9"
+                checksum: "ff8fa398180b57f26827044edf7afd0bbde30057880842ca2bc25f3f325a8c6d"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
@@ -589,7 +589,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
-                checksum: "774c885f1961db111a8f9e70ca1ee53e44acb2864ddb9cdf94bfe3a0fd5191c4"
+                checksum: "7fceb9ce9470c73cffa7db4193b6915da3e3df8695fe01b82f0b6a065224879e"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
