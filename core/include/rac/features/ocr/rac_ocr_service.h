@@ -11,12 +11,20 @@
  *
  * Distinct from EMBED_IMAGE too: that is image -> VECTOR for retrieval. This is image -> TEXT.
  *
- * FULL-PAGE OCR IS TWO MODELS, and the split is visible in this API on purpose. A detector finds
- * text regions; a recognizer reads each one. `rac_ocr_recognize` takes an already-cropped line and
- * is the smaller, always-available half; `rac_ocr_read_page` runs detection first and returns one
- * region per line. An engine may serve only the former — `read_page` then returns
- * RAC_ERROR_NOT_SUPPORTED rather than silently treating the whole page as one line, which produces
- * confident garbage.
+ * FULL-PAGE OCR IS TWO MODELS, and `read_page` is the REQUIRED verb — not `recognize`.
+ *
+ * That ordering is the opposite of the obvious one, and it is forced by how these models are
+ * actually built. nvidia/nemotron-ocr's recognizer does not take a line IMAGE: its input is
+ * `crop [1, 128, 8, 32]`, a grid-sampled crop of the DETECTOR's 128-channel feature map. Its own
+ * gold says so — "a real input is a grid-sampled crop of the detector's feature map, which needs
+ * the RegNet forward plus the C++ IndirectGridSample". So the recognizer cannot run standalone at
+ * all, and a `recognize(line_image)` verb is unimplementable for this entire family.
+ *
+ * `recognize` therefore stays OPTIONAL, for engines whose recognizer genuinely consumes pixels
+ * (CRNN-style line models do). An engine that has only the coupled detector+recognizer pipeline
+ * serves `read_page` and returns RAC_ERROR_NOT_SUPPORTED from `recognize` — which is honest,
+ * where accepting a line image and feeding it to a graph expecting feature-map channels would
+ * return a confident string of nonsense.
  */
 #ifndef RAC_OCR_SERVICE_H
 #define RAC_OCR_SERVICE_H
@@ -32,7 +40,8 @@ extern "C" {
  *  every engine is real weight for no benefit. */
 typedef enum rac_ocr_format { RAC_OCR_FORMAT_RGB8 = 0 } rac_ocr_format_t;
 
-/** One decoded image: a full page for `read_page`, a single cropped line for `recognize`. */
+/** One decoded image: a full page for `read_page`, or a cropped line for the optional
+ *  `recognize` on engines whose recognizer consumes pixels rather than detector features. */
 typedef struct rac_ocr_image {
     rac_ocr_format_t format;
     /** Borrowed pixel buffer; must outlive the call. */
@@ -66,8 +75,9 @@ typedef struct rac_ocr_result {
 
 /** Engine capabilities. */
 typedef struct rac_ocr_info {
-    /** RAC_TRUE when the engine has a detector and can serve `read_page`. */
-    rac_bool_t supports_page_detection;
+    /** RAC_TRUE when the engine's recognizer consumes pixels and can serve `recognize`.
+     *  FALSE for detector-coupled families (nemotron-ocr), where only `read_page` exists. */
+    rac_bool_t supports_line_recognition;
     /** Size of the recognizer's charset, or 0 when unknown. */
     int32_t charset_size;
 } rac_ocr_info_t;
@@ -77,16 +87,20 @@ typedef struct rac_ocr_service_ops {
     /** Initialize the service with a model path. */
     rac_result_t (*initialize)(void* impl, const char* model_path);
 
-    /** Read ONE already-cropped text line. Every OCR engine must serve this. */
-    rac_result_t (*recognize)(void* impl, const rac_ocr_image_t* line,
+    /**
+     * Detect text regions across a full page and read each one. THE REQUIRED VERB: every OCR
+     * engine must serve this, because for detector-coupled families it is the only entry point
+     * that can exist.
+     */
+    rac_result_t (*read_page)(void* impl, const rac_ocr_image_t* page,
                               rac_ocr_result_t* out_result);
 
     /**
-     * Detect text regions across a full page and read each one. An engine without a detector
-     * returns RAC_ERROR_NOT_SUPPORTED — it must NOT fall back to recognizing the page as a single
-     * line, which returns fluent nonsense that no caller can distinguish from a real read.
+     * OPTIONAL. Read one already-cropped line image. Only meaningful for engines whose
+     * recognizer consumes PIXELS; a recognizer taking detector feature-map crops leaves this
+     * NULL and the service returns RAC_ERROR_NOT_SUPPORTED.
      */
-    rac_result_t (*read_page)(void* impl, const rac_ocr_image_t* page,
+    rac_result_t (*recognize)(void* impl, const rac_ocr_image_t* line,
                               rac_ocr_result_t* out_result);
 
     /** Service information. */
@@ -119,12 +133,12 @@ RAC_API rac_result_t rac_ocr_create(const char* model_id, rac_handle_t* out_hand
 /** Initialize a created service. */
 RAC_API rac_result_t rac_ocr_initialize(rac_handle_t handle, const char* model_path);
 
-/** Read one already-cropped text line. */
-RAC_API rac_result_t rac_ocr_recognize(rac_handle_t handle, const rac_ocr_image_t* line,
+/** Detect and read every text region on a page. The required verb. */
+RAC_API rac_result_t rac_ocr_read_page(rac_handle_t handle, const rac_ocr_image_t* page,
                                        rac_ocr_result_t* out_result);
 
-/** Detect and read every text region on a page. RAC_ERROR_NOT_SUPPORTED without a detector. */
-RAC_API rac_result_t rac_ocr_read_page(rac_handle_t handle, const rac_ocr_image_t* page,
+/** Read one already-cropped line image. RAC_ERROR_NOT_SUPPORTED on detector-coupled engines. */
+RAC_API rac_result_t rac_ocr_recognize(rac_handle_t handle, const rac_ocr_image_t* line,
                                        rac_ocr_result_t* out_result);
 
 /** Engine capabilities. */

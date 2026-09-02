@@ -93,6 +93,10 @@ rac_result_t rac_ocr_recognize(rac_handle_t handle, const rac_ocr_image_t* line,
         return v;
     }
     auto* service = static_cast<rac_ocr_service_t*>(handle);
+    // Optional by design: a recognizer whose input is a grid-sampled crop of the DETECTOR's
+    // feature map (nemotron-ocr: `crop [1,128,8,32]`) cannot consume a line image at all, so it
+    // leaves this NULL. Returning NOT_SUPPORTED is honest; feeding pixels to a graph expecting
+    // 128 feature channels would return a confident string of nonsense.
     if (!service->ops || !service->ops->recognize) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
@@ -110,9 +114,8 @@ rac_result_t rac_ocr_read_page(rac_handle_t handle, const rac_ocr_image_t* page,
         return v;
     }
     auto* service = static_cast<rac_ocr_service_t*>(handle);
-    // A recognizer-only engine leaves this slot NULL and gets NOT_SUPPORTED. It must never fall
-    // through to `recognize` on the whole page: that returns a confident line of nonsense which
-    // no caller can distinguish from a real read.
+    // The required verb. It must never fall through to `recognize` on the whole page: that
+    // returns a confident line of nonsense no caller can distinguish from a real read.
     if (!service->ops || !service->ops->read_page) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
