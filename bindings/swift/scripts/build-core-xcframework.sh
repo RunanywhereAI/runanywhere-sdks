@@ -87,6 +87,7 @@ if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
             lib/libneurt_rac_vlm_ops.a \
             lib/libneurt_rac_image_embedding_ops.a \
             lib/libneurt_rac_tts_ops.a \
+            lib/libneurt_rac_ocr_ops.a \
             lib/libneurt_rac_diffusion.a
         do
             [ -f "${_root}/${_rel}" ] || _neurt_missing+=("${_slice}/${_rel}")
@@ -895,6 +896,7 @@ _NEURT_ROUTABLE_ARCHIVES=(
     lib/libneurt_rac_vlm_ops.a
     lib/libneurt_rac_image_embedding_ops.a
     lib/libneurt_rac_tts_ops.a
+    lib/libneurt_rac_ocr_ops.a
     lib/libneurt_rac_diffusion.a
 )
 

@@ -28,9 +28,10 @@
 #include "rac/plugin/rac_primitive.h"
 
 // ABI v7 promoted two pointers (diarization + segmentation), v8 promoted a third
-// (rerank_ops, from reserved_slot_2) and v10 a fourth (image_embedding_ops, from
-// reserved_slot_3) — all from the existing reserve, without changing the
-// 17-pointer primitive/reserve tail or the total vtable size.
+// (rerank_ops, from reserved_slot_2), v10 a fourth (image_embedding_ops, from
+// reserved_slot_3) and v11 a fifth (ocr_ops, from reserved_slot_4) — all from the
+// existing reserve, without changing the 17-pointer primitive/reserve tail or the
+// total vtable size.
 //
 // The tail count below is the load-bearing assertion: it is what proves a
 // promotion RENAMED a slot rather than growing the struct. A promotion that
@@ -47,10 +48,12 @@ static_assert(offsetof(rac_engine_vtable_t, rerank_ops) ==
               offsetof(rac_engine_vtable_t, segmentation_ops) + sizeof(void*));
 static_assert(offsetof(rac_engine_vtable_t, image_embedding_ops) ==
               offsetof(rac_engine_vtable_t, rerank_ops) + sizeof(void*));
-// image_embedding_ops took reserved_slot_3's exact offset in v10, so the first
-// surviving reserve slot is now slot_4 and it sits immediately after it.
-static_assert(offsetof(rac_engine_vtable_t, reserved_slot_4) ==
+static_assert(offsetof(rac_engine_vtable_t, ocr_ops) ==
               offsetof(rac_engine_vtable_t, image_embedding_ops) + sizeof(void*));
+// ocr_ops took reserved_slot_4's exact offset in v11, so the first surviving reserve
+// slot is now slot_5 and it sits immediately after it.
+static_assert(offsetof(rac_engine_vtable_t, reserved_slot_5) ==
+              offsetof(rac_engine_vtable_t, ocr_ops) + sizeof(void*));
 
 static_assert(RAC_MODEL_FORMAT_ID_UNSPECIFIED ==
               static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_UNSPECIFIED));
@@ -184,7 +187,7 @@ const rac_engine_vtable_t k_manifest_vtable = {
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
     /* rerank_ops       */ nullptr,
-    /* reserved_slot_3..9 */
+    /* image_embedding_ops, ocr_ops, reserved_slot_5..9 — 7 pointers */
     nullptr,
     nullptr,
     nullptr,

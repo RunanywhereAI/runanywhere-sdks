@@ -181,6 +181,10 @@ static const rac_primitive_t k_neurt_primitives[] = {
     RAC_PRIMITIVE_EMBED_IMAGE,
     // Text-to-speech on the Neural Engine. The last slot NeuRT left null.
     RAC_PRIMITIVE_SYNTHESIZE,
+    // The registry validates BOTH directions (rac_plugin_registry.cpp): a primitive listed
+    // here with a NULL slot, or a filled slot missing from this list, is rejected. They move
+    // together or not at all.
+    RAC_PRIMITIVE_OCR,
     // Speech-to-text on the Neural Engine, backed by NeuRT's ASR drivers. Four bundle shapes are
     // served through one op table: Parakeet TDT and RNNT (transducer), Whisper and Moonshine
     // (attention decoder), and Parakeet CTC.
@@ -318,6 +322,11 @@ extern "C" const struct rac_image_embedding_service_ops g_neurt_image_embedding_
 // against a 0.60 tolerance.
 extern "C" const struct rac_tts_service_ops g_neurt_tts_ops;
 
+// Optical character recognition (neurun/NeuRT/src/sdk/rac_ocr_ops_neurt.cpp). A detector +
+// recogniser PAIR: the recogniser's input is a grid-sampled crop of the detector's 128-channel
+// feature map, so it serves `read_page` and leaves `recognize` NULL.
+extern "C" const struct rac_ocr_service_ops g_neurt_ocr_ops;
+
 static const rac_engine_vtable_t g_neurt_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_neurt_manifest),
     /* capability_check */ neurt_capability_check,
@@ -367,9 +376,9 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
 
-    // rerank_ops (wire value 11, promoted from reserved_slot_2 in ABI v8) and image_embedding_ops
-    // (wire value 12, promoted from reserved_slot_3 in ABI v10), then reserved_slot_4..9. Both
-    // promotions kept the same binary offset, so the struct layout did not move.
+    // rerank_ops (wire 11, from reserved_slot_2 in ABI v8), image_embedding_ops (wire 12, from
+    // reserved_slot_3 in v10) and ocr_ops (wire 13, from reserved_slot_4 in v11), then
+    // reserved_slot_5..9. Every promotion kept the same binary offset, so the layout never moved.
 /* rerank_ops        */
 #if RAC_NEURT_ROUTABLE
     &g_neurt_rerank_ops,  // RERANK on the Apple Neural Engine, backed by NeuRT
@@ -382,8 +391,13 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
 #else
     nullptr,
 #endif
-    /* reserved_slot_4..9 */
+/* ocr_ops             */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_ocr_ops,  // OCR on the Apple Neural Engine, backed by NeuRT
+#else
     nullptr,
+#endif
+    /* reserved_slot_5..9 */
     nullptr,
     nullptr,
     nullptr,
