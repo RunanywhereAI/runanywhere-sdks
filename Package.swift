@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.35")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-swift.git", from: "0.20.36")
 //
 //   Consume the SWIFT DISTRIBUTION REPO, never this monorepo. Two reasons, and
 //   the first one is fatal:
@@ -115,7 +115,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.20.35"
+let sdkVersion = "0.20.36"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -564,7 +564,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "71377399180991ad1e614dca49d7cfd4612a24caf44a04f5ed1f96dd966f0172"
+                checksum: "0c79feb81861c16272e2718facddedb5ca593a1442624da0daaba147f50b19d3"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",

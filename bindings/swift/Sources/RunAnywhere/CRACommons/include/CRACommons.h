@@ -81,6 +81,7 @@
 
 // Semantic Image Segmentation
 #include "rac_segmentation.h"
+#include "rac_ocr_service.h"
 
 // VLM (Vision Language Model)
 #include "rac_vlm.h"

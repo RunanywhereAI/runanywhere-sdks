@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/electron-neurt",
-  "version": "0.20.35",
+  "version": "0.20.36",
   "description": "RunAnywhere Electron SDK — NeuRT backend plugin (Apple Neural Engine via Core ML; macOS only)",
   "license": "SEE LICENSE IN LICENSE",
   "type": "commonjs",

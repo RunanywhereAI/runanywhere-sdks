@@ -5,6 +5,49 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.36] - 2026-09-02
+
+### Added
+
+- **OCR is a first-class modality, not just a reachable primitive.** 0.20.35 shipped
+  `RAC_PRIMITIVE_OCR`, the `ocr_ops` slot and a NeuRT driver behind it — reachable from C
+  and from nothing else, because every platform SDK reaches a modality through the
+  lifecycle proto ABI and OCR had no component. This release adds the rest of the stack:
+  `MODEL_CATEGORY_OCR` (wire 13) and `SDK_COMPONENT_OCR` (wire 14), `idl/ocr.proto`,
+  `ocr_ops` on the lifecycle's loaded-model record, `rac_ocr_read_page_lifecycle_proto`,
+  and Swift's `RunAnywhere.ocr` namespace with `readPage` / `recognizeLine`.
+- **Regions carry a four-corner quad, not a rect.** Detectors in this family emit rotated
+  boxes; flattening to an axis-aligned rectangle at the boundary throws the angle away
+  before a caller can use it. `OCRRegion.boundingBox` computes the hull for callers that
+  only want a rect.
+- **RGBA8 and BGRA8 pages are accepted** and narrowed to packed RGB8 inside commons.
+  Platform image decoders hand back four channels (CGImage gives BGRA, a canvas gives
+  RGBA), and stripping alpha in each SDK is exactly the per-platform logic that belongs
+  one layer down.
+- **KNOWN LIMITATION — OCR transcripts are not yet correct.** The plumbing in this
+  release is verified end to end on the Neural Engine: a model loads through the
+  lifecycle by category, `read_page` returns regions, and their quads are in
+  source-image pixels. The RECOGNIZER's text output is not right yet — on
+  nvidia/nemotron-ocr-v1's own example image it returns single characters at high
+  confidence. Region geometry is usable; the transcript is not. No shipping surface
+  (app screen, CLI verb, catalog entry) exposes OCR in this release for that reason.
+
+- **`recognizeLine` refuses rather than guesses.** The OCR models here are
+  detector-coupled: their recognizer consumes a grid-sampled crop of the detector's
+  feature map, not pixels, so there is no standalone line form. It returns
+  `notSupported`, and `OCRPageResult.supportsLineRecognition` tells a caller which kind of
+  model is loaded before they try.
+
+### Fixed
+
+- **`OCRResult.processing_time_ms` reported 0 on every read.** The C ABI leaves that field
+  to the engine and the one engine filling `ocr_ops` never wrote it, so the value was
+  forwarded as a confident zero. Commons owns the call boundary and now measures it there.
+- **A comment in `model_lifecycle_translation.cpp` asserted `ModelCategory` has no
+  `MODEL_CATEGORY_RERANK` member "by design".** It has had one since #605. Rerank genuinely
+  has no component so its absence from that switch is still correct, but the stated reason
+  was false — and following it is what nearly left OCR in the same state.
+
 ## [0.20.35] - 2026-09-02
 
 ### Added

@@ -401,7 +401,7 @@ public extension RunAnywhere {
         private static let trackedCategories: [ModelCategory] = [
             .language, .multimodal, .vision, .speechRecognition, .speechSynthesis,
             .voiceActivityDetection, .embedding, .imageGeneration,
-            .speakerDiarization, .semanticSegmentation
+            .speakerDiarization, .semanticSegmentation, .ocr
         ]
     }
 }

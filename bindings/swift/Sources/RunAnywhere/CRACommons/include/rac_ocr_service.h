@@ -31,8 +31,8 @@
 
 #include <stddef.h>
 
-#include "rac/core/rac_types.h"
-#include "rac/foundation/rac_proto_buffer.h"
+#include "rac_types.h"
+#include "rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {

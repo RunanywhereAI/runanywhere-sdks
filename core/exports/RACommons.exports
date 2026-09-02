@@ -370,6 +370,7 @@ _rac_ocr_create
 _rac_ocr_initialize
 _rac_ocr_recognize
 _rac_ocr_read_page
+_rac_ocr_read_page_lifecycle_proto
 _rac_ocr_get_info
 _rac_ocr_result_free
 _rac_ocr_cleanup
