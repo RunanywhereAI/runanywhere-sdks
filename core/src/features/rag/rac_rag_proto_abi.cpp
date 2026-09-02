@@ -422,11 +422,18 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     // Base off RAC_LLM_OPTIONS_DEFAULT, then apply the embedded generation
     // knobs with the RAG pipeline defaults (max 512 tokens, top_p 0.9) when
     // unset.
+    //
+    // temperature and top_k are `optional` in llm_options.proto, so presence
+    // is what "unset" means: reading the value instead yields 0, which is a
+    // legal explicit setting for both (greedy / top-k disabled) and therefore
+    // cannot double as a sentinel. has_generation() is not a substitute -- a
+    // caller that sets any other generation knob makes the submessage present
+    // while leaving these two absent.
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.max_tokens = gen.max_output_tokens() > 0 ? gen.max_output_tokens() : 512;
-    opts.temperature = query_proto.has_generation() ? gen.temperature() : opts.temperature;
+    opts.temperature = gen.has_temperature() ? gen.temperature() : opts.temperature;
     opts.top_p = gen.top_p() > 0.0f ? gen.top_p() : 0.9f;
-    opts.top_k = gen.top_k();
+    opts.top_k = gen.has_top_k() ? gen.top_k() : opts.top_k;
     opts.disable_thinking =
         (gen.has_reasoning() && gen.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF)
             ? RAC_TRUE
