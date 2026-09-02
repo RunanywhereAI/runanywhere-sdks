@@ -20,7 +20,7 @@ Pod::Spec.new do |s|
   # `pod install` fails outright. Mirrors asset_version in the Flutter
   # podspecs. Bump back in step with the SwiftPM pin once a matching release
   # exists; check_release_version_coherence.sh enforces that they agree.
-  source_tag_version = '0.20.33'
+  source_tag_version = '0.20.34'
   s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{source_tag_version}" }
 
   # =============================================================================
