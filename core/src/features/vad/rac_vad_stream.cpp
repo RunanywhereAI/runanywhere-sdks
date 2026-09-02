@@ -78,6 +78,7 @@ struct StreamSession {
     // rac_vad_component_process_proto uses (vad_component.cpp:1019-1041), so
     // streaming and one-shot proto callers honor the same per-call threshold.
     float threshold_override = 0.0f;
+    bool has_threshold_override = false;
     // Session-owned endpointing policy. The detector supplies one speech
     // verdict per fed frame; these fields turn that verdict into stable
     // utterance boundaries without asking each SDK to rebuild the state
@@ -328,10 +329,11 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.is_cancelled.store(false, std::memory_order_relaxed);
         s.sample_rate =
             positive_or_default(parsed.sample_rate(), RAC_DEFAULT_VAD_OPTIONS_SAMPLE_RATE);
-        // Capture the per-call energy threshold override (0.0f = use the
-        // component's configured value).
-        s.threshold_override =
-            parsed.activation_threshold() > 0.0f ? parsed.activation_threshold() : 0.0f;
+        // Capture the per-call energy threshold override. Presence decides,
+        // because 0.0 is a legal threshold in the documented [0,1] range and so
+        // cannot double as "unset" (see VADOptions.activation_threshold).
+        s.has_threshold_override = parsed.has_activation_threshold();
+        s.threshold_override = parsed.activation_threshold();
         s.min_speech_ms = positive_or_default(parsed.min_speech_duration_ms(),
                                               RAC_DEFAULT_VAD_OPTIONS_MIN_SPEECH_DURATION_MS);
         s.min_silence_ms = positive_or_default(parsed.min_silence_duration_ms(),
@@ -365,6 +367,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     rac_handle_t component_handle = nullptr;
     int32_t sample_rate = RAC_DEFAULT_VAD_OPTIONS_SAMPLE_RATE;
     float threshold_override = 0.0f;
+    bool has_threshold_override = false;
     std::shared_ptr<std::recursive_mutex> feed_mutex;
     std::string request_id;
     {
@@ -378,6 +381,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         component_handle = it->second.handle;
         sample_rate = it->second.sample_rate;
         threshold_override = it->second.threshold_override;
+        has_threshold_override = it->second.has_threshold_override;
         feed_mutex = it->second.feed_mutex;
         request_id = it->second.request_id;
     }
@@ -430,7 +434,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     // lock-free w.r.t. this stream-level mutex.
     rac_bool_t is_speech = RAC_FALSE;
     rac_result_t rc = RAC_SUCCESS;
-    if (threshold_override > 0.0f) {
+    if (has_threshold_override) {
         auto handle_mutex = rac::vad::get_or_create_threshold_mutex(component_handle);
         std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
         const float original_threshold = rac_vad_component_get_energy_threshold(component_handle);
