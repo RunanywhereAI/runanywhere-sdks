@@ -1091,6 +1091,50 @@ TEST(rag_solution_compiles) {
 }
 
 // ---------------------------------------------------------------------------
+// 10b. RAG retrieval tuning knobs reach the graph.
+//      config_loader.cpp parses vector_store / bm25_k1 / bm25_b / rrf_k out of
+//      the solution YAML. vector_store is the sharpest of the four: dropping
+//      it while forwarding vector_store_path splits one setting in half.
+// ---------------------------------------------------------------------------
+TEST(rag_retrieval_params_reach_the_retrieve_operator) {
+    ScopedSolutionStandins standins;
+
+    SolutionConfig cfg;
+    auto* rag = cfg.mutable_rag();
+    rag->set_embed_model_id("bge-small");
+    rag->set_llm_model_id("qwen3-4b");
+    rag->set_vector_store(runanywhere::v1::VECTOR_STORE_USEARCH);
+    rag->set_vector_store_path("/tmp/store");
+    rag->set_bm25_k1(1.5f);
+    rag->set_bm25_b(0.6f);
+    rag->set_rrf_k(30);
+
+    SolutionRunner runner(cfg);
+    CHECK(runner.start() == RAC_SUCCESS);
+
+    const runanywhere::v1::OperatorSpec* retrieve = nullptr;
+    for (const auto& op : runner.spec().operators()) {
+        if (op.name() == "retrieve")
+            retrieve = &op;
+    }
+    CHECK(retrieve != nullptr);
+    const auto& params = retrieve->params();
+    // The path was already forwarded; assert it and the type travel together.
+    CHECK(params.find("vector_store_path") != params.end());
+    const auto store = params.find("vector_store");
+    CHECK(store != params.end());
+    CHECK(store->second == "VECTOR_STORE_USEARCH");
+    CHECK(params.find("bm25_k1") != params.end());
+    CHECK(params.find("bm25_b") != params.end());
+    const auto rrf = params.find("rrf_k");
+    CHECK(rrf != params.end());
+    CHECK(rrf->second == "30");
+
+    runner.close_input();
+    runner.wait();
+}
+
+// ---------------------------------------------------------------------------
 // 11. C ABI end-to-end: proto-bytes path.
 // ---------------------------------------------------------------------------
 TEST(c_abi_proto_bytes_lifecycle) {
@@ -1271,6 +1315,7 @@ int main() {
     run_test_context_build_builtin_applies_prompt_template();
     run_test_voice_agent_solution_compiles();
     run_test_rag_solution_compiles();
+    run_test_rag_retrieval_params_reach_the_retrieve_operator();
     run_test_c_abi_proto_bytes_lifecycle();
     run_test_c_abi_yaml_solution_lifecycle();
     run_test_c_abi_yaml_pipeline_lifecycle();
