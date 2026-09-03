@@ -69,6 +69,27 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSp
         (*llm->mutable_params())["temperature"] = std::to_string(cfg.generation().temperature());
     }
     (*tts->mutable_params())["emit_partials"] = cfg.emit_partials() ? "true" : "false";
+    // Barge-in is detected on the VAD side (user speech arriving while the
+    // assistant is talking), which is why these ride the vad op alongside
+    // sample_rate_hz/chunk_ms rather than tts. config_loader.cpp parses both
+    // out of the solution YAML, so without forwarding them here a caller's
+    // `enable_barge_in: false` reaches the proto and then stops.
+    if (cfg.has_enable_barge_in()) {
+        (*vad->mutable_params())["enable_barge_in"] = cfg.enable_barge_in() ? "true" : "false";
+    }
+    if (cfg.barge_in_threshold_ms() > 0) {
+        (*vad->mutable_params())["barge_in_threshold_ms"] =
+            std::to_string(cfg.barge_in_threshold_ms());
+    }
+    // `emit_thoughts` in the YAML lands on generation.reasoning.include_in_output
+    // (config_loader.cpp), and only system_prompt and temperature were being
+    // read back off `generation`, so it stopped at the proto like the barge-in
+    // pair. Guarded on has_reasoning() rather than the bool, which is a plain
+    // proto3 field with no presence of its own.
+    if (cfg.has_generation() && cfg.generation().has_reasoning()) {
+        (*llm->mutable_params())["emit_thoughts"] =
+            cfg.generation().reasoning().include_in_output() ? "true" : "false";
+    }
 
     add_edge(out, "vad.out", "stt.in");
     add_edge(out, "stt.final", "llm.in");
