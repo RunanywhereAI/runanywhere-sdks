@@ -1085,6 +1085,7 @@ TEST(voice_agent_barge_in_params_reach_the_vad_operator) {
     va->set_vad_model_id("silero");
     va->set_enable_barge_in(false);
     va->set_barge_in_threshold_ms(250);
+    va->mutable_generation()->mutable_reasoning()->set_include_in_output(true);
 
     SolutionRunner runner(cfg);
     CHECK(runner.start() == RAC_SUCCESS);
@@ -1103,6 +1104,18 @@ TEST(voice_agent_barge_in_params_reach_the_vad_operator) {
     const auto threshold = params.find("barge_in_threshold_ms");
     CHECK(threshold != params.end());
     CHECK(threshold->second == "250");
+
+    // emit_thoughts rides `generation.reasoning`, which was the other knob the
+    // loader parsed and the expansion dropped.
+    const runanywhere::v1::OperatorSpec* llm = nullptr;
+    for (const auto& op : spec.operators()) {
+        if (op.name() == "llm")
+            llm = &op;
+    }
+    CHECK(llm != nullptr);
+    const auto thoughts = llm->params().find("emit_thoughts");
+    CHECK(thoughts != llm->params().end());
+    CHECK(thoughts->second == "true");
 
     runner.close_input();
     runner.wait();

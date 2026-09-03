@@ -81,6 +81,15 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSp
         (*vad->mutable_params())["barge_in_threshold_ms"] =
             std::to_string(cfg.barge_in_threshold_ms());
     }
+    // `emit_thoughts` in the YAML lands on generation.reasoning.include_in_output
+    // (config_loader.cpp), and only system_prompt and temperature were being
+    // read back off `generation`, so it stopped at the proto like the barge-in
+    // pair. Guarded on has_reasoning() rather than the bool, which is a plain
+    // proto3 field with no presence of its own.
+    if (cfg.has_generation() && cfg.generation().has_reasoning()) {
+        (*llm->mutable_params())["emit_thoughts"] =
+            cfg.generation().reasoning().include_in_output() ? "true" : "false";
+    }
 
     add_edge(out, "vad.out", "stt.in");
     add_edge(out, "stt.final", "llm.in");
