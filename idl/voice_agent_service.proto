@@ -107,15 +107,24 @@ message VoiceAgentComposeConfig {
     optional string tts_voice_id   = 6;
 
     optional VADConfiguration vad_config = 7;
+    // NOT HONORED YET either: make_voice_llm_options() builds the turn options
+    // from compile-time constants and takes no argument, so none of these
+    // reach the LLM. The note on `instructions` below says
+    // llm_generation.system_prompt is ignored here, which is true, but so is
+    // the rest of the message.
     optional LLMGenerationOptions llm_generation = 8;
 
-    // System prompt for the agent. Governs persona AND spoken delivery
+    // Intended as the system prompt for the agent: persona AND spoken delivery
     // ("talk quickly", "sound warm"), not just content. Same name and role as
-    // OpenAI Realtime `session.instructions`. Unset uses the commons voice
-    // default (short, spoken, no markdown).
+    // OpenAI Realtime `session.instructions`.
     //
-    // This is the only system prompt the voice path reads:
-    // llm_generation.system_prompt is IGNORED here.
+    // NOT HONORED YET. config_from_proto (voice_agent_internal_helpers.cpp)
+    // translates this message into rac_voice_agent_config_t and never reads
+    // this field, and nothing else reads it either. Every turn gets the
+    // compile-time kVoiceAgentSystemPrompt that make_voice_llm_options()
+    // hardcodes, so the commons voice default is not merely what you get when
+    // this is unset, it is what you get regardless. Honoring it needs a slot
+    // on rac_voice_agent_llm_config_t, which has none today.
     optional string instructions = 9;
 
     optional TurnDetection turn_detection = 10;
