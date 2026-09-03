@@ -420,6 +420,23 @@ void d7_emit_cancelled(rac_voice_agent_handle_t handle,
 
 namespace rac::voice_agent::detail {
 
+/**
+ * @brief Processes a single voice utterance end-to-end (VAD -> STT -> LLM -> TTS).
+ *
+ * Runs voice activity validation, speech transcription, conversational response generation
+ * with history preservation, and speech synthesis under handle mutex synchronization.
+ *
+ * @param handle Voice agent handle instance.
+ * @param audio Raw audio buffer for the closed utterance.
+ * @param session_id Tracking session ID.
+ * @param turn_id Unique turn identifier.
+ * @param request_id Request correlation identifier.
+ * @param language_code Optional spoken language code override.
+ * @param event_callback Optional per-turn event listener callback.
+ * @param user_data User context forwarded to callback.
+ * @param out_result Output VoiceAgentResult containing synthesized response and transcript.
+ * @return RAC_SUCCESS on successful processing, or an error code on failure/cancellation.
+ */
 rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::string& audio,
                                   const std::string& session_id, const std::string& turn_id,
                                   const std::string& request_id, const std::string& language_code,
@@ -763,13 +780,9 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
     // and context-aware — instead of feeding the raw transcript with no guidance
     // (which is why responses were rambly/useless).
     //
-    // Snapshot under handle->mutex so concurrent cleanup/cancel does not invalidate
-    // string pointers while LLM generation is running.
-    std::vector<VoiceConversationTurn> history_snapshot;
-    {
-        std::lock_guard<std::mutex> lock(handle->mutex);
-        history_snapshot = handle->conversation_history;
-    }
+    // Snapshot into local storage while handle->mutex is held so string pointers
+    // remain safely bounded to this stack frame during LLM generation.
+    const std::vector<VoiceConversationTurn> history_snapshot = handle->conversation_history;
     std::vector<const char*> history_ptrs;
     history_ptrs.reserve(history_snapshot.size() * 2);
     for (const auto& turn : history_snapshot) {
@@ -874,7 +887,6 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
     // Bound to the same flattened-entry budget so the prompt stays within the
     // context window.
     if (stt.text != nullptr && stt.text[0] != '\0') {
-        std::lock_guard<std::mutex> lock(handle->mutex);
         handle->conversation_history.push_back(
             VoiceConversationTurn{.user_text = stt.text, .assistant_text = response.answer});
         const size_t max_turns = kVoiceAgentMaxHistoryEntries / 2;
