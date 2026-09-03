@@ -12,7 +12,7 @@
 #
 # Verify:  idl/codegen/schema_lock.sh --check
 # =============================================================================
-IDL_VERSION=1.2.0
+IDL_VERSION=1.2.1
 IDL_PROTO_COUNT=40
 IDL_SCHEMA_SHA256=6fe2a85a037537fd0a17c47a48f22de081844c8fee8cd4e91284d68526dd4f29
 IDL_PROTOC_VERSION=35.1
