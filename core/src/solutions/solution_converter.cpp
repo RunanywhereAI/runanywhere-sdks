@@ -108,6 +108,24 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
     if (!cfg.rerank_model_id().empty()) {
         (*retrieve->mutable_params())["rerank_model_id"] = cfg.rerank_model_id();
     }
+    // vector_store selects the backend that vector_store_path points into, so
+    // forwarding the path while dropping the type left the two halves of one
+    // setting split. Retrieval tuning goes the same way: config_loader.cpp
+    // parses bm25_k1/bm25_b/rrf_k out of the solution YAML, and without these
+    // they stop at the proto.
+    if (cfg.vector_store() != runanywhere::v1::VECTOR_STORE_UNSPECIFIED) {
+        (*retrieve->mutable_params())["vector_store"] =
+            runanywhere::v1::VectorStore_Name(cfg.vector_store());
+    }
+    if (cfg.bm25_k1() > 0.0f) {
+        (*retrieve->mutable_params())["bm25_k1"] = std::to_string(cfg.bm25_k1());
+    }
+    if (cfg.bm25_b() > 0.0f) {
+        (*retrieve->mutable_params())["bm25_b"] = std::to_string(cfg.bm25_b());
+    }
+    if (cfg.rrf_k() > 0) {
+        (*retrieve->mutable_params())["rrf_k"] = std::to_string(cfg.rrf_k());
+    }
     (void)llm;
 
     add_edge(out, "query.out", "retrieve.in");
