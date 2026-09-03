@@ -80,7 +80,11 @@ inline rac_result_t resolve_model_reference(const char* model_id,
     }
 
     if (result != RAC_SUCCESS && options.lookup_last_path_component) {
-        const char* last_slash = strrchr(model_id, '/');
+        const char* last_fwd = strrchr(model_id, '/');
+        const char* last_bck = strrchr(model_id, '\\');
+        const char* last_slash = (last_fwd && last_bck) ? std::max(last_fwd, last_bck)
+                                 : last_fwd             ? last_fwd
+                                                        : last_bck;
         if (last_slash && last_slash[1] != '\0') {
             const char* extracted_id = last_slash + 1;
             RAC_LOG_DEBUG(options.log_cat, "Trying extracted model ID from path: %s", extracted_id);
@@ -121,8 +125,18 @@ inline rac_result_t resolve_model_reference(const char* model_id,
                 rac_model_path_resolution_free(&resolution);
             }
         }
-        if (options.prefer_input_path_when_contains &&
-            strstr(model_id, options.prefer_input_path_when_contains) != nullptr) {
+        bool prefer_input = false;
+        if (options.prefer_input_path_when_contains) {
+            if (std::strcmp(options.prefer_input_path_when_contains, "/") == 0) {
+                // Path separator match: accept either '/' or '\' for cross-platform file paths
+                prefer_input =
+                    (strchr(model_id, '/') != nullptr || strchr(model_id, '\\') != nullptr);
+            } else {
+                prefer_input =
+                    (strstr(model_id, options.prefer_input_path_when_contains) != nullptr);
+            }
+        }
+        if (prefer_input) {
             out_reference->path = model_id;
         } else {
             out_reference->path = registry_path;
