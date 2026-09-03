@@ -54,6 +54,17 @@ struct ResolvedModelReference {
     ModelInfoPtr model_info;
 };
 
+/**
+ * @brief Resolves a model ID or path reference against the model registry.
+ *
+ * Performs model resolution by ID, full path, or extracted filename component across
+ * POSIX and Windows path formats, evaluating local path preferences and fallback frameworks.
+ *
+ * @param model_id Model identifier or filesystem path to resolve.
+ * @param options Resolution configuration options including log category and defaults.
+ * @param out_reference Output struct populated with resolved path, framework, and metadata.
+ * @return RAC_SUCCESS on successful resolution, or an error code on invalid parameters.
+ */
 inline rac_result_t resolve_model_reference(const char* model_id,
                                             const ModelReferenceOptions& options,
                                             ResolvedModelReference* out_reference) {
@@ -171,6 +182,13 @@ struct PluginServiceCreateSpec {
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
 };
 
+/**
+ * @brief Returns the preferred engine plugin identifier for a framework and primitive.
+ *
+ * @param framework Inference framework enum.
+ * @param primitive Primitive operation kind enum.
+ * @return Engine identifier string constant, or nullptr if no specific preference.
+ */
 inline const char* plugin_hint_for_framework(rac_inference_framework_t framework,
                                              rac_primitive_t primitive) {
     switch (framework) {
@@ -226,33 +244,28 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
     }
 }
 
-// Whether plugin_hint_for_framework()'s answer is a hard requirement rather than a
-// preference.
-//
-// The priority fallback in create_plugin_service() exists for frameworks whose hint is
-// advisory — several engines can read the same bytes, so the next-best engine is a real
-// answer. That is not true when the framework names the on-disk *format*: nothing but
-// NeuRT can open an .mlmodelc/.mlpackage tree. Falling back by priority hands a Core ML
-// bundle to MLX (safetensors), Sherpa or ONNX, which can only produce a confusing
-// load-time error far from its cause — or, for a primitive where the fallback engine
-// happens to accept the path, a silently wrong model.
-//
-// This is not hypothetical. Before COREML was routed to NeuRT unconditionally it mapped
-// to `platform` for the primitives NeuRT did not serve, and `platform` really does serve
-// SYNTHESIZE; without this guard, routing COREML to NeuRT would have sent a Core ML TTS
-// request to MLX by priority (110 > 100) instead.
-//
-// NeuRT now fills tts_ops, so that particular case no longer fires -- but the guard is not
-// therefore obsolete. It is what keeps the NEXT unfilled slot from repeating the pattern,
-// which this engine has already done twice.
-//
-// Only COREML is strict here. The other format-determined frameworks (LLAMACPP, MLX,
-// QHEXRT) have the same argument available to them, but changing their behaviour is
-// outside the scope of the ABI-10 work and untested.
+/**
+ * @brief Checks whether a framework requires its hinted engine strictly without priority fallback.
+ *
+ * @param framework Inference framework enum.
+ * @return True if fallback to alternative engines is disallowed.
+ */
 inline bool framework_requires_hinted_plugin(rac_inference_framework_t framework) {
     return framework == RAC_FRAMEWORK_COREML;
 }
 
+/**
+ * @brief Instantiates a typed plugin service instance according to creation specifications.
+ *
+ * Routes primitive dispatch to the hinted or highest-priority plugin backend, invokes
+ * backend creation, and returns a heap-allocated service wrapper.
+ *
+ * @tparam ServiceT C service struct type.
+ * @tparam OpsT Engine vtable ops struct type.
+ * @param spec Configuration and model descriptor parameters.
+ * @param out_service Output pointer receiving the created service instance.
+ * @return RAC_SUCCESS on success, or a typed error code on failure.
+ */
 template <typename ServiceT, typename OpsT>
 rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>& spec,
                                    ServiceT** out_service) {
