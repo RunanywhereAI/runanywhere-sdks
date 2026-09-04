@@ -922,6 +922,25 @@ int test_embeddings_options_mapping() {
     CHECK(raw.truncate == 0, "explicit truncate=false maps exactly");
     CHECK(raw.batch_size == 32, "embedding batch size maps exactly");
 
+    // normalize is `optional` with rac_default "true": "Unset = true. false
+    // returns the raw pooled vector" (embeddings_options.proto). Explicit false
+    // is the only way to ask for the raw vector, so it has to survive the hop.
+    runanywhere::v1::EmbeddingsOptions no_normalize;
+    no_normalize.set_normalize(false);
+    raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(no_normalize, &raw),
+          "EmbeddingsOptions with normalize=false maps");
+    CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_NONE,
+          "an explicit normalize=false reaches the C ABI as NONE");
+
+    runanywhere::v1::EmbeddingsOptions yes_normalize;
+    yes_normalize.set_normalize(true);
+    raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(yes_normalize, &raw),
+          "EmbeddingsOptions with normalize=true maps");
+    CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_L2,
+          "an explicit normalize=true stays L2");
+
     runanywhere::v1::EmbeddingsOptions defaults;
     raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
     CHECK(rac::foundation::rac_embeddings_options_from_proto(defaults, &raw),
