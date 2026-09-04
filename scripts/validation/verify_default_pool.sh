@@ -23,7 +23,7 @@
 # Exit codes:
 #   0  Every language agrees with the proto.
 #   1  At least one value disagrees, or a language is missing a field.
-#   2  A generated file is missing (run idl/codegen/generate_defaults_pool.sh).
+#   2  A generated file is missing (run idl/codegen/generate_defaults_pool.py).
 
 set -euo pipefail
 
