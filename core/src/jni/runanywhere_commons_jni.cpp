@@ -497,6 +497,8 @@ static jbyteArray makeModelRegistryProtoByteArray(JNIEnv* env, uint8_t* bytes, s
     return env->ExceptionCheck() ? nullptr : result;
 }
 
+static bool jniClearPendingException(JNIEnv* env);
+
 static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_result_t status,
                                     const char* message) {
     if (env == nullptr || env->ExceptionCheck()) {
@@ -507,15 +509,43 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
     char formatted[512];
     std::snprintf(formatted, sizeof(formatted), "%s failed with code %d: %s", operation, status,
                   detail);
-    jclass exClass = env->FindClass("java/lang/IllegalStateException");
+    jclass exClass = env->FindClass("com/runanywhere/sdk/native/bridge/NativeProtoException");
     if (exClass != nullptr) {
-        env->ThrowNew(exClass, formatted);
+        jmethodID constructor = env->GetMethodID(exClass, "<init>", "(ILjava/lang/String;)V");
+        jstring javaMessage = constructor != nullptr ? env->NewStringUTF(formatted) : nullptr;
+        if (!env->ExceptionCheck() && javaMessage != nullptr) {
+            jobject exception = env->NewObject(exClass, constructor, static_cast<jint>(status),
+                                               javaMessage);
+            if (!env->ExceptionCheck() && exception != nullptr) {
+                env->Throw(static_cast<jthrowable>(exception));
+                env->DeleteLocalRef(exception);
+                env->DeleteLocalRef(javaMessage);
+                env->DeleteLocalRef(exClass);
+                return;
+            }
+            if (exception != nullptr) {
+                env->DeleteLocalRef(exception);
+            }
+        }
+        if (javaMessage != nullptr) {
+            env->DeleteLocalRef(javaMessage);
+        }
         env->DeleteLocalRef(exClass);
     }
+
+    jniClearPendingException(env);
+    jclass fallbackClass = env->FindClass("java/lang/RuntimeException");
+    if (fallbackClass == nullptr) {
+        jniClearPendingException(env);
+        return;
+    }
+    env->ThrowNew(fallbackClass, formatted);
+    env->DeleteLocalRef(fallbackClass);
 }
 
 static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buffer,
-                                           const char* operation) {
+                                            const char* operation,
+                                            bool preserveFailure = false) {
     if (buffer == nullptr) {
         return nullptr;
     }
@@ -523,9 +553,10 @@ static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buff
         LOGe("%s: native proto API failed with code %d (%s)", operation, buffer->status,
              buffer->error_message ? buffer->error_message : "");
         const rac_result_t status = buffer->status;
-        const char* message = buffer->error_message;
+        if (preserveFailure) {
+            throwNativeProtoFailure(env, operation, status, buffer->error_message);
+        }
         rac_proto_buffer_free(buffer);
-        throwNativeProtoFailure(env, operation, status, message);
         return nullptr;
     }
     if (buffer->size > 0 && buffer->data == nullptr) {
@@ -624,7 +655,7 @@ static jbyteArray callModelRegistryProtoBuffer(JNIEnv* env, jbyteArray requestPr
 using ProtoBufferCallFn = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
 
 static jbyteArray callProtoBufferFn(JNIEnv* env, jbyteArray requestProto, ProtoBufferCallFn callFn,
-                                    const char* operation) {
+                                    const char* operation, bool preserveFailure = false) {
     if (requestProto == nullptr) {
         return nullptr;
     }
@@ -646,7 +677,7 @@ static jbyteArray callProtoBufferFn(JNIEnv* env, jbyteArray requestProto, ProtoB
     if (RAC_FAILED(rc) && result.status == RAC_SUCCESS) {
         rac_proto_buffer_set_error(&result, rc, operation);
     }
-    return makeProtoBufferByteArray(env, &result, operation);
+    return makeProtoBufferByteArray(env, &result, operation, preserveFailure);
 }
 
 static jbyteArray callLifecycleLoadProtoFn(JNIEnv* env, jbyteArray requestProto) {
@@ -2370,14 +2401,14 @@ JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegisterModelFromUrlProto(
     JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
     return callProtoBufferFn(env, requestBytes, rac_register_model_from_url_proto,
-                             "racRegisterModelFromUrlProto");
+                             "racRegisterModelFromUrlProto", true);
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegisterMultiFileModelProto(
     JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
     return callProtoBufferFn(env, requestBytes, rac_register_multi_file_model_proto,
-                             "racRegisterMultiFileModelProto");
+                             "racRegisterMultiFileModelProto", true);
 }
 
 JNIEXPORT jbyteArray JNICALL

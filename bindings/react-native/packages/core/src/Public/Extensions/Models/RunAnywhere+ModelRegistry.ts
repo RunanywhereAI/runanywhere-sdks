@@ -86,6 +86,11 @@ export interface RegisterModelInput {
   framework: InferenceFramework;
   /** Estimated runtime RAM, used for compatibility checks. */
   memoryRequirement?: number;
+  /** Exact remote artifact bytes, when known. */
+  downloadSize?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   /** Optional model category (Swift shorthand defaults to LANGUAGE). */
   modality?: ModelCategory;
   /** Optional artifact archive type hint. */
@@ -172,11 +177,18 @@ export async function registerModel(
     name: input.name,
     framework: input.framework,
     category: modality,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
+    ...(input.source !== undefined ? { source: input.source } : {}),
     ...(input.id !== undefined ? { id: input.id } : {}),
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
       : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
+      : {}),
+    ...(input.contextLength !== undefined && input.contextLength > 0
+      ? { contextLength: input.contextLength }
+      : {}),
+    ...(input.description ? { description: input.description } : {}),
     ...(input.supportsThinking ? { supportsThinking: true } : {}),
     ...(input.supportsLora ? { supportsLora: true } : {}),
     ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),

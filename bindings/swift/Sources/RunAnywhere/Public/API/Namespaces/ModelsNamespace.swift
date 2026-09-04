@@ -57,6 +57,10 @@ public extension RunAnywhere {
                     framework: registration.framework,
                     modality: registration.category,
                     memoryRequirement: registration.memoryRequirementBytes,
+                    downloadSize: registration.downloadSizeBytes,
+                    contextLength: registration.contextLength,
+                    source: registration.source,
+                    description: registration.description,
                     supportsThinking: registration.supportsThinking,
                     supportsLora: registration.supportsLora,
                     cuaProfile: registration.cuaProfile
@@ -71,6 +75,10 @@ public extension RunAnywhere {
                     modality: registration.category,
                     archiveType: type,
                     memoryRequirement: registration.memoryRequirementBytes,
+                    downloadSize: registration.downloadSizeBytes,
+                    contextLength: registration.contextLength,
+                    source: registration.source,
+                    description: registration.description,
                     supportsThinking: registration.supportsThinking,
                     supportsLora: registration.supportsLora,
                     cuaProfile: registration.cuaProfile
@@ -92,7 +100,10 @@ public extension RunAnywhere {
                     memoryRequirement: registration.memoryRequirementBytes,
                     contextLength: registration.contextLength,
                     supportsThinking: registration.supportsThinking,
+                    supportsLora: registration.supportsLora,
+                    source: registration.source,
                     downloadSize: registration.downloadSizeBytes,
+                    description: registration.description,
                     cuaProfile: registration.cuaProfile
                 )
             }
