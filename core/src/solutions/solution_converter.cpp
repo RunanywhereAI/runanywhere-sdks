@@ -65,7 +65,10 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSp
     if (cfg.max_context_tokens() > 0) {
         (*llm->mutable_params())["max_context_tokens"] = std::to_string(cfg.max_context_tokens());
     }
-    if (cfg.has_generation() && cfg.generation().temperature() != 0.0f) {
+    // Presence, not value: llm_options.proto documents "0.0 = greedy decoding, and
+    // is honoured as an explicit request", so a caller asking for 0.0 must reach the
+    // operator rather than look identical to a caller who set nothing.
+    if (cfg.has_generation() && cfg.generation().has_temperature()) {
         (*llm->mutable_params())["temperature"] = std::to_string(cfg.generation().temperature());
     }
     (*tts->mutable_params())["emit_partials"] = cfg.emit_partials() ? "true" : "false";
