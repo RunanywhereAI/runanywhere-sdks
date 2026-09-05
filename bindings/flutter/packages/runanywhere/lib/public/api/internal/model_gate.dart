@@ -118,6 +118,7 @@ abstract final class ModelGate {
     required ModelCategory category,
     LoadOptions? options,
   }) async {
+    _validateLoadOptions(options);
     final request = model_pb.ModelLoadRequest(
       modelId: modelId,
       category: category,
