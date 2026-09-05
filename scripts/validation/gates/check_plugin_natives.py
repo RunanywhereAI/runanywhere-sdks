@@ -127,8 +127,8 @@ REQUIRED_OPS: dict[str, tuple[str, ...]] = {
     "qhexrt": ("qhexrt:engine-available",),
     # engines/neurt/rac_plugin_entry_neurt.cpp gates &g_neurt_{llm,stt}_ops behind
     # #if RAC_NEURT_ROUTABLE, exactly like sherpa/onnx/llamacpp: the addresses are
-    # only taken (an undefined reference in the carrier) when the private neurun
-    # checkout was actually present at build time (NEURT_ROOT resolved). Without
+    # only taken (an undefined reference in the carrier) when the private NeuRT
+    # prebuilt was actually present at build time. Without
     # it, engines/neurt/CMakeLists.txt builds the documented non-routable shell
     # (registration refused with RAC_ERROR_BACKEND_UNAVAILABLE) instead of hard
     # failing configure — legitimate on any host that can't clone the private
@@ -187,7 +187,7 @@ BACKEND_TARBALL_RE = re.compile(
 
 # rac_backend_<id> is normally the sibling ENGINE library that a carrier links
 # against, not itself gated here. NeuRT is the exception: verified by building
-# it for real (macOS, with the actual neurun checkout) and reading `nm -a` on
+# it for real (macOS, with the actual NeuRT prebuilt) and reading `nm -a` on
 # both files —
 #
 #   librunanywhere_neurt.dylib (the carrier, rac_static_register_neurt.cpp only): no symbols at all

@@ -255,7 +255,8 @@ elseif(RAC_PLATFORM_LINUX)
 
         message(STATUS "Found Sherpa-ONNX Linux: ${SHERPA_LIB_PATH}")
     else()
-        message(STATUS "Sherpa-ONNX not found. Run: ./scripts/linux/download-sherpa-onnx.sh")
+        message(STATUS "Sherpa-ONNX not found. Run, from the repo root: "
+                   "bash core/scripts/linux/download-sherpa-onnx.sh")
     endif()
 
 elseif(RAC_PLATFORM_WINDOWS)
@@ -344,6 +345,26 @@ endif()
 # this flag means the real Sherpa-ONNX C API artifact was found.
 set(RAC_SHERPA_ONNX_AVAILABLE "${SHERPA_ONNX_AVAILABLE}" CACHE INTERNAL
     "Whether the Sherpa-ONNX runtime artifact is available for this build" FORCE)
+
+# Desktop kits advertise HAS_SHERPA from TARGET existence. A missing prebuilt
+# still produces rac_backend_sherpa with RAC_SHERPA_ROUTABLE=0, so
+# capability_check returns BACKEND_UNAVAILABLE and RCLI e2e sees
+# "sherpa not registered" while the tarball looks complete. Fail configure
+# rather than packaging that stub. iOS/Android/Electron jobs prefetch the
+# same scripts; kit jobs must too.
+if(RAC_PACKAGE_CPP_DESKTOP AND RAC_BACKEND_SHERPA AND NOT SHERPA_ONNX_AVAILABLE)
+    if(APPLE)
+        set(_sherpa_hint "bash core/scripts/macos/download-sherpa-onnx.sh")
+    elseif(WIN32)
+        set(_sherpa_hint "core\\\\scripts\\\\windows\\\\download-sherpa-onnx.bat")
+    else()
+        set(_sherpa_hint "bash core/scripts/linux/download-sherpa-onnx.sh")
+    endif()
+    message(FATAL_ERROR
+        "C++ desktop kit has RAC_BACKEND_SHERPA=ON but Sherpa-ONNX prebuilts "
+        "were not found (SHERPA_ONNX_AVAILABLE=OFF). That compiles a "
+        "non-routable stub. Fetch them first:\n  ${_sherpa_hint}")
+endif()
 
 # =============================================================================
 # Sherpa Plugin Library

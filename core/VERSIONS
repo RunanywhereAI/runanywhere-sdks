@@ -14,7 +14,7 @@
 # =============================================================================
 
 # Project version (read from VERSION file, but also defined here for scripts)
-PROJECT_VERSION=0.20.25
+PROJECT_VERSION=0.20.36
 
 # =============================================================================
 # Platform Deployment Targets
@@ -309,29 +309,61 @@ LIBARCHIVE_VERSION=3.8.7
 RAC_COMMONS_VERSION=0.1.1
 
 # =============================================================================
-# NeuRT (the Apple Neural Engine engine — built and published by the PRIVATE
-# `neurun` repo, consumed here as prebuilt archives)
+# neurun — the PRIVATE repo that builds and publishes both accelerator engines
 # =============================================================================
-# This is a repo boundary, pinned the same way sherpa-onnx is: a release tag plus
-# a SHA-256 per artifact. Nothing here needs neurun's source.
+# One neurun release carries both engines' payloads. Pinned by tag + SHA-256 the
+# same way sherpa-onnx is; no engine source enters this repo.
 #
-# It used to. engines/neurt/CMakeLists.txt resolved a NEURT_ROOT checkout of that
-# PRIVATE repo and regex-parsed its root CMakeLists.txt to recover a source list —
-# so this repo's Apple release could only be built by someone holding it, and a
-# stray `)` in a comment over there silently dropped a source file here.
+# The repo is shared, but each engine keeps its OWN release tag: a release can be
+# cut for one lane only (see that repo's `lanes` input), so a tag may carry just
+# one engine's assets.
 #
 # NEURT_RAC_ABI_VERSION must equal RAC_PLUGIN_API_VERSION in
 # core/include/rac/plugin/rac_plugin_entry.h. The downloader enforces it against
-# each archive's RECEIPT.json. That check is the whole safety argument for linking
-# binaries built in another repo: a vtable-layout change relinks cleanly and
-# corrupts dispatch at runtime, and a static archive resolves no symbols, so
-# nothing else would catch it.
+# each archive's receipt.
 #
-# To bump: cut a neurun release, then copy the pin block from its release notes
-# (neurun's package-rac-dist.sh prints exactly these lines).
-NEURT_REPO=RunanywhereAI/neurun
-NEURT_RELEASE_TAG=v0.20.26
-NEURT_RAC_ABI_VERSION=9
-NEURT_MACOS_ARM64_SHA256=cde625d0d521d202634a0709a9228edf940fe73e1b640782f707efd465eb4e42
-NEURT_IOS_ARM64_SHA256=afc21c4fd448d1593d4c411f90f48d113cedcc6f65c090e4d3a75141b70aef2b
-NEURT_IOS_ARM64_SIMULATOR_SHA256=43f245b110e820dd839f29d10691b5cda5da671de74289f6fe479053aa046a38
+# QHEXRT_*_RECEIPT is the payload's own build-receipt digest, which is also its
+# directory name, so the downloader can prove the extracted tree is the payload
+# that was pinned rather than trusting the archive's claim about itself.
+#
+# QAIRT is read for HEADERS ONLY when QHexRT is built, and its runtime is dlopen'd
+# on device; the neurun engine payload still carries no Qualcomm binary. The
+# runtime itself is pinned separately below and fetched from the PRIVATE neurun
+# repo with NEURUN_TOKEN, exactly like the engine payloads.
+#
+# To bump: cut a neurun release, then paste the pin block from its release notes.
+# Never compute these locally — a local build's bytes are never the published ones.
+NEURUN_REPO=RunanywhereAI/neurun
+
+NEURT_RELEASE_TAG=v0.20.35
+NEURT_RAC_ABI_VERSION=11
+NEURT_MACOS_ARM64_SHA256=576f356e8bde6a54dd64f4a22f6dce947338fa6ba49fc9a51fd0f79756b3710b
+NEURT_IOS_ARM64_SHA256=bf4f945e988c133abe6e45a8652ae30323e841454a54668034e294e6c8985267
+NEURT_IOS_ARM64_SIMULATOR_SHA256=c14fe5bfc2375fa6dd4227b6e6a63682d1fdff2acd5d1bb19c93fbf03cd817dd
+
+QHEXRT_RELEASE_TAG=v0.20.31
+QHEXRT_ARM64_V8A_SHA256=1c49bfa5dd6546a34b63f79f6be90ff26a04da40832d3c0dbfe4ed35aef3fcd6
+QHEXRT_ARM64_V8A_RECEIPT=5e815d3a8f6c1d7dbefde9012f023c9f6edeaee18cbc910830c80c8ba4dcd147
+QHEXRT_WIN_ARM64_SHA256=531c8cf79a9e46c797074be9b7b32f3c38a92396a4c0a77c898537bfa7c65468
+QHEXRT_WIN_ARM64_RECEIPT=67aef6df8f549b84fcca541fe6d963cf87b246bcb2a75a362707ca530c76a5cd
+
+# The QAIRT/QNN runtime redistributables the QHexRT engine dlopens at run time.
+# A SEPARATE axis from the engine pins above: the QAIRT SDK version and the SDK
+# release version move independently, so these carry their own tag and are not
+# bumped by a neurun release.
+#
+# PRIVATE assets on the neurun repo, fetched with NEURUN_TOKEN — the same
+# mechanism as NEURT_*/QHEXRT_* above, so a build that can reach one reaches all
+# three. A hosted runner with the token builds a routable Hexagon engine without a
+# licensed QAIRT install; without the token it gets the non-routable shell, which
+# is the intended public/fork outcome. Produced by
+# scripts/build/publish-qairt-runtime.sh from a licensed install (that step still
+# needs a human with the SDK) and fetched by scripts/build/download-qairt-runtime.sh.
+#
+# scripts/validation/gates/check_qairt_pairing.sh asserts this runtime is the same
+# QAIRT the pinned engine was built against — two independent pins CAN drift, and a
+# hash-verified but wrong-version runtime crashes on a real Hexagon device.
+QAIRT_RUNTIME_VERSION=2.47.0.260601
+QAIRT_RUNTIME_RELEASE_TAG=qairt-runtime-v2.47.0.260601
+QAIRT_RUNTIME_ARM64_V8A_SHA256=b851e3d3f8b7888ce747f1ef05e0b41d5dab60f9b2490fe384649461cecd0800
+QAIRT_RUNTIME_WIN_ARM64_SHA256=76499d3bb11196e42f5801e1d3c240f0fd120938b75820992f93101a33db8aa8

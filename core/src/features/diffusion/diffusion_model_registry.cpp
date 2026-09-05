@@ -30,6 +30,34 @@ const char* LOG_CAT = "DiffusionModelRegistry";
 // BUILT-IN MODEL DEFINITIONS (CoreML only for now - iOS/macOS)
 // =============================================================================
 
+// WHAT THE APPLE ENGINE ACTUALLY DOES, and why these rows changed.
+//
+// A model definition here is a capability PROMISE the SDK reports through get_capabilities() and
+// surfaces in pickers. Both CoreML rows promised three things `rac_diffusion_coreml.mm` does not do:
+//
+//   * `scheduler: DPM_PP_2M` — the engine implements DDIM ONLY, hardcoded (ddim_step, scaled-linear
+//     betas, linear timestep spacing). There is no scheduler selection at all, so advertising DPM++
+//     meant a caller asking for it silently got DDIM.
+//   * `supports_img2img: TRUE` — the engine REJECTS img2img and inpainting outright, and its own
+//     get_info() reports supports_image_to_image=false. The registry and the engine contradicted
+//     each other about the same model.
+//   * `coreml_path` did not match anything in the published repo. Corrected to
+//     `split_einsum_v2/compiled`, which is where the compiled models actually live under
+//     `base_url`. Note this field is DECLARATIVE: the only code that touches it (builtin_select_
+//     backend, below) null-checks it and never resolves it, so neither value was breaking a
+//     download today — but a path that matches nothing is a trap for whoever wires it up next.
+//     Two namings legitimately exist and they are easy to confuse: the repo TREE has
+//     `split_einsum_v2/compiled/`, while the compiled ZIP extracts to a single
+//     `coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled/` directory. Verified by
+//     downloading and extracting the real 1.57 GB asset: it contains TextEncoder/Unet/VAEDecoder/
+//     VAEEncoder/SafetyChecker .mlmodelc plus vocab.json and merges.txt, all at that one level.
+//
+// Sizes were also wrong: the published
+// `coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip` is 1.57 GB (checked against
+// the HF file metadata), not 1.2 GB.
+//
+// Corrected rather than left aspirational: an untrue capability is worse than a missing one, because
+// the caller has no way to discover it is untrue.
 // SD 1.5 CoreML (iOS/macOS - uses Apple Neural Engine)
 static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
     .model_id = "stable-diffusion-v1-5-coreml",
@@ -43,16 +71,16 @@ static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
                  .height = 512,
                  .steps = 20,
                  .guidance_scale = 7.5f,
-                 .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
+                 .scheduler = RAC_DIFFUSION_SCHEDULER_DDIM,
                  .requires_cfg = RAC_TRUE},
     .download = {.base_url = "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized",
                  .onnx_path = nullptr,
-                 .coreml_path = "split_einsum_v2_compiled",
-                 .size_bytes = 1200000000ULL,
+                 .coreml_path = "split_einsum_v2/compiled",
+                 .size_bytes = 1570000000ULL,
                  .checksum = nullptr},
     .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_1_5, .custom_url = nullptr},
     .is_recommended = RAC_TRUE,
-    .supports_img2img = RAC_TRUE,
+    .supports_img2img = RAC_FALSE,
     .supports_inpainting = RAC_FALSE};
 
 // SD 2.1 CoreML (iOS/macOS)
@@ -68,17 +96,17 @@ static const rac_diffusion_model_def_t MODEL_SD21_COREML = {
                  .height = 768,
                  .steps = 20,
                  .guidance_scale = 7.5f,
-                 .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
+                 .scheduler = RAC_DIFFUSION_SCHEDULER_DDIM,
                  .requires_cfg = RAC_TRUE},
     .download = {.base_url =
                      "https://huggingface.co/apple/coreml-stable-diffusion-2-1-base-palettized",
                  .onnx_path = nullptr,
-                 .coreml_path = "split_einsum_v2_compiled",
+                 .coreml_path = "split_einsum_v2/compiled",
                  .size_bytes = 1500000000ULL,
                  .checksum = nullptr},
     .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_2_X, .custom_url = nullptr},
     .is_recommended = RAC_FALSE,
-    .supports_img2img = RAC_TRUE,
+    .supports_img2img = RAC_FALSE,
     .supports_inpainting = RAC_FALSE};
 
 // All built-in models (CoreML only)

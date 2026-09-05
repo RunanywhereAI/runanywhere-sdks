@@ -74,7 +74,7 @@ platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control 
 call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings
 for every language.
 
-**Current version**: `0.20.25` (canonical source: `core/VERSION`)
+**Current version**: `0.20.36` (canonical source: `core/VERSION`)
 
 | SDK | Path | Bridge mechanism | Platforms |
 |-----|------|-------------------|-----------|
@@ -168,14 +168,10 @@ llamacpp=100, sherpa=90, onnx/cloud=50. An explicit engine name is honored throu
   `emscripten_fetch` on Web).
 - **NeuRT crosses a repo boundary as BYTES, not source**: the Apple engine is built and
   published by the private `neurun` repo and consumed here as prebuilt archives, pinned by
-  tag + SHA-256 in `core/VERSIONS` (`NEURT_*`) the same way sherpa-onnx is. Fetch with
-  `scripts/build/download-neurt.sh`. This repo previously resolved a `NEURT_ROOT` checkout
-  of that private repo and regex-parsed its `CMakeLists.txt` for a source list, which meant
-  only a holder of that repo could build the Apple release. Every archive carries a
-  `RECEIPT.json` naming the `RAC_PLUGIN_API_VERSION` it was compiled against, and both the
-  downloader and CMake refuse a mismatch — a vtable-layout change relinks cleanly and
-  corrupts dispatch at runtime, and a static archive resolves no symbols, so nothing else
-  would catch it.
+  tag + SHA-256 in `core/VERSIONS` (`NEURT_*`). Fetch with `scripts/build/download-neurt.sh`.
+  Each archive carries a receipt naming the `RAC_PLUGIN_API_VERSION` it was built against,
+  and both the downloader and CMake refuse a mismatch — a vtable-layout change relinks
+  cleanly and corrupts dispatch at runtime, so nothing else would catch it.
 
 A side-by-side comparison of entry point / bridge / streaming / events / storage / HTTP
 per SDK — useful when porting a fix across SDKs — lives in
@@ -187,7 +183,7 @@ per SDK — useful when porting a fix across SDKs — lives in
 
 The root `CMakeLists.txt` (version from `core/VERSION`) is the single entry point for
 native builds; `CMakePresets.json` defines `macos-{debug,release}`, `linux-{debug,release,asan}`,
-`ios-{device,simulator}`, `android-arm64`, `wasm`, and the `rcli-*`/`windows-*` presets.
+`ios-{device,simulator}`, `android-arm64`, `wasm`, `cpp-desktop-*`, and the `windows-*` presets.
 
 ```bash
 cmake --preset macos-debug && cmake --build build/macos-debug && ctest --preset macos-debug
@@ -236,6 +232,86 @@ smoke tests) is a multi-step process captured in three skills — use them rathe
 improvising the steps: **sdk-release** (version bump through published GitHub Release),
 **sdk-publish** (registry publishing + the `runanywhere-swift` dist repo cut), and
 **sdk-test-starters** (post-release device/app smoke tests).
+
+### Release pipeline lessons (v0.20.29 through v0.20.31 — read before cutting a release by hand)
+
+- **`native_ios` and `native_android` always rebuild fresh archives on every `release.yml`
+  run — there is no reuse/skip mechanism for either job** (unlike `native_web`'s
+  `reuse_native_web_run_id` or the cpp-desktop kits' `reuse_cpp_desktop_run_id`). This makes
+  the Apple/Android TEMP-pin convention (Package.swift's `sdkVersion`, the Flutter podspecs'
+  `asset_version`, Kotlin's `nativeLibVersion` pinned to an old version "because this release
+  ships no new iOS/Android archives") **structurally unsound for any release where those two
+  jobs actually run — which is every release.** It surfaced as three separate bugs
+  (`auto-tag.yml`'s coherence check, `package-sdk.sh`'s podspec check, and `sync-checksums.sh`'s
+  publish-time verification) before the pattern was recognized. If a release genuinely ships
+  no new Apple/Android bytes, that has to be proven by diffing the actual built artifacts
+  against the previous release, not assumed from what changed in the diff.
+- **`RunAnywhereMLXRuntime`'s stripped Mach-O is not byte-reproducible across builds**
+  (`RAC_CHECKSUM_SKIP=RunAnywhereMLXRuntime` in `release.yml`'s publish job exists because of
+  this, and is the ONLY archive exempted from the publish-time checksum gate). The corollary
+  that bit v0.20.29: **the checksum committed to `Package.swift` / the Flutter MLX podspec
+  can only be computed from a build that already happened, but the tag that freezes those
+  files has to be pushed before `native_ios` (which produces that exact artifact) even runs**
+  — so re-syncing checksums against an EARLIER, superseded build (e.g. after a tag had to be
+  moved and re-dispatched to fix an unrelated bug) commits a value that does not match what
+  the FINAL successful run actually publishes, and the skip means nothing catches it. v0.20.29
+  shipped this way (committed `d942788f...`, actually published `fc4b23a0...`) — caught only
+  because the Flutter `runanywhere_mlx` package hadn't been published to pub.dev yet for that
+  version. Before publishing any package that ships `RunAnywhereMLXRuntime`, re-run
+  `bindings/swift/scripts/sync-checksums.sh` against the artifacts from the SPECIFIC run whose
+  tag is being published — never reuse a checksum computed against an earlier attempt.
+- **The Electron QHexRT backend never set `ADSP_LIBRARY_PATH`, and one comment in the
+  codebase confidently asserted Windows doesn't need it.** It does, for exactly one decode
+  path: `QHexRT/src/bonsai/fastrpc_win.cpp`'s custom FastRPC skel (the ternary/Bonsai
+  decoder, e.g. `qwen3.8-27b-1bit-npu`) resolves through `ADSP_LIBRARY_PATH ∪ cwd`, separately
+  from the standard QNN HTP graph path's `LoadLibraryW` + PATH search that `bridge.ts`'s
+  `addSidecarDirToDllSearch` already handled. Every OTHER QHexRT model worked fine in the
+  packaged app, which is exactly what let this ship undetected — validate the Bonsai/ternary
+  path specifically, not just "some NPU model works." Fixed in `bridge.ts`'s
+  `addSidecarDirToDspSearchPath` (#803).
+- **`package-private-engine-overlay.sh`'s QAIRT-runtime copy step filtered on `{".dll",
+  ".lib"}` only**, silently dropping every `.so`/`.cat` skel file (both the standard HTP skel
+  and, since it never read `engines/qhexrt/prebuilt/current/dsp/win-arm64/` at all, the
+  Bonsai skel too). This meant **RCLI could not have run any QHexRT model** — standard or
+  ternary — from a fresh private overlay, a gap invisible until someone actually tried to run
+  inference rather than just building. `bindings/electron/scripts/bundle-native.ts` already
+  had the correct pattern (copy `dsp/win-arm64/` flat, no extension filter); the overlay
+  script just never matched it. Fixed in #804.
+- **General pattern across all four of the above**: each one was invisible to the checks that
+  existed (a version-coherence check, a checksum-skip escape hatch, a "the model loaded"
+  smoke test, a "the build succeeded" CI job) because none of those checks actually ran the
+  specific thing that was broken. When validating a release, run the SPECIFIC flagship/hardest
+  model end-to-end on-device, not just confirm the pipeline completed.
+- **The RACommons/RunAnywhereMLXRuntime checksum-staleness bug above recurred on v0.20.30 AND
+  v0.20.31** — same `mismatch: RACommonsBinary` failure in `publish`, same root cause both
+  times: the version-bump PR ran `sync-versions.sh` and merged/tagged directly, skipping the
+  **mandatory** "dispatch a release candidate off the unmerged branch, sync checksums from
+  its real build, THEN merge" sequence that the **`sdk-release` skill's step 2-3 already
+  document in detail** (including this exact failure signature). Documenting the lesson in
+  prose here was not enough to stop it recurring twice more — **if you are about to run
+  `scripts/release/sync-versions.sh` for ANY reason, including as one step of a larger
+  cross-repo release cascade, invoke the `sdk-release` skill and follow it from step 1**,
+  rather than reconstructing the sequence from memory or treating a "small" version bump as
+  exempt. v0.20.31 additionally caught `RunAnywhereMLXRuntime` in the Flutter podspec
+  independently stale in the SAME commit — `RAC_CHECKSUM_SKIP` exempts it from `publish`'s
+  check, so it would have shipped broken to Flutter consumers with no CI signal at all; check
+  every row of the checksum-location table, not only the one the CI error names.
+- **QHexRT's `qhx_runtime_device()` (arch/soc lookup, needed to pick the `v75`/`v79`/`v81`
+  manifest directory in `session_open()`) shared its live-device cost with the standard QNN
+  graph path**, so a `host_only` model with ZERO QNN graphs — the Bonsai/Maple ternary decoder
+  (`qwen3.8-27b-1bit-npu`) — paid for a live QNN HTP device anyway, which then contended with
+  the decoder's own direct FastRPC session for the same Hexagon cDSP and made every generation
+  fail with a bare `HostOpFailed`. This shipped in v0.20.30 (the SAME release that fixed the
+  `ADSP_LIBRARY_PATH` bug for the same model) and was found only by running that SPECIFIC model
+  on real Windows-ARM64 hardware after the "fix" — reinforcing the point above: a green
+  `HostOpFailed`-free run of a DIFFERENT QHexRT model proves nothing about this one. Two red
+  herrings were chased and ruled out with live device tracing before the real cause: neither
+  `ADSP_LIBRARY_PATH` (confirmed correctly set) nor a QAIRT-version mismatch between the
+  shipped host DLLs and the on-device skel (confirmed present, but fixing it alone did not fix
+  the failure) was the actual cause. Fixed in `neurun` v0.20.31 (`Backend::profile()` now uses
+  a separate, device-handle-free `deviceGetPlatformInfo` query instead of sharing
+  `ensure_device()` with `device()`) + this repo's `qhexrt_session.cpp` (#810, a complementary
+  fix removing a second, redundant eager device query used only for a log line).
 
 ---
 

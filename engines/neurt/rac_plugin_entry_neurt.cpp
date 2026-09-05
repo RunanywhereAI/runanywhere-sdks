@@ -170,6 +170,21 @@ static const uint32_t k_neurt_formats[] = {
 
 static const rac_primitive_t k_neurt_primitives[] = {
     RAC_PRIMITIVE_DIFFUSION,
+    // Text embedding on the Apple Neural Engine, backed by NeuRT's bidirectional encoder driver.
+    RAC_PRIMITIVE_EMBED,
+    // Cross-encoder relevance reranking (query x candidates), same body, single-logit head.
+    RAC_PRIMITIVE_RERANK,
+    // Image + prompt -> text on the Apple Neural Engine.
+    RAC_PRIMITIVE_VLM,
+    // Image -> vector, for retrieval/similarity. Distinct from VLM (which returns text) and from
+    // EMBED (which takes text).
+    RAC_PRIMITIVE_EMBED_IMAGE,
+    // Text-to-speech on the Neural Engine. The last slot NeuRT left null.
+    RAC_PRIMITIVE_SYNTHESIZE,
+    // The registry validates BOTH directions (rac_plugin_registry.cpp): a primitive listed
+    // here with a NULL slot, or a filled slot missing from this list, is rejected. They move
+    // together or not at all.
+    RAC_PRIMITIVE_OCR,
     // Speech-to-text on the Neural Engine, backed by NeuRT's ASR drivers. Four bundle shapes are
     // served through one op table: Parakeet TDT and RNNT (transducer), Whisper and Moonshine
     // (attention decoder), and Parakeet CTC.
@@ -260,7 +275,7 @@ static const rac_engine_manifest_t k_neurt_manifest = {
 // via `rac_neurt_llm_ops` -> `rac_neurt_core`. NeuRT runs prebuilt Core ML graphs on the Apple
 // Neural Engine; it never compiles a model.
 //
-// NEURT_ROOT is NOT a hard requirement: without the neurun checkout engines/neurt builds a
+// A prebuilt is NOT a hard requirement: without one engines/neurt builds a
 // non-routable shell rather than failing configure, so the engine can be compiled on a CI host
 // that cannot clone the private repo. `RAC_NEURT_ROUTABLE` is what re-establishes the guarantee
 // the old FATAL_ERROR was after — in the stub arm the vtable's llm_ops slot is NULL and
@@ -279,6 +294,38 @@ extern "C" const rac_llm_service_ops_t g_neurt_llm_ops;
 // The speech modality, implemented in NeuRT (neurun/NeuRT/src/sdk/rac_stt_ops_neurt.cpp) and linked
 // in via `rac_neurt_stt_ops` -> `rac_neurt_core`.
 extern "C" const rac_stt_service_ops_t g_neurt_stt_ops;
+// The embedding modality, implemented in NeuRT (neurun/NeuRT/src/sdk/rac_embedding_ops_neurt.cpp)
+// and linked in via `rac_neurt_embedding_ops` -> `rac_neurt_core`. Drives a bidirectional encoder
+// bundle to one pooled, L2-normalised sentence vector. docs/BUNDLE_CONTRACT.md lists
+// Nemotron-3-Embed-1B as "loads, undrivable" precisely because this slot was null.
+// NOTE the tag, not the typedef: rac_engine_vtable.h forward-declares
+// `struct rac_embeddings_service_ops` and this file does not include the embeddings
+// header, so the `_t` alias is not in scope here.
+extern "C" const struct rac_embeddings_service_ops g_neurt_embeddings_ops;
+// The rerank modality (neurun/NeuRT/src/sdk/rac_rerank_ops_neurt.cpp). A cross-encoder over the same
+// bidirectional body as the embedder, with a single-logit head. Its bundle's `score` graph role was
+// outside the manifest vocabulary until now, so the published bundle was rejected before a graph was
+// touched.
+extern "C" const struct rac_rerank_service_ops g_neurt_rerank_ops;
+// The VLM modality (neurun/NeuRT/src/sdk/rac_vlm_ops_neurt.cpp). Runs the vision tower, splices its
+// visual tokens over the prompt's <IMG_CONTEXT> positions, then drives the ordinary chunked text
+// decode. Accepts RGB_PIXELS only — decoding is a platform concern, not a runtime one.
+extern "C" const struct rac_vlm_service_ops g_neurt_vlm_ops;
+// Image embedding (neurun/NeuRT/src/sdk/rac_image_embedding_ops_neurt.cpp): pixels -> one pooled
+// vector, for retrieval and similarity. The slot it fills was promoted from reserved_slot_3 in
+// ABI v10 — SigLIP2 is the first model to serve it.
+extern "C" const struct rac_image_embedding_service_ops g_neurt_image_embedding_ops;
+// Text-to-speech (neurun/NeuRT/src/sdk/rac_tts_ops_neurt.cpp). Kokoro-82M across three graphs with
+// two host seams -- duration -> [alignment] -> decode -> [harmonic source] -> gen -- plus the
+// grapheme-to-phoneme step the public op needs, since it takes TEXT and the runtime takes ids.
+// Measured on an M4 Max: 3.25 s of 24 kHz audio in 175 ms (18.6x realtime), mel_distance 0.3025
+// against a 0.60 tolerance.
+extern "C" const struct rac_tts_service_ops g_neurt_tts_ops;
+
+// Optical character recognition (neurun/NeuRT/src/sdk/rac_ocr_ops_neurt.cpp). A detector +
+// recogniser PAIR: the recogniser's input is a grid-sampled crop of the detector's 128-channel
+// feature map, so it serves `read_page` and leaves `recognize` NULL.
+extern "C" const struct rac_ocr_service_ops g_neurt_ocr_ops;
 
 static const rac_engine_vtable_t g_neurt_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_neurt_manifest),
@@ -301,10 +348,25 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
 #else
     nullptr,
 #endif
-    /* tts_ops          */ nullptr,
+/* tts_ops          */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_tts_ops,  // SYNTHESIZE on the Apple Neural Engine, backed by NeuRT
+#else
+    nullptr,
+#endif
     /* vad_ops          */ nullptr,
-    /* embedding_ops    */ nullptr,
-    /* vlm_ops          */ nullptr,
+/* embedding_ops    */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_embeddings_ops,  // EMBED on the Apple Neural Engine, backed by NeuRT
+#else
+    nullptr,
+#endif
+/* vlm_ops          */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_vlm_ops,  // VLM on the Apple Neural Engine, backed by NeuRT
+#else
+    nullptr,
+#endif
 /* diffusion_ops    */
 #if RAC_NEURT_ROUTABLE
     &g_coreml_diffusion_ops,  // DIFFUSION over CoreML MLModel
@@ -314,10 +376,28 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
 
-    /* reserved_slot_2..9 */
+    // rerank_ops (wire 11, from reserved_slot_2 in ABI v8), image_embedding_ops (wire 12, from
+    // reserved_slot_3 in v10) and ocr_ops (wire 13, from reserved_slot_4 in v11), then
+    // reserved_slot_5..9. Every promotion kept the same binary offset, so the layout never moved.
+/* rerank_ops        */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_rerank_ops,  // RERANK on the Apple Neural Engine, backed by NeuRT
+#else
     nullptr,
+#endif
+/* image_embedding_ops */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_image_embedding_ops,  // EMBED_IMAGE on the Apple Neural Engine, backed by NeuRT
+#else
     nullptr,
+#endif
+/* ocr_ops             */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_ocr_ops,  // OCR on the Apple Neural Engine, backed by NeuRT
+#else
     nullptr,
+#endif
+    /* reserved_slot_5..9 */
     nullptr,
     nullptr,
     nullptr,

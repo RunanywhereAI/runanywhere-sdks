@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+# =============================================================================
+# check_engine_prebuilt_pins.sh — assert the private-engine prebuilt boundary is
+# whole: pins well-formed and matching the published bytes, the ABI pin equal to
+# the header, no consumer silently building without a payload, and no workflow
+# pinning a payload by absolute path.
+#
+# Read-only. Offline by default; with a token it also verifies the release itself.
+#
+# Usage: check_engine_prebuilt_pins.sh [--offline]
+# =============================================================================
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+OFFLINE=0
+[[ "${1:-}" == "--offline" ]] && OFFLINE=1
+
+fail=0
+# This gate aborted once with NO output at all: `set -o pipefail` propagated a
+# grep-found-nothing exit through a command substitution. A guard that dies
+# silently is worse than no guard, so report any unexpected abort with its line.
+trap 'rc=$?; [[ $rc -ne 0 && $rc -ne 1 ]] && echo "  [FAIL] gate aborted unexpectedly at line $LINENO (exit $rc)" >&2; exit $rc' ERR
+note() { printf '  %s\n' "$*"; }
+bad()  { printf '  [FAIL] %s\n' "$*" >&2; fail=1; }
+ok()   { printf '  [OK] %s\n' "$*"; }
+
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/core/scripts/load-versions.sh"
+# shellcheck source=scripts/build/_release_asset.sh
+source "${REPO_ROOT}/scripts/build/_release_asset.sh"
+
+# The engines, their ABIs/slices, and the asset basename each publishes.
+NEURT_SLICES=(macos-arm64 ios-arm64 ios-arm64-simulator)
+QHEXRT_ABIS=(arm64-v8a win-arm64)
+QAIRT_PLATFORMS=(arm64-v8a win-arm64)
+
+echo "== engine prebuilt pins =="
+
+# ---- 1. every pin is present and well-formed --------------------------------
+check_sha_var() {
+    local name="$1" value="${!1:-}"
+    if [[ -z "$value" ]]; then bad "$name is not set in core/VERSIONS"; return; fi
+    if [[ ! "$value" =~ ^[0-9a-f]{64}$ ]]; then bad "$name is not a sha256: '$value'"; return; fi
+}
+for s in "${NEURT_SLICES[@]}"; do
+    check_sha_var "NEURT_$(echo "$s" | tr 'a-z-' 'A-Z_')_SHA256"
+done
+for a in "${QHEXRT_ABIS[@]}"; do
+    u="$(echo "$a" | tr 'a-z-' 'A-Z_')"
+    check_sha_var "QHEXRT_${u}_SHA256"
+    check_sha_var "QHEXRT_${u}_RECEIPT"
+done
+for p in "${QAIRT_PLATFORMS[@]}"; do
+    check_sha_var "QAIRT_RUNTIME_$(echo "$p" | tr 'a-z-' 'A-Z_')_SHA256"
+done
+[[ -n "${NEURUN_REPO:-}"          ]] || bad "NEURUN_REPO is not set"
+[[ -n "${NEURT_RELEASE_TAG:-}"     ]] || bad "NEURT_RELEASE_TAG is not set"
+[[ -n "${QHEXRT_RELEASE_TAG:-}"    ]] || bad "QHEXRT_RELEASE_TAG is not set"
+[[ -n "${QAIRT_RUNTIME_VERSION:-}"     ]] || bad "QAIRT_RUNTIME_VERSION is not set"
+[[ -n "${QAIRT_RUNTIME_RELEASE_TAG:-}" ]] || bad "QAIRT_RUNTIME_RELEASE_TAG is not set"
+[[ $fail -eq 0 ]] && ok "all pins present and well-formed"
+
+# ---- 2. the ABI pin matches the header it must match ------------------------
+# A drifted NEURT_RAC_ABI_VERSION makes the downloader refuse, but only once a
+# native job gets that far. Catch it here instead.
+hdr="${REPO_ROOT}/core/include/rac/plugin/rac_plugin_entry.h"
+local_abi="$(awk '$1=="#define" && $2=="RAC_PLUGIN_API_VERSION" {gsub(/[^0-9]/,"",$3); print $3; exit}' "$hdr")"
+if [[ -z "$local_abi" ]]; then
+    bad "could not read RAC_PLUGIN_API_VERSION from $hdr"
+elif [[ "${NEURT_RAC_ABI_VERSION:-}" != "$local_abi" ]]; then
+    bad "NEURT_RAC_ABI_VERSION=${NEURT_RAC_ABI_VERSION:-<unset>} but the header says $local_abi"
+else
+    ok "NEURT_RAC_ABI_VERSION matches RAC_PLUGIN_API_VERSION ($local_abi)"
+fi
+
+# ---- 3. every consumer that needs a payload actually fetches one ------------
+# This is the check that would have caught Android shipping the shell. A build
+# that silently degrades to "no engine" is the failure mode with no symptom, so
+# assert the fetch exists rather than trusting the build to complain.
+echo "== consumers fetch what they need =="
+expect_fetch() {
+    local what="$1" file="$2" pattern="$3"
+    if [[ ! -f "${REPO_ROOT}/${file}" ]]; then bad "$file is missing"; return; fi
+    if grep -q -- "$pattern" "${REPO_ROOT}/${file}"; then
+        ok "$what fetches its payload"
+    else
+        bad "$what does NOT fetch its payload (expected '$pattern' in $file)"
+    fi
+}
+# Every Apple binding (Swift, Flutter, RN, Electron-macOS, Python) consumes NeuRT
+# through the ONE xcframework native_ios builds, so this single fetch covers them.
+expect_fetch "native_ios (NeuRT, all Apple bindings)" \
+    ".github/workflows/release.yml" "download-neurt.sh --all"
+expect_fetch "native_android arm64-v8a (QHexRT)" \
+    ".github/workflows/release.yml" "download-qhexrt.sh --abi arm64-v8a"
+expect_fetch "electron macOS (NeuRT)" \
+    ".github/workflows/electron-native-package.yml" "download-neurt.sh --slice macos-arm64"
+expect_fetch "electron win-arm64 (QHexRT)" \
+    ".github/workflows/electron-native-package.yml" "download-qhexrt.sh --abi win-arm64"
+
+# Downstream consumers get the engines via an sdks artifact rather than fetching
+# themselves, so what matters for them is that the artifact is REQUIRED, not that
+# they fetch. Assert those requirements exist, since a missing one degrades to
+# "packaged without the engine" with no error.
+expect_requires() {
+    local what="$1" file="$2" pattern="$3"
+    if [[ ! -f "${REPO_ROOT}/${file}" ]]; then bad "$file is missing"; return; fi
+    grep -q -- "$pattern" "${REPO_ROOT}/${file}" \
+        && ok "$what requires its engine artifact" \
+        || bad "$what does NOT require '$pattern' ($file)"
+}
+# Apple: every binding consumes the ONE xcframework native_ios builds.
+expect_requires "swift packaging (NeuRT xcframework)" \
+    "bindings/swift/scripts/build-core-xcframework.sh" "libneurt_core.a"
+expect_requires "react-native packaging (NeuRT xcframework)" \
+    "bindings/react-native/scripts/package-sdk.sh" "RABackendNeuRT"
+expect_requires "flutter packaging (NeuRT xcframework)" \
+    "bindings/flutter/scripts/package-sdk.sh" "RABackendNeuRT"
+# NeuRT registration smoke for the desktop CLI lives in RunanywhereAI/RCLI.
+# The public C++ desktop kit does not ship NeuRT.
+# Android: QHexRT .so is staged into all three Android SDKs from one build.
+expect_requires "android packaging (QHexRT jniLibs, all 3 SDKs)" \
+    "scripts/build/build-core-android.sh" "KOTLIN_QHEXRT_DEST"
+# The routability signal for Android is the marker the ENGINE embeds, not
+# check_plugin_natives.py. That tool looks for a carrier (librunanywhere_<id>)
+# with undefined ops symbols; the Android qhexrt build produces no such carrier,
+# so it printed "nothing to verify" and exited 0 -- a vacuous pass that would let
+# an engine-less Android build ship. Single-quoted so the pattern reaches grep
+# literally rather than being expanded here.
+expect_requires "android release asserts the QHexRT engine is routable" \
+    ".github/workflows/release.yml" 'grep -aFq "qhexrt:engine-available"'
+# The engine is useless without the runtime it dlopens, so the release must fetch
+# the pinned QAIRT redistributables and prove they pair with this engine.
+expect_requires "android release fetches the pinned QAIRT runtime" \
+    ".github/workflows/release.yml" "download-qairt-runtime.sh --platform arm64-v8a"
+expect_requires "android release checks the QAIRT/engine pairing" \
+    ".github/workflows/release.yml" "check_qairt_pairing.sh --platform arm64-v8a"
+expect_requires "electron win-arm64 fetches the pinned QAIRT runtime" \
+    ".github/workflows/electron-native-package.yml" "download-qairt-runtime.sh --platform win-arm64"
+
+# No consumer may point at a hand-staged payload by absolute path again.
+echo "== no hand-staged payload paths =="
+# Also covers QAIRT: RA_QNN_RUNTIME_DIR pointing at a literal Windows path is
+# exactly the C:\actions-runner-state\qhexrt-qnn-runtime-flat regression --
+# that directory carried no version info and had already gone stale once.
+HANDSTAGE_RE="QHEXRT_ROOT: *['\"][A-Za-z]:\\\\|NEURT_ROOT: *['\"]?[A-Za-z]:\\\\|QAIRT_ROOT: *['\"][A-Za-z]:\\\\|RA_QNN_RUNTIME_DIR: *['\"][A-Za-z]:\\\\|qhexrt-prebuilt\\\\versions|qairt-runtime\\\\(arm64-v8a|win-arm64)\\\\versions"
+if grep -rnE "$HANDSTAGE_RE" "${REPO_ROOT}/.github/workflows/" >/dev/null 2>&1; then
+    bad "a workflow pins an engine or QAIRT payload by absolute path; use the downloader"
+    grep -rnE "$HANDSTAGE_RE" "${REPO_ROOT}/.github/workflows/" | sed 's/^/         /' >&2
+else
+    ok "no workflow hardcodes an engine or QAIRT payload path"
+fi
+
+# ---- 3b. the headers the prebuilt was compiled against have not moved -------
+# This REPLACES cloning neurun and recompiling its adapters on every SDK PR.
+#
+# The receipt records the sdks commit whose headers the published archives were
+# compiled against. If the ABI surface has changed since then, those archives may
+# no longer match this repo -- and the ABI-version check cannot see it, because a
+# widened signature does not necessarily bump RAC_PLUGIN_API_VERSION. Comparing
+# the headers is a pure git operation: no private checkout, no compiler.
+echo "== ABI headers vs the prebuilt receipt =="
+ABI_HEADERS=(
+    core/include/rac/plugin/rac_engine_vtable.h
+    core/include/rac/plugin/rac_plugin_entry.h
+    core/include/rac/features/llm/rac_llm_service.h
+    core/include/rac/features/stt/rac_stt_service.h
+    core/include/rac/features/diffusion/rac_diffusion_types.h
+    core/include/rac/core/rac_error.h
+)
+# Check EVERY downloaded slice, not just the first: one stale slice among three is
+# exactly the drift this is for, and slices must agree on the commit they were
+# built against or they are not from one release.
+receipts=(); commits=()
+for s in "${NEURT_SLICES[@]}"; do
+    cand="${REPO_ROOT}/core/third_party/neurt/${s}/RECEIPT.json"
+    [[ -f "$cand" ]] && receipts+=("$cand")
+done
+if [[ ${#receipts[@]} -gt 0 ]]; then
+    for r in "${receipts[@]}"; do
+        c="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('sdks_commit',''))" "$r" 2>/dev/null || true)"
+        [[ -n "$c" ]] && commits+=("$c")
+    done
+fi
+# `grep` exits 1 on no match and `set -o pipefail` propagates that, so an empty
+# commit list aborted the whole gate with no message. Count without a pipeline.
+uniq_commits=0
+if [[ ${#commits[@]} -gt 0 ]]; then
+    uniq_commits="$(printf '%s\n' "${commits[@]}" | sort -u | wc -l | tr -d ' ')"
+fi
+if [[ "$uniq_commits" -gt 1 ]]; then
+    bad "downloaded slices disagree on sdks_commit; they are not from one release:"
+    printf '         %s\n' "${commits[@]}" >&2
+fi
+receipt="${receipts[0]:-}"
+if [[ -z "$receipt" ]]; then
+    note "SKIPPED: no downloaded receipt locally (run download-neurt.sh to enable)."
+else
+    built_at="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('sdks_commit',''))" "$receipt")"
+    if [[ -z "$built_at" || "$built_at" == "unknown" ]]; then
+        bad "the receipt records no sdks_commit; re-cut the neurun release"
+    elif ! git -C "$REPO_ROOT" cat-file -e "${built_at}^{commit}" 2>/dev/null; then
+        # A shallow CI checkout will not have it. Try to fetch just that commit.
+        git -C "$REPO_ROOT" fetch -q --depth=1 origin "$built_at" 2>/dev/null || true
+        if ! git -C "$REPO_ROOT" cat-file -e "${built_at}^{commit}" 2>/dev/null; then
+            note "SKIPPED: commit ${built_at:0:12} not available in this checkout."
+        fi
+    fi
+    if git -C "$REPO_ROOT" cat-file -e "${built_at}^{commit}" 2>/dev/null; then
+        drifted="$(git -C "$REPO_ROOT" diff --name-only "$built_at" -- "${ABI_HEADERS[@]}" 2>/dev/null || true)"
+        if [[ -n "$drifted" ]]; then
+            bad "ABI headers changed since the prebuilt was built (${built_at:0:12}):"
+            printf '         %s\n' $drifted >&2
+            note "Re-cut a neurun release so its adapters compile against these headers,"
+            note "then re-pin. The ABI-version check cannot catch this on its own: a"
+            note "widened signature need not bump RAC_PLUGIN_API_VERSION."
+        else
+            ok "ABI headers unchanged since ${built_at:0:12}"
+        fi
+    fi
+fi
+
+# ---- 4. the pinned release really has all of it -----------------------------
+echo "== pinned release contents =="
+TOKEN="${NEURUN_TOKEN:-${GH_TOKEN:-}}"
+if [[ "$OFFLINE" -eq 1 || -z "$TOKEN" ]]; then
+    note "SKIPPED (offline or no NEURUN_TOKEN): cannot verify the release itself."
+    note "Local pin checks above still ran."
+else
+    repo="${NEURUN_REPO:-RunanywhereAI/neurun}"
+    # Same precedence as scripts/build/download-qairt-runtime.sh -- if a future
+    # QAIRT_RUNTIME_REPO override ever points QAIRT at a different repo than the
+    # engine payloads, this gate must validate the same release the downloader
+    # actually fetches, not silently fall back to the engine repo.
+    qairt_repo="${QAIRT_RUNTIME_REPO:-${NEURUN_REPO:-RunanywhereAI/neurun}}"
+    # curl, not `gh`: a self-hosted runner may not have the CLI at all.
+    listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/${repo}/releases/tags/${NEURT_RELEASE_TAG}" \
+               | python3 -c "import json,sys
+rel=json.load(sys.stdin)
+for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
+    if [[ -z "$listing" ]]; then
+        bad "could not read release $NEURT_RELEASE_TAG from $repo"
+    else
+        nv="${NEURT_RELEASE_TAG#v}"
+        qv="${QHEXRT_RELEASE_TAG#v}"
+
+        # QHexRT has its OWN tag pin, so it needs its OWN release listing -- the line below
+        # used to build the right FILENAME from $qv and then grep for it in NeuRT's listing,
+        # which passes only while the two tags happen to be equal. v0.20.32 was the first
+        # release to diverge them (an Apple-only lane, exactly the case the per-engine tags
+        # exist for) and the gate reported the QHexRT assets missing from a release that was
+        # never supposed to carry them. Same shape as the QAIRT block below, which already
+        # fetched its own listing.
+        qhexrt_listing="$listing"
+        if [[ "$QHEXRT_RELEASE_TAG" != "$NEURT_RELEASE_TAG" ]]; then
+            qhexrt_listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
+                         -H "Accept: application/vnd.github+json" \
+                         "https://api.github.com/repos/${repo}/releases/tags/${QHEXRT_RELEASE_TAG}" \
+                       | python3 -c "import json,sys
+rel=json.load(sys.stdin)
+for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
+            [[ -n "$qhexrt_listing" ]] \
+                || bad "could not read release $QHEXRT_RELEASE_TAG from $repo"
+        fi
+
+        want=()
+        for s in "${NEURT_SLICES[@]}"; do want+=("neurt-${s}-v${nv}.tar.gz"); done
+        for w in "${want[@]}"; do
+            if ! grep -qx "$w" <<<"$listing"; then bad "release is missing $w"
+            elif ! grep -qx "${w}.sha256" <<<"$listing"; then bad "release is missing ${w}.sha256"
+            fi
+        done
+        qwant=()
+        for a in "${QHEXRT_ABIS[@]}"; do qwant+=("qhexrt-${a}-v${qv}.tar.gz"); done
+        for w in "${qwant[@]}"; do
+            if ! grep -qx "$w" <<<"$qhexrt_listing"; then
+                bad "release $QHEXRT_RELEASE_TAG is missing $w"
+            elif ! grep -qx "${w}.sha256" <<<"$qhexrt_listing"; then
+                bad "release $QHEXRT_RELEASE_TAG is missing ${w}.sha256"
+            fi
+        done
+        [[ $fail -eq 0 ]] && ok "releases carry all $(( (${#want[@]} + ${#qwant[@]}) * 2 )) expected files"
+
+        # QAIRT is on its OWN tag too -- the SDK version and the engine version
+        # move independently, so it is fetched from a separate release listing.
+        qairt_listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
+                     -H "Accept: application/vnd.github+json" \
+                     "https://api.github.com/repos/${qairt_repo}/releases/tags/${QAIRT_RUNTIME_RELEASE_TAG}" \
+                   | python3 -c "import json,sys
+rel=json.load(sys.stdin)
+for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
+        if [[ -z "$qairt_listing" ]]; then
+            bad "could not read release ${QAIRT_RUNTIME_RELEASE_TAG} from $qairt_repo"
+        else
+            qairt_want=()
+            for p in "${QAIRT_PLATFORMS[@]}"; do
+                qairt_want+=("qairt-runtime-${p}-v${QAIRT_RUNTIME_VERSION}.tar.gz")
+            done
+            qairt_fail_before=$fail
+            for w in "${qairt_want[@]}"; do
+                if ! grep -qx "$w" <<<"$qairt_listing"; then bad "QAIRT release is missing $w"
+                elif ! grep -qx "${w}.sha256" <<<"$qairt_listing"; then bad "QAIRT release is missing ${w}.sha256"
+                fi
+            done
+            [[ $fail -eq $qairt_fail_before ]] && ok "QAIRT release carries all $(( ${#qairt_want[@]} * 2 )) expected files"
+        fi
+
+        # The pin must equal the PUBLISHED checksum. A local rebuild produces
+        # different bytes, so a hand-copied pin can describe something that was
+        # never released -- exactly the drift this boundary exists to prevent.
+        tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+        for s in "${NEURT_SLICES[@]}"; do
+            var="NEURT_$(echo "$s" | tr 'a-z-' 'A-Z_')_SHA256"
+            if ! fetch_release_asset "$repo" "$NEURT_RELEASE_TAG" \
+                    "neurt-${s}-v${nv}.tar.gz.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
+                bad "could not download the published checksum for neurt-${s}"; continue
+            fi
+            pub="$(cut -d' ' -f1 < "$tmp/neurt-${s}-v${nv}.tar.gz.sha256")"
+            [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
+                                      || bad "$var=${!var} but the release publishes $pub"
+        done
+        for a in "${QHEXRT_ABIS[@]}"; do
+            var="QHEXRT_$(echo "$a" | tr 'a-z-' 'A-Z_')_SHA256"
+            qrepo="${NEURUN_REPO:-$repo}"
+            if ! fetch_release_asset "$qrepo" "$QHEXRT_RELEASE_TAG" \
+                    "qhexrt-${a}-v${qv}.tar.gz.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
+                bad "could not download the published checksum for qhexrt-${a}"; continue
+            fi
+            pub="$(cut -d' ' -f1 < "$tmp/qhexrt-${a}-v${qv}.tar.gz.sha256")"
+            [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
+                                      || bad "$var=${!var} but the release publishes $pub"
+        done
+        for p in "${QAIRT_PLATFORMS[@]}"; do
+            var="QAIRT_RUNTIME_$(echo "$p" | tr 'a-z-' 'A-Z_')_SHA256"
+            aname="qairt-runtime-${p}-v${QAIRT_RUNTIME_VERSION}.tar.gz"
+            if ! fetch_release_asset "$qairt_repo" "$QAIRT_RUNTIME_RELEASE_TAG" \
+                    "${aname}.sha256" "$tmp" "$TOKEN" python3 2>/dev/null; then
+                bad "could not download the published checksum for qairt-runtime-${p}"; continue
+            fi
+            pub="$(cut -d' ' -f1 < "$tmp/${aname}.sha256")"
+            [[ "$pub" == "${!var}" ]] && ok "$var matches the published asset" \
+                                      || bad "$var=${!var} but the release publishes $pub"
+        done
+    fi
+fi
+
+echo
+if [[ $fail -ne 0 ]]; then
+    echo "FAILED: the engine prebuilt boundary is not whole (see [FAIL] above)." >&2
+    exit 1
+fi
+echo "OK: engine prebuilt pins, consumers and release contents all agree."
