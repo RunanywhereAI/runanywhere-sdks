@@ -456,6 +456,18 @@ validate_public_remote_binary_contract() {
     local pkg component pkg_dir build_gradle binary_config podspec package_manifest
     local file relative expected_target expected_targets expected_count actual_count
     local actual_pubignore expected_pubignore podspec_version asset_version
+    # asset_version normally equals s.version, but check_release_version_coherence.sh
+    # (the authoritative release gate) sanctions one documented exception: when the
+    # canonical repo version leads the last published Apple archives, Package.swift
+    # carries an explicit "TEMP: pin to X until vY assets are published" marker and
+    # every podspec's asset_version pins to that same X. Recognize that exact,
+    # already-reviewed pin instead of unconditionally requiring equality -- a release
+    # that legitimately republishes non-iOS packages without cutting new iOS archives
+    # (0.20.20, 0.20.29) must not fail this check.
+    local spm_pin_version=""
+    if [ -f "$REPO_ROOT/Package.swift" ]; then
+        spm_pin_version="$(sed -nE 's/^let sdkVersion = "([^"]+)"$/\1/p' "$REPO_ROOT/Package.swift")"
+    fi
     for pkg in runanywhere runanywhere_llamacpp runanywhere_mlx runanywhere_onnx; do
         case "$pkg" in
             runanywhere)
@@ -527,7 +539,15 @@ validate_public_remote_binary_contract() {
         podspec_version="$(sed -nE "s/^[[:space:]]*s\.version[[:space:]]*=[[:space:]]*'([^']+)'$/\1/p" "$podspec")"
         asset_version="$(sed -nE "s/^[[:space:]]*asset_version[[:space:]]*=[[:space:]]*'([^']+)'$/\1/p" "$podspec")"
         [ -n "$podspec_version" ] || { echo "ERROR: $pkg podspec is missing s.version" >&2; exit 1; }
-        [ "$asset_version" = "$podspec_version" ] || { echo "ERROR: $pkg podspec asset_version must match s.version ($podspec_version)" >&2; exit 1; }
+        if [ "$asset_version" != "$podspec_version" ]; then
+            if [ -n "$spm_pin_version" ] && [ "$asset_version" = "$spm_pin_version" ] && \
+               grep -Fq "TEMP: pin to $spm_pin_version until the v$podspec_version GitHub release assets are published." "$REPO_ROOT/Package.swift"; then
+                :
+            else
+                echo "ERROR: $pkg podspec asset_version ($asset_version) must match s.version ($podspec_version), or the reviewed SwiftPM TEMP pin naming it" >&2
+                exit 1
+            fi
+        fi
         apple_archive_name_variable='$name'
         [ "$pkg" != "runanywhere_mlx" ] || apple_archive_name_variable='$asset_name'
         apple_archive_template="v#{asset_version}/${apple_archive_name_variable}-ios-v#{asset_version}.zip"

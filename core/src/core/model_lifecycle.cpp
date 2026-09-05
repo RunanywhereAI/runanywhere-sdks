@@ -115,6 +115,7 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
     model->diffusion_ops = nullptr;
     model->diarization_ops = nullptr;
     model->segmentation_ops = nullptr;
+    model->ocr_ops = nullptr;
 }
 
 // Cross-modality DSP eviction. A single Hexagon NPU cannot hold an LLM, a VLM,
@@ -346,6 +347,24 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 };
             }
             break;
+        case RAC_PRIMITIVE_OCR:
+            if (!vt->ocr_ops || !vt->ocr_ops->create) {
+                return RAC_ERROR_BACKEND_NOT_FOUND;
+            }
+            rc = vt->ocr_ops->create(resolved_path.c_str(), nullptr, &impl);
+            if (rc == RAC_SUCCESS && impl && vt->ocr_ops->initialize) {
+                rc = vt->ocr_ops->initialize(impl, resolved_path.c_str());
+            }
+            if (rc == RAC_SUCCESS && impl) {
+                auto* ops = vt->ocr_ops;
+                *out_destroy = [ops, impl]() {
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
+                };
+            }
+            break;
         default:
             return RAC_ERROR_UNSUPPORTED_MODALITY;
     }
@@ -391,6 +410,11 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 case RAC_PRIMITIVE_SEGMENT:
                     if (vt->segmentation_ops && vt->segmentation_ops->destroy) {
                         vt->segmentation_ops->destroy(impl);
+                    }
+                    break;
+                case RAC_PRIMITIVE_OCR:
+                    if (vt->ocr_ops && vt->ocr_ops->destroy) {
+                        vt->ocr_ops->destroy(impl);
                     }
                     break;
                 default:
@@ -1064,6 +1088,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->diarization_ops = vt->diarization_ops;
     } else if (primitive == RAC_PRIMITIVE_SEGMENT) {
         loaded->segmentation_ops = vt->segmentation_ops;
+    } else if (primitive == RAC_PRIMITIVE_OCR) {
+        loaded->ocr_ops = vt->ocr_ops;
     }
     loaded->impl = impl;
     // QHexRT reasoning templates may prefill `<think>` into the prompt

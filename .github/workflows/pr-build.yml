@@ -60,6 +60,12 @@ jobs:
         run: bash scripts/validation/gates/check_typescript_centralization.sh
       - name: WASM vendor provenance schema contract
         run: bash scripts/validation/gates/check_wasm_provenance_contract.sh
+      # Asserts the private-engine prebuilt boundary is whole: pins well-formed, the
+      # ABI pin equal to the header, and every consumer actually fetching a payload.
+      # Offline here -- the release-content half needs a token and runs at release time.
+      - name: Engine prebuilt pins and consumers
+        run: bash scripts/validation/gates/check_engine_prebuilt_pins.sh --offline
+
       - name: Release-train version coherence
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -127,7 +133,8 @@ jobs:
 
   macos-release:
     # Keep the release compile on the canonical Apple toolchain too. Metal is
-    # disabled in this preset; the dedicated rcli lane covers Metal separately.
+    # disabled in this preset (Apple GPU coverage lives in the C++ desktop kit
+    # and in RunanywhereAI/RCLI).
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
@@ -164,103 +171,61 @@ jobs:
       - run: cmake --build --preset linux-asan
       - run: ctest --preset linux-asan
 
-  rcli-macos:
-    # rcli desktop CLI — full-backend release build + modelless smoke.
-    # This is the one macOS lane that enables GGML_METAL, so it retains the
-    # older compatible runner while CPU-only native and SDK lanes use Xcode 26.
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v7
-      - run: brew install ninja protobuf
-      - run: cmake --preset rcli-macos-release
-      - run: cmake --build --preset rcli-macos-release
-      - name: Smoke (modelless)
-        run: |
-          set -euo pipefail
-          RCLI=build/rcli-macos-release/rcli/rcli
-          "$RCLI" version
-          BACKENDS="$("$RCLI" backends --json)"
-          echo "$BACKENDS"
-          # Release CLI must ship llama.cpp. MLX is linked (RCLI_HAS_MLX) but
-          # only registers once Swift callbacks are present (RunAnywhereMLXCLI).
-          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
-          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
-          "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
-          "$RCLI" info --json
-      - name: Package smoke
-        run: bash rcli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
-
-  rcli-linux:
-    # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev patchelf
-      - name: Sherpa-ONNX prebuilts
-        run: ./core/scripts/linux/download-sherpa-onnx.sh
-      - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON
-      - run: cmake --build --preset rcli-linux-release
-      - name: Unit tests
-        run: ctest --test-dir build/rcli-linux-release -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
-      - name: Smoke (modelless)
-        run: |
-          set -euo pipefail
-          RCLI=build/rcli-linux-release/rcli/rcli
-          "$RCLI" version
-          BACKENDS="$("$RCLI" backends --json)"
-          echo "$BACKENDS"
-          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
-          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
-          "$RCLI" info --json
-      - name: Package smoke
-        run: bash rcli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
-
-  rcli-windows:
-    # Windows is compiled and exercised on the native runner. MLX remains
-    # Apple-only; the portable CLI ships llama.cpp + Sherpa/ONNX on Windows.
+  windows-commons-release:
+    # PR-time coverage for core/scripts/build-windows.bat, i.e. exactly what
+    # release.yml's native_windows job ships as RACommons-windows-x64-v*.zip.
+    #
+    # WHY THIS JOB EXISTS: nothing in pr-build.yml ever ran that script, so it
+    # rotted invisibly. It configured core/ (a standalone project that never
+    # does add_subdirectory(engines)), so no engine target was ever created;
+    # its backend copies pointed at a pre-engine-split core/src/backends/ layout
+    # that no longer exists; and every copy was `if exist`-guarded, so all of
+    # them silently no-oped while the script exited 0. Result: the release
+    # bundle shipped commons-only with ZERO engines for multiple versions with
+    # CI fully green. Keep this job green and that cannot recur.
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: windows
-      - name: Install static libcurl
-        shell: pwsh
-        run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-mingw-static --host-triplet=x64-mingw-static
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
-      - name: Sherpa-ONNX prebuilts
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
         shell: cmd
         run: core\scripts\windows\download-sherpa-onnx.bat
-      - name: Configure
-        shell: pwsh
-        run: cmake --preset rcli-windows-release -DRAC_BUILD_TESTS=ON
-      - name: Build
-        shell: pwsh
-        run: cmake --build --preset rcli-windows-release
-      - name: Add native runtimes to PATH
-        shell: pwsh
+      - name: Build commons + all backends (windows-x64-shared-release preset)
+        working-directory: core
+        shell: cmd
+        run: scripts\build-windows.bat
+      # build-windows.bat already fails closed on a missing artifact; assert it
+      # again here so a regression in the script's own gate is also caught.
+      - name: Assert the full DLL set was staged
+        shell: bash
         run: |
-          $Onnx = Get-ChildItem build/rcli-windows-release -Filter onnxruntime.dll -File -Recurse |
-            Where-Object { $_.FullName -match 'onnxruntime-src[\\/]lib' } |
-            Select-Object -First 1
-          if (-not $Onnx) { throw "onnxruntime.dll not found" }
-          $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          "$env:GITHUB_WORKSPACE\core\third_party\sherpa-onnx-windows\lib" |
-            Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Unit tests
-        shell: pwsh
-        run: >-
-          ctest --test-dir build/rcli-windows-release
-          -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
-      - name: Package and smoke
-        shell: pwsh
-        run: >-
-          ./rcli/scripts/package-rcli-windows.ps1
-          -BuildDir build/rcli-windows-release
+          set -euo pipefail
+          lib=core/dist/windows/x64/lib
+          missing=0
+          for want in rac_commons.dll \
+              rac_backend_llamacpp.dll runanywhere_llamacpp.dll \
+              rac_backend_onnx.dll runanywhere_onnx.dll onnxruntime.dll \
+              rac_backend_sherpa.dll runanywhere_sherpa.dll sherpa-onnx-c-api.dll; do
+            if [ ! -f "$lib/$want" ]; then
+              echo "::error::missing $want in $lib"
+              missing=$((missing + 1))
+            fi
+          done
+          ls -la "$lib"
+          [ "$missing" -eq 0 ] || { echo "::error::$missing native(s) missing"; exit 1; }
+      # --allow-placeholder-staging-url: a PR build has no STAGING_BASE_URL by
+      # design (the secret is unavailable to fork PRs), so rac_commons.dll here
+      # necessarily carries the placeholder. Routability is still fully enforced,
+      # which is what this job is for. release.yml runs the SAME gate WITHOUT the
+      # flag, so a real release still cannot ship the placeholder.
+      - name: Verify Windows plugin natives are routable
+        shell: bash
+        run: |
+          python3 scripts/validation/gates/check_plugin_natives.py \
+            --allow-placeholder-staging-url core/dist/windows/x64/lib
 
   python-windows:
     # Builds the runanywhere-python wheel (pybind11 _core over the C ABI) via
@@ -332,89 +297,8 @@ jobs:
           Copy-Item tests -Destination $tmp -Recurse -Force
           python -m pytest $tmp\tests -q
 
-  python-linux:
-    # Linux sibling of python-windows: builds the runanywhere-python wheel via
-    # scikit-build-core, repairs it with auditwheel (vendors the onnxruntime/sherpa sidecar
-    # .so into runanywhere.libs/ and retags linux_x86_64 -> manylinux), installs it into a
-    # clean interpreter, and runs the hermetic suite. ubuntu-22.04 keeps the manylinux tag low
-    # (glibc 2.35) for a broadly-installable wheel.
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.9', '3.12']
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          platform: linux
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      # runanywhere/_proto, _generated_errors.py and _generated_defaults.py are
-      # IDL codegen output and are not tracked. `python -m build` runs them via
-      # the in-tree PEP 517 backend, but only when protoc + grpcio-tools are on
-      # the host; generating here makes that unconditional (the backend then
-      # finds the files present and skips). Without it the wheel builds,
-      # repairs, installs — and fails at `import runanywhere`.
-      - uses: ./.github/actions/generate-idl
-        with:
-          languages: python
-      # patchelf comes from PyPI, not apt. ubuntu-22.04 ships 0.14.3 and current
-      # auditwheel requires >= 0.14.5, so `auditwheel repair` died with
-      # "patchelf 0.14.3 found. auditwheel repair requires patchelf >= 0.14.5".
-      # Only 3.12 failed: 3.9 resolves an older auditwheel that still accepts
-      # 0.14.3, which is why this surfaced as one red cell rather than a red job.
-      # Both tools now come from the same resolver, so they cannot drift apart
-      # again the way an apt package and a pip package silently did.
-      - name: Build tools (patchelf is required by auditwheel)
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q ninja-build
-          python -m pip install --upgrade pip build auditwheel patchelf pytest
-          patchelf --version
-      - name: Sherpa-ONNX prebuilts
-        run: |
-          ./core/scripts/linux/download-sherpa-onnx.sh
-          # The prebuilt ships libonnxruntime.so, but _core/sherpa record a versioned
-          # DT_NEEDED (libonnxruntime.so.1); give auditwheel a matching filename to vendor.
-          lib="core/third_party/sherpa-onnx-linux/lib"
-          ln -sf libonnxruntime.so "$lib/libonnxruntime.so.1"
-      - name: Build wheel
-        working-directory: bindings/python
-        run: python -m build --wheel -o dist
-      - name: Repair wheel (vendor sidecar .so)
-        working-directory: bindings/python
-        run: |
-          # The sherpa prebuilt lib dir holds the version-matched libonnxruntime.so +
-          # libsherpa-onnx-c-api.so; on LD_LIBRARY_PATH auditwheel finds + vendors them.
-          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/core/third_party/sherpa-onnx-linux/lib:$LD_LIBRARY_PATH"
-          wheel="$(ls dist/*.whl | head -1)"
-          auditwheel repair -w wheelhouse "$wheel"
-      - name: Validate release boundary (no host paths, no binaries in sdist)
-        working-directory: bindings/python
-        run: |
-          python -m build --sdist -o wheelhouse
-          ver="$(tr -d '[:space:]' < ../../core/VERSION)"
-          python scripts/validate_public_packages.py --dist wheelhouse --expected-version "$ver"
-      - name: Install + hermetic tests
-        working-directory: bindings/python
-        run: |
-          wheel="$(ls wheelhouse/*.whl | head -1)"
-          # [server,test] pulls fastapi/uvicorn/multipart + httpx so tests/test_server.py runs
-          # (not skips); the gated native/model smoke tests still self-skip (no models).
-          python -m pip install "${wheel}[server,test]"
-          # Run the hermetic suite from a temp dir so `runanywhere` resolves to the installed
-          # wheel, not the source tree.
-          tmp="$RUNNER_TEMP/ratests"; mkdir -p "$tmp"
-          cp -r tests "$tmp/tests"
-          cd "$tmp" && python -m pytest tests -q
-
   python-macos:
-    # macOS sibling of python-linux: builds the wheel, repairs it with delocate (vendors the
+    # Builds the wheel, repairs it with delocate (vendors the
     # onnxruntime/sherpa dylibs into runanywhere/.dylibs), installs it, runs the hermetic suite.
     # Uses the macOS 26 / Xcode 26 runner line like the other SDK lanes (macos-debug/release):
     # setup-toolchain platform:macos pins Xcode 26.6, which only exists on macos-26 (macos-14
@@ -486,8 +370,7 @@ jobs:
 
   ios-device:
     # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
-    # Use the macOS 26 runner line for Xcode 26; only the Metal rcli lane keeps
-    # its explicit older-runner compatibility exception.
+    # Use the macOS 26 runner line for Xcode 26.
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
