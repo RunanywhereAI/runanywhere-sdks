@@ -396,10 +396,15 @@ bump_line "${REPO_ROOT}/bindings/web/packages/core/src/Foundation/Version.ts" \
     "export const SDK_VERSION = '${NEW_VERSION}'"
 
 # 4a. Electron SDK packages
-# The root manifest, the native addon, and the three thin backend packages all
+# The root manifest, the native addon, and the five thin backend packages all
 # publish as a fixed train, so every one of them has to move together. Before
 # 0.20.15 only the root was listed here and the other four stayed stranded on
-# 0.1.0, which is why none of them was ever part of a release.
+# 0.1.0, which is why none of them was ever part of a release. `neurt` was
+# added after this list was last touched (electron#734) and got missed the
+# same way — stayed on a stale version until release.yml's real Electron
+# packaging (this release) actually exercised `npm pack` against it and
+# failed on the filename mismatch. Add every new backend package here the
+# same day it's created, not after it silently drifts.
 echo ""
 echo ">> Electron SDK:"
 for pkg in \
@@ -408,7 +413,8 @@ for pkg in \
     "${REPO_ROOT}/bindings/electron/packages/llamacpp/package.json" \
     "${REPO_ROOT}/bindings/electron/packages/onnx/package.json" \
     "${REPO_ROOT}/bindings/electron/packages/qhexrt/package.json" \
-    "${REPO_ROOT}/bindings/electron/packages/sherpa/package.json"; do
+    "${REPO_ROOT}/bindings/electron/packages/sherpa/package.json" \
+    "${REPO_ROOT}/bindings/electron/packages/neurt/package.json"; do
     bump_json_version "$pkg"
     bump_npm_proto_ts_dep "$pkg"
 done

@@ -883,6 +883,20 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
         }
         out->batch_size = in.batch_size();
     }
+
+    switch (in.input_type()) {
+        case ::runanywhere::v1::EMBEDDINGS_INPUT_TYPE_UNSPECIFIED:
+            out->input_type = RAC_EMBEDDINGS_INPUT_TYPE_UNSPECIFIED;
+            break;
+        case ::runanywhere::v1::EMBEDDINGS_INPUT_TYPE_QUERY:
+            out->input_type = RAC_EMBEDDINGS_INPUT_TYPE_QUERY;
+            break;
+        case ::runanywhere::v1::EMBEDDINGS_INPUT_TYPE_DOCUMENT:
+            out->input_type = RAC_EMBEDDINGS_INPUT_TYPE_DOCUMENT;
+            break;
+        default:
+            return false;
+    }
     return true;
 }
 

@@ -246,9 +246,19 @@ qhx_runtime* runtime_acquire() {
             RAC_LOG_ERROR(LOG_CAT, "qhx_runtime_create failed (QNN libs unavailable?)");
             return nullptr;
         }
-        char arch[32] = {0};
-        qhx_runtime_device(g_rt, arch, sizeof(arch), nullptr, nullptr);
-        RAC_LOG_INFO(LOG_CAT, "QHexRT runtime up (arch=%s, %s)", arch, qhx_version());
+        // Do NOT query qhx_runtime_device() here for the log line: it forces the QNN HTP
+        // device (a live DSP session) into existence before any manifest is even read.
+        // A host_only plan (the Bonsai/Maple ternary decoder — QHexRT/src/hostop/qwen38_gen.cpp)
+        // has zero QNN graphs and instead opens its own raw FastRPC session directly
+        // (fastrpc_win.cpp / run_main_on_hexagon). On Windows the two contend for the same
+        // cDSP: with a QNN device already live, the FastRPC SET_PATH/GET_PATH session
+        // controls both return a non-zero rc and the subsequent remote_handle64_open for
+        // librun_main_on_hexagon_skel.so fails (0x80000406), surfacing as a bare
+        // HostOpFailed with the model otherwise loaded fine. session_open() below still
+        // queries the real arch via qhx_runtime_device() when it actually needs it (to
+        // pick the v75/v79/v81 manifest dir), which is the only place this call is load-
+        // bearing rather than cosmetic.
+        RAC_LOG_INFO(LOG_CAT, "QHexRT runtime up (%s)", qhx_version());
     }
     ++g_rt_refs;
     return g_rt;

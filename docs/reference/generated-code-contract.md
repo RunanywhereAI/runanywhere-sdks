@@ -11,7 +11,7 @@ until codegen runs. `./scripts/setup/setup.sh` runs it first for exactly that re
 
 | tree | who generates it | when |
 |---|---|---|
-| `core/src/generated/proto/` (76 files, ~336k lines) | `core/CMakeLists.txt`, at **configure** time when the files are absent | every `cmake --preset …`, i.e. all ~29 native CI runner instances, the Electron addon, the Python wheel, rcli and WASM |
+| `core/src/generated/proto/` (76 files, ~336k lines) | `core/CMakeLists.txt`, at **configure** time when the files are absent | every `cmake --preset …`, i.e. all ~29 native CI runner instances, the Electron addon, the Python wheel, the C++ desktop kit, and WASM |
 | `core/include/rac/rac_defaults_generated.h` | same block | same. A SHIPPED public header: `install(DIRECTORY include/)` puts it in the XCFramework `Headers/` and the Linux/Windows dist, and five shipped `rac_{llm,stt,tts,vad,vlm}_types.h` `#include` it — so it must exist before packaging, which configure time guarantees |
 | `bindings/kotlin/.../sdk/generated/` (373 files) | the `generateIdlKotlinBindings` Gradle task, wired into `preBuild` | every `assemble*` / `compile*Kotlin` / `test*` / ktlint / detekt, including JitPack |
 | `bindings/swift/Sources/RunAnywhere/Generated/` | `sync-dist-repo.sh` | ships in the SwiftPM tag |
@@ -20,10 +20,9 @@ until codegen runs. `./scripts/setup/setup.sh` runs it first for exactly that re
 | the two `RADefaultsPool.kt` under flutter/ and react-native/ | the same packaging scripts | ship inside the pub / npm packages |
 | `bindings/python/runanywhere/_proto/`, `_generated_{errors,defaults}.py` | the in-tree PEP 517 backend | ship in the sdist + wheel |
 
-Two CI jobs read generated C/C++ **without** configuring CMake and therefore carry an
+One CI job reads generated C/C++ **without** configuring CMake and therefore carries an
 explicit `generate-idl` step with `cpp`: `pr-build.rn-typecheck` (`-fsyntax-only` over
-`core/include`) and `release.native_rcli_macos` (`swift build` over the root
-`Package.swift`).
+`core/include`).
 
 `idl/codegen/generated_trees.txt` is the machine-readable version of that table, plus
 the eight hand-written files that live *inside* those trees and stay tracked (the
@@ -79,3 +78,19 @@ bumping `idl/VERSION` also fails.
 
 CI `idl-drift-check.yml` is **generate, then verify** — not "regenerate and diff", which
 cannot fail for an ignored file.
+
+## Downstream kits (RCLI)
+
+The C++ desktop kit (`package-cpp-desktop`) is how a second repo stays on this
+schema without running `protoc`:
+
+1. `idl/*.proto` is the only schema.
+2. Commons compiles it **once**; `.pb.cc` lives inside `librac_commons.a`.
+3. The kit ships the matching `include/runanywhere/proto/*.pb.h`, vendored
+   protobuf/absl headers, and a copy of `idl/SCHEMA_LOCK`.
+4. RCLI `find_package(RunAnywhere)` consumes those headers and pins
+   `IDL_SCHEMA_SHA256` in `cmake/sdk-pin.cmake`. A kit whose lock does not
+   match is a configure error.
+
+Do not add a second codegen path in RCLI. When the schema moves, cut a new
+SDK kit and bump the RCLI pin.
