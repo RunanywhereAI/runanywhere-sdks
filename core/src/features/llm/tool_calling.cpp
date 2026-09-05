@@ -334,6 +334,18 @@ static size_t skip_whitespace(const char* str, size_t pos, size_t len) {
 
 enum class ToolParseStatus { kNoMatch, kSuccess, kOutOfMemory };
 
+struct OwnedToolParseResult {
+    char* tool_name = nullptr;
+    char* arguments_json = nullptr;
+    char* clean_text = nullptr;
+
+    ~OwnedToolParseResult() {
+        std::free(tool_name);
+        std::free(arguments_json);
+        std::free(clean_text);
+    }
+};
+
 /**
  * @brief Extract a JSON string value starting at the given position (must be after opening quote)
  *
@@ -1693,34 +1705,33 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     size_t output_len = strlen(llm_output);
 
     // Parse using the appropriate format parser
-    char* tool_name = nullptr;
-    char* args_json = nullptr;
-    char* clean_text = nullptr;
+    OwnedToolParseResult parsed;
     ToolParseStatus parse_status = ToolParseStatus::kNoMatch;
 
     try {
         switch (format) {
             case RAC_TOOL_FORMAT_DEFAULT:
-                parse_status =
-                    parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+                parse_status = parse_default_format(llm_output, &parsed.tool_name,
+                                                    &parsed.arguments_json, &parsed.clean_text);
                 break;
 
             case RAC_TOOL_FORMAT_LFM2:
-                parse_status = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
+                parse_status = parse_lfm2_format(llm_output, &parsed.tool_name,
+                                                &parsed.arguments_json, &parsed.clean_text);
                 // Small LFM2 models often ignore the <|tool_call_start|> dialect and emit the
                 // more common JSON <tool_call> envelope instead. parse_lfm2_format nulls its
                 // outputs and bails without allocating when the LFM2 tag is absent, so a
                 // fall-through to the default parser recovers a well-formed call in that shape
                 // rather than silently dropping it.
                 if (parse_status == ToolParseStatus::kNoMatch) {
-                    parse_status =
-                        parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+                    parse_status = parse_default_format(
+                        llm_output, &parsed.tool_name, &parsed.arguments_json, &parsed.clean_text);
                 }
                 break;
 
             case RAC_TOOL_FORMAT_PYTHONIC:
-                parse_status =
-                    parse_pythonic_format(llm_output, &tool_name, &args_json, &clean_text);
+                parse_status = parse_pythonic_format(llm_output, &parsed.tool_name,
+                                                     &parsed.arguments_json, &parsed.clean_text);
                 break;
 
             default:
@@ -1728,46 +1739,30 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
                 break;
         }
     } catch (const std::bad_alloc&) {
-        free(tool_name);
-        free(args_json);
-        free(clean_text);
         return RAC_ERROR_OUT_OF_MEMORY;
     } catch (...) {
-        free(tool_name);
-        free(args_json);
-        free(clean_text);
         return RAC_ERROR_INTERNAL;
     }
 
     if (parse_status == ToolParseStatus::kOutOfMemory) {
-        free(tool_name);
-        free(args_json);
-        free(clean_text);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    if (parse_status == ToolParseStatus::kSuccess && tool_name && args_json && clean_text) {
+    if (parse_status == ToolParseStatus::kSuccess && parsed.tool_name && parsed.arguments_json &&
+        parsed.clean_text) {
         out_result->has_tool_call = RAC_TRUE;
-        out_result->tool_name = tool_name;
-        out_result->arguments_json = args_json;
-        out_result->clean_text = clean_text;
+        out_result->tool_name = parsed.tool_name;
+        out_result->arguments_json = parsed.arguments_json;
+        out_result->clean_text = parsed.clean_text;
+        parsed.tool_name = nullptr;
+        parsed.arguments_json = nullptr;
+        parsed.clean_text = nullptr;
         out_result->format = format;
         out_result->call_id = next_tool_call_id();
     } else {
         if (parse_status == ToolParseStatus::kSuccess) {
-            free(tool_name);
-            free(args_json);
-            free(clean_text);
             return RAC_ERROR_OUT_OF_MEMORY;
         }
-
-        // Parsing failed - clean up any partial results
-        if (tool_name)
-            free(tool_name);
-        if (args_json)
-            free(args_json);
-        if (clean_text)
-            free(clean_text);
 
         // Return original text as clean_text
         out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
