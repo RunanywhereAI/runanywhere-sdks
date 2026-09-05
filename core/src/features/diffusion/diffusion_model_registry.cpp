@@ -386,10 +386,12 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
 }
 
 rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
-                                               size_t* out_count) {
+                                               size_t* out_count) try {
     if (!out_models || !out_count) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_models = nullptr;
+    *out_count = 0;
 
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
@@ -403,8 +405,18 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
                 rac_diffusion_model_def_t* models = nullptr;
                 size_t count = 0;
 
-                rac_result_t list_result =
-                    strategy.list_models(&models, &count, strategy.user_data);
+                rac_result_t list_result;
+                try {
+                    list_result = strategy.list_models(&models, &count, strategy.user_data);
+                } catch (const std::bad_alloc&) {
+                    std::free(models);
+                    return RAC_ERROR_OUT_OF_MEMORY;
+                } catch (...) {
+                    std::free(models);
+                    RAC_LOG_ERROR(LOG_CAT, "Strategy '%s' threw while listing models",
+                                  strategy.name);
+                    return RAC_ERROR_INTERNAL;
+                }
                 std::unique_ptr<rac_diffusion_model_def_t[], decltype(&std::free)> models_owner(
                     models, &std::free);
 
@@ -426,11 +438,12 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
         }
     } catch (const std::bad_alloc&) {
         return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        RAC_LOG_ERROR(LOG_CAT, "Unexpected exception while aggregating model definitions");
+        return RAC_ERROR_INTERNAL;
     }
 
     if (all_models.empty()) {
-        *out_models = nullptr;
-        *out_count = 0;
         return RAC_SUCCESS;
     }
 
@@ -451,6 +464,23 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
     *out_models = result;
     *out_count = all_models.size();
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    if (out_models) {
+        *out_models = nullptr;
+    }
+    if (out_count) {
+        *out_count = 0;
+    }
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    if (out_models) {
+        *out_models = nullptr;
+    }
+    if (out_count) {
+        *out_count = 0;
+    }
+    RAC_LOG_ERROR(LOG_CAT, "Unexpected exception while listing model definitions");
+    return RAC_ERROR_INTERNAL;
 }
 
 rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {

@@ -297,7 +297,8 @@ RAC_API rac_result_t rac_diffusion_model_registry_get(const char* model_id,
  * @param out_models Output array (caller must free with free())
  * @param out_count Number of models
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if an argument is null, or
- *         RAC_ERROR_OUT_OF_MEMORY if aggregation or output allocation fails. Strategies that
+ *         RAC_ERROR_OUT_OF_MEMORY if aggregation or output allocation fails, or
+ *         RAC_ERROR_INTERNAL if a strategy throws an unexpected exception. Strategies that
  *         report RAC_ERROR_NOT_FOUND are skipped; any other strategy error is returned as-is.
  */
 RAC_API rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
