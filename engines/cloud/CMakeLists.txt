@@ -33,7 +33,7 @@ endif()
 
 message(STATUS "Configuring cloud backend...")
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 

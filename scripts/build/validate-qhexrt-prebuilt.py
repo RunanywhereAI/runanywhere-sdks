@@ -16,8 +16,17 @@ from pathlib import Path, PurePosixPath
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _selection  # noqa: E402  (path set above so this works when run directly)
+
 
 ABSENT = 3
+# neurun names the MSVC/Windows-on-ARM ABI dir "win-arm64" (see its
+# QHexRT/tools/scripts/qhexrt_build_receipt.py WIN_ARM64_ABI). Receipts for it
+# differ from Android in four ways, all handled below: no `ndk` key, a Windows
+# cmake_system, a coff_reader instead of llvm_ar/llvm_readelf, and .lib names.
+WIN_ARM64_ABI = "win-arm64"
+
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -42,7 +51,7 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
     if prebuilt.exists() and not prebuilt.is_dir():
         raise RuntimeError(f"QHexRT prebuilt root must be a directory: {prebuilt}")
     current = prebuilt / "current"
-    if not current.exists() and not current.is_symlink():
+    if not current.exists() and not _selection.is_selection(current):
         legacy = [prebuilt / "include", prebuilt / "lib", prebuilt / "qhexrt-prebuilt.json"]
         if any(path.exists() or path.is_symlink() for path in legacy):
             raise RuntimeError(
@@ -52,18 +61,25 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
         # Immutable versions without `current` are retained history, not a
         # selected build input; public/stub mode is intentional.
         return None
-    if not current.is_symlink():
-        raise RuntimeError(f"QHexRT prebuilt/current must be an atomic symlink: {current}")
-    raw_target = os.readlink(current)
+    # Windows selects with a junction, not a symlink -- the runner service
+    # account cannot create symlinks. See scripts/build/_selection.py.
+    if not _selection.is_selection(current):
+        raise RuntimeError(
+            f"QHexRT prebuilt/current must be an atomic {_selection.describe_kind()}: {current}"
+        )
+    raw_target = _selection.read_target(prebuilt, current)
     target_parts = PurePosixPath(raw_target).parts
     if (
         len(target_parts) != 2
         or target_parts[0] != "versions"
         or not SHA256.fullmatch(target_parts[1])
     ):
-        raise RuntimeError("QHexRT prebuilt/current must directly name versions/<64-hex-receipt>")
+        raise RuntimeError(
+            f"QHexRT prebuilt/current must directly name versions/<64-hex-receipt> "
+            f"(got {raw_target!r})"
+        )
     selected_entry = prebuilt / raw_target
-    if selected_entry.is_symlink():
+    if _selection.is_selection(selected_entry):
         raise RuntimeError("QHexRT selected immutable version must not be a symlink")
     try:
         selected = current.resolve(strict=True)
@@ -139,10 +155,17 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
     ):
         raise RuntimeError("QHexRT current selection has an invalid source identity")
     build = manifest.get("build")
+    # win-arm64 is an MSVC host build: no NDK is involved, so the receipt
+    # legitimately omits that key. Keeping `ndk` unconditional here made this
+    # validator reject every valid Windows tree — latent because its only
+    # caller (build-core-android.sh) is gated on arm64-v8a.
+    _is_win = abi == WIN_ARM64_ABI
     expected_build_keys = {
         "android_abi", "build_type", "cmake_cache_sha256", "cmake_system",
-        "compiler", "ndk", "qnn_sdk", "archive_evidence",
+        "compiler", "qnn_sdk", "archive_evidence",
     }
+    if not _is_win:
+        expected_build_keys.add("ndk")
     if not isinstance(build, dict) or set(build) != expected_build_keys:
         raise RuntimeError("QHexRT current selection has an invalid build identity")
     if build.get("android_abi") != abi or not isinstance(build.get("build_type"), str):
@@ -163,11 +186,15 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
     system = build.get("cmake_system")
     if not isinstance(system, dict) or set(system) != {
         "name", "processor", "crosscompiling", "state_file_sha256"
-    } or system.get("name") != "Android" or system.get("processor") not in {"aarch64", "arm64"}:
-        raise RuntimeError("QHexRT current selection has an invalid Android system identity")
+    } or system.get("name") != ("Windows" if _is_win else "Android") \
+         or (system.get("processor") or "").lower() not in ({"arm64", "aarch64"} if _is_win
+                                                            else {"aarch64", "arm64"}):
+        raise RuntimeError(
+            f"QHexRT current selection has an invalid "
+            f"{'Windows' if _is_win else 'Android'} system identity")
     if not isinstance(system.get("state_file_sha256"), str) or not SHA256.fullmatch(system["state_file_sha256"]):
         raise RuntimeError("QHexRT current selection has invalid CMake system-state digest")
-    for key in ("ndk", "qnn_sdk"):
+    for key in (("qnn_sdk",) if _is_win else ("ndk", "qnn_sdk")):
         identity = build.get(key)
         if not isinstance(identity, dict) or set(identity) != {"metadata_file", "metadata_sha256"}:
             raise RuntimeError(f"QHexRT current selection has invalid {key} identity")
@@ -183,11 +210,11 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
         if not isinstance(identity.get("metadata_sha256"), str) or not SHA256.fullmatch(identity["metadata_sha256"]):
             raise RuntimeError(f"QHexRT current selection has invalid {key} digest")
     archive = build.get("archive_evidence")
-    if not isinstance(archive, dict) or set(archive) != {
-        "llvm_ar_sha256", "llvm_readelf_sha256", "core", "host"
-    }:
+    _expected_archive = ({"coff_reader", "core", "host"} if _is_win
+                         else {"llvm_ar_sha256", "llvm_readelf_sha256", "core", "host"})
+    if not isinstance(archive, dict) or set(archive) != _expected_archive:
         raise RuntimeError("QHexRT current selection has invalid archive evidence")
-    for key in ("llvm_ar_sha256", "llvm_readelf_sha256"):
+    for key in (() if _is_win else ("llvm_ar_sha256", "llvm_readelf_sha256")):
         if not isinstance(archive.get(key), str) or not SHA256.fullmatch(archive[key]):
             raise RuntimeError(f"QHexRT current selection has invalid archive-tool digest {key}")
     for key in ("core", "host"):
@@ -203,8 +230,8 @@ def validate(prebuilt: Path, abi: str) -> Path | None:
 
     expected = {
         "include/qhexrt/qhexrt_c.h",
-        f"lib/{abi}/libqhexrt_core.a",
-        f"lib/{abi}/libqhexrt_host.a",
+        f"lib/{abi}/qhexrt_core.lib" if _is_win else f"lib/{abi}/libqhexrt_core.a",
+        f"lib/{abi}/qhexrt_host.lib" if _is_win else f"lib/{abi}/libqhexrt_host.a",
     }
     files = manifest.get("files")
     if not isinstance(files, dict) or set(files) != expected:

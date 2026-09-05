@@ -83,7 +83,7 @@ auto-seeded, though: an unknown id is rejected before generation, so the one
 `models.register` call in `bootstrap` (in `MainActivity.onCreate`) is required. To
 try a different model, change `MODEL_ID`/`MODEL_URL` at the top of
 `app/src/main/java/com/runanywhere/minimal/MainActivity.kt` (the canonical ids and
-URLs live in `rcli/src/catalog/catalog.cpp` at the repo root).
+URLs live in the [RCLI](https://github.com/RunanywhereAI/RCLI) catalog (`src/catalog/catalog.cpp`).
 
 ## Source layout
 

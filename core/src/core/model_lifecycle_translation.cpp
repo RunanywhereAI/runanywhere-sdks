@@ -49,14 +49,22 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
     return rac::proto::copy_message(message, out, "failed to serialize proto result");
 }
 
-// NOTE on MODEL_CATEGORY coverage: `ModelCategory` (idl/model_types.proto)
-// has NO `MODEL_CATEGORY_RERANK` member by design — rerank models are routed
-// straight to `SDK_COMPONENT_RERANK` / `RAC_PRIMITIVE_RERANK` via the
-// dedicated rerank service factory, never through this category->component
-// mapping. So `rac_model_lifecycle_load_proto` (which resolves the component
-// from `ModelLoadRequest.category`) structurally cannot load a rerank model;
-// that is expected, not a missing `case`. Do not add a rerank arm here
-// without first adding the category to the IDL.
+// NOTE on MODEL_CATEGORY coverage: this switch is deliberately NOT exhaustive.
+// `MODEL_CATEGORY_RERANK` has no arm because there is no rerank COMPONENT — a
+// rerank model is created straight from a path by `rac_rerank_create`, so
+// `rac_model_lifecycle_load_proto` (which resolves a component from
+// `ModelLoadRequest.category`) structurally cannot load one. That is expected,
+// not a missing `case`; do not add an arm without a component layer behind it,
+// or a clean UNSPECIFIED becomes a component that resolves to nothing.
+//
+// OCR is the counter-example, and the reason this note is worth reading: it
+// started in that same shape and it was WRONG for it to stay there. Every
+// platform SDK reaches a modality through the lifecycle proto ABI, so a
+// modality with no component is a modality no SDK can call — reachable from C
+// and from nothing else. OCR therefore has the full stack (SDK_COMPONENT_OCR,
+// ocr_ops on LoadedModel, acquire_lifecycle_ocr, ocr_module.cpp) and belongs in
+// this switch. `rac_ocr_create` taking a path does not distinguish it;
+// `rac_segmentation_create` takes a path too.
 runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCategory category) {
     switch (category) {
         case runanywhere::v1::MODEL_CATEGORY_LANGUAGE:
@@ -79,6 +87,8 @@ runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCateg
             return runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION;
         case runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION;
+        case runanywhere::v1::MODEL_CATEGORY_OCR:
+            return runanywhere::v1::SDK_COMPONENT_OCR;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -190,6 +200,8 @@ rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component)
             return RAC_PRIMITIVE_DIARIZE;
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION:
             return RAC_PRIMITIVE_SEGMENT;
+        case runanywhere::v1::SDK_COMPONENT_OCR:
+            return RAC_PRIMITIVE_OCR;
         case runanywhere::v1::SDK_COMPONENT_RERANK:
             return RAC_PRIMITIVE_RERANK;
         default:
@@ -221,6 +233,8 @@ rac_model_category_t c_category_from_proto(runanywhere::v1::ModelCategory catego
             return RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION;
         case runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+        case runanywhere::v1::MODEL_CATEGORY_OCR:
+            return RAC_MODEL_CATEGORY_OCR;
         case runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED:
         default:
             return RAC_MODEL_CATEGORY_UNKNOWN;
