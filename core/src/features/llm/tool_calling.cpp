@@ -23,6 +23,7 @@
 #include <cstring>
 #include <ctime>
 #include <limits>
+#include <new>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <utility>
@@ -1697,33 +1698,45 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     char* clean_text = nullptr;
     ToolParseStatus parse_status = ToolParseStatus::kNoMatch;
 
-    switch (format) {
-        case RAC_TOOL_FORMAT_DEFAULT:
-            parse_status =
-                parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
-            break;
-
-        case RAC_TOOL_FORMAT_LFM2:
-            parse_status = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
-            // Small LFM2 models often ignore the <|tool_call_start|> dialect and emit the
-            // more common JSON <tool_call> envelope instead. parse_lfm2_format nulls its
-            // outputs and bails without allocating when the LFM2 tag is absent, so a
-            // fall-through to the default parser recovers a well-formed call in that shape
-            // rather than silently dropping it.
-            if (parse_status == ToolParseStatus::kNoMatch) {
+    try {
+        switch (format) {
+            case RAC_TOOL_FORMAT_DEFAULT:
                 parse_status =
                     parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
-            }
-            break;
+                break;
 
-        case RAC_TOOL_FORMAT_PYTHONIC:
-            parse_status =
-                parse_pythonic_format(llm_output, &tool_name, &args_json, &clean_text);
-            break;
+            case RAC_TOOL_FORMAT_LFM2:
+                parse_status = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
+                // Small LFM2 models often ignore the <|tool_call_start|> dialect and emit the
+                // more common JSON <tool_call> envelope instead. parse_lfm2_format nulls its
+                // outputs and bails without allocating when the LFM2 tag is absent, so a
+                // fall-through to the default parser recovers a well-formed call in that shape
+                // rather than silently dropping it.
+                if (parse_status == ToolParseStatus::kNoMatch) {
+                    parse_status =
+                        parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+                }
+                break;
 
-        default:
-            parse_status = ToolParseStatus::kNoMatch;
-            break;
+            case RAC_TOOL_FORMAT_PYTHONIC:
+                parse_status =
+                    parse_pythonic_format(llm_output, &tool_name, &args_json, &clean_text);
+                break;
+
+            default:
+                parse_status = ToolParseStatus::kNoMatch;
+                break;
+        }
+    } catch (const std::bad_alloc&) {
+        free(tool_name);
+        free(args_json);
+        free(clean_text);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        free(tool_name);
+        free(args_json);
+        free(clean_text);
+        return RAC_ERROR_INTERNAL;
     }
 
     if (parse_status == ToolParseStatus::kOutOfMemory) {
@@ -3241,10 +3254,11 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
 extern "C" rac_result_t
 rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
                                         size_t num_definitions, rac_tool_call_format_t format,
-                                        char** out_prompt) {
+                                        char** out_prompt) try {
     if (!out_prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_prompt = nullptr;
 
     if (!definitions || num_definitions == 0) {
         *out_prompt = static_cast<char*>(malloc(1));
@@ -3304,14 +3318,19 @@ rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions
     memcpy(*out_prompt, prompt.c_str(), prompt.size() + 1);
 
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    return RAC_ERROR_INTERNAL;
 }
 
 extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
                                                                      rac_tool_call_format_t format,
-                                                                     char** out_prompt) {
+                                                                     char** out_prompt) try {
     if (!out_prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_prompt = nullptr;
 
     if (!tools_json || strlen(tools_json) == 0 || strcmp(tools_json, "[]") == 0) {
         *out_prompt = static_cast<char*>(malloc(1));
@@ -3372,6 +3391,10 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     memcpy(*out_prompt, prompt.c_str(), prompt.size() + 1);
 
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    return RAC_ERROR_INTERNAL;
 }
 
 // =============================================================================
@@ -3616,10 +3639,12 @@ rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char
 // =============================================================================
 
 extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
-                                                          size_t num_definitions, char** out_json) {
+                                                          size_t num_definitions,
+                                                          char** out_json) try {
     if (!out_json) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_json = nullptr;
 
     if (!definitions || num_definitions == 0) {
         *out_json = static_cast<char*>(malloc(3));
@@ -3704,6 +3729,10 @@ extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definit
     memcpy(*out_json, json.c_str(), json.size() + 1);
 
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    return RAC_ERROR_INTERNAL;
 }
 
 extern "C" rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t success,
