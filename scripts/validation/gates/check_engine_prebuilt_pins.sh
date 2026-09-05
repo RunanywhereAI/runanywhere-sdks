@@ -245,17 +245,43 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
     else
         nv="${NEURT_RELEASE_TAG#v}"
         qv="${QHEXRT_RELEASE_TAG#v}"
+
+        # QHexRT has its OWN tag pin, so it needs its OWN release listing -- the line below
+        # used to build the right FILENAME from $qv and then grep for it in NeuRT's listing,
+        # which passes only while the two tags happen to be equal. v0.20.32 was the first
+        # release to diverge them (an Apple-only lane, exactly the case the per-engine tags
+        # exist for) and the gate reported the QHexRT assets missing from a release that was
+        # never supposed to carry them. Same shape as the QAIRT block below, which already
+        # fetched its own listing.
+        qhexrt_listing="$listing"
+        if [[ "$QHEXRT_RELEASE_TAG" != "$NEURT_RELEASE_TAG" ]]; then
+            qhexrt_listing="$(curl -sSL -H "Authorization: Bearer ${TOKEN}" \
+                         -H "Accept: application/vnd.github+json" \
+                         "https://api.github.com/repos/${repo}/releases/tags/${QHEXRT_RELEASE_TAG}" \
+                       | python3 -c "import json,sys
+rel=json.load(sys.stdin)
+for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
+            [[ -n "$qhexrt_listing" ]] \
+                || bad "could not read release $QHEXRT_RELEASE_TAG from $repo"
+        fi
+
         want=()
         for s in "${NEURT_SLICES[@]}"; do want+=("neurt-${s}-v${nv}.tar.gz"); done
-        # QHexRT has its OWN repo and tag pins; reusing NeuRT's would check the
-        # wrong release the moment the two diverge.
-        for a in "${QHEXRT_ABIS[@]}"; do want+=("qhexrt-${a}-v${qv}.tar.gz"); done
         for w in "${want[@]}"; do
             if ! grep -qx "$w" <<<"$listing"; then bad "release is missing $w"
             elif ! grep -qx "${w}.sha256" <<<"$listing"; then bad "release is missing ${w}.sha256"
             fi
         done
-        [[ $fail -eq 0 ]] && ok "release carries all $(( ${#want[@]} * 2 )) expected files"
+        qwant=()
+        for a in "${QHEXRT_ABIS[@]}"; do qwant+=("qhexrt-${a}-v${qv}.tar.gz"); done
+        for w in "${qwant[@]}"; do
+            if ! grep -qx "$w" <<<"$qhexrt_listing"; then
+                bad "release $QHEXRT_RELEASE_TAG is missing $w"
+            elif ! grep -qx "${w}.sha256" <<<"$qhexrt_listing"; then
+                bad "release $QHEXRT_RELEASE_TAG is missing ${w}.sha256"
+            fi
+        done
+        [[ $fail -eq 0 ]] && ok "releases carry all $(( (${#want[@]} + ${#qwant[@]}) * 2 )) expected files"
 
         # QAIRT is on its OWN tag too -- the SDK version and the engine version
         # move independently, so it is fetched from a separate release listing.

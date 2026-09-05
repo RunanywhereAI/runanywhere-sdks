@@ -20,7 +20,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_llamacpp'
-  s.version          = '0.20.31'
+  s.version          = '0.20.36'
   # iOS archives are downloaded from the v#{asset_version} GitHub release.
   # Normally identical to s.version, and a literal on purpose:
   # scripts/release/sync-versions.sh rewrites it and
@@ -28,7 +28,7 @@ Pod::Spec.new do |s|
   # diverges when a version republishes non-iOS packages without cutting iOS
   # archives (0.20.20 did that) -- then pin the last
   # release that has them.
-  asset_version      = '0.20.31'
+  asset_version      = '0.20.36'
   s.summary          = 'RunAnywhere LlamaCPP: LLM text generation for Flutter'
   s.description      = <<-DESC
 LlamaCPP backend for RunAnywhere Flutter SDK. Provides LLM text generation

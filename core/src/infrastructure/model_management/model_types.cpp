@@ -153,6 +153,10 @@ rac_inference_framework_t rac_model_category_default_framework(rac_model_categor
         case RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION:
         case RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return RAC_FRAMEWORK_ONNX;
+        case RAC_MODEL_CATEGORY_OCR:
+            // Matches rac_ocr_service.cpp's own default_framework: the only
+            // engine that fills `ocr_ops` today is NeuRT, via Core ML.
+            return RAC_FRAMEWORK_COREML;
         default:
             return RAC_FRAMEWORK_UNKNOWN;
     }
@@ -267,6 +271,10 @@ rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
         case RAC_FRAMEWORK_MLX:
+        // Core ML text generation runs on the Apple Neural Engine through the neurt
+        // engine's llm_ops. Omitting it here made every generic capability query claim
+        // a shipped, device-validated ANE LLM could not generate text.
+        case RAC_FRAMEWORK_COREML:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -279,6 +287,10 @@ rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
         case RAC_FRAMEWORK_MLX:
+        // Core ML speech-to-text is served by the neurt engine's stt_ops, which drives
+        // four published bundle shapes (Parakeet TDT/RNNT, Whisper/Moonshine attention
+        // decoders, Parakeet CTC).
+        case RAC_FRAMEWORK_COREML:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -292,6 +304,11 @@ rac_bool_t rac_framework_supports_tts(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
         case RAC_FRAMEWORK_MLX:
+        // COREML is NeuRT, whose tts_ops slot is filled as of this release (Kokoro-82M across
+        // three graphs and two host seams). Deliberately NOT added when the other CoreML
+        // predicates were: the slot was still null then, and claiming a capability the engine
+        // does not serve routes a model to an engine that refuses it.
+        case RAC_FRAMEWORK_COREML:
             return RAC_TRUE;
         default:
             return RAC_FALSE;

@@ -174,10 +174,26 @@ int main() {
     std::fprintf(stdout, "test_rerank\n");
 
     // (1) ABI + primitive naming.
-    check(RAC_PLUGIN_API_VERSION == 9u, "RAC_PLUGIN_API_VERSION must be 9");
+    //
+    // The version pin is deliberately exact rather than `>=`: it is a tripwire, and it fired
+    // correctly when ABI v10 promoted reserved_slot_3 to image_embedding_ops. Bumping it is the
+    // right response ONLY once the WIRE VALUE below has been re-verified — that is the assertion
+    // that actually protects rerank, because a promotion which shifted wire 11 would reroute every
+    // rerank call silently. v10 promoted a RESERVED slot and left rerank's offset and wire value
+    // untouched (locked by test_engine_vtable.cpp's 17-pointer tail assertion).
+    check(RAC_PLUGIN_API_VERSION == 11u, "RAC_PLUGIN_API_VERSION must be 11");
     check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_RERANK), "rerank") == 0,
           "rac_primitive_name(RAC_PRIMITIVE_RERANK) == \"rerank\"");
     check(static_cast<int>(RAC_PRIMITIVE_RERANK) == 11, "RAC_PRIMITIVE_RERANK wire value is 11");
+    // The v10 addition, asserted here too so a future promotion cannot quietly take its number.
+    check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_EMBED_IMAGE), "embed_image") == 0,
+          "rac_primitive_name(RAC_PRIMITIVE_EMBED_IMAGE) == \"embed_image\"");
+    check(static_cast<int>(RAC_PRIMITIVE_EMBED_IMAGE) == 12,
+          "RAC_PRIMITIVE_EMBED_IMAGE wire value is 12");
+    // The v11 addition (reserved_slot_4 -> ocr_ops), asserted for the same reason.
+    check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_OCR), "ocr") == 0,
+          "rac_primitive_name(RAC_PRIMITIVE_OCR) == \"ocr\"");
+    check(static_cast<int>(RAC_PRIMITIVE_OCR) == 13, "RAC_PRIMITIVE_OCR wire value is 13");
 
     // (2) No backend registered yet → create fails gracefully, no route.
     check(rac_plugin_find(RAC_PRIMITIVE_RERANK) == nullptr,

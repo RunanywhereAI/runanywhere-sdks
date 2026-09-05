@@ -101,7 +101,7 @@ extern "C" {
  *                 NULL `get_stream_token_counts` means counts must be marked
  *                 estimated. Engine-vtable reserved_slot_3 is unchanged.
  */
-#define RAC_PLUGIN_API_VERSION 9u
+#define RAC_PLUGIN_API_VERSION 11u
 
 /* ===========================================================================
  * Plugin entry-point signature
