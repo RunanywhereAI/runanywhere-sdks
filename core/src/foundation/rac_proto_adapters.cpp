@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -90,6 +91,25 @@ uint8_t* copy_bytes(const ::std::string& bytes) {
     if (out)
         std::memcpy(out, bytes.data(), bytes.size());
     return out;
+}
+
+bool checked_raw_image_size(int32_t width, int32_t height, size_t bytes_per_pixel,
+                            size_t* out_size) {
+    if (!out_size || width <= 0 || height <= 0 || bytes_per_pixel == 0)
+        return false;
+
+    const size_t width_size = static_cast<size_t>(width);
+    const size_t height_size = static_cast<size_t>(height);
+    const size_t max_size = std::numeric_limits<size_t>::max();
+    if (width_size > max_size / height_size)
+        return false;
+
+    const size_t pixels = width_size * height_size;
+    if (pixels > max_size / bytes_per_pixel)
+        return false;
+
+    *out_size = pixels * bytes_per_pixel;
+    return true;
 }
 
 // ---- Audio format enum mapping --------------------------------------------
@@ -531,14 +551,20 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         out->file_path = copy_string_required(in.file_path());
     } else if (in.has_raw_rgb()) {
         // 3 bytes/px, tightly packed -- no alpha to drop.
-        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
         const ::std::string& src = in.raw_rgb();
-        out->data_size = src.size();
-        if (out->data_size > 0) {
-            uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-            std::memcpy(buf, src.data(), out->data_size);
-            out->pixel_data = buf;
-        }
+        size_t rgb_size = 0;
+        if (!checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
+            src.size() != rgb_size)
+            return false;
+
+        uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
+        if (!buf)
+            return false;
+        std::memcpy(buf, src.data(), rgb_size);
+
+        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
+        out->data_size = rgb_size;
+        out->pixel_data = buf;
     } else if (in.has_raw_rgba()) {
         // raw_rgba is now its own oneof arm (4 B/px) instead of being
         // disambiguated out of raw_rgb via a deleted `format` field. The
@@ -547,22 +573,30 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         // path. Without this, a 4 B/px buffer reaches mtmd_bitmap_init,
         // which reads it as 3 B/px, overshoots the heap by 33%, and either
         // hallucinates or EXC_BAD_ACCESSes.
-        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
         const ::std::string& src = in.raw_rgba();
-        const size_t pixels = static_cast<size_t>(out->width) * out->height;
-        if (pixels == 0 || src.size() < pixels * 4) {
+        size_t rgba_size = 0;
+        size_t rgb_size = 0;
+        if (!checked_raw_image_size(in.width(), in.height(), 4, &rgba_size) ||
+            !checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
+            src.size() != rgba_size) {
             // Dimensions inconsistent with RGBA payload — refuse rather
             // than read past the buffer.
             return false;
         }
-        out->data_size = pixels * 3;
-        uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
+        uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
+        if (!buf)
+            return false;
+
         const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
+        const size_t pixels = rgb_size / 3;
         for (size_t i = 0; i < pixels; ++i) {
             buf[i * 3 + 0] = in_px[i * 4 + 0];
             buf[i * 3 + 1] = in_px[i * 4 + 1];
             buf[i * 3 + 2] = in_px[i * 4 + 2];
         }
+
+        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
+        out->data_size = rgb_size;
         out->pixel_data = buf;
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
