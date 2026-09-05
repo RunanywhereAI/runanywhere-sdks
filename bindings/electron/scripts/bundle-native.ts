@@ -500,6 +500,46 @@ function stageQnnRuntime(): { files: number; bytes: number } {
   return { files: qnnFiles, bytes: qnnBytes };
 }
 
+/**
+ * Bonsai (qwen38_generate) FastRPC DSP skel for win-arm64 — `dsp/win-arm64/`
+ * in the qhexrt prebuilt payload, NOT part of `qhexrt-prebuilt.json`'s
+ * schema-locked file set (the SDK's manifest validator only iterates what it
+ * already knows about, so this rides along as an extra, unmanifested pair).
+ *
+ * Must land in the SAME flat directory as stageQnnRuntime()'s output: Windows
+ * resolves the skel's dependencies through the DLL's own directory (no
+ * ADSP_LIBRARY_PATH), so librun_main_on_hexagon_skel.so and its .cat have to
+ * sit next to QnnHtp.dll like every other HTP skel does. Omitting them is
+ * silent at build time — qwen38_generate still links into
+ * runanywhere_qhexrt.dll — and only surfaces at runtime, when the Bonsai
+ * host-op cannot open the DSP handle.
+ *
+ * Opt-in via RA_QHEXRT_PREBUILT_DIR (the qhexrt engine payload root, e.g.
+ * engines/qhexrt/prebuilt/current); absent for older prebuilts that predate
+ * this directory and for local dev without a downloaded payload.
+ */
+function stageQhexrtDspSkel(): { files: number; bytes: number } {
+  const prebuiltDir = process.env.RA_QHEXRT_PREBUILT_DIR;
+  if (!prebuiltDir) return { files: 0, bytes: 0 };
+  const dspDir = path.join(prebuiltDir, 'dsp', 'win-arm64');
+  if (!fs.existsSync(dspDir)) return { files: 0, bytes: 0 };
+  const outDir = packageOutDir(BundlePackageId.QHexRT);
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  let skelFiles = 0;
+  let skelBytes = 0;
+  for (const entry of fs.readdirSync(dspDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const src = path.join(dspDir, entry.name);
+    fs.copyFileSync(src, path.join(outDir, entry.name));
+    skelBytes += fs.statSync(src).size;
+    skelFiles++;
+  }
+  console.log(
+    `  + [qhexrt] Bonsai DSP skel: ${skelFiles} files, ${(skelBytes / 1e6).toFixed(1)} MB (from ${dspDir})`
+  );
+  return { files: skelFiles, bytes: skelBytes };
+}
+
 const wantPackage = parsePackageArg(process.argv.slice(2));
 const packages = selectPackages(wantPackage);
 const mode = detectStagingMode();
@@ -527,11 +567,11 @@ if (staged.copied < staged.required) {
 }
 
 // Runs after stageFiles so the carrier's resetPackageOutDir() cannot wipe it.
-const qnn = wantPackage === 'all' || wantPackage === BundlePackageId.QHexRT
-  ? stageQnnRuntime()
-  : { files: 0, bytes: 0 };
+const wantsQhexrt = wantPackage === 'all' || wantPackage === BundlePackageId.QHexRT;
+const qnn = wantsQhexrt ? stageQnnRuntime() : { files: 0, bytes: 0 };
+const dspSkel = wantsQhexrt ? stageQhexrtDspSkel() : { files: 0, bytes: 0 };
 
-const totalBytes = staged.bytes + qnn.bytes;
+const totalBytes = staged.bytes + qnn.bytes + dspSkel.bytes;
 const summary = [...staged.byPackage.entries()]
   .map(([id, n]) => `${id}:${n}`)
   .join(', ');
