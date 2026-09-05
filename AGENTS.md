@@ -74,7 +74,7 @@ platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control 
 call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings
 for every language.
 
-**Current version**: `0.20.31` (canonical source: `core/VERSION`)
+**Current version**: `0.20.36` (canonical source: `core/VERSION`)
 
 | SDK | Path | Bridge mechanism | Platforms |
 |-----|------|-------------------|-----------|
@@ -233,7 +233,7 @@ improvising the steps: **sdk-release** (version bump through published GitHub Re
 **sdk-publish** (registry publishing + the `runanywhere-swift` dist repo cut), and
 **sdk-test-starters** (post-release device/app smoke tests).
 
-### Release pipeline lessons (v0.20.29 — read before cutting a release by hand)
+### Release pipeline lessons (v0.20.29 through v0.20.31 — read before cutting a release by hand)
 
 - **`native_ios` and `native_android` always rebuild fresh archives on every `release.yml`
   run — there is no reuse/skip mechanism for either job** (unlike `native_web`'s
@@ -282,6 +282,36 @@ improvising the steps: **sdk-release** (version bump through published GitHub Re
   smoke test, a "the build succeeded" CI job) because none of those checks actually ran the
   specific thing that was broken. When validating a release, run the SPECIFIC flagship/hardest
   model end-to-end on-device, not just confirm the pipeline completed.
+- **The RACommons/RunAnywhereMLXRuntime checksum-staleness bug above recurred on v0.20.30 AND
+  v0.20.31** — same `mismatch: RACommonsBinary` failure in `publish`, same root cause both
+  times: the version-bump PR ran `sync-versions.sh` and merged/tagged directly, skipping the
+  **mandatory** "dispatch a release candidate off the unmerged branch, sync checksums from
+  its real build, THEN merge" sequence that the **`sdk-release` skill's step 2-3 already
+  document in detail** (including this exact failure signature). Documenting the lesson in
+  prose here was not enough to stop it recurring twice more — **if you are about to run
+  `scripts/release/sync-versions.sh` for ANY reason, including as one step of a larger
+  cross-repo release cascade, invoke the `sdk-release` skill and follow it from step 1**,
+  rather than reconstructing the sequence from memory or treating a "small" version bump as
+  exempt. v0.20.31 additionally caught `RunAnywhereMLXRuntime` in the Flutter podspec
+  independently stale in the SAME commit — `RAC_CHECKSUM_SKIP` exempts it from `publish`'s
+  check, so it would have shipped broken to Flutter consumers with no CI signal at all; check
+  every row of the checksum-location table, not only the one the CI error names.
+- **QHexRT's `qhx_runtime_device()` (arch/soc lookup, needed to pick the `v75`/`v79`/`v81`
+  manifest directory in `session_open()`) shared its live-device cost with the standard QNN
+  graph path**, so a `host_only` model with ZERO QNN graphs — the Bonsai/Maple ternary decoder
+  (`qwen3.8-27b-1bit-npu`) — paid for a live QNN HTP device anyway, which then contended with
+  the decoder's own direct FastRPC session for the same Hexagon cDSP and made every generation
+  fail with a bare `HostOpFailed`. This shipped in v0.20.30 (the SAME release that fixed the
+  `ADSP_LIBRARY_PATH` bug for the same model) and was found only by running that SPECIFIC model
+  on real Windows-ARM64 hardware after the "fix" — reinforcing the point above: a green
+  `HostOpFailed`-free run of a DIFFERENT QHexRT model proves nothing about this one. Two red
+  herrings were chased and ruled out with live device tracing before the real cause: neither
+  `ADSP_LIBRARY_PATH` (confirmed correctly set) nor a QAIRT-version mismatch between the
+  shipped host DLLs and the on-device skel (confirmed present, but fixing it alone did not fix
+  the failure) was the actual cause. Fixed in `neurun` v0.20.31 (`Backend::profile()` now uses
+  a separate, device-handle-free `deviceGetPlatformInfo` query instead of sharing
+  `ensure_device()` with `device()`) + this repo's `qhexrt_session.cpp` (#810, a complementary
+  fix removing a second, redundant eager device query used only for a log line).
 
 ---
 

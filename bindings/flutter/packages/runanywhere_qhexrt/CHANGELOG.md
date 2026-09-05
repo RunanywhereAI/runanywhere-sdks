@@ -5,6 +5,38 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.36] - 2026-09-02
+
+- Version bump to keep the backend package in lockstep with the SDK release.
+
+## [0.20.35] - 2026-09-02
+
+### Changed
+
+- No API change and no new QHexRT payload: v0.20.35 rebuilt the Apple lane only.
+
+## [0.20.34] - 2026-09-02
+
+### Changed
+
+- No API change and no new QHexRT payload: the NeuRT fix in this release rebuilt the
+  Apple lane only, so the engine stays pinned to the v0.20.31 archives.
+
+## [0.20.33] - 2026-09-01
+
+### Changed
+
+- No API change and no new QHexRT payload: this release ships the Apple lane only,
+  so the engine stays pinned to the v0.20.31 archives.
+
+## [0.20.32] - 2026-08-31
+
+### Changed
+
+- No API change and no new QHexRT payload: this release ships the Apple lane
+  only, so the engine stays pinned to the v0.20.31 archives. Rebuilt against
+  plugin ABI v10.
+
 ## [0.20.31] - 2026-08-27
 
 ### Fixed

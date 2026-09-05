@@ -132,7 +132,7 @@ Primitive enum → vtable field → who implements it today:
 | `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | sherpa (Silero), energy-based (built-in) |
 | `RAC_PRIMITIVE_EMBED` | `embedding_ops` | llamacpp, onnx |
 | `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp, qhexrt |
-| `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | neurt (Core ML, Apple), platform (Apple) |
+| `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | neurt (Core ML, Apple), qhexrt (Hexagon NPU), platform (Apple) |
 | `RAC_PRIMITIVE_DIARIZE` | `diarization_ops` | onnx (Sortformer) |
 | `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
 | `RAC_PRIMITIVE_RERANK` | `rerank_ops` | llamacpp (rank-pooling GGUF) |
