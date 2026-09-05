@@ -287,22 +287,59 @@ rac_result_t copy_jstring_headers(JNIEnv* env, jobjectArray arr, rac_http_header
             reinterpret_cast<jstring>(env->GetObjectArrayElement(arr, static_cast<jsize>(i * 2)));
         auto v = reinterpret_cast<jstring>(
             env->GetObjectArrayElement(arr, static_cast<jsize>(i * 2 + 1)));
-        if (k != nullptr) {
+
+        // Copy each header atomically: a null element, a failed JNI string
+        // conversion, or a failed strdup must not leave a counted pair with
+        // a null name/value behind a RAC_SUCCESS return.
+        bool failed = false;
+        if (k == nullptr) {
+            failed = true;
+        } else {
             const char* chars = env->GetStringUTFChars(k, nullptr);
-            if (chars != nullptr) {
+            if (chars == nullptr) {
+                failed = true;
+            } else {
                 kvs[i].name = strdup(chars);
                 env->ReleaseStringUTFChars(k, chars);
+                if (kvs[i].name == nullptr) {
+                    failed = true;
+                }
             }
-            env->DeleteLocalRef(k);
         }
-        if (v != nullptr) {
+        if (!failed && v == nullptr) {
+            failed = true;
+        } else if (!failed) {
             const char* chars = env->GetStringUTFChars(v, nullptr);
-            if (chars != nullptr) {
+            if (chars == nullptr) {
+                failed = true;
+            } else {
                 kvs[i].value = strdup(chars);
                 env->ReleaseStringUTFChars(v, chars);
+                if (kvs[i].value == nullptr) {
+                    failed = true;
+                }
             }
-            env->DeleteLocalRef(v);
         }
+
+        if (failed) {
+            if (env->ExceptionCheck() == JNI_TRUE) {
+                env->ExceptionClear();
+            }
+            // kvs is zero-initialised, so freeing every slot is safe even
+            // where a name/value was never assigned.
+            for (size_t j = 0; j < pairs; ++j) {
+                std::free(const_cast<char*>(kvs[j].name));
+                std::free(const_cast<char*>(kvs[j].value));
+            }
+            std::free(kvs);
+            env->DeleteLocalRef(k);
+            env->DeleteLocalRef(v);
+            *out = nullptr;
+            *out_count = 0;
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
     }
     *out = kvs;
     *out_count = pairs;
