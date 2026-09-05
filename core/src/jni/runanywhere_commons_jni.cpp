@@ -3941,6 +3941,17 @@ static jmethodID g_fc_get_file_size = nullptr;
 static jmethodID g_fc_get_available_space = nullptr;
 static jmethodID g_fc_get_total_space = nullptr;
 
+static void free_directory_entry_copies(char** entries, size_t count) {
+    if (entries == nullptr)
+        return;
+    for (size_t i = 0; i < count; ++i) {
+        std::free(entries[i]);
+    }
+    // free() takes void*; the multilevel cast is intentional.
+    // NOLINTNEXTLINE(bugprone-multi-level-implicit-pointer-conversion)
+    std::free(entries);
+}
+
 // JNI file callback implementations
 static rac_result_t jni_fc_create_directory(const char* path, int recursive, void* user_data) {
     JNIEnv* env = getJNIEnv();
@@ -3966,51 +3977,99 @@ static rac_result_t jni_fc_delete_path(const char* path, int recursive, void* us
 
 static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries, size_t* out_count,
                                           void* user_data) {
+    if (path == nullptr || out_entries == nullptr || out_count == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_entries = nullptr;
+    *out_count = 0;
+
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_list_directory == nullptr)
         return RAC_ERROR_NOT_INITIALIZED;
 
     jstring jPath = env->NewStringUTF(path);
+    if (jPath == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jobjectArray jEntries = static_cast<jobjectArray>(
         env->CallObjectMethod(g_file_callbacks_obj, g_fc_list_directory, jPath));
     env->DeleteLocalRef(jPath);
 
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        if (jEntries != nullptr) {
+            env->DeleteLocalRef(jEntries);
+        }
+        return RAC_ERROR_INTERNAL;
+    }
     if (jEntries == nullptr) {
-        *out_entries = nullptr;
-        *out_count = 0;
         return RAC_ERROR_FILE_NOT_FOUND;
     }
 
-    jsize count = env->GetArrayLength(jEntries);
-    auto** entries = static_cast<char**>(std::malloc(count * sizeof(char*)));
+    const jsize count = env->GetArrayLength(jEntries);
+    if (count == 0) {
+        env->DeleteLocalRef(jEntries);
+        return RAC_SUCCESS;
+    }
+
+    const size_t entry_count = static_cast<size_t>(count);
+    if (entry_count > std::numeric_limits<size_t>::max() / sizeof(char*)) {
+        env->DeleteLocalRef(jEntries);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    auto** entries = static_cast<char**>(std::malloc(entry_count * sizeof(char*)));
     if (entries == nullptr) {
         env->DeleteLocalRef(jEntries);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
+    // Copy the entries transactionally: any failed JNI/string allocation
+    // frees what has already been copied and reports RAC_ERROR_OUT_OF_MEMORY
+    // instead of returning a partially initialized array or strdup(nullptr).
     for (jsize i = 0; i < count; i++) {
         auto jEntry = static_cast<jstring>(env->GetObjectArrayElement(jEntries, i));
+        if (jEntry == nullptr) {
+            const bool has_exception = env->ExceptionCheck() == JNI_TRUE;
+            if (has_exception) {
+                env->ExceptionClear();
+            }
+            free_directory_entry_copies(entries, static_cast<size_t>(i));
+            env->DeleteLocalRef(jEntries);
+            return has_exception ? RAC_ERROR_INTERNAL : RAC_ERROR_INVALID_ARGUMENT;
+        }
+
         const char* entryChars = env->GetStringUTFChars(jEntry, nullptr);
+        if (entryChars == nullptr) {
+            if (env->ExceptionCheck() == JNI_TRUE) {
+                env->ExceptionClear();
+            }
+            env->DeleteLocalRef(jEntry);
+            free_directory_entry_copies(entries, static_cast<size_t>(i));
+            env->DeleteLocalRef(jEntries);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
         entries[i] = strdup(entryChars);
         env->ReleaseStringUTFChars(jEntry, entryChars);
         env->DeleteLocalRef(jEntry);
+        if (entries[i] == nullptr) {
+            free_directory_entry_copies(entries, static_cast<size_t>(i));
+            env->DeleteLocalRef(jEntries);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
 
     env->DeleteLocalRef(jEntries);
     *out_entries = entries;
-    *out_count = static_cast<size_t>(count);
+    *out_count = entry_count;
     return RAC_SUCCESS;
 }
 
 static void jni_fc_free_entries(char** entries, size_t count, void* user_data) {
-    if (entries == nullptr)
-        return;
-    for (size_t i = 0; i < count; i++) {
-        std::free(entries[i]);
-    }
-    // free() takes void*; the multilevel cast is intentional.
-    // NOLINTNEXTLINE(bugprone-multi-level-implicit-pointer-conversion)
-    std::free(entries);
+    free_directory_entry_copies(entries, count);
 }
 
 static rac_bool_t jni_fc_path_exists(const char* path, rac_bool_t* out_is_directory,
