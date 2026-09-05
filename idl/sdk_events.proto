@@ -105,6 +105,7 @@ enum SDKComponent {
     SDK_COMPONENT_SPEAKER_DIARIZATION   = 11 [(runanywhere.v1.rac_wire_string) = "speaker_diarization"];
     SDK_COMPONENT_SEMANTIC_SEGMENTATION = 12 [(runanywhere.v1.rac_wire_string) = "semantic_segmentation"];
     SDK_COMPONENT_RERANK                = 13 [(runanywhere.v1.rac_wire_string) = "rerank"];
+    SDK_COMPONENT_OCR                   = 14 [(runanywhere.v1.rac_wire_string) = "ocr"];
 }
 
 // ---------------------------------------------------------------------------

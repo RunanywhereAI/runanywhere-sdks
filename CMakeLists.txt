@@ -690,6 +690,123 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
     endif()
 
+    # EMBED_IMAGE end to end through the PUBLIC C API (rac_image_embedding_create/_embed).
+    # Wired HERE and not in core/tests/CMakeLists.txt for the reason that file already documents:
+    # engines/ is configured after core/, so `TARGET rac_backend_neurt` is still false there.
+    # Skips (exit 0) without RAC_TEST_NEURT_IMAGE_EMBED_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND NOT TARGET test_image_embedding_neurt_e2e)
+        add_executable(test_image_embedding_neurt_e2e
+            core/tests/test_image_embedding_neurt_e2e.cpp)
+        target_include_directories(test_image_embedding_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+        )
+        target_link_libraries(test_image_embedding_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_image_embedding_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME image_embedding_neurt_e2e_tests COMMAND test_image_embedding_neurt_e2e)
+        # 77 = "no bundle configured". Without SKIP_RETURN_CODE the test's own SKIP path exits 0
+        # and CTest reports a PASS, which is how test_stt_neurt_e2e went its whole life reported
+        # green without ever running.
+        set_tests_properties(image_embedding_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
+    # OCR end to end through the LIFECYCLE PROTO ABI -- rac_model_lifecycle_load_proto by
+    # category, then rac_ocr_read_page_lifecycle_proto. Deliberately NOT the handle API
+    # (rac_ocr_create/_read_page): that path already worked in 0.20.35 while no platform SDK
+    # could reach OCR at all, because none of them use it. Skips (77) without
+    # RAC_TEST_NEURT_OCR_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND RAC_ENABLE_PROTOBUF
+       AND NOT TARGET test_ocr_neurt_e2e)
+        add_executable(test_ocr_neurt_e2e
+            core/tests/test_ocr_neurt_e2e.cpp)
+        target_include_directories(test_ocr_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/src
+            # _RAC_PROTO_GEN_DIR is set inside core/CMakeLists.txt and does not
+            # reach this scope; spell the same path out rather than leaking a
+            # PARENT_SCOPE variable for one test.
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/src/generated/proto
+        )
+        target_link_libraries(test_ocr_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        # rac_commons keeps its proto headers and protobuf includes PRIVATE by
+        # design (the C ABI exposes byte buffers, not runanywhere::v1:: types),
+        # so a test that speaks the proto ABI has to bring protobuf itself.
+        target_include_directories(test_ocr_neurt_e2e PRIVATE ${Protobuf_INCLUDE_DIRS})
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE protobuf::libprotobuf)
+        else()
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(TARGET archive_static)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_ocr_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME ocr_neurt_e2e_tests COMMAND test_ocr_neurt_e2e)
+        set_tests_properties(ocr_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
+    # SYNTHESIZE end to end through the PUBLIC C API (rac_tts_create/_synthesize). Wired here for
+    # the same reason as the EMBED_IMAGE test above: engines/ is configured after core/.
+    # Skips (77) without RAC_TEST_NEURT_TTS_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND NOT TARGET test_tts_neurt_e2e)
+        add_executable(test_tts_neurt_e2e
+            core/tests/test_tts_neurt_e2e.cpp)
+        target_include_directories(test_tts_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+        )
+        target_link_libraries(test_tts_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_tts_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME tts_neurt_e2e_tests COMMAND test_tts_neurt_e2e)
+        set_tests_properties(tts_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
     # NeuRT ASR end to end: a WAV in through the SDK's own stt_ops, a scored transcript out.
     # The seam neither of the other two neurt tests covers — the plugin test stops at the vtable
     # and neurun's own tools stop at the runtime. Skips (exit 0) without RAC_ASR_BUNDLE, because a
