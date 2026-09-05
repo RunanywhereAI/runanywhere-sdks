@@ -368,6 +368,7 @@ object OkHttpHttpTransport {
         // that lands during startup observes this stream.
         val slot = StreamSlot()
         inFlightStreams[streamId] = slot
+        var activeCall: Call? = null
         return try {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             // Streaming downloads use the dedicated streaming client with a
@@ -376,6 +377,7 @@ object OkHttpHttpTransport {
             val clientForCall = resolveStreamingClient(timeoutMs, followRedirects)
 
             val call = clientForCall.newCall(request)
+            activeCall = call
             // Publish the Call into the slot. If cancelAllStreams() landed
             // between slot pre-registration and now, cancel immediately.
             val cancelImmediately = synchronized(slot) {
@@ -409,7 +411,8 @@ object OkHttpHttpTransport {
                     }
                 var totalRead = if (honoredRange) resumeFromByte else 0L
 
-                val cancelled = drainBody(body, call, contentLength, totalRead, nativeCallback, nativeUserData)
+                val cancelled =
+                    drainBody(body, call, slot, contentLength, totalRead, nativeCallback, nativeUserData)
 
                 StreamResponse(
                     statusCode = resp.code,
@@ -423,7 +426,7 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = false,
+                cancelled = activeCall != null && synchronized(slot) { slot.cancelRequested },
             )
         } finally {
             inFlightStreams.remove(streamId)
@@ -433,6 +436,7 @@ object OkHttpHttpTransport {
     private fun drainBody(
         body: okhttp3.ResponseBody,
         call: Call,
+        slot: StreamSlot,
         contentLength: Long,
         initialTotalRead: Long,
         nativeCallback: Long,
@@ -447,7 +451,7 @@ object OkHttpHttpTransport {
                 val n = try {
                     input.read(buffer)
                 } catch (io: IOException) {
-                    if (call.isCanceled()) {
+                    if (synchronized(slot) { slot.cancelRequested }) {
                         cancelled = true
                         break
                     }
@@ -468,6 +472,9 @@ object OkHttpHttpTransport {
                 )
                 if (!keepGoing) {
                     cancelled = true
+                    synchronized(slot) {
+                        slot.cancelRequested = true
+                    }
                     call.cancel()
                     break
                 }
