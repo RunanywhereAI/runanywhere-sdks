@@ -342,6 +342,7 @@ public enum SdkEvent: Sendable {
         case .embeddings: return .embedding
         case .speakerDiarization: return .speakerDiarization
         case .semanticSegmentation: return .semanticSegmentation
+        case .ocr: return .ocr
         default: return .unspecified
         }
     }

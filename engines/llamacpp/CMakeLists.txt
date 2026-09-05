@@ -182,6 +182,25 @@ elseif(RAC_PLATFORM_WINDOWS)
         set(GGML_CUDA OFF CACHE BOOL "" FORCE)
         message(STATUS "Configuring llama.cpp for Windows (no CUDA; Vulkan=${GGML_VULKAN})")
     endif()
+
+    # ggml's MSVC ARM backend is an explicit FATAL_ERROR ("use clang").
+    # Windows-on-ARM hosts still report CMAKE_SYSTEM_PROCESSOR=ARM64 even
+    # when vcvarsall amd64 has selected Hostx64/x64/cl.exe, which is how
+    # the cpp-desktop-windows-x64 kit is built on Snapdragon boxes under
+    # Prism. Force AMD64 so ggml takes the AVX path, not ARM.
+    if(MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64")
+        if(CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
+           OR CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$"
+           OR CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
+            set(CMAKE_SYSTEM_PROCESSOR AMD64)
+            message(STATUS "llama.cpp: x64 MSVC on ARM host — CMAKE_SYSTEM_PROCESSOR=AMD64")
+        else()
+            message(FATAL_ERROR
+                "llama.cpp cannot be built with MSVC targeting ARM. "
+                "Use vcvarsall amd64 (x64 kit under Prism) or clang, "
+                "or set RAC_BACKEND_LLAMACPP=OFF.")
+        endif()
+    endif()
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORCE)
@@ -299,7 +318,7 @@ list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 # ../../core.
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 rac_add_engine_plugin(llamacpp
     TARGET_NAME         rac_backend_llamacpp

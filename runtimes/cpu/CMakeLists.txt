@@ -21,6 +21,6 @@ set_target_properties(rac_runtime_cpu PROPERTIES
 )
 
 target_include_directories(rac_runtime_cpu PRIVATE
-    ${CMAKE_SOURCE_DIR}/core/include
+    ${RAC_ROOT_DIR}/core/include
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

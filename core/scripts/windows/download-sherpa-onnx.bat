@@ -21,7 +21,18 @@ set "DEST_DIR=%ROOT_DIR%\third_party\sherpa-onnx-windows"
 
 :: Load versions
 call :load_versions
-if not defined SHERPA_ONNX_VERSION_WINDOWS set "SHERPA_ONNX_VERSION_WINDOWS=1.12.23"
+:: Fail closed rather than falling back. The old hardcoded default (1.12.23)
+:: had already drifted from core/VERSIONS (now 1.13.5), so an unreadable
+:: VERSIONS file would silently request a nonexistent release asset and the
+:: sherpa backend would then build as a non-routable stub.
+if not defined SHERPA_ONNX_VERSION_WINDOWS (
+    echo [ERROR] SHERPA_ONNX_VERSION_WINDOWS not loaded from core\VERSIONS.
+    exit /b 1
+)
+if not defined SHERPA_ONNX_WINDOWS_X64_SHA256 (
+    echo [ERROR] SHERPA_ONNX_WINDOWS_X64_SHA256 not loaded from core\VERSIONS.
+    exit /b 1
+)
 set "VERSION=%SHERPA_ONNX_VERSION_WINDOWS%"
 set "REPOSITORY=%SHERPA_ONNX_REPO_DESKTOP%"
 set "RELEASE_TAG=%SHERPA_ONNX_RELEASE_TAG_DESKTOP%"
@@ -106,25 +117,51 @@ if /i not "%ACTUAL_SHA256%"=="%EXPECTED_SHA256%" (
 )
 echo [OK] Verified archive SHA-256: %ACTUAL_SHA256%
 
-:: Extract. Windows' bundled bsdtar hangs indefinitely decompressing .tar.bz2
-:: on CI (its bzip2 filter stalls with no console), so use 7-Zip — preinstalled
-:: on GitHub windows runners — to turn .tar.bz2 into a plain .tar, then plain
-:: tar (no bzip2) to lay it down, dropping the archive's top-level directory.
-:: -y answers any 7-Zip prompt so it can never block on stdin.
-echo [EXTRACT] Decompressing (7-Zip)...
+:: Extract. Two paths, chosen by whether 7-Zip is actually present.
+::
+:: 7-Zip is preinstalled on GitHub's windows runners, and the two-step
+:: (.tar.bz2 -> .tar -> extract) is the path proven there: bsdtar's bzip2 filter
+:: was observed stalling indefinitely on CI with no console attached. That path
+:: is unchanged.
+::
+:: But 7-Zip is NOT part of a stock Windows install, and this script invoked it
+:: unconditionally — so on a developer machine without it the download failed
+:: outright and there was no way to build commons locally on Windows. Measured on
+:: a Snapdragon X2 Elite / Windows 11 ARM64 box with no 7-Zip: bsdtar 3.8.4
+:: (bz2lib 1.0.8) extracted the real pinned asset directly, exit 0, in 2.5 s,
+:: producing onnxruntime.dll, onnxruntime_providers_shared.dll and
+:: sherpa-onnx-c-api.dll. So fall back to it rather than refusing to run.
 mkdir "%DEST_DIR%" 2>nul
-7z x -y "%TEMP_DL%\sherpa-onnx.tar.bz2" -o"%TEMP_DL%"
+where 7z >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] 7-Zip bzip2 decompression failed.
-    rmdir /s /q "%TEMP_DL%" 2>nul
-    exit /b 1
-)
-echo [EXTRACT] Unpacking tar...
-tar -xf "%TEMP_DL%\sherpa-onnx.tar" --strip-components=1 -C "%DEST_DIR%"
-if errorlevel 1 (
-    echo [ERROR] Extraction failed.
-    rmdir /s /q "%TEMP_DL%" 2>nul
-    exit /b 1
+    echo [EXTRACT] 7-Zip not found; extracting .tar.bz2 directly with bsdtar...
+    tar -xf "%TEMP_DL%\sherpa-onnx.tar.bz2" --strip-components=1 -C "%DEST_DIR%"
+    if errorlevel 1 (
+        echo [ERROR] bsdtar extraction failed.
+        rmdir /s /q "%TEMP_DL%" 2>nul
+        exit /b 1
+    )
+) else (
+    rem Parens in an echo MUST be escaped inside a parenthesized block: an
+    rem unescaped ^) closes the block early and cmd fails the whole thing with
+    rem "... was unexpected at this time." This echo was harmless at top level
+    rem and broke the moment it moved in here. Measured: exit 255.
+    rem Same reason this is `rem` and not `::` — a label inside ^( ^) is illegal.
+    rem -y answers any 7-Zip prompt so it can never block on stdin.
+    echo [EXTRACT] Decompressing ^(7-Zip^)...
+    7z x -y "%TEMP_DL%\sherpa-onnx.tar.bz2" -o"%TEMP_DL%"
+    if errorlevel 1 (
+        echo [ERROR] 7-Zip bzip2 decompression failed.
+        rmdir /s /q "%TEMP_DL%" 2>nul
+        exit /b 1
+    )
+    echo [EXTRACT] Unpacking tar...
+    tar -xf "%TEMP_DL%\sherpa-onnx.tar" --strip-components=1 -C "%DEST_DIR%"
+    if errorlevel 1 (
+        echo [ERROR] Extraction failed.
+        rmdir /s /q "%TEMP_DL%" 2>nul
+        exit /b 1
+    )
 )
 
 :: Cleanup temp
