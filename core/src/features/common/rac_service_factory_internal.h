@@ -179,17 +179,28 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
         case RAC_FRAMEWORK_SYSTEM_TTS:
             return RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_COREML:
-            // The neurt engine serves BOTH Core ML modalities: DIFFUSION over MLModel
-            // and GENERATE_TEXT on the Apple Neural Engine. It used to serve diffusion
-            // only, so everything else fell through to `platform` (Apple Foundation
-            // Models / System TTS) — which for a COREML-framework LLM meant pinning the
-            // wrong engine and quietly generating from Foundation Models instead of the
-            // ANE bundle the caller asked for.
-            if (primitive == RAC_PRIMITIVE_DIFFUSION ||
-                primitive == RAC_PRIMITIVE_GENERATE_TEXT) {
-                return RAC_ENGINE_ID_NEURT;
-            }
-            return RAC_ENGINE_ID_PLATFORM;
+            // A Core ML model is a NeuRT model, for every primitive NeuRT serves.
+            //
+            // This used to be a per-primitive allow-list ({DIFFUSION, GENERATE_TEXT}),
+            // with everything else falling through to `platform` (Apple Foundation
+            // Models / System TTS). That list went stale twice: first for GENERATE_TEXT
+            // — a COREML-framework LLM pinned the wrong engine and quietly generated
+            // from Foundation Models instead of the ANE bundle the caller asked for —
+            // and again the moment NeuRT grew TRANSCRIBE, EMBED, RERANK and VLM.
+            //
+            // The second staleness is the dangerous one, because it does not fail: when
+            // the hinted engine does not serve the primitive, create_plugin_service()
+            // below falls back to plain priority. MLX is priority 110 and NeuRT is 100,
+            // and MLX also fills embedding_ops — so a Core ML embedding model would be
+            // served by MLX, silently, with a warning nobody reads.
+            //
+            // model_lifecycle.cpp's engine_name_for_framework() has always mapped
+            // COREML -> neurt unconditionally. Matching that invariant here is what
+            // stops the two paths disagreeing, and it cannot go stale again.
+            //
+            // See framework_requires_hinted_plugin() below for why COREML must not use
+            // the priority fallback at all.
+            return RAC_ENGINE_ID_NEURT;
         case RAC_FRAMEWORK_QHEXRT:
             return RAC_ENGINE_ID_QHEXRT;
         case RAC_FRAMEWORK_FLUID_AUDIO:
@@ -199,6 +210,33 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
         default:
             return nullptr;
     }
+}
+
+// Whether plugin_hint_for_framework()'s answer is a hard requirement rather than a
+// preference.
+//
+// The priority fallback in create_plugin_service() exists for frameworks whose hint is
+// advisory — several engines can read the same bytes, so the next-best engine is a real
+// answer. That is not true when the framework names the on-disk *format*: nothing but
+// NeuRT can open an .mlmodelc/.mlpackage tree. Falling back by priority hands a Core ML
+// bundle to MLX (safetensors), Sherpa or ONNX, which can only produce a confusing
+// load-time error far from its cause — or, for a primitive where the fallback engine
+// happens to accept the path, a silently wrong model.
+//
+// This is not hypothetical. Before COREML was routed to NeuRT unconditionally it mapped
+// to `platform` for the primitives NeuRT did not serve, and `platform` really does serve
+// SYNTHESIZE; without this guard, routing COREML to NeuRT would have sent a Core ML TTS
+// request to MLX by priority (110 > 100) instead.
+//
+// NeuRT now fills tts_ops, so that particular case no longer fires -- but the guard is not
+// therefore obsolete. It is what keeps the NEXT unfilled slot from repeating the pattern,
+// which this engine has already done twice.
+//
+// Only COREML is strict here. The other format-determined frameworks (LLAMACPP, MLX,
+// QHEXRT) have the same argument available to them, but changing their behaviour is
+// outside the scope of the ABI-10 work and untested.
+inline bool framework_requires_hinted_plugin(rac_inference_framework_t framework) {
+    return framework == RAC_FRAMEWORK_COREML;
 }
 
 template <typename ServiceT, typename OpsT>
@@ -214,6 +252,13 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     if (engine_hint != nullptr) {
         vt = rac_plugin_find_for_engine(spec.primitive, engine_hint);
         if (vt == nullptr) {
+            if (framework_requires_hinted_plugin(spec.framework)) {
+                RAC_LOG_ERROR(spec.log_cat,
+                              "plugin '%s' does not serve %s and no other plugin can read this "
+                              "model's format; failing closed",
+                              engine_hint, rac_primitive_name(spec.primitive));
+                return RAC_ERROR_BACKEND_NOT_FOUND;
+            }
             RAC_LOG_WARNING(spec.log_cat, "plugin '%s' does not serve %s; falling back to priority",
                             engine_hint, rac_primitive_name(spec.primitive));
         }

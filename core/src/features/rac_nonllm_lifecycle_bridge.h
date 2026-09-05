@@ -5,6 +5,7 @@
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/ocr/rac_ocr_service.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -60,6 +61,14 @@ struct LifecycleDiarizationRef {
     void* opaque = nullptr;
 };
 
+struct LifecycleOcrRef {
+    const rac_ocr_service_ops_t* ops = nullptr;
+    void* impl = nullptr;
+    const char* model_id = nullptr;
+    const char* framework_name = nullptr;
+    void* opaque = nullptr;
+};
+
 struct LifecycleSegmentationRef {
     const rac_segmentation_service_ops_t* ops = nullptr;
     void* impl = nullptr;
@@ -88,6 +97,9 @@ void release_lifecycle_diarization(LifecycleDiarizationRef* ref);
 
 rac_result_t acquire_lifecycle_segmentation(LifecycleSegmentationRef* out_ref);
 void release_lifecycle_segmentation(LifecycleSegmentationRef* ref);
+
+rac_result_t acquire_lifecycle_ocr(LifecycleOcrRef* out_ref);
+void release_lifecycle_ocr(LifecycleOcrRef* ref);
 
 
 /**

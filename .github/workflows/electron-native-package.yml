@@ -384,6 +384,12 @@ jobs:
           # preset's own doc comment warns its dir differs
           # (electron-win-arm64-vs2026) and says to point RA_NATIVE_DIR here.
           RA_NATIVE_DIR: '${{ github.workspace }}\build\electron-win-arm64-vs2026\bindings\electron\native\Release'
+          # The Bonsai (qwen38_generate) FastRPC DSP skel lives at
+          # <qhexrt prebuilt root>/dsp/win-arm64/ -- an extra file the SDK's
+          # qhexrt-prebuilt.json schema doesn't know about, so stageFiles()
+          # never copies it. stageQhexrtDspSkel() reads it from here and lands
+          # it in the same flat directory as the QAIRT runtime above.
+          RA_QHEXRT_PREBUILT_DIR: '${{ github.workspace }}\engines\qhexrt\prebuilt\current'
         run: |
           npm install
           if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
@@ -401,6 +407,20 @@ jobs:
             bindings/electron/prebuilds/win32-arm64 `
             bindings/electron/packages/qhexrt/prebuilds/win32-arm64
           if ($LASTEXITCODE -ne 0) { throw "check_plugin_natives.py failed" }
+
+          # check_plugin_natives.py proves the DLL itself is routable; it says
+          # nothing about the Bonsai (qwen38_generate) DSP skel, which is a
+          # runtime FILE dependency, not a link-time one -- qwen38_generate
+          # links into runanywhere_qhexrt.dll either way, so a missing skel is
+          # invisible here and only fails at runtime when the host-op tries to
+          # open the DSP handle. Assert it directly, the same way NeuRT's
+          # backend .dylib is asserted on macOS above.
+          $skelDir = "bindings/electron/packages/qhexrt/prebuilds/win32-arm64"
+          if (-not (Test-Path "$skelDir/librun_main_on_hexagon_skel.so") -or
+              -not (Test-Path "$skelDir/librun_main_on_hexagon_skel.cat")) {
+            Write-Output "::error::Bonsai DSP skel missing from $skelDir -- RA_QHEXRT_PREBUILT_DIR did not resolve or the pinned payload predates dsp/win-arm64/. qwen38_generate will link but fail at runtime."
+            throw "Bonsai DSP skel staging failed"
+          }
 
       - name: Upload staged win32-arm64 prebuilds
         uses: actions/upload-artifact@v4
