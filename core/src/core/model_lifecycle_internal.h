@@ -46,6 +46,7 @@
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/ocr/rac_ocr_service.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -125,6 +126,7 @@ struct LoadedModel {
     const rac_diffusion_service_ops_t* diffusion_ops{nullptr};
     const rac_diarization_service_ops_t* diarization_ops{nullptr};
     const rac_segmentation_service_ops_t* segmentation_ops{nullptr};
+    const rac_ocr_service_ops_t* ocr_ops{nullptr};
     void* impl{nullptr};
     int active_refs{0};
     std::atomic<bool> cancel_requested{false};

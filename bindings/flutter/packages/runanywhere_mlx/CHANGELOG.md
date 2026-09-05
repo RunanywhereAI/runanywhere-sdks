@@ -1,3 +1,88 @@
+## [0.20.36] - 2026-09-02
+
+- Version bump to keep the backend package in lockstep with the SDK release.
+
+## [0.20.35] - 2026-09-02
+
+### Changed
+
+- No API change. Rebuilt against the 0.20.35 core.
+
+## [0.20.34] - 2026-09-02
+
+### Changed
+
+- No API change. Rebuilt against the 0.20.34 core.
+
+## [0.20.33] - 2026-09-01
+
+### Changed
+
+- No API change. Rebuilt against the 0.20.33 core.
+- `rac_framework_supports_tts()` now includes Core ML, because NeuRT actually
+  serves the primitive as of this release. It was deliberately left out while the
+  slot was null: claiming a capability the engine does not serve routes a model to
+  an engine that refuses it.
+
+## [0.20.32] - 2026-08-31
+
+### Changed
+
+- No API change. Rebuilt against plugin ABI v10.
+- Core ML models are now routed to the NeuRT engine unconditionally and fail
+  closed when it cannot serve the primitive. Previously a Core ML model that MLX
+  could not read could still be handed to MLX by plugin priority (110 vs
+  NeuRT's 100).
+
+## [0.20.31] - 2026-08-27
+
+### Changed
+
+- No Flutter-facing API change. QHexRT's `HostOpFailed` regression on
+  `qwen3.8-27b-1bit-npu` fixed (see the `runanywhere_qhexrt` changelog);
+  this bump keeps versions in lockstep.
+
+## [0.20.30] - 2026-08-27
+
+### Changed
+
+- No Flutter-facing API change. Electron and RCLI's QHexRT Windows packaging fixed
+  (see the `runanywhere_qhexrt` changelog); this bump keeps versions in lockstep.
+
+## [0.20.29] - 2026-08-26
+
+### Changed
+
+- Re-pinned NeuRT and QHexRT engine archives to neurun v0.20.29. QHexRT win-arm64
+  now ships with the Bonsai fully-on-NPU 1-bit decoder (`qwen38_generate`)
+  enabled, intended to address `PlanStepFailed` when running
+  `qwen3.8-27b-1bit-npu` -- Windows ARM64 device validation of this exact
+  pin is in progress.
+
+## [0.20.28] - 2026-08-24
+
+### Changed
+
+- Version-train bump only; no MLX-facing changes in this release.
+
+## [0.20.27] - 2026-08-24
+
+### Changed
+
+- Version-train bump only; no MLX-facing changes in this release.
+
+## [0.20.26] - 2026-08-23
+
+### Changed
+
+- Version-train bump only; no MLX-facing changes in this release.
+
+## [0.20.25] - 2026-08-21
+
+### Changed
+
+- Version-train bump only; no Flutter-facing changes.
+
 ## [0.20.24] - 2026-08-16
 
 ### Changed

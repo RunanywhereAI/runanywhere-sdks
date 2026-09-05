@@ -180,7 +180,10 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
         if (config->context_size > 0) {
             model_config["context_size"] = config->context_size;
         }
-        if (config->gpu_layers != 0) {
+        // AUTO means "no opinion"; every other value, INCLUDING 0, is an
+        // explicit placement request and must reach the backend. Gating on
+        // `!= 0` here is what silently swallowed a CPU pin.
+        if (config->gpu_layers != RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO) {
             model_config["gpu_layers"] = config->gpu_layers;
         }
         if (config->batch_size > 0) {

@@ -17,7 +17,7 @@ description: |
     and keeps each job's install to what it actually needs.
 
   WHAT DOES *NOT* NEED THIS
-    Jobs that configure core/CMakeLists.txt (native_*, wasm, rcli, ios-device,
+    Jobs that configure core/CMakeLists.txt (native_*, wasm, ios-device,
     android-arm64, macos-*, linux-*, the Electron addon, the Python wheel) get
     the C/C++ bindings generated for them at CMake configure time, and jobs that
     run Gradle on bindings/kotlin get the Kotlin bindings from the
@@ -25,8 +25,8 @@ description: |
     so ~29 native runner instances do not each need a codegen step here.
 
     A job that reads core/include WITHOUT configuring CMake does still need
-    this with `cpp` — rn-typecheck (-fsyntax-only against core/include) and
-    native_rcli_macos (`swift build` over root Package.swift) are the two.
+    this with `cpp` — rn-typecheck (-fsyntax-only against core/include) is
+    the remaining case.
 
   All versions come from core/VERSIONS. Nothing here is installed from a package
   manager where the exact patch level matters: idl/codegen/bootstrap_protoc.sh

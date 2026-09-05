@@ -76,7 +76,7 @@ option(RAC_BUILD_SERVER       "Build the OpenAI-compatible HTTP server (runanywh
 option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Models, System TTS) on Apple hosts" ON)
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
-option(RAC_BUILD_CLI          "Build the rcli desktop CLI (rcli)" OFF)
+option(RAC_BUILD_CLI          "Retired: in-tree rcli was moved to RunanywhereAI/RCLI. Leaving ON is a hard error." OFF)
 option(RAC_BUILD_ELECTRON_HARNESS "Build the runanywhere-electron M0 Win32 inference harness" OFF)
 option(RAC_BUILD_ELECTRON_ADDON "Build the runanywhere-electron N-API .node addon" OFF)
 option(RAC_BUILD_PYTHON_MODULE "Build the runanywhere-python pybind11 _core module" OFF)
@@ -176,6 +176,15 @@ endif()
 # Shared cmake/ helpers
 # =============================================================================
 
+# Where this repository's own tree starts.
+#
+# CMAKE_SOURCE_DIR is the TOP-LEVEL project, which is this repo only when it is
+# built directly. Embedded with add_subdirectory or FetchContent — the rcli
+# repo, the Electron addon, anything that consumes commons as a subproject —
+# it points at the consumer, and every path built from it resolves into their
+# tree instead of ours. Sub-CMakeLists use this variable instead.
+set(RAC_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "runanywhere-sdks source root")
+
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
     "${CMAKE_CURRENT_SOURCE_DIR}/core/cmake"  # LoadVersions, FetchONNXRuntime, ... — kept for engine subdirs
@@ -267,10 +276,14 @@ if(RAC_BUILD_TESTS)
     enable_testing()
 endif()
 
-# rcli desktop CLI. Added after engines/ because it links the
-# rac_backend_* targets that only exist once the engine subdirs configured.
+# In-tree rcli is retired. The product lives in RunanywhereAI/RCLI and
+# consumes the C++ desktop kit (find_package(RunAnywhere)).
 if(RAC_BUILD_CLI)
-    add_subdirectory(rcli)
+    message(FATAL_ERROR
+        "RAC_BUILD_CLI is retired. Build EXTERNAL/RCLI (RunanywhereAI/RCLI) against "
+        "the C++ desktop kit:\n"
+        "  cmake --preset cpp-desktop-macos-arm64 && cmake --build --preset cpp-desktop-macos-arm64\n"
+        "  cmake -S EXTERNAL/RCLI -B EXTERNAL/RCLI/build -DCMAKE_PREFIX_PATH=<kit>")
 endif()
 
 # runanywhere-electron M0 inference harness. Added after engines/ because it
@@ -644,7 +657,7 @@ if(RAC_BUILD_TESTS)
         set_tests_properties(stt_tests PROPERTIES LABELS "native;sherpa;stt")
     endif()
 
-    # RAC_NEURT_ENGINE_AVAILABLE, not just the target: without the neurun checkout the engine
+    # RAC_NEURT_ENGINE_AVAILABLE, not just the target: without a prebuilt slice the engine
     # builds as a non-routable shell, so the target exists but rac_diffusion_coreml.h is on no
     # include path and this test cannot compile.
     if(APPLE AND RAC_BACKEND_NEURT
@@ -653,7 +666,7 @@ if(RAC_BUILD_TESTS)
        AND NOT TARGET test_diffusion_coreml_generate)
         add_executable(test_diffusion_coreml_generate
             core/tests/test_diffusion_coreml_generate.cpp)
-        # rac_diffusion_coreml.h lives in neurun (NeuRT/src/sdk/) and reaches
+        # rac_diffusion_coreml.h ships in the prebuilt include dir and reaches
         # this target transitively: rac_add_engine_plugin exports the engine's
         # INCLUDE_DIRECTORIES as PUBLIC on rac_backend_neurt, linked below.
         target_include_directories(test_diffusion_coreml_generate PRIVATE
@@ -675,6 +688,123 @@ if(RAC_BUILD_TESTS)
         endif()
         target_compile_features(test_diffusion_coreml_generate PRIVATE cxx_std_17)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
+    endif()
+
+    # EMBED_IMAGE end to end through the PUBLIC C API (rac_image_embedding_create/_embed).
+    # Wired HERE and not in core/tests/CMakeLists.txt for the reason that file already documents:
+    # engines/ is configured after core/, so `TARGET rac_backend_neurt` is still false there.
+    # Skips (exit 0) without RAC_TEST_NEURT_IMAGE_EMBED_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND NOT TARGET test_image_embedding_neurt_e2e)
+        add_executable(test_image_embedding_neurt_e2e
+            core/tests/test_image_embedding_neurt_e2e.cpp)
+        target_include_directories(test_image_embedding_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+        )
+        target_link_libraries(test_image_embedding_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_image_embedding_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_image_embedding_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME image_embedding_neurt_e2e_tests COMMAND test_image_embedding_neurt_e2e)
+        # 77 = "no bundle configured". Without SKIP_RETURN_CODE the test's own SKIP path exits 0
+        # and CTest reports a PASS, which is how test_stt_neurt_e2e went its whole life reported
+        # green without ever running.
+        set_tests_properties(image_embedding_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
+    # OCR end to end through the LIFECYCLE PROTO ABI -- rac_model_lifecycle_load_proto by
+    # category, then rac_ocr_read_page_lifecycle_proto. Deliberately NOT the handle API
+    # (rac_ocr_create/_read_page): that path already worked in 0.20.35 while no platform SDK
+    # could reach OCR at all, because none of them use it. Skips (77) without
+    # RAC_TEST_NEURT_OCR_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND RAC_ENABLE_PROTOBUF
+       AND NOT TARGET test_ocr_neurt_e2e)
+        add_executable(test_ocr_neurt_e2e
+            core/tests/test_ocr_neurt_e2e.cpp)
+        target_include_directories(test_ocr_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/src
+            # _RAC_PROTO_GEN_DIR is set inside core/CMakeLists.txt and does not
+            # reach this scope; spell the same path out rather than leaking a
+            # PARENT_SCOPE variable for one test.
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/src/generated/proto
+        )
+        target_link_libraries(test_ocr_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        # rac_commons keeps its proto headers and protobuf includes PRIVATE by
+        # design (the C ABI exposes byte buffers, not runanywhere::v1:: types),
+        # so a test that speaks the proto ABI has to bring protobuf itself.
+        target_include_directories(test_ocr_neurt_e2e PRIVATE ${Protobuf_INCLUDE_DIRS})
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE protobuf::libprotobuf)
+        else()
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(TARGET archive_static)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_ocr_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME ocr_neurt_e2e_tests COMMAND test_ocr_neurt_e2e)
+        set_tests_properties(ocr_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
+    # SYNTHESIZE end to end through the PUBLIC C API (rac_tts_create/_synthesize). Wired here for
+    # the same reason as the EMBED_IMAGE test above: engines/ is configured after core/.
+    # Skips (77) without RAC_TEST_NEURT_TTS_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND NOT TARGET test_tts_neurt_e2e)
+        add_executable(test_tts_neurt_e2e
+            core/tests/test_tts_neurt_e2e.cpp)
+        target_include_directories(test_tts_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+        )
+        target_link_libraries(test_tts_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_tts_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_tts_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME tts_neurt_e2e_tests COMMAND test_tts_neurt_e2e)
+        set_tests_properties(tts_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
     endif()
 
     # NeuRT ASR end to end: a WAV in through the SDK's own stt_ops, a scored transcript out.
@@ -763,6 +893,10 @@ else()
     set(_rac_plugin_mode "SHARED (dlopen-loaded)")
 endif()
 
+# C++ desktop kit (find_package(RunAnywhere) prefix for RCLI). After engines
+# so rac_backend_* targets exist for the kit's optional-engine flags.
+include(CppDesktopKit)
+
 message(STATUS "")
 message(STATUS "============================================")
 message(STATUS "RunAnywhere SDKs — root CMake configured")
@@ -776,7 +910,8 @@ message(STATUS "Server (HTTP)    : ${RAC_BUILD_SERVER}")
 message(STATUS "Platform backend : ${RAC_BUILD_PLATFORM}")
 message(STATUS "JNI bridge       : ${RAC_BUILD_JNI}")
 message(STATUS "Plugin smoke CLI : ${RAC_BUILD_PLUGIN_SMOKE}")
-message(STATUS "CLI (rcli)       : ${RAC_BUILD_CLI}")
+message(STATUS "CLI (in-tree)    : retired (RunanywhereAI/RCLI)")
+message(STATUS "C++ desktop kit  : ${RAC_PACKAGE_CPP_DESKTOP}")
 message(STATUS "Desktop adapter  : ${RAC_DESKTOP_ADAPTER}")
 message(STATUS "============================================")
 message(STATUS "")

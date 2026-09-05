@@ -12,7 +12,11 @@ name: Auto-Tag Release
 #   1. Reads the pre-merge version from the PR base and the reviewed version
 #      from merged main.
 #   2. Verifies the reviewed version is the exact label-selected semver bump.
-#   3. Runs scripts/release/sync-versions.sh as a read-only coherence check.
+#   3. Runs scripts/validation/gates/check_release_version_coherence.sh as a
+#      read-only check against the already-merged tree (the same checker
+#      release.yml and pr-build.yml use — it understands the TEMP-pin
+#      convention for a release that ships no new iOS/Android archives, which
+#      a naive sync-versions.sh + diff does not).
 #   4. Tags the exact reviewed merge commit and explicitly dispatches
 #      release.yml to build the draft release.
 #
@@ -133,15 +137,6 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run sync-versions.sh
-        if: steps.label.outputs.should-release == 'true'
-        env:
-          NEW_VERSION: ${{ steps.version.outputs.new-version }}
-        run: |
-          set -euo pipefail
-          chmod +x scripts/release/sync-versions.sh
-          ./scripts/release/sync-versions.sh "${NEW_VERSION}"
-
       - name: Verify release manifest coherence
         if: steps.label.outputs.should-release == 'true'
         env:
@@ -149,17 +144,26 @@ jobs:
         run: |
           set -euo pipefail
           # Main's branch protection requires every versioned manifest change
-          # to be reviewed in the PR. sync-versions.sh above is therefore a
-          # read-only assertion: it must produce no tracked diff after merge.
-          status="$(git status --porcelain --untracked-files=all)"
-          if [ -n "$status" ]; then
-            echo "::error::Merged release manifests are out of sync with reviewed version v${NEW_VERSION}."
-            echo "::error::Run scripts/release/sync-versions.sh ${NEW_VERSION}, commit its output, and merge a corrected PR."
-            git diff
-            printf '%s\n' "$status"
+          # to be reviewed in the PR, so this is a read-only assertion against
+          # the already-merged tree. It must call the SAME authoritative
+          # checker release.yml and pr-build.yml already use
+          # (check_release_version_coherence.sh), not re-run sync-versions.sh
+          # and diff against it: sync-versions.sh unconditionally bumps every
+          # asset_version/sdkVersion/nativeLibVersion pointer to NEW_VERSION,
+          # but a release that ships no new iOS/Android archives (this repo's
+          # documented TEMP-pin convention — see Package.swift's own comment,
+          # and the podspecs' asset_version) deliberately leaves those pinned
+          # to the last release that has matching archives. A naive
+          # sync-versions.sh + diff treats every correctly-TEMP-pinned release
+          # as "out of sync" and fails here even though the PR was reviewed
+          # and merged exactly as intended. check_release_version_coherence.sh
+          # already understands both states.
+          if ! bash scripts/validation/gates/check_release_version_coherence.sh; then
+            echo "::error::Merged release manifests fail version coherence for v${NEW_VERSION}."
+            echo "::error::Run scripts/release/sync-versions.sh ${NEW_VERSION}, re-establish any TEMP pins that still apply, commit, and merge a corrected PR."
             exit 1
           fi
-          echo "::notice::Manifests already bumped to v${NEW_VERSION} in the release PR."
+          echo "::notice::Manifests are coherent for v${NEW_VERSION} in the release PR."
 
       - name: Push reviewed release tag
         if: steps.label.outputs.should-release == 'true' && steps.tag.outputs.exists != 'true'

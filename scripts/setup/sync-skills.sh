@@ -9,9 +9,11 @@
 # Why a copy and not a symlink: a checkout without core.symlinks=true (common on Windows) materializes
 # git symlinks as text files, which would break Codex's reads. A generated copy + a drift check is portable.
 #
-# Both `.claude/*` and `.agents/*` are currently git-ignored in this repo (see .gitignore) — the skill
-# content is being kept local until a public/private decision is made, but the two trees still need to
-# agree with each other for whichever agent happens to read the mirror.
+# BOTH trees are TRACKED (see .gitignore: `.claude/*` / `.agents/*` are ignored except for the
+# `!.claude/skills/`, `!.claude/commands/`, `!.agents/skills/` negations). Because the mirror is
+# committed, a stale mirror is a wrong file published to a PUBLIC repo, not just local confusion —
+# so `--check` runs in CI as a required gate (.github/workflows/agent-skills-gate.yml), alongside a
+# scan that keeps private hostnames/credentials out of both trees.
 #
 # Usage:
 #   scripts/setup/sync-skills.sh            # regenerate .agents/skills from .claude/skills

@@ -231,6 +231,41 @@ find_qairt_root() {
         fi
     done < <(find "${REPO_ROOT}/.." -maxdepth 4 -type d -path "*/qairt/*/lib/aarch64-android" -print 2>/dev/null | sort -r)
 
+    # LAST RESORT: the pinned QAIRT runtime fetched by
+    # scripts/build/download-qairt-runtime.sh from the PRIVATE neurun repo (needs
+    # NEURUN_TOKEN/GH_TOKEN; that script exits 3 without one). Deliberately last,
+    # so any real local install still wins and every branch above keeps its
+    # fail-closed semantics. With the token, this is what lets a hosted runner
+    # build a routable Hexagon engine with no licensed QAIRT install on the
+    # machine; without it, this branch is skipped and the build falls back to the
+    # non-routable shell.
+    candidate="${REPO_ROOT}/engines/qhexrt/prebuilt/qairt-runtime/arm64-v8a/current"
+    if [ -d "${candidate}/lib/aarch64-android" ] && [ -f "${candidate}/qairt-runtime.json" ]; then
+        # Refuse anything resolving INSIDE the engine payload tree. If the runtime
+        # ever lived beside the engine, "identity matches" would degenerate into
+        # hashing a file against a copy of itself -- a check that looks closed and
+        # is not. Designed out here rather than left to discipline.
+        # Both sides physical: REPO_ROOT is built with `pwd`, which keeps symlink
+        # components, so comparing it against a `pwd -P` result would never match
+        # if any parent of the checkout is a symlink -- and this guard would pass
+        # silently, which is the one thing it must never do.
+        local resolved repo_real
+        resolved="$(cd "${candidate}" && pwd -P)"
+        repo_real="$(cd "${REPO_ROOT}" && pwd -P)"
+        case "${resolved}" in
+            "${repo_real}/engines/qhexrt/prebuilt/versions/"*)
+                echo "error: QAIRT runtime resolved inside the engine payload tree: ${resolved}" >&2
+                return 2 ;;
+        esac
+        if qairt_identity_matches "${manifest_path}" "${candidate}"; then
+            echo "${candidate}"
+            return 0
+        fi
+        echo "error: pinned QAIRT runtime does not match the selected QHexRT build identity." >&2
+        echo "       The engine and runtime pins have drifted; see core/VERSIONS QAIRT_RUNTIME_*." >&2
+        return 2
+    fi
+
     return 1
 }
 
