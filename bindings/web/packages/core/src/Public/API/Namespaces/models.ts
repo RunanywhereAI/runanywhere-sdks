@@ -167,6 +167,14 @@ function validateLoadOptions(options?: LoadOptions): void {
         + 'and is not a hard runtime guarantee. Remove it.',
     );
   }
+  if (options?.contextLength !== undefined
+      && (!Number.isInteger(options.contextLength)
+        || options.contextLength < 0
+        || options.contextLength > 2_147_483_647)) {
+    throw SDKException.invalidConfiguration(
+      'LoadOptions.contextLength must be an integer between 0 and 2147483647.',
+    );
+  }
   if (options?.backendPreferences?.some((preference) => preference.required)) {
     throw SDKException.invalidConfiguration(
       'LoadOptions.backendPreferences.required cannot be carried by ModelLoadRequest because '
@@ -386,8 +394,9 @@ export const models = {
   /**
    * Load a model now instead of paying the cost on the first generation.
    * contextLength and optional backendPreferences are forwarded on ModelLoadRequest.
-   * @throws SDKException when the model is absent, accelerator npu, threads, or a
-   *   required backend preference is requested, or the backend rejects the load.
+   * @throws SDKException when the model is absent; accelerator npu, threads, an invalid
+   *   context length, or a required backend preference is requested; or the backend rejects
+   *   the load.
    */
   async load(id: string, options?: LoadOptions): Promise<LoadedModel> {
     await ensureReady();
