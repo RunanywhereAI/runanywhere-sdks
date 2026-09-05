@@ -273,6 +273,9 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
         out_entries[written].is_dir = is_dir ? RAC_TRUE : RAC_FALSE;
         out_entries[written].size_bytes =
             is_dir ? 0 : static_cast<int64_t>(fs::file_size(it->path(), ec2));
+        if (ec2) {
+            out_entries[written].size_bytes = 0;
+        }
         ++written;
     }
     *in_out_count = out_entries ? written : total;
