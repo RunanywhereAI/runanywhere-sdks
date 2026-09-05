@@ -65,6 +65,16 @@ if(NEURT_PREBUILT_ROOT)
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_core.a"
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_llm_ops.a"
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_stt_ops.a"
+            # Required, not optional: the vtable below references &g_neurt_embeddings_ops under
+            # RAC_NEURT_ROUTABLE, so a prebuilt without this archive fails at link with an
+            # undefined symbol rather than merely lacking a capability. It ships from the same
+            # neurun release as the other four — this list and core/VERSIONS move together.
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_embedding_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_rerank_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_vlm_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_image_embedding_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_tts_ops.a"
+            "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_ocr_ops.a"
             "${NEURT_PREBUILT_ROOT}/lib/libneurt_rac_diffusion.a")
         if(NOT EXISTS "${_probe}")
             message(FATAL_ERROR
@@ -137,6 +147,12 @@ if(_neurt_available)
 
     foreach(_pair "rac_neurt_llm_ops:libneurt_rac_llm_ops.a"
                   "rac_neurt_stt_ops:libneurt_rac_stt_ops.a"
+                  "rac_neurt_embedding_ops:libneurt_rac_embedding_ops.a"
+                  "rac_neurt_rerank_ops:libneurt_rac_rerank_ops.a"
+                  "rac_neurt_vlm_ops:libneurt_rac_vlm_ops.a"
+                  "rac_neurt_image_embedding_ops:libneurt_rac_image_embedding_ops.a"
+                  "rac_neurt_tts_ops:libneurt_rac_tts_ops.a"
+                  "rac_neurt_ocr_ops:libneurt_rac_ocr_ops.a"
                   "rac_neurt_diffusion:libneurt_rac_diffusion.a")
         string(REPLACE ":" ";" _parts "${_pair}")
         list(GET _parts 0 _tgt)
@@ -149,7 +165,10 @@ if(_neurt_available)
 
     set(_neurt_extra_includes ${NEURT_PREBUILT_ROOT}/include)
     set(_neurt_generate_available 1)
-    set(_neurt_extra_links rac_neurt_llm_ops rac_neurt_stt_ops rac_neurt_diffusion)
+    set(_neurt_extra_links rac_neurt_llm_ops rac_neurt_stt_ops rac_neurt_embedding_ops
+                           rac_neurt_rerank_ops rac_neurt_vlm_ops
+                           rac_neurt_image_embedding_ops rac_neurt_tts_ops rac_neurt_ocr_ops
+                           rac_neurt_diffusion)
 else()
     set(_neurt_extra_includes "")
     set(_neurt_generate_available 0)

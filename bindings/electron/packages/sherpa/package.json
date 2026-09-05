@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/electron-sherpa",
-  "version": "0.20.30",
+  "version": "0.20.36",
   "description": "RunAnywhere Electron SDK — Sherpa backend plugin (STT / TTS / VAD)",
   "publishConfig": {
     "access": "public"

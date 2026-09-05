@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let sdkVersion = "0.20.30"
+let sdkVersion = "0.20.36"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -23,7 +23,7 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let llamaTarget = runAnywhereBinaryTarget(
     name: "RABackendLLAMACPP",
-    checksum: "7062f7c8da988e6aee323efbb03f09b70cde7956138191e82720b81c7ed90a2b"
+    checksum: "57daca2207f819bd432cf27c0b3d1f7b4466fc68d1d7133ec1b87fd5ac503b8b"
 )
 
 let package = Package(
