@@ -4,7 +4,8 @@
 Public kits:
   - every checked-in generated *.pb.h is in include/runanywhere/proto/
   - share/runanywhere/SCHEMA_LOCK is present
-  - on Windows, zlibstatic.lib / bz2_bundled.lib / onnxruntime.lib + DLL
+  - on Windows, zlibstatic.lib / bz2_bundled.lib / libcurl.lib /
+    onnxruntime.lib + DLL (ARM64 OSS kits skip ONNX, never libcurl)
   - --forbid-private-engines: no neurt/qhexrt paths
   - if a sherpa backend archive is present, rac_plugin_entry_sherpa must
     reference g_sherpa_stt_ops (RAC_SHERPA_ROUTABLE=1). Ops symbols in a
@@ -142,7 +143,7 @@ def main() -> int:
         missing.append("share/runanywhere/SCHEMA_LOCK")
 
     if args.windows:
-        for lib in ("zlibstatic.lib", "bz2_bundled.lib"):
+        for lib in ("zlibstatic.lib", "bz2_bundled.lib", "libcurl.lib"):
             if not any(n.endswith(lib) for n in names):
                 missing.append(f"lib/{lib}")
         if not args.allow_missing_onnxruntime:
