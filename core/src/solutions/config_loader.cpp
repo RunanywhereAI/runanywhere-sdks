@@ -122,6 +122,21 @@ class YamlParser {
                     break;
                 clean.push_back(c);
             }
+            // An apostrophe in ordinary prose (`Don't use markdown`) opens a
+            // quote state nothing closes, so the loop above treats the rest of
+            // the line as quoted and keeps the trailing comment as part of the
+            // value. An unterminated quote means the tracking was wrong for
+            // this line, so fall back to YAML's own rule: an inline comment is
+            // a '#' preceded by whitespace. That still leaves `a#b` alone and
+            // still protects a balanced "has # inside".
+            if (in_sq || in_dq) {
+                clean.clear();
+                for (size_t i = 0; i < line.size(); ++i) {
+                    if (line[i] == '#' && (i == 0 || line[i - 1] == ' ' || line[i - 1] == '\t'))
+                        break;
+                    clean.push_back(line[i]);
+                }
+            }
             // Trim trailing WS.
             while (!clean.empty() &&
                    (clean.back() == ' ' || clean.back() == '\t' || clean.back() == '\r')) {
