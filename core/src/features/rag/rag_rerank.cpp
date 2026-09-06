@@ -30,6 +30,17 @@ std::string flatten_and_truncate(const std::string& text, size_t max_chars) {
             break;
         out.push_back((c == '\n' || c == '\r' || c == '\t') ? ' ' : c);
     }
+    // Back off to a UTF-8 character boundary. The budget is a byte count, so
+    // a passage in any non-Latin script is cut mid-sequence and the snippet
+    // handed to the scorer ends in an incomplete character. The whitespace
+    // substitution above is 1 byte for 1 byte, so offsets into `out` and
+    // `text` still line up. Same walk as rag_backend.cpp's source preview.
+    size_t cut = out.size();
+    while (cut > 0 && cut < text.size() &&
+           (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80) {
+        --cut;
+    }
+    out.resize(cut);
     return out;
 }
 
