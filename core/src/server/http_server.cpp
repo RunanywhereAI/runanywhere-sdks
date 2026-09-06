@@ -291,7 +291,15 @@ void HttpServer::setupCors() {
         [origins](const httplib::Request& req, httplib::Response& res) {
             res.set_header("Access-Control-Allow-Origin", origins);
             res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            // Reflect whatever headers the browser asked to send, the way the
+            // hosted LiteLLM gateway does (verified against the dev deployment
+            // 2026-09-06). A pinned allowlist silently breaks any client that
+            // adds a benign header — the console's X-RA-Harness attribution
+            // header was the one that exposed this. CORS is not an auth
+            // boundary; the Authorization check happens in the handlers.
+            std::string requested = req.get_header_value("Access-Control-Request-Headers");
+            res.set_header("Access-Control-Allow-Headers",
+                           requested.empty() ? "Content-Type, Authorization" : requested);
 
             // Handle preflight
             if (req.method == "OPTIONS") {
