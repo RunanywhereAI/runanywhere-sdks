@@ -38,6 +38,14 @@ rac_result_t rac_backend_mlx_register(void) {
     }
 
     rac_result_t rc = rac_plugin_register(vt);
+    // CAPABILITY_UNSUPPORTED is the expected reject when this host cannot run MLX
+    // (non-Apple, or a C++-only build with no MLX runtime callbacks). It is not a
+    // failure — the registry already noted it at DEBUG. Return quietly so a host
+    // that legitimately lacks MLX does not print a warning on every command.
+    if (rc == RAC_ERROR_CAPABILITY_UNSUPPORTED) {
+        RAC_LOG_DEBUG(LOG_CAT, "MLX not available on this host; skipping registration");
+        return rc;
+    }
     if (rc != RAC_SUCCESS && rc != RAC_ERROR_PLUGIN_DUPLICATE) {
         RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register(mlx) failed: %d", rc);
         return rc;
