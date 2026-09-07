@@ -457,6 +457,26 @@ static bool chunker_utf8_boundaries_hold() {
 
     runanywhere::rag::DocumentChunker chunker{runanywhere::rag::ChunkerConfig{}};
     bool ok = true;
+
+    // A budget narrower than one character. The size-only paths must emit the
+    // character whole rather than slice it, and must not then re-slice it.
+    {
+        runanywhere::rag::ChunkerConfig tiny;
+        tiny.chunk_size = 1;
+        tiny.chars_per_token = 2;  // 2-byte budget, narrower than a 3-byte CJK char
+        runanywhere::rag::DocumentChunker narrow{tiny};
+        std::string doc;
+        for (int i = 0; i < 40; ++i) {
+            doc += "\xe6\x9c\xba\xe5\x99\xa8";
+        }
+        for (const auto& chunk : narrow.chunk_document(doc)) {
+            if (!valid_utf8(chunk.text)) {
+                std::fprintf(stderr, "FAIL: narrow-budget chunk is not valid UTF-8\n");
+                ok = false;
+                break;
+            }
+        }
+    }
     // The one-byte prefixes matter: an unshifted CJK string happens to land the
     // 720-byte budget on a character boundary, so the bug hides without them.
     for (const char* prefix : {"", "a", "ab"}) {
