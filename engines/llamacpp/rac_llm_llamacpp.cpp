@@ -478,6 +478,21 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     };
 
     int prompt_tokens = 0;
+    // Authoritative decode-loop count (LlamaCppTextGeneration::run_decode_loop's
+    // return value, forwarded through generate_stream()'s out_tokens_generated).
+    // `completion_tokens` above only counts *callback invocations*, i.e. how many
+    // times run_decode_loop's sink() flushed — and sink() coalesces the built-in
+    // stop-sequence window, so it fires far less than once per token (a short
+    // capped generation typically flushes everything in one final call). That
+    // mismatch is what let a `--max-tokens 5` stream report completion_tokens=1:
+    // this wrapper counted flushes, not tokens, exactly the pitfall
+    // llamacpp_backend.h documents on generate_stream()'s out_tokens_generated
+    // parameter. generate() (non-streaming, llamacpp_backend.cpp) already
+    // prefers this authoritative count over its own callback-piece counter for
+    // the same reason; mirror that here so the streaming completion count next
+    // feeds the commons max-tokens finish_reason check with a real number
+    // instead of an undercount that made a truncated stream look like "stop".
+    int decoded_tokens = 0;
     bool success = false;
     try {
         success = h->text_gen->generate_stream(
@@ -506,24 +521,24 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 }
                 return true;
             },
-            &prompt_tokens);
+            &prompt_tokens, /*out_prompt_eval_ms=*/nullptr, &decoded_tokens);
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("LLM.LlamaCpp.C-API", "generate_stream exception: %s", e.what());
         rac_error_set_details(e.what());
         h->last_stream_prompt_tokens = prompt_tokens;
-        h->last_stream_completion_tokens = completion_tokens;
+        h->last_stream_completion_tokens = decoded_tokens > 0 ? decoded_tokens : completion_tokens;
         emit_terminal();
         return RAC_ERROR_INFERENCE_FAILED;
     } catch (...) {
         rac_error_set_details("Unknown C++ exception during streaming LLM generation");
         h->last_stream_prompt_tokens = prompt_tokens;
-        h->last_stream_completion_tokens = completion_tokens;
+        h->last_stream_completion_tokens = decoded_tokens > 0 ? decoded_tokens : completion_tokens;
         emit_terminal();
         return RAC_ERROR_INFERENCE_FAILED;
     }
 
     h->last_stream_prompt_tokens = prompt_tokens;
-    h->last_stream_completion_tokens = completion_tokens;
+    h->last_stream_completion_tokens = decoded_tokens > 0 ? decoded_tokens : completion_tokens;
 
     // Treat a caller-stop hit as a successful terminal exit so the final marker
     // is still emitted to the caller's accumulator. Without this, an early
@@ -533,7 +548,8 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         if (!stop_hit && !stop_window.empty()) {
             // Flush any tail bytes held back as potential stop prefix.
             (void)emit_bytes(stop_window.size());
-            h->last_stream_completion_tokens = completion_tokens;
+            h->last_stream_completion_tokens =
+                decoded_tokens > 0 ? decoded_tokens : completion_tokens;
         }
         emit_terminal();
         return RAC_SUCCESS;
