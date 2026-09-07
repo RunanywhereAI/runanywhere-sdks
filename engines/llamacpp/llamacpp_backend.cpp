@@ -1,5 +1,7 @@
 #include "llamacpp_backend.h"
 
+#include "llamacpp_logging.h"
+
 #include "common.h"
 // llama.cpp b9180 puts the model-memory fitting helper + status enum in a
 // dedicated header (common/fit.h). Include it explicitly so callers don't
@@ -229,29 +231,6 @@ llama_sampler* build_sampler_chain(llama_model* model, const TextGenerationReque
 }  // namespace
 
 // =============================================================================
-// LOG CALLBACK
-// =============================================================================
-
-static void llama_log_callback(ggml_log_level level, const char* fmt, void* data) {
-    (void)data;
-
-    std::string msg(fmt ? fmt : "");
-    while (!msg.empty() && (msg.back() == '\n' || msg.back() == '\r')) {
-        msg.pop_back();
-    }
-    if (msg.empty())
-        return;
-
-    if (level == GGML_LOG_LEVEL_ERROR) {
-        RAC_LOG_ERROR("LLM.LlamaCpp.GGML", "%s", msg.c_str());
-    } else if (level == GGML_LOG_LEVEL_WARN) {
-        RAC_LOG_WARNING("LLM.LlamaCpp.GGML", "%s", msg.c_str());
-    } else if (level == GGML_LOG_LEVEL_INFO) {
-        RAC_LOG_DEBUG("LLM.LlamaCpp.GGML", "%s", msg.c_str());
-    }
-}
-
-// =============================================================================
 // LLAMACPP BACKEND IMPLEMENTATION
 // =============================================================================
 
@@ -275,7 +254,7 @@ bool LlamaCppBackend::initialize(const nlohmann::json& config) {
     config_ = config;
 
     llama_backend_init();
-    llama_log_set(llama_log_callback, nullptr);
+    runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
 
     if (config.contains("num_threads")) {
         num_threads_ = config["num_threads"].get<int>();
