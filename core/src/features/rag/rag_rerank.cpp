@@ -36,8 +36,7 @@ std::string flatten_and_truncate(const std::string& text, size_t max_chars) {
     // substitution above is 1 byte for 1 byte, so offsets into `out` and
     // `text` still line up. Same walk as rag_backend.cpp's source preview.
     size_t cut = out.size();
-    while (cut > 0 && cut < text.size() &&
-           (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80) {
+    while (cut > 0 && cut < text.size() && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80) {
         --cut;
     }
     out.resize(cut);
