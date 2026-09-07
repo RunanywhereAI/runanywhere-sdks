@@ -1067,7 +1067,57 @@ TEST(voice_agent_solution_compiles) {
 }
 
 // ---------------------------------------------------------------------------
-// 9b. VoiceAgent barge-in knobs reach the graph.
+// 10. SolutionConfig (RAG) expands + compiles with explicit stand-ins.
+//     Topology: query (source) → retrieve → context → llm. The retrieve
+//     operator owns the embedding lookup via the host-supplied RAG
+//     session handle, so the L5 graph carries 4 operators + 3 edges.
+// ---------------------------------------------------------------------------
+TEST(rag_solution_compiles) {
+    ScopedSolutionStandins standins;
+
+    SolutionConfig cfg;
+    auto* rag = cfg.mutable_rag();
+    rag->set_embed_model_id("bge-small");
+    rag->set_llm_model_id("qwen3-4b");
+    rag->set_retrieve_k(12);
+
+    SolutionRunner runner(cfg);
+    CHECK(runner.start() == RAC_SUCCESS);
+    const auto& spec = runner.spec();
+    CHECK(spec.operators_size() == 4);
+    CHECK(spec.edges_size() == 3);
+    runner.close_input();
+    runner.wait();
+}
+
+// ---------------------------------------------------------------------------
+// 11. C ABI end-to-end: proto-bytes path.
+// ---------------------------------------------------------------------------
+TEST(c_abi_proto_bytes_lifecycle) {
+    ScopedSolutionStandins standins;
+
+    SolutionConfig cfg;
+    auto* rag = cfg.mutable_rag();
+    rag->set_embed_model_id("bge-small");
+    rag->set_llm_model_id("qwen3-4b");
+    rag->set_retrieve_k(8);
+
+    std::string buf;
+    CHECK(cfg.SerializeToString(&buf));
+
+    rac_solution_handle_t h = nullptr;
+    rac_result_t st = rac_solution_create_from_proto(buf.data(), buf.size(), &h);
+    CHECK(st == RAC_SUCCESS);
+    CHECK(h != nullptr);
+
+    CHECK(rac_solution_start(h) == RAC_SUCCESS);
+    CHECK(rac_solution_feed(h, "why is the sky blue?") == RAC_SUCCESS);
+    CHECK(rac_solution_close_input(h) == RAC_SUCCESS);
+    rac_solution_destroy(h);
+}
+
+// ---------------------------------------------------------------------------
+// 11b. VoiceAgent barge-in knobs reach the graph.
 //     config_loader.cpp parses enable_barge_in / barge_in_threshold_ms out of
 //     the solution YAML, so the expansion has to carry them onto an operator
 //     or a caller's setting stops at the proto. Explicit false is the case
@@ -1119,56 +1169,6 @@ TEST(voice_agent_barge_in_params_reach_the_vad_operator) {
 
     runner.close_input();
     runner.wait();
-}
-
-// ---------------------------------------------------------------------------
-// 10. SolutionConfig (RAG) expands + compiles with explicit stand-ins.
-//     Topology: query (source) → retrieve → context → llm. The retrieve
-//     operator owns the embedding lookup via the host-supplied RAG
-//     session handle, so the L5 graph carries 4 operators + 3 edges.
-// ---------------------------------------------------------------------------
-TEST(rag_solution_compiles) {
-    ScopedSolutionStandins standins;
-
-    SolutionConfig cfg;
-    auto* rag = cfg.mutable_rag();
-    rag->set_embed_model_id("bge-small");
-    rag->set_llm_model_id("qwen3-4b");
-    rag->set_retrieve_k(12);
-
-    SolutionRunner runner(cfg);
-    CHECK(runner.start() == RAC_SUCCESS);
-    const auto& spec = runner.spec();
-    CHECK(spec.operators_size() == 4);
-    CHECK(spec.edges_size() == 3);
-    runner.close_input();
-    runner.wait();
-}
-
-// ---------------------------------------------------------------------------
-// 11. C ABI end-to-end: proto-bytes path.
-// ---------------------------------------------------------------------------
-TEST(c_abi_proto_bytes_lifecycle) {
-    ScopedSolutionStandins standins;
-
-    SolutionConfig cfg;
-    auto* rag = cfg.mutable_rag();
-    rag->set_embed_model_id("bge-small");
-    rag->set_llm_model_id("qwen3-4b");
-    rag->set_retrieve_k(8);
-
-    std::string buf;
-    CHECK(cfg.SerializeToString(&buf));
-
-    rac_solution_handle_t h = nullptr;
-    rac_result_t st = rac_solution_create_from_proto(buf.data(), buf.size(), &h);
-    CHECK(st == RAC_SUCCESS);
-    CHECK(h != nullptr);
-
-    CHECK(rac_solution_start(h) == RAC_SUCCESS);
-    CHECK(rac_solution_feed(h, "why is the sky blue?") == RAC_SUCCESS);
-    CHECK(rac_solution_close_input(h) == RAC_SUCCESS);
-    rac_solution_destroy(h);
 }
 
 // ---------------------------------------------------------------------------
@@ -1325,9 +1325,9 @@ int main() {
     run_test_time_series_solution_compiles_with_builtin_window();
     run_test_context_build_builtin_applies_prompt_template();
     run_test_voice_agent_solution_compiles();
-    run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_rag_solution_compiles();
     run_test_c_abi_proto_bytes_lifecycle();
+    run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_c_abi_yaml_solution_lifecycle();
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();
