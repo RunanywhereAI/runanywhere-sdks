@@ -61,9 +61,29 @@ void perform_recursive_chunking(std::string_view text_view, const std::string& o
 
     std::vector<std::string_view> splits;
     if (separator.empty()) {
-        for (size_t i = 0; i < text_view.length(); i += chunk_size_chars) {
-            splits.push_back(
-                text_view.substr(i, std::min(chunk_size_chars, text_view.length() - i)));
+        // Last-resort split: no separator matched, so cut on size alone. The
+        // budget is a byte count, so land it on a UTF-8 character boundary or
+        // every chunk of a script without spaces (CJK reaches this branch
+        // routinely, since none of "\n\n" / ". " / " " occur in it) carries a
+        // half character at each end.
+        size_t i = 0;
+        while (i < text_view.length()) {
+            size_t end = std::min(i + chunk_size_chars, text_view.length());
+            while (end > i && end < text_view.length() &&
+                   (static_cast<unsigned char>(text_view[end]) & 0xC0) == 0x80) {
+                --end;
+            }
+            if (end == i) {
+                // One character is wider than the whole budget: emit it whole
+                // rather than spin, since a partial character is never useful.
+                end = i + 1;
+                while (end < text_view.length() &&
+                       (static_cast<unsigned char>(text_view[end]) & 0xC0) == 0x80) {
+                    ++end;
+                }
+            }
+            splits.push_back(text_view.substr(i, end - i));
+            i = end;
         }
     } else {
         size_t start = 0;
