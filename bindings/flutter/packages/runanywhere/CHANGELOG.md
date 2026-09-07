@@ -5,6 +5,17 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.37] - 2026-09-07
+
+### Fixed
+
+- **A capability-unsupported plugin no longer logs at WARN.** `RAC_ERROR_CAPABILITY_UNSUPPORTED`
+  is the documented silent-reject path for a backend that simply isn't for this host (e.g.
+  MLX registering on a C++-only build) — it was logging `[RAC][WARN] backend '...' is
+  unavailable (-811)` on every command regardless. Both the registry ledger
+  (`plugin_availability.cpp`) and the MLX registration path now log that specific case at
+  DEBUG; a genuine load failure still warns.
+
 ## [0.20.36] - 2026-09-02
 
 ### Added

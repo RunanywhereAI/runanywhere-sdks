@@ -1,3 +1,12 @@
+## [0.20.37] - 2026-09-07
+
+### Fixed
+
+- MLX registration no longer logs a WARN when it correctly declines to register on a
+  host with no MLX runtime (a C++-only build) — that result is the documented
+  silent-reject path, not a fault. Real registration failures still warn. Registration
+  behavior and priority (110) are unchanged.
+
 ## [0.20.36] - 2026-09-02
 
 - Version bump to keep the backend package in lockstep with the SDK release.
