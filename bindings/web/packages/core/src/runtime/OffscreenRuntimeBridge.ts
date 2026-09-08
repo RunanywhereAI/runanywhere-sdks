@@ -335,7 +335,9 @@ export class OffscreenRuntimeBridge {
         // dies while the consumer is running its loop body has no waiter to
         // reject, and without this the next `next()` would read the stream as
         // a clean end.
-        let failure: unknown = null;
+        // Boxed: a bare `unknown` sentinel cannot tell "rejected with null"
+        // apart from "never failed", and that reason would be dropped.
+        let failure: { reason: unknown } | null = null;
 
         const finish = (): void => {
           if (finished) return;
@@ -349,7 +351,7 @@ export class OffscreenRuntimeBridge {
         const fail = (err: unknown): void => {
           if (finished) return;
           finished = true;
-          failure = err;
+          failure = { reason: err };
           this.pending.delete(requestId);
           while (waiters.length > 0) waiters.shift()!.reject(err);
         };
@@ -406,7 +408,7 @@ export class OffscreenRuntimeBridge {
               return Promise.resolve({ value: queue.shift()!, done: false });
             }
             if (failure !== null) {
-              const err = failure;
+              const err = failure.reason;
               failure = null;
               return Promise.reject(err);
             }

@@ -79,7 +79,10 @@ interface StreamPending {
    * loop body has no waiter to reject, and `next()` would otherwise read
    * `finished` as a clean end of stream.
    */
-  failure?: unknown;
+  // Boxed so a rejection reason of `undefined` is still a failure. A bare
+  // `failure?: unknown` cannot tell "rejected with undefined" apart from
+  // "never failed", and the undefined case then ends the stream cleanly.
+  failure: { reason: unknown } | null;
 }
 
 type PendingRequest = UnaryPending | StreamPending;
@@ -216,7 +219,13 @@ export class BackendWorkerHost {
   ): AsyncIterable<unknown> {
     const requestId = this.nextRequestId('stream');
     let started = false;
-    const state: StreamPending = { kind: 'stream', events: [], waiters: [], finished: false };
+    const state: StreamPending = {
+      kind: 'stream',
+      events: [],
+      waiters: [],
+      finished: false,
+      failure: null,
+    };
 
     const finish = (): void => {
       if (state.finished) return;
@@ -230,7 +239,7 @@ export class BackendWorkerHost {
     const fail = (error: unknown): void => {
       if (state.finished) return;
       state.finished = true;
-      state.failure = error;
+      state.failure = { reason: error };
       this.pending.delete(requestId);
       this.activeStreamIds.delete(requestId);
       while (state.waiters.length) state.waiters.shift()!.reject(error);
@@ -252,10 +261,10 @@ export class BackendWorkerHost {
           if (state.events.length) {
             return Promise.resolve({ value: state.events.shift(), done: false });
           }
-          if (state.failure !== undefined) {
-            const error = state.failure;
-            state.failure = undefined;
-            return Promise.reject(error);
+          if (state.failure) {
+            const { reason } = state.failure;
+            state.failure = null;
+            return Promise.reject(reason);
           }
           if (state.finished) return Promise.resolve({ value: undefined, done: true });
           return new Promise((resolve, reject) => state.waiters.push({ resolve, reject }));
@@ -264,7 +273,7 @@ export class BackendWorkerHost {
           if (started && !state.finished) this.cancel(requestId);
           // An explicit cancel outranks an error the consumer never asked
           // about, matching the other two iterators.
-          state.failure = undefined;
+          state.failure = null;
           finish();
           return Promise.resolve({ value: undefined, done: true });
         },
@@ -396,7 +405,7 @@ export class BackendWorkerHost {
       return;
     }
     pending.finished = true;
-    pending.failure = error;
+    pending.failure = { reason: error };
     while (pending.waiters.length) pending.waiters.shift()!.reject(error);
   }
 
