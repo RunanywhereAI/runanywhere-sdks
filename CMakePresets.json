@@ -103,7 +103,7 @@
                 "RAC_RUNTIME_ONNXRT": "ON",
                 "RAC_RUNTIME_COREML": "ON",
                 "RAC_BACKEND_RAG": "ON",
-                "RAC_BUILD_SERVER": "OFF",
+                "RAC_BUILD_SERVER": "ON",
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "ON",
@@ -132,7 +132,7 @@
                 "RAC_BACKEND_QHEXRT": "OFF",
                 "RAC_RUNTIME_ONNXRT": "ON",
                 "RAC_BACKEND_RAG": "OFF",
-                "RAC_BUILD_SERVER": "OFF",
+                "RAC_BUILD_SERVER": "ON",
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "OFF"
@@ -157,7 +157,7 @@
                 "RAC_BACKEND_QHEXRT": "OFF",
                 "RAC_RUNTIME_ONNXRT": "ON",
                 "RAC_BACKEND_RAG": "ON",
-                "RAC_BUILD_SERVER": "OFF",
+                "RAC_BUILD_SERVER": "ON",
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "OFF"
@@ -198,7 +198,7 @@
                 "RAC_BACKEND_QHEXRT": "OFF",
                 "RAC_RUNTIME_ONNXRT": "OFF",
                 "RAC_BACKEND_RAG": "OFF",
-                "RAC_BUILD_SERVER": "OFF",
+                "RAC_BUILD_SERVER": "ON",
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "OFF"
