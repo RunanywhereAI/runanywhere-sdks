@@ -617,18 +617,29 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     RAC_LOG_INFO("LLM.LlamaCpp", "Model loaded: %.2fB params, training context=%d", params_billions,
                  model_train_ctx);
 
+    // max_default_context_ caps the context we pick *by default*, to keep an
+    // unconfigured server from allocating the model's full (often huge) training
+    // window. An explicit user request outranks that default: common_fit_params
+    // has already clamped the request to what memory allows (fitted_ctx), and
+    // model_train_ctx still bounds it, so honoring it here cannot over-allocate.
+    // Without this, `--context-length 16384` loaded fine, fit succeeded at
+    // 16384, and then this line silently pinned the context back to 2048.
+    const int effective_context_cap =
+        user_context_size > 0 ? std::max(max_default_context_, user_context_size)
+                              : max_default_context_;
+
     if (ctx_params.n_ctx == 0) {
-        ctx_params.n_ctx = std::min(model_train_ctx, max_default_context_);
+        ctx_params.n_ctx = std::min(model_train_ctx, effective_context_cap);
     }
     // ctx_params.n_ctx is uint32_t; clamp to INT_MAX before converting to int so
     // a pathological fitted/user value above ~2.1B can't wrap to a negative
     // number that `std::min` would then pick as the "smallest" context size.
     const int fitted_ctx =
         static_cast<int>(std::min(ctx_params.n_ctx, static_cast<uint32_t>(INT_MAX)));
-    context_size_ = std::min({fitted_ctx, model_train_ctx, max_default_context_});
+    context_size_ = std::min({fitted_ctx, model_train_ctx, effective_context_cap});
 
     RAC_LOG_INFO("LLM.LlamaCpp", "Final context size: %d (fitted=%u, train=%d, cap=%d)",
-                 context_size_, ctx_params.n_ctx, model_train_ctx, max_default_context_);
+                 context_size_, ctx_params.n_ctx, model_train_ctx, effective_context_cap);
 
     static constexpr int MAX_BATCH_SIZE = 2048;
     static constexpr int MAX_UBATCH_SIZE = 512;
@@ -1254,11 +1265,15 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 
     // Decode loop: sample → stop-window detection → KV-decode step, emitting
     // completed UTF-8 chunks straight through the streaming callback. The
-    // starting KV position mirrors the historical generate_stream value
-    // (batch.n_tokens after the prefill loop). Shared with
+    // starting KV position is the total prompt length: the prefill loop above
+    // filled positions [0, prompt_tokens). Using batch.n_tokens here was only
+    // correct while the whole prompt fit in a single batch — once a prompt
+    // spans multiple chunks, batch.n_tokens holds just the last chunk's size,
+    // so generation resumed at the wrong position and llama_decode rejected the
+    // batch with an "inconsistent sequence positions" error. Shared with
     // generate_from_context() via run_decode_loop().
     const int tokens_generated =
-        run_decode_loop(sampler_, batch, batch.n_tokens, effective_max_tokens, callback);
+        run_decode_loop(sampler_, batch, prompt_tokens, effective_max_tokens, callback);
     if (out_tokens_generated != nullptr) {
         *out_tokens_generated = tokens_generated;
     }

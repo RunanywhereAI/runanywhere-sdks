@@ -186,6 +186,23 @@ typedef struct rac_llm_service {
 RAC_API rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
+ * @brief Create an LLM service with backend load options
+ *
+ * Same routing as rac_llm_create(), but forwards @p config_json to the
+ * selected plugin's `create` op. For the llama.cpp backend this JSON carries
+ * the v4 load knobs (`context_length`, `accelerator_policy`/`use_gpu`,
+ * `num_threads`); passing NULL is identical to rac_llm_create() and keeps every
+ * backend default.
+ *
+ * @param model_id Model identifier (registry ID or path to model file)
+ * @param config_json Backend load options as a JSON object string, or NULL
+ * @param out_handle Output: Handle to the created service
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_create_with_config(const char* model_id, const char* config_json,
+                                                rac_handle_t* out_handle);
+
+/**
  * @brief Initialize an LLM service
  *
  * @param handle Service handle

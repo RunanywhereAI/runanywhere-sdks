@@ -77,6 +77,10 @@ bool parse_load_options(const char* options_json, rac_llm_llamacpp_config_t* con
         config->context_size = parsed["context_length"].get<int32_t>();
         any = true;
     }
+    if (parsed.contains("num_threads") && parsed["num_threads"].is_number_integer()) {
+        config->num_threads = parsed["num_threads"].get<int32_t>();
+        any = true;
+    }
     // accelerator_policy wins over the deprecated use_gpu when both are present,
     // matching the proto comment that calls use_gpu an adapter onto it.
     int policy = 0;
