@@ -1652,9 +1652,23 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     rac_bool_t is_speech = RAC_FALSE;
 
     if (have_model) {
-        if (ref.ops->set_threshold && request.has_options() &&
-            request.options().has_activation_threshold()) {
-            (void)ref.ops->set_threshold(ref.impl, threshold);
+        if (request.has_options() && request.options().has_activation_threshold()) {
+            // An override the backend cannot apply must not be ignored: the
+            // caller would get a result computed at the calibrated threshold
+            // while believing theirs took effect. Same contract as the
+            // `!ref.ops->process` check below.
+            if (!ref.ops->set_threshold) {
+                rac::lifecycle::release_lifecycle_vad(&ref);
+                return rac_proto_buffer_set_error(
+                    out_result, RAC_ERROR_NOT_SUPPORTED,
+                    "VAD backend cannot apply activation_threshold");
+            }
+            rc = ref.ops->set_threshold(ref.impl, threshold);
+            if (rc != RAC_SUCCESS) {
+                publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
+                rac::lifecycle::release_lifecycle_vad(&ref);
+                return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+            }
         }
         if (!ref.ops->process) {
             rac::lifecycle::release_lifecycle_vad(&ref);
