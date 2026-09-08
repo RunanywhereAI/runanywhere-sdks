@@ -203,6 +203,21 @@ if(RAC_BINARY_DIR)
             endif()
         endif()
     endif()
+    # Linux Sherpa-ONNX is SHARED from core/third_party/sherpa-onnx-linux/lib,
+    # same shape as the Windows DLL case above: libsherpa-onnx-c-api.so was
+    # dynamically linked against its own libonnxruntime.so.1 at sherpa's build
+    # time, so both live outside RAC_BINARY_DIR and the third_party glob above
+    # never sees them. Without this a routable rac_backend_sherpa.a still
+    # fails to dlopen at runtime for want of these two files.
+    if(UNIX AND NOT APPLE)
+        set(_sherpa_linux "${RAC_SOURCE_DIR}/core/third_party/sherpa-onnx-linux/lib")
+        if(EXISTS "${_sherpa_linux}")
+            file(GLOB _sherpa_linux_libs "${_sherpa_linux}/*.so*")
+            foreach(_lib IN LISTS _sherpa_linux_libs)
+                file(COPY "${_lib}" DESTINATION "${RAC_KIT_OUT}/third_party")
+            endforeach()
+        endif()
+    endif()
     if(APPLE AND EXISTS "${RAC_KIT_OUT}/third_party/libonnxruntime.dylib")
         # The real dylib advertises LC_ID_DYLIB @rpath/libonnxruntime.1.dylib.
         # There is no loadable file by that name in the kit, so rewrite the id

@@ -306,7 +306,29 @@ void HttpServer::setupCors() {
 rac_result_t HttpServer::loadModel(const std::string& modelPath) {
     RAC_LOG_INFO("Server", "Loading model: %s", modelPath.c_str());
 
-    rac_result_t rc = rac_llm_create(modelPath.c_str(), &llmHandle_);
+    // Forward the CLI load knobs (--context-length, --threads, --accelerator)
+    // to the backend's create op. Without this the llama.cpp backend never sees
+    // context_size and falls back to its 2048 default, so any agentic harness
+    // whose system prompt exceeds 2048 tokens gets "Prompt too long". The JSON
+    // keys are the ones llama.cpp's parse_load_options() honors; NULL when
+    // nothing is set preserves the previous default-only behavior exactly.
+    nlohmann::json loadOpts;
+    if (config_.context_size > 0) {
+        loadOpts["context_length"] = config_.context_size;
+    }
+    if (config_.threads > 0) {
+        loadOpts["num_threads"] = config_.threads;
+    }
+    if (config_.gpu_layers != RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO) {
+        // parse_load_options speaks CPU/GPU intent (0 or all layers), not an
+        // arbitrary layer count. Pin to CPU only when explicitly requested;
+        // treat every other explicit value as "use the GPU".
+        loadOpts["use_gpu"] = (config_.gpu_layers != 0);
+    }
+    std::string loadOptsStr = loadOpts.empty() ? std::string() : loadOpts.dump();
+    const char* loadOptsCStr = loadOpts.empty() ? nullptr : loadOptsStr.c_str();
+
+    rac_result_t rc = rac_llm_create_with_config(modelPath.c_str(), loadOptsCStr, &llmHandle_);
     if (RAC_FAILED(rc)) {
         RAC_LOG_ERROR("Server", "Failed to create generic LLM handle: %d", rc);
         return RAC_ERROR_SERVER_MODEL_LOAD_FAILED;

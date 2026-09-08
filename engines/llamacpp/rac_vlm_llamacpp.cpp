@@ -34,6 +34,7 @@
 #include "mtmd-helper.h"
 #include "mtmd.h"
 
+#include "llamacpp_logging.h"
 #include "llamacpp_stop_helpers.h"
 
 #include "rac/core/rac_error.h"
@@ -1027,6 +1028,7 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
 
     // Initialize llama backend
     llama_backend_init();
+    runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
 
     // Load model
     int gpu_layers = backend->config.gpu_layers;
