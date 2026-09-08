@@ -146,7 +146,7 @@ ctest --test-dir build --output-on-failure
 
 `telemetry_extraction_tests` and `device_identity_tests` are registered in
 `core/tests/CMakeLists.txt`; `rcli_telemetry_live_tests` is registered separately in
-`rcli/tests/CMakeLists.txt`. All three are hand-rolled assertion runners — `CHECK()` in
+`tests/CMakeLists.txt` in `RunanywhereAI/RCLI`. All three are hand-rolled assertion runners — `CHECK()` in
 some files, `ASSERT_EQ`/`ASSERT_TRUE` (from `core/tests/test_common.h`) in others — never
 GoogleTest:
 
@@ -282,7 +282,7 @@ public staging backend — `--environment development --base-url <origin> teleme
 12) and prints a `MODALITY | RESULT | STATUS | RECEIVED | STORED | SKIPPED` table parsed
 directly from the backend's own batch response — **the `STORED` column is authoritative
 server-side confirmation**, not just an HTTP 2xx. `run_telemetry_blast()`'s own exit-code
-logic (`rcli/src/commands/cmd_telemetry.cpp`) does fold `stored >= count` into its overall
+logic (`src/commands/cmd_telemetry.cpp` in `RunanywhereAI/RCLI`) does fold `stored >= count` into its overall
 pass/fail, so a genuine storage shortfall on any modality does make the process exit
 non-zero, not just a transport error — but the exit code is one bit for all 12 modalities
 combined, so a non-zero exit still requires reading the table to know *which* modality
@@ -302,7 +302,7 @@ didn't recognize — a real bug to chase, not the same failure class at all).
 ```
 
 `auth login` only has a path in `production` — `development`'s keyless mode has no login
-step by design (see `rcli/src/commands/cmd_auth.cpp`'s own subcommand help text).
+step by design (see `src/commands/cmd_auth.cpp`'s own subcommand help text in `RunanywhereAI/RCLI`).
 
 **To inspect the actual request body**, not just the summary table, add `--json` for
 machine-readable CLI output and `-v` for debug logging (the debug log includes the
