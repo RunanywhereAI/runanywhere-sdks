@@ -51,8 +51,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND RAC_BUILD_BACKENDS)
     message(FATAL_ERROR
         "RAC_BUILD_BACKENDS=ON cannot be honoured here: engines/ is added by the "
         "repo-root CMakeLists.txt, not by core/. Configure the repo root instead "
-        "(from core/: cmake -S .. -B build -DRAC_BUILD_BACKENDS=ON), or drop the "
-        "flag for a commons-only build.")
+        "(from core/: cmake -S .. -B ../build/backends -DRAC_BUILD_BACKENDS=ON), or "
+        "drop the flag for a commons-only build.")
 endif()
 
 # Ensure EMSCRIPTEN is always defined so
