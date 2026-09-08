@@ -406,7 +406,9 @@ typedef struct rac_vlm_info {
 /**
  * @brief Simple VLM streaming callback
  *
- * Called for each generated token during streaming.
+ * Called with successive runs of decoded text during streaming, each ending on
+ * a complete UTF-8 character. This is not one call per token: see
+ * rac_vlm_component_process_stream.
  *
  * @param token The generated token string
  * @param user_data User-provided context
