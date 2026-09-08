@@ -24,6 +24,7 @@
 #include "core/internal/platform_compat.h"
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/common/special_token_filter.h"
+#include "features/common/utf8_stream_boundary.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
@@ -535,6 +536,12 @@ struct vlm_stream_context {
     // `<end_of_utterance>` across two callbacks, and neither half is
     // recognisable on its own.
     rac::tokens::StreamFilter filter;
+
+    // Trailing bytes of a UTF-8 character the backend has only partly emitted.
+    // Held until the rest arrives so no chunk handed to the caller is invalid
+    // UTF-8. Accumulation into `cleaned_text` is deliberately not delayed, so
+    // the final result is unaffected.
+    std::string utf8_tail;
 };
 
 /**
@@ -569,9 +576,18 @@ static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) 
     ctx->cleaned_text += cleaned;
     ctx->token_count++;
 
-    // Forward only non-empty cleaned tokens to the user callback
+    // Forward only non-empty cleaned tokens to the user callback, and only up
+    // to the last complete character: a piece may end mid-sequence, and its
+    // remaining bytes arrive on a later callback.
     if (!cleaned.empty() && ctx->token_callback) {
-        return ctx->token_callback(cleaned.c_str(), ctx->user_data);
+        ctx->utf8_tail += cleaned;
+        const size_t hold = rac::tokens::incomplete_utf8_tail(ctx->utf8_tail);
+        if (ctx->utf8_tail.size() > hold) {
+            const std::string deliverable = ctx->utf8_tail.substr(0, ctx->utf8_tail.size() - hold);
+            ctx->utf8_tail.erase(0, ctx->utf8_tail.size() - hold);
+            return ctx->token_callback(deliverable.c_str(), ctx->user_data);
+        }
+        return RAC_TRUE;  // whole chunk is a partial character; wait for the rest
     }
 
     return RAC_TRUE;
@@ -654,8 +670,22 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     if (!held_tail.empty()) {
         ctx.cleaned_text += held_tail;
         if (token_callback) {
-            token_callback(held_tail.c_str(), user_data);
+            ctx.utf8_tail += held_tail;
         }
+    }
+
+    // Anything still held is a character the backend never finished emitting
+    // (generation hit max_tokens or was cancelled mid-sequence). Deliver only
+    // what completes; the leftover bytes cannot render and would put an
+    // invalid chunk on the stream. `cleaned_text` already has them, so the
+    // final result is unchanged.
+    if (token_callback && !ctx.utf8_tail.empty()) {
+        const size_t hold = rac::tokens::incomplete_utf8_tail(ctx.utf8_tail);
+        if (ctx.utf8_tail.size() > hold) {
+            const std::string final_chunk = ctx.utf8_tail.substr(0, ctx.utf8_tail.size() - hold);
+            token_callback(final_chunk.c_str(), user_data);
+        }
+        ctx.utf8_tail.clear();
     }
 
     // Build final result for completion callback
