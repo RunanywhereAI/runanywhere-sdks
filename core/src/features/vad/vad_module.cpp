@@ -1432,6 +1432,17 @@ namespace {
 // a caller alternating threshold values does not churn allocations. Guarded by
 // its own mutex because the lifecycle entry points take no handle and therefore
 // carry no other serialization.
+// Serialises the set_threshold -> process window on the handle-less lifecycle
+// path. The lifecycle ref keeps the model loaded but does not stop a second
+// request from re-setting the threshold between this request's set and its
+// process, which would return a result computed at the other caller's value.
+// The component path solves the same problem per handle; this path has no
+// handle, so the lock is module-wide.
+std::mutex& lifecycle_threshold_mutex() {
+    static std::mutex m;
+    return m;
+}
+
 std::mutex& fallback_vad_mutex() {
     static std::mutex m;
     return m;
@@ -1652,7 +1663,11 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     rac_bool_t is_speech = RAC_FALSE;
 
     if (have_model) {
+        // Only taken when an override is in effect; the common path stays
+        // lock-free, matching rac_vad_component_process_proto.
+        std::unique_lock<std::mutex> threshold_lock;
         if (request.has_options() && request.options().has_activation_threshold()) {
+            threshold_lock = std::unique_lock<std::mutex>(lifecycle_threshold_mutex());
             // An override the backend cannot apply must not be ignored: the
             // caller would get a result computed at the calibrated threshold
             // while believing theirs took effect. Same contract as the
