@@ -33,6 +33,7 @@ on:
       - '.gitignore'
       - 'scripts/setup/sync-skills.sh'
       - 'scripts/ci/check_agent_skills.py'
+      - 'scripts/ci/test_agent_skills.py'
       - '.github/workflows/agent-skills-gate.yml'
   push:
     branches: [main]
@@ -42,6 +43,7 @@ on:
       - '.gitignore'
       - 'scripts/setup/sync-skills.sh'
       - 'scripts/ci/check_agent_skills.py'
+      - 'scripts/ci/test_agent_skills.py'
       - '.github/workflows/agent-skills-gate.yml'
 
 permissions:
@@ -58,3 +60,8 @@ jobs:
       # deliberately, so it cannot be broken by an unrelated toolchain change.
       - name: Check agent skill trees
         run: python3 scripts/ci/check_agent_skills.py
+      - name: Agent skills rule tests
+        # The step above only proves the trees are clean today. These prove each
+        # private-coordinate rule still matches the shape it was added for, so a
+        # rule cannot quietly stop catching anything.
+        run: python3 scripts/ci/test_agent_skills.py
