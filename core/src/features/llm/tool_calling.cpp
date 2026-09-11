@@ -23,6 +23,7 @@
 #include <cstring>
 #include <ctime>
 #include <limits>
+#include <memory>
 #include <new>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -719,12 +720,13 @@ static ToolParseStatus get_json_keys(const char* json_obj, std::vector<std::stri
                     return key_status;
                 }
                 if (key_status == ToolParseStatus::kSuccess) {
+                    const std::unique_ptr<char, decltype(&std::free)> owned_key(found_key,
+                                                                               &std::free);
                     // Verify it's followed by colon
                     size_t pos = skip_whitespace(json_obj, key_end, len);
                     if (pos < len && json_obj[pos] == ':') {
-                        out_keys->emplace_back(found_key);
+                        out_keys->emplace_back(owned_key.get());
                     }
-                    free(found_key);
                     i = key_end - 1;
                     continue;
                 }
@@ -2291,7 +2293,13 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
                                   tool_format_key_from_proto(request.options().format())),
                               &next)
                         : rac_tool_call_parse(remainder.c_str(), &next);
-                if (next_rc != RAC_SUCCESS || next.has_tool_call != RAC_TRUE) {
+                if (next_rc != RAC_SUCCESS) {
+                    rac_tool_call_free(&next);
+                    rac_tool_call_free(&parsed);
+                    return set_tool_parse_proto_error(
+                        out_result, request.text(), "tool-call parsing failed", next_rc);
+                }
+                if (next.has_tool_call != RAC_TRUE) {
                     rac_tool_call_free(&next);
                     break;
                 }
