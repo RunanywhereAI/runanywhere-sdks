@@ -48,7 +48,10 @@ class RunAnywhereStructuredOutput {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     final generation = await generateWithStructuredOutput(
       prompt: prompt,
-      structuredOutput: StructuredOutputOptions(schema: schema),
+      structuredOutput: StructuredOutputOptions(
+        schema: schema,
+        includeSchemaInPrompt: true,
+      ),
       options: options,
     );
     return RunAnywhereLLM.shared.extractStructuredOutput(
