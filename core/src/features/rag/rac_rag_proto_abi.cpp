@@ -27,7 +27,6 @@
 #include <vector>
 
 #include "../embeddings/embeddings_service_internal.h"
-#include "features/llm/llm_thinking_tags_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -46,6 +45,7 @@
 #include "rag.pb.h"
 #include "sdk_events.pb.h"
 
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "foundation/rac_proto_marshal_internal.h"
 #include "infrastructure/events/sdk_event_publish.h"
 #endif
