@@ -107,7 +107,7 @@ repos:
 
       - id: ios-sdk-periphery
         name: iOS SDK Periphery (Unused Code)
-        entry: bash -c 'cd bindings/swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
+        entry: bash -c 'cd bindings/swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
         language: system
         files: ^bindings/swift/.*\.swift$
         pass_filenames: false
