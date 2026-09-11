@@ -8,10 +8,41 @@
 #include <algorithm>
 #include <cctype>
 #include <string_view>
+#include <vector>
 
 namespace runanywhere::rag {
 
 namespace {
+
+// Append size-budgeted slices of `text` to `out`, never cutting through a
+// UTF-8 character. Used by both size-only split paths below: the top-level
+// one when no separator matched, and the per-split one when a piece is
+// oversized and there is no finer separator left to try.
+void append_utf8_bounded_slices(std::string_view text, size_t budget,
+                                std::vector<std::string_view>& out) {
+    if (budget == 0) {
+        out.push_back(text);
+        return;
+    }
+    size_t i = 0;
+    while (i < text.length()) {
+        size_t end = std::min(i + budget, text.length());
+        while (end > i && end < text.length() &&
+               (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) {
+            --end;
+        }
+        if (end == i) {
+            // One character is wider than the whole budget: emit it intact
+            // rather than spin or hand back a partial character.
+            end = i + 1;
+            while (end < text.length() && (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80) {
+                ++end;
+            }
+        }
+        out.push_back(text.substr(i, end - i));
+        i = end;
+    }
+}
 
 void perform_recursive_chunking(std::string_view text_view, const std::string& original_text,
                                 const std::vector<std::string>& separators, size_t chunk_size_chars,
@@ -61,10 +92,10 @@ void perform_recursive_chunking(std::string_view text_view, const std::string& o
 
     std::vector<std::string_view> splits;
     if (separator.empty()) {
-        for (size_t i = 0; i < text_view.length(); i += chunk_size_chars) {
-            splits.push_back(
-                text_view.substr(i, std::min(chunk_size_chars, text_view.length() - i)));
-        }
+        // Last-resort split: no separator matched, so cut on size alone. A
+        // script without spaces reaches this routinely (none of "\n\n" / ". "
+        // / " " occur in CJK), so the cut must land on a character boundary.
+        append_utf8_bounded_slices(text_view, chunk_size_chars, splits);
     } else {
         size_t start = 0;
         size_t pos = text_view.find(separator);
@@ -123,9 +154,12 @@ void perform_recursive_chunking(std::string_view text_view, const std::string& o
                 perform_recursive_chunking(split, original_text, next_separators, chunk_size_chars,
                                            chunk_overlap_chars, output_chunks, chunk_index);
             } else {
-                for (size_t j = 0; j < split.length(); j += chunk_size_chars) {
-                    std::string_view sub_split =
-                        split.substr(j, std::min(chunk_size_chars, split.length() - j));
+                // Same boundary rule as the size-only path above: this
+                // slices an oversized piece by size, so it must not cut
+                // through a character either.
+                std::vector<std::string_view> sub_splits;
+                append_utf8_bounded_slices(split, chunk_size_chars, sub_splits);
+                for (const auto& sub_split : sub_splits) {
                     current_batch.push_back(sub_split);
                     emit_chunk();
                     current_batch.clear();

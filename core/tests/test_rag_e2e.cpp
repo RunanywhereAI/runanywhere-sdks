@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include "features/rag/rag_chunker.h"
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -421,8 +422,86 @@ void run_scoping_case(const std::string& embed_id, const std::string& llm_id,
 
 }  // namespace
 
+// The chunker needs no model, so this runs before the model gate below.
+// Its last-resort branch (no separator matched) cuts on a byte budget, and a
+// script without spaces reaches that branch routinely: none of "\n\n", ". "
+// or " " occur in CJK. Cutting there on a raw byte offset put half a
+// character at both ends of every chunk, and those chunks are what gets
+// embedded, stored, and returned in RAGResult's string fields.
+static bool chunker_utf8_boundaries_hold() {
+    auto valid_utf8 = [](const std::string& s) {
+        size_t i = 0;
+        while (i < s.size()) {
+            const unsigned char c = static_cast<unsigned char>(s[i]);
+            size_t need = 99;
+            if (c < 0x80) {
+                need = 0;
+            } else if ((c & 0xE0) == 0xC0) {
+                need = 1;
+            } else if ((c & 0xF0) == 0xE0) {
+                need = 2;
+            } else if ((c & 0xF8) == 0xF0) {
+                need = 3;
+            } else {
+                return false;  // continuation byte or invalid lead
+            }
+            for (size_t k = 1; k <= need; ++k) {
+                if (i + k >= s.size() || (static_cast<unsigned char>(s[i + k]) & 0xC0) != 0x80) {
+                    return false;  // truncated or malformed sequence
+                }
+            }
+            i += need + 1;
+        }
+        return true;
+    };
+
+    runanywhere::rag::DocumentChunker chunker{runanywhere::rag::ChunkerConfig{}};
+    bool ok = true;
+
+    // A budget narrower than one character. The size-only paths must emit the
+    // character whole rather than slice it, and must not then re-slice it.
+    {
+        runanywhere::rag::ChunkerConfig tiny;
+        tiny.chunk_size = 1;
+        tiny.chars_per_token = 2;  // 2-byte budget, narrower than a 3-byte CJK char
+        runanywhere::rag::DocumentChunker narrow{tiny};
+        std::string doc;
+        for (int i = 0; i < 40; ++i) {
+            doc += "\xe6\x9c\xba\xe5\x99\xa8";
+        }
+        for (const auto& chunk : narrow.chunk_document(doc)) {
+            if (!valid_utf8(chunk.text)) {
+                std::fprintf(stderr, "FAIL: narrow-budget chunk is not valid UTF-8\n");
+                ok = false;
+                break;
+            }
+        }
+    }
+    // The one-byte prefixes matter: an unshifted CJK string happens to land the
+    // 720-byte budget on a character boundary, so the bug hides without them.
+    for (const char* prefix : {"", "a", "ab"}) {
+        std::string doc = prefix;
+        for (int i = 0; i < 200; ++i) {
+            doc += "\xe6\x9c\xba\xe5\x99\xa8\xe5\xad\xa6\xe4\xb9\xa0";  // CJK, 3 bytes each
+        }
+        for (const auto& chunk : chunker.chunk_document(doc)) {
+            if (!valid_utf8(chunk.text)) {
+                std::fprintf(stderr, "FAIL: chunk is not valid UTF-8 (prefix=\"%s\")\n", prefix);
+                ok = false;
+                break;
+            }
+        }
+    }
+    return ok;
+}
+
 int main() {
     std::fprintf(stdout, "=== RAG end-to-end test ===\n");
+
+    if (!chunker_utf8_boundaries_hold()) {
+        return 1;
+    }
+    std::fprintf(stdout, "OK: chunker keeps UTF-8 boundaries\n");
 
     const std::string embed_model = env_or("RAG_TEST_EMBED_MODEL", "");
     const std::string embed_vocab = env_or("RAG_TEST_EMBED_VOCAB", "");
