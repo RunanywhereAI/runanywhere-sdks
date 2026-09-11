@@ -195,10 +195,10 @@ Install via Gradle (Maven Central):
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.37")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.37")
     // Optional: STT / TTS / VAD
-    // implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.11")
+    // implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.37")
 }
 ```
 
@@ -232,11 +232,11 @@ Install via pub.dev:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.11
-  runanywhere_llamacpp: ^0.20.11  # LLM/VLM text generation
-  # runanywhere_onnx: ^0.20.11    # STT, TTS, VAD, voice agent
-  # runanywhere_mlx: ^0.20.11     # Apple-native LLM/VLM/STT/TTS/embeddings
-  # runanywhere_qhexrt: ^0.20.11  # Snapdragon Hexagon NPU
+  runanywhere: ^0.20.37
+  runanywhere_llamacpp: ^0.20.37  # LLM/VLM text generation
+  # runanywhere_onnx: ^0.20.37    # STT, TTS, VAD, voice agent
+  # runanywhere_mlx: ^0.20.37     # Apple-native LLM/VLM/STT/TTS/embeddings
+  # runanywhere_qhexrt: ^0.20.37  # Snapdragon Hexagon NPU
 ```
 
 [Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](bindings/flutter/)
@@ -268,7 +268,7 @@ console.log(result.text); // "Paris is the capital of France."
 Install via npm:
 
 ```bash
-npm install @runanywhere/core@0.20.11 @runanywhere/llamacpp@0.20.11
+npm install @runanywhere/core@0.20.37 @runanywhere/llamacpp@0.20.37
 # optional backends: @runanywhere/onnx @runanywhere/mlx @runanywhere/qhexrt
 ```
 
@@ -303,7 +303,7 @@ console.log(result.text); // "Paris is the capital of France."
 Install via npm:
 
 ```bash
-npm install @runanywhere/web@0.20.11 @runanywhere/web-llamacpp@0.20.11
+npm install @runanywhere/web@0.20.37 @runanywhere/web-llamacpp@0.20.37
 # @runanywhere/web-onnx for STT/TTS/VAD/embeddings in the browser
 ```
 
@@ -372,7 +372,7 @@ Namespaces per modality (`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rag`,
 Install via pip:
 
 ```bash
-pip install runanywhere==0.20.11
+pip install runanywhere==0.20.37
 ```
 
 [Source](bindings/python/)
@@ -431,7 +431,7 @@ irm https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.ps1 | iex
 | **Python** | Windows, macOS, Linux | Alpha | pip (`runanywhere`) | [SDK README](bindings/python/) |
 | **rcli** | macOS, Linux, Windows | Stable | Homebrew / install script | [RCLI](https://github.com/RunanywhereAI/RCLI) |
 
-All SDKs ship on one version line, currently **0.20.29**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
+All SDKs ship on one version line, currently **0.20.37**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
 
 ---
 
