@@ -67,7 +67,14 @@ LIST_ONLY=0
 #   node_modules, build, dist      not source
 #   DevTools, Playground, examples not shipped SDK surface
 # ---------------------------------------------------------------------------
-mapfile -t FILES < <(
+# Read loop rather than `mapfile`: macOS ships bash 3.2, which has no mapfile,
+# and this gate has to be runnable locally to reproduce a CI failure. Same
+# reasoning as bindings/swift/scripts/sync-dist-repo.sh and
+# scripts/build/build-core-android.sh.
+FILES=()
+while IFS= read -r _file; do
+  FILES+=("$_file")
+done < <(
   find \
     bindings/swift/Sources \
     bindings/kotlin/src/main \
