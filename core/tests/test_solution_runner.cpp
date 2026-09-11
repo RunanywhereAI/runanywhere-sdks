@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "pipeline.pb.h"
@@ -1067,6 +1068,41 @@ TEST(voice_agent_solution_compiles) {
 }
 
 // ---------------------------------------------------------------------------
+// 9b. An explicit temperature of 0.0 is greedy decoding. llm_options.proto
+//     documents it as "honoured as an explicit request", so it has to reach
+//     the llm operator instead of looking identical to an unset field.
+// ---------------------------------------------------------------------------
+TEST(voice_agent_explicit_zero_temperature_reaches_llm_operator) {
+    SolutionConfig cfg;
+    auto* va = cfg.mutable_voice_agent();
+    va->set_llm_model_id("qwen3-4b");
+    va->set_stt_model_id("whisper");
+    va->set_tts_model_id("kokoro");
+    va->set_vad_model_id("silero");
+    va->mutable_generation()->set_temperature(0.0f);
+
+    runanywhere::v1::PipelineSpec spec;
+    CHECK(rac::solutions::convert_solution_to_pipeline(cfg, &spec) == RAC_SUCCESS);
+
+    const runanywhere::v1::OperatorSpec* llm = nullptr;
+    for (const auto& op : spec.operators()) {
+        if (op.name() == "llm") {
+            llm = &op;
+            break;
+        }
+    }
+    CHECK(llm != nullptr);
+    if (llm == nullptr) {
+        return;
+    }
+    const auto it = llm->params().find("temperature");
+    CHECK(it != llm->params().end());
+    if (it != llm->params().end()) {
+        CHECK(std::stof(it->second) == 0.0f);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 10. SolutionConfig (RAG) expands + compiles with explicit stand-ins.
 //     Topology: query (source) → retrieve → context → llm. The retrieve
 //     operator owns the embedding lookup via the host-supplied RAG
@@ -1270,6 +1306,7 @@ int main() {
     run_test_time_series_solution_compiles_with_builtin_window();
     run_test_context_build_builtin_applies_prompt_template();
     run_test_voice_agent_solution_compiles();
+    run_test_voice_agent_explicit_zero_temperature_reaches_llm_operator();
     run_test_rag_solution_compiles();
     run_test_c_abi_proto_bytes_lifecycle();
     run_test_c_abi_yaml_solution_lifecycle();
