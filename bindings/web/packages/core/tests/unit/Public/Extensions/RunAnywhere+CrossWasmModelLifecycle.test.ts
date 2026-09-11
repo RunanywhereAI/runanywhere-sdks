@@ -5,10 +5,13 @@ import {
   InferenceFramework,
   ModelCategory,
   ModelInfo,
+  ModelLoadRequest,
+  ModelLoadResult,
   ModelUnloadRequest,
   ModelUnloadResult,
   type ModelInfo as ProtoModelInfo,
   type CurrentModelRequest as ProtoCurrentModelRequest,
+  type ModelLoadRequest as ProtoModelLoadRequest,
   type ModelUnloadRequest as ProtoModelUnloadRequest,
 } from '@runanywhere/proto-ts/model_types';
 import { SDKError } from '@runanywhere/proto-ts/errors';
@@ -20,6 +23,21 @@ import {
   registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
+import {
+  getActiveBackendWorkerHost,
+  type BackendWorkerHost,
+} from '../../../../src/runtime/BackendWorkerHost';
+import type * as BackendWorkerHostModule from '../../../../src/runtime/BackendWorkerHost.js';
+
+vi.mock('../../../../src/runtime/BackendWorkerHost.js', async () => {
+  const actual = await vi.importActual<typeof BackendWorkerHostModule>(
+    '../../../../src/runtime/BackendWorkerHost.js',
+  );
+  return {
+    ...actual,
+    getActiveBackendWorkerHost: vi.fn(),
+  };
+});
 
 interface LoadedModelSeed {
   id: string;
@@ -27,12 +45,14 @@ interface LoadedModelSeed {
 }
 
 interface FakeLifecycleOptions {
+  framework?: InferenceFramework;
   throwOnUnload?: boolean;
   throwOnReset?: boolean;
 }
 
 interface FakeLifecycleRuntime {
   module: EmscriptenRunanywhereModule;
+  loadRequests: ProtoModelLoadRequest[];
   unloadRequests: ProtoModelUnloadRequest[];
   loadedModelIds(): string[];
   resetCalls(): number;
@@ -40,10 +60,129 @@ interface FakeLifecycleRuntime {
 
 afterEach(() => {
   clearRunanywhereModule();
+  vi.mocked(getActiveBackendWorkerHost).mockReset();
   vi.restoreAllMocks();
 });
 
 describe('WebModelLifecycle multi-WASM routing', () => {
+  it('routes a preferred backend to its owning WASM instead of the catalog owner', () => {
+    const llama = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    });
+    const onnx = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    });
+    registerBackends(llama.module, onnx.module);
+    installRegistrySnapshots([
+      modelSnapshot(
+        'portable-model',
+        ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      ),
+    ]);
+
+    const request = ModelLoadRequest.create({
+      modelId: 'portable-model',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      backendPreferences: [
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      ],
+    });
+
+    expect(WebModelLifecycle.loadModel(request)?.framework).toBe(
+      InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    );
+    expect(onnx.loadRequests).toEqual([request]);
+    expect(llama.loadRequests).toEqual([]);
+  });
+
+  it('routes to the next registered backend preference when the first is unavailable', () => {
+    const llama = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    });
+    const onnx = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    });
+    registerBackends(llama.module, onnx.module);
+    installRegistrySnapshots([
+      modelSnapshot(
+        'portable-model',
+        ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      ),
+    ]);
+
+    const request = ModelLoadRequest.create({
+      modelId: 'portable-model',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+      backendPreferences: [
+        InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      ],
+    });
+
+    WebModelLifecycle.loadModel(request);
+
+    expect(onnx.loadRequests).toEqual([request]);
+    expect(llama.loadRequests).toEqual([]);
+  });
+
+  it('keeps a llama.cpp embedding load on the llama BackendWorker', async () => {
+    const llama = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    });
+    const onnx = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    });
+    registerBackends(llama.module, onnx.module);
+    installRegistrySnapshots([
+      modelSnapshot(
+        'gguf-embedding',
+        ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      ),
+    ]);
+    vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+    const resultBytes = ModelLoadResult.encode(ModelLoadResult.create({
+      modelId: 'gguf-embedding',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    })).finish();
+    const host = {
+      loadModel: vi.fn(async () => ({ resultBytes })),
+    } as unknown as BackendWorkerHost;
+    vi.mocked(getActiveBackendWorkerHost).mockImplementation((backendId) => (
+      backendId === 'llamacpp' ? host : null
+    ));
+    const request = ModelLoadRequest.create({
+      modelId: 'gguf-embedding',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      backendPreferences: [
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      ],
+    });
+
+    await expect(WebModelLifecycle.loadModelAsync(request)).resolves.toMatchObject({
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    });
+    expect(host.loadModel).toHaveBeenCalledWith(
+      'embeddings',
+      expect.objectContaining({
+        requestBytes: expect.any(Uint8Array),
+        modelInfoBytes: expect.any(Uint8Array),
+      }),
+    );
+    expect(getActiveBackendWorkerHost).not.toHaveBeenCalledWith('onnx');
+    expect(llama.loadRequests).toEqual([]);
+    expect(onnx.loadRequests).toEqual([]);
+  });
+
   it('routes framework-scoped current-model queries to the owning WASM', () => {
     const llama = fakeLifecycleRuntime([
       { id: 'llama-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },
@@ -262,6 +401,7 @@ function fakeLifecycleRuntime(
   const heap32 = new Int32Array(memory);
   const heapU32 = new Uint32Array(memory);
   const loaded = new Map(initialModels.map((model) => [model.id, model.category]));
+  const loadRequests: ProtoModelLoadRequest[] = [];
   const unloadRequests: ProtoModelUnloadRequest[] = [];
   let nextPointer = 64;
   let resetCount = 0;
@@ -271,6 +411,15 @@ function fakeLifecycleRuntime(
     nextPointer += (Math.max(size, 1) + 7) & ~7;
     if (nextPointer >= memory.byteLength) throw new Error('fake WASM heap exhausted');
     return pointer;
+  };
+
+  const writeResult = (outResult: number, resultBytes: Uint8Array): void => {
+    const dataPointer = allocate(resultBytes.length);
+    heapU8.set(resultBytes, dataPointer);
+    heapU32[outResult >>> 2] = dataPointer;
+    heapU32[(outResult + 4) >>> 2] = resultBytes.length;
+    heap32[(outResult + 8) >>> 2] = 0;
+    heapU32[(outResult + 12) >>> 2] = 0;
   };
 
   const module: EmscriptenRunanywhereModule = {
@@ -310,6 +459,26 @@ function fakeLifecycleRuntime(
       heapU32.fill(0, bufferPointer >>> 2, (bufferPointer >>> 2) + 4);
     },
     _rac_proto_buffer_free: () => undefined,
+    _rac_get_model_registry: () => 1,
+    _rac_model_lifecycle_load_proto: (_registry, requestPointer, requestSize, outResult) => {
+      const request = ModelLoadRequest.decode(
+        heapU8.slice(requestPointer, requestPointer + requestSize),
+      );
+      loadRequests.push(request);
+      loaded.set(request.modelId, request.category ?? ModelCategory.MODEL_CATEGORY_UNSPECIFIED);
+      const resultBytes = ModelLoadResult.encode(ModelLoadResult.create({
+        modelId: request.modelId,
+        category: request.category ?? ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+        framework: options.framework ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+        resolvedPath: '',
+        resolvedArtifacts: [],
+        loadedAtUnixMs: 1,
+        warnings: [],
+        alreadyLoaded: false,
+      })).finish();
+      writeResult(outResult, resultBytes);
+      return 0;
+    },
     _rac_model_lifecycle_current_model_proto: (requestPointer, requestSize, outResult) => {
       const request: ProtoCurrentModelRequest = CurrentModelRequest.decode(
         heapU8.slice(requestPointer, requestPointer + requestSize),
@@ -326,12 +495,7 @@ function fakeLifecycleRuntime(
         resolvedPath: '',
         resolvedArtifacts: [],
       })).finish();
-      const dataPointer = allocate(resultBytes.length);
-      heapU8.set(resultBytes, dataPointer);
-      heapU32[outResult >>> 2] = dataPointer;
-      heapU32[(outResult + 4) >>> 2] = resultBytes.length;
-      heap32[(outResult + 8) >>> 2] = 0;
-      heapU32[(outResult + 12) >>> 2] = 0;
+      writeResult(outResult, resultBytes);
       return 0;
     },
     _rac_model_lifecycle_unload_proto: (requestPointer, requestSize, outResult) => {
@@ -360,12 +524,7 @@ function fakeLifecycleRuntime(
         unloadedAtUnixMs: 1,
         warnings: [],
       })).finish();
-      const dataPointer = allocate(resultBytes.length);
-      heapU8.set(resultBytes, dataPointer);
-      heapU32[outResult >>> 2] = dataPointer;
-      heapU32[(outResult + 4) >>> 2] = resultBytes.length;
-      heap32[(outResult + 8) >>> 2] = 0;
-      heapU32[(outResult + 12) >>> 2] = 0;
+      writeResult(outResult, resultBytes);
       return 0;
     },
     _rac_model_lifecycle_reset: () => {
@@ -377,6 +536,7 @@ function fakeLifecycleRuntime(
 
   return {
     module,
+    loadRequests,
     unloadRequests,
     loadedModelIds: () => Array.from(loaded.keys()).sort((left, right) => left.localeCompare(right)),
     resetCalls: () => resetCount,
