@@ -566,6 +566,17 @@ rac_link_archive_deps(test_plugin_registry_isolation)
 target_compile_features(test_plugin_registry_isolation PRIVATE cxx_std_17)
 add_test(NAME plugin_registry_isolation_tests COMMAND test_plugin_registry_isolation)
 
+# --- Diffusion model strategy error/exception contract ---------------------
+add_executable(test_diffusion_model_registry test_diffusion_model_registry.cpp)
+target_include_directories(test_diffusion_model_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_diffusion_model_registry PRIVATE rac_commons)
+rac_link_archive_deps(test_diffusion_model_registry)
+target_compile_features(test_diffusion_model_registry PRIVATE cxx_std_20)
+add_test(NAME diffusion_model_registry_tests COMMAND test_diffusion_model_registry)
+
 # --- Shared C ABI proto-byte buffer ownership tests -------------------------
 add_executable(test_proto_buffer test_proto_buffer.cpp)
 target_include_directories(test_proto_buffer PRIVATE
