@@ -500,6 +500,14 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: flutter
+      # The core plugin's Android module (packages/runanywhere/android) is a real
+      # Kotlin source set, but `flutter analyze`/`test` below only read Dart: a
+      # Kotlin syntax or dependency error in OkHttpHttpTransport.kt used to ship
+      # with every job green. Add the pinned JDK + Android SDK so the plugin's own
+      # Kotlin task can be compiled (issue #869).
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: android
       # The Dart bindings under packages/runanywhere/lib/generated are IDL codegen output and are not tracked; generate
       # before anything compiles them.
       - uses: ./.github/actions/generate-idl
@@ -513,6 +521,40 @@ jobs:
           dart run melos bootstrap
           dart run melos run analyze
           dart run melos run test
+      # `flutter analyze`/`test` never compile the plugin's Android copy of
+      # OkHttpHttpTransport.kt, so compile the core plugin's Kotlin module here.
+      # `:runanywhere` is the module dev.flutter.flutter-plugin-loader registers
+      # from `.flutter-plugins-dependencies`, which `flutter pub get` in the
+      # example writes; that single task compiles the same source set a full
+      # `flutter build apk` would, for a fraction of the cost.
+      #
+      # android/local.properties (flutter.sdk + sdk.dir) is gitignored and
+      # normally written by `flutter build`; create it when pub get did not,
+      # mirroring bindings/flutter/scripts/test-android-remote-downloads.sh.
+      #
+      # preBuild - and therefore every AGP compile path - depends on
+      # downloadNativeLibs, which fails closed on a clean checkout because the
+      # plugin's jniLibs are not tracked. It only stages native libraries, which
+      # the Kotlin source set does not need, so exclude it rather than pull
+      # release archives into PR CI.
+      - name: Compile Flutter Android transport
+        working-directory: bindings/flutter/example
+        run: |
+          set -euo pipefail
+          flutter pub get
+          if [ ! -f android/local.properties ]; then
+            _sdk_dir="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+            _flutter_sdk="$(cd "$(dirname "$(command -v flutter)")/.." 2>/dev/null && pwd || true)"
+            {
+              [ -n "${_sdk_dir}" ] && echo "sdk.dir=${_sdk_dir}"
+              [ -n "${_flutter_sdk}" ] && echo "flutter.sdk=${_flutter_sdk}"
+            } > android/local.properties
+          fi
+          android/gradlew -p android \
+            :runanywhere:compileDebugKotlin \
+            --no-daemon \
+            --max-workers="$(nproc)" \
+            -x downloadNativeLibs
 
   rn-typecheck:
     runs-on: ubuntu-22.04
@@ -521,6 +563,14 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
+      # The core package's Android module (packages/core/android) is a real
+      # Kotlin source set, but nothing above compiles it: a Kotlin syntax or
+      # dependency error in OkHttpHttpTransport.kt used to ship with every job
+      # green. Add the pinned JDK + Android SDK so the core module's own Kotlin
+      # task can be compiled below (issue #869).
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: android
       # Repo root and bindings/react-native pin `packageManager: yarn@3.6.1`
       # (Yarn Berry). The runner's global yarn is 1.x and refuses to run, so we
       # activate the pinned version through Corepack before any `yarn` call.
@@ -584,6 +634,28 @@ jobs:
       - name: Jest unit tests (React Native example)
         working-directory: bindings/react-native
         run: yarn workspace runanywhere-ai-example test --runInBand --config jest.config.js
+      # `yarn typecheck`/`lint` and the C++ header check above never compile the
+      # core package's Android copy of OkHttpHttpTransport.kt. Compile just the
+      # core module's Kotlin task instead of a full app assembly: :runanywhere_core
+      # is the project example/android/settings.gradle maps to
+      # node_modules/@runanywhere/core/android, so this compiles the same Kotlin
+      # source set `./gradlew assembleDebug` would.
+      #
+      # The example's android/gradle.properties is gitignored, so seed it from the
+      # documented template - it carries android.useAndroidX and keeps
+      # useLocalNatives=true, which also detaches the core module's
+      # downloadNativeLibs from preBuild. `-x downloadNativeLibs` keeps the step
+      # hermetic even if that property changes.
+      - name: Compile React Native Android transport
+        working-directory: bindings/react-native/example
+        run: |
+          set -euo pipefail
+          cp android/gradle.properties.example android/gradle.properties
+          android/gradlew -p android \
+            :runanywhere_core:compileDebugKotlin \
+            --no-daemon \
+            --max-workers="$(nproc)" \
+            -x downloadNativeLibs
 
   web-typecheck:
     runs-on: ubuntu-22.04
