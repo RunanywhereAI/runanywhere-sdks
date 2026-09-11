@@ -337,8 +337,15 @@ static ProtoStructuredOutputConfig
 structured_output_config_from_options(const runanywhere::v1::StructuredOutputOptions& options) {
     ProtoStructuredOutputConfig converted;
     converted.json_schema = json_schema_from_options(options);
-    converted.config.include_schema_in_prompt =
-        options.include_schema_in_prompt() ? RAC_TRUE : RAC_FALSE;
+    // include_schema_in_prompt is `optional` with rac_default "true", and
+    // converted.config already carries that default from
+    // RAC_STRUCTURED_OUTPUT_DEFAULT. Reading the value unconditionally turned
+    // an absent field into RAC_FALSE and threw the default away, which makes
+    // rac_structured_output_prepare_prompt hand back the prompt untouched.
+    if (options.has_include_schema_in_prompt()) {
+        converted.config.include_schema_in_prompt =
+            options.include_schema_in_prompt() ? RAC_TRUE : RAC_FALSE;
+    }
     refresh_proto_structured_output_config(&converted);
     return converted;
 }
