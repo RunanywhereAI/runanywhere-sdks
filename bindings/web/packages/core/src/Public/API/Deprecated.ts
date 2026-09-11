@@ -79,12 +79,12 @@ export const deprecatedForwarders = {
     await tts.speak(text, options);
   },
 
-  /** @deprecated Use `RunAnywhere.tts.stop()`. */
+  /** @deprecated Use the `SpeechHandle` returned by `RunAnywhere.tts.speak(text, options)`. */
   stopSpeaking(): void {
     tts.stop();
   },
 
-  /** @deprecated Use `RunAnywhere.tts.stop()`. */
+  /** @deprecated Use the `SpeechHandle` returned by `RunAnywhere.tts.speak(text, options)`. */
   stopSynthesis(): void {
     tts.stop();
   },

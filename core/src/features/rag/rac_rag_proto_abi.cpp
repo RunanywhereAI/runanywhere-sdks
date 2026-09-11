@@ -785,6 +785,17 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
             publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
             return rc;
         }
+        // `create` only builds the session; backends that defer the weight load
+        // (MLX) finish it in `initialize`, so generation would fail here with
+        // "model is not loaded". Same reason HttpServer::loadModel calls this
+        // (#735) and llm_create_service has always called it.
+        rc = rac_llm_initialize(llm_handle, llm_path.c_str());
+        if (rc != RAC_SUCCESS) {
+            rac_llm_destroy(llm_handle);
+            rac_embeddings_destroy(embed_handle);
+            publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
+            return rc;
+        }
     }
 
     try {

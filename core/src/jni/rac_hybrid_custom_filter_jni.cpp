@@ -101,6 +101,15 @@ rac_bool_t custom_filter_predicate(const rac_hybrid_routing_context_t* ctx, void
     }
     const jboolean keep = scope.env->CallBooleanMethod(a->predicate, a->mid_evaluate, model_id);
     scope.env->DeleteLocalRef(model_id);
+    // The predicate is app code. A throw leaves `keep` undefined and, worse,
+    // leaves the exception pending on this thread: the next JNI call made by
+    // whoever we return into aborts the process with "JNI called with pending
+    // exception". Clear it and keep the candidate, the same answer this
+    // function already gives when it cannot reach the JVM at all.
+    if (scope.env->ExceptionCheck() == JNI_TRUE) {
+        scope.env->ExceptionClear();
+        return RAC_TRUE;
+    }
     return keep != JNI_FALSE ? RAC_TRUE : RAC_FALSE;
 }
 

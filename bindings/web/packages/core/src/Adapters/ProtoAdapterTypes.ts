@@ -549,6 +549,9 @@ export function streamCallback<T>(
       let callbackPtr = 0;
       let started = false;
       let finished = false;
+      // Boxed: a bare `unknown` sentinel cannot tell "rejected with null"
+      // apart from "never failed", and that reason would be dropped.
+      let failure: { reason: unknown } | null = null;
       let callActive = false;
       let emitsSinceYield = 0;
 
@@ -571,6 +574,10 @@ export function streamCallback<T>(
       const fail = (error: unknown): void => {
         if (finished) return;
         finished = true;
+        // Kept for the consumer that is not parked right now (a decode that
+        // throws while earlier events are still buffered, say); without it the
+        // next `next()` would read the stream as a clean end.
+        failure = { reason: error };
         while (waiters.length > 0) {
           waiters.shift()!.reject(error);
         }
@@ -700,6 +707,11 @@ export function streamCallback<T>(
           if (queue.length > 0) {
             return Promise.resolve({ value: queue.shift()!, done: false });
           }
+          if (failure !== null) {
+            const error = failure.reason;
+            failure = null;
+            return Promise.reject(error);
+          }
           if (finished) {
             return Promise.resolve({ value: undefined as T, done: true });
           }
@@ -711,6 +723,11 @@ export function streamCallback<T>(
           try {
             onCancel?.();
           } finally {
+            // An explicit cancel outranks an error the consumer never asked
+            // about: `finish()` is a no-op once `fail()` has set `finished`,
+            // so drop the retained failure here rather than replaying it at
+            // the next `next()`.
+            failure = null;
             finish();
           }
           return Promise.resolve({ value: undefined as T, done: true });

@@ -331,6 +331,13 @@ export class OffscreenRuntimeBridge {
         }> = [];
         let started = false;
         let finished = false;
+        // Rejecting the parked waiters is not enough on its own: a worker that
+        // dies while the consumer is running its loop body has no waiter to
+        // reject, and without this the next `next()` would read the stream as
+        // a clean end.
+        // Boxed: a bare `unknown` sentinel cannot tell "rejected with null"
+        // apart from "never failed", and that reason would be dropped.
+        let failure: { reason: unknown } | null = null;
 
         const finish = (): void => {
           if (finished) return;
@@ -344,6 +351,7 @@ export class OffscreenRuntimeBridge {
         const fail = (err: unknown): void => {
           if (finished) return;
           finished = true;
+          failure = { reason: err };
           this.pending.delete(requestId);
           while (waiters.length > 0) waiters.shift()!.reject(err);
         };
@@ -399,6 +407,11 @@ export class OffscreenRuntimeBridge {
             if (queue.length > 0) {
               return Promise.resolve({ value: queue.shift()!, done: false });
             }
+            if (failure !== null) {
+              const err = failure.reason;
+              failure = null;
+              return Promise.reject(err);
+            }
             if (finished) {
               return Promise.resolve({ value: undefined as T, done: true });
             }
@@ -415,6 +428,11 @@ export class OffscreenRuntimeBridge {
               const cancelMsg: WorkerRequest = { type: 'cancel', requestId };
               this.worker.postMessage(cancelMsg);
             }
+            // An explicit cancel outranks an error the consumer never asked
+            // about: `finish()` is a no-op once `fail()` has set `finished`,
+            // so drop the retained failure here rather than replaying it at
+            // the next `next()`.
+            failure = null;
             finish();
             return Promise.resolve({ value: undefined as T, done: true });
           },

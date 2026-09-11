@@ -109,9 +109,10 @@ rac_result_t win_file_read(const char* path, void** out_data, size_t* out_size, 
     *out_size = 0;
     FILE* f = wfopen_utf8(utf8_path(path), L"rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
-    fseek(f, 0, SEEK_END);
-    long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
+    // Use 64-bit seek/tell — plain ftell/long truncates files >2GB on Win32.
+    _fseeki64(f, 0, SEEK_END);
+    __int64 n = _ftelli64(f);
+    _fseeki64(f, 0, SEEK_SET);
     if (n < 0) {
         fclose(f);
         return RAC_ERROR_FILE_READ_FAILED;

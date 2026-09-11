@@ -943,8 +943,16 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     }
     // Lock released — safe to do long-running transcription
 
-    // Estimate audio length (assuming 16kHz mono 16-bit audio)
-    double audio_length_ms = (audio_size / 2.0 / 16000.0) * 1000.0;
+#if defined(RAC_HAVE_PROTOBUF)
+    // Estimate audio length at the component's configured rate. The 16 kHz this
+    // used to hard-code is only a default: the very next event field below is
+    // set from `sample_rate`, so a component at any other rate reported a
+    // duration that disagreed with the rate in the same message.
+    //
+    // Guarded because every consumer is: the lifecycle events below are the only
+    // readers, and estimate_audio_length_ms itself lives inside this same guard.
+    const int64_t audio_length_ms = estimate_audio_length_ms(audio_size, sample_rate);
+#endif
 
     RAC_LOG_INFO("STT.Component", "Transcribing audio");
 
@@ -1112,8 +1120,13 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         RAC_LOG_DEBUG("STT.Component", "STT streaming transcription using model_id: %s", model_id);
     }
 
-    // Calculate audio length in ms (assume 16kHz, 16-bit mono)
-    double audio_length_ms = (audio_size * 1000.0) / (component->config.sample_rate * 2);
+#if defined(RAC_HAVE_PROTOBUF)
+    // Calculate audio length in ms. Via the shared helper so a zero sample rate
+    // falls back to the default instead of dividing by zero. Guarded for the
+    // same reason as the batch path above.
+    const int64_t audio_length_ms =
+        estimate_audio_length_ms(audio_size, component->config.sample_rate);
+#endif
 
     // Generate transcription ID for tracking
     std::string transcription_id = generate_unique_id();

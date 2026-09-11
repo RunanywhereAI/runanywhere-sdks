@@ -24,6 +24,7 @@ import {
   getModel as getModelProto,
   listModels,
   queryModels,
+  refreshModelRegistry,
   registerArchiveModel,
   registerModel as registerUrlModel,
   registerMultiFileModel,
@@ -458,6 +459,25 @@ export const models = {
       storageUsedBytes: Number(storage?.app?.totalBytes ?? 0),
       storageFreeBytes: Number(storage?.device?.freeBytes ?? 0),
     };
+  },
+
+  /**
+   * Rescan managed model directories and reconcile downloaded state.
+   *
+   * Matches `models.refresh` on the Swift, Kotlin, and Flutter namespaces,
+   * including its defaults. Non-throwing like the others: a failed refresh
+   * leaves the current registry contents in place.
+   *
+   * `list()` reads the registry as it stands and never rescans, so this is
+   * the only way to pick up artifacts that changed on disk out from under
+   * the SDK.
+   */
+  refresh(options?: {
+    rescanLocal?: boolean;
+    includeRemoteCatalog?: boolean;
+    pruneOrphans?: boolean;
+  }): Promise<void> {
+    return refreshModelRegistry(options);
   },
 };
 
