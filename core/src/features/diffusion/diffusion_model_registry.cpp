@@ -352,7 +352,7 @@ rac_result_t rac_diffusion_model_registry_unregister(const char* name) {
 }
 
 rac_result_t rac_diffusion_model_registry_get(const char* model_id,
-                                              rac_diffusion_model_def_t* out_def) {
+                                              rac_diffusion_model_def_t* out_def) try {
     if (!model_id || !out_def) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -383,6 +383,12 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
 
     RAC_LOG_WARNING(LOG_CAT, "Model not found: %s", model_id);
     return RAC_ERROR_NOT_FOUND;
+} catch (const std::bad_alloc&) {
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    RAC_LOG_ERROR(LOG_CAT, "Strategy callback threw while resolving model '%s'",
+                  model_id ? model_id : "(null)");
+    return RAC_ERROR_INTERNAL;
 }
 
 rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
@@ -483,7 +489,7 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
     return RAC_ERROR_INTERNAL;
 }
 
-rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {
+rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) try {
     rac_diffusion_model_def_t model_def;
 
     rac_result_t result = rac_diffusion_model_registry_get(model_id, &model_def);
@@ -512,6 +518,18 @@ rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* 
 
     // Return model's preferred backend
     return model_def.backend;
+} catch (const std::bad_alloc&) {
+    RAC_LOG_ERROR(LOG_CAT,
+                  "Strategy callback threw while selecting a backend for '%s' (result %d), using "
+                  "CoreML (Apple only)",
+                  model_id ? model_id : "(null)", static_cast<int>(RAC_ERROR_OUT_OF_MEMORY));
+    return RAC_DIFFUSION_BACKEND_COREML;
+} catch (...) {
+    RAC_LOG_ERROR(LOG_CAT,
+                  "Strategy callback threw while selecting a backend for '%s' (result %d), using "
+                  "CoreML (Apple only)",
+                  model_id ? model_id : "(null)", static_cast<int>(RAC_ERROR_INTERNAL));
+    return RAC_DIFFUSION_BACKEND_COREML;
 }
 
 rac_bool_t rac_diffusion_model_registry_is_available(const char* model_id) {
