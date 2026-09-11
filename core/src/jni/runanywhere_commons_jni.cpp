@@ -1694,6 +1694,28 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_method_secure_delete =
         env->GetMethodID(adapterClass, "secureDelete", "(Ljava/lang/String;)Z");
     g_method_now_ms = env->GetMethodID(adapterClass, "nowMs", "()J");
+
+    // GetMethodID throws NoSuchMethodError when a lookup misses, so a Kotlin-side
+    // rename or signature change leaves BOTH a null id and a pending exception.
+    // Neither is currently noticed: the pending exception is absorbed by the
+    // first optional-probe ExceptionCheck below (which then blames the probe and
+    // nulls it), and the null id is handed to Call*Method later, which is
+    // undefined behaviour. Unlike fileListDirectory / isNonEmptyDirectory, these
+    // nine are required by the adapter contract in rac_platform_adapter.h, so a
+    // miss is a build mismatch to report, not a capability to degrade.
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
+    if (g_method_log == nullptr || g_method_file_exists == nullptr ||
+        g_method_file_read == nullptr || g_method_file_write == nullptr ||
+        g_method_file_delete == nullptr || g_method_secure_get == nullptr ||
+        g_method_secure_set == nullptr || g_method_secure_delete == nullptr ||
+        g_method_now_ms == nullptr) {
+        LOGe("racSetPlatformAdapter: platform adapter is missing a required method "
+             "(log/fileExists/fileRead/fileWrite/fileDelete/secureGet/secureSet/secureDelete/"
+             "nowMs); refusing to install a partially resolved adapter");
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
     // Optional Kotlin-side directory probes. Method lookup is
     // best-effort — older host apps that haven't been recompiled against the
     // new adapter surface will miss these IDs and commons will fall through
