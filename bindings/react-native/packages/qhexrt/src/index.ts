@@ -2,8 +2,8 @@
  * @runanywhere/qhexrt - QHexRT (Qualcomm Hexagon NPU) Backend for RunAnywhere RN
  *
  * This package registers the QHexRT native provider and exposes its pre-flight
- * capability and device-aware catalog facade. Public model lifecycle,
- * generation, VLM, STT, and TTS APIs live in @runanywhere/core.
+ * capability probe. Public model registration, lifecycle, generation, VLM,
+ * STT, and TTS APIs live in @runanywhere/core.
  *
  * QHexRT is Qualcomm-only (Snapdragon Hexagon NPU): Android arm64 exclusively.
  *
@@ -11,29 +11,23 @@
  *
  * ```typescript
  * import { RunAnywhere } from '@runanywhere/core';
- * import { InferenceFramework, RegisterModelFromUrlRequest } from '@runanywhere/proto-ts/model_types';
+ * import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
  * import { QHexRT } from '@runanywhere/qhexrt';
  *
  * await RunAnywhere.initialize({ apiKey: 'your-key' });
  *
  * // Warn unsupported devices up front (no QNN load).
  * const npu = await QHexRT.probeNpu();
- * if (!npu.supported) {
+ * if (npu.supported && await QHexRT.register()) {
+ *   await RunAnywhere.models.register({
+ *     id: 'my-qhexrt-model',
+ *     name: 'My QHexRT Model',
+ *     url: 'https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json',
+ *     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+ *   });
+ * } else {
  *   console.warn(`Hexagon ${npu.socModel} is outside V75/V79/V81`);
  * }
- *
- * // Register the QHexRT backend (covers LLM, VLM, STT, TTS).
- * await QHexRT.register();
- *
- * // URLs and display metadata stay app-owned; QHexRT selects the chip folder.
- * await QHexRT.registerModelForDevice(
- *   RegisterModelFromUrlRequest.fromPartial({
- *     id: 'qwen3_5_0_8b',
- *     name: 'Qwen3.5 0.8B (HNPU)',
- *     url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
- *     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
- *   })
- * );
  * ```
  *
  * @packageDocumentation

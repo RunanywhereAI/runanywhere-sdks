@@ -3,8 +3,7 @@
  *
  * Nitrogen HybridObject implementation for the RunAnywhere QHexRT backend.
  *
- * QHexRT-specific provider registration, Hexagon capability, and
- * device-aware model-catalog adapter.
+ * QHexRT-specific provider registration and Hexagon capability.
  *
  * NOTE: The QHexRT registration symbol lives in librac_backend_qhexrt.so and
  * all QHexRT-facing symbols live in librac_backend_qhexrt.so. The engine
@@ -22,11 +21,9 @@
 #include "rac_logger.h"
 
 #include <cmath>
-#include <cstring>
 #include <limits>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 #ifndef RAC_QHEXRT_BACKEND_AVAILABLE
 #define RAC_QHEXRT_BACKEND_AVAILABLE 0
@@ -82,16 +79,6 @@ rac_qhexrt_hexagon_arch_t toNativeArch(double arch) {
     return RAC_QHEXRT_HEXAGON_ARCH_UNKNOWN;
   }
   return static_cast<rac_qhexrt_hexagon_arch_t>(static_cast<int32_t>(arch));
-}
-
-std::vector<uint8_t>
-copyArrayBuffer(const std::shared_ptr<ArrayBuffer> &buffer) {
-  if (!buffer || buffer->size() == 0) {
-    return {};
-  }
-  std::vector<uint8_t> bytes(buffer->size());
-  std::memcpy(bytes.data(), buffer->data(), buffer->size());
-  return bytes;
 }
 
 } // namespace
@@ -213,61 +200,6 @@ bool HybridRunAnywhereQHexRT::isArchitectureSupported(double arch) {
 #else
   return rac_qhexrt_arch_is_supported(toNativeArch(arch)) == RAC_TRUE;
 #endif
-}
-
-bool HybridRunAnywhereQHexRT::modelSupportsArchitecture(
-    const std::string &modelId, double arch) {
-#if !RAC_QHEXRT_BACKEND_AVAILABLE
-  (void)modelId;
-  (void)arch;
-  return false;
-#else
-  return rac_qhexrt_catalog_model_supports_arch(modelId.c_str(),
-                                                toNativeArch(arch)) == RAC_TRUE;
-#endif
-}
-
-bool HybridRunAnywhereQHexRT::modelRequiresHfAuth(const std::string &modelId) {
-#if !RAC_QHEXRT_BACKEND_AVAILABLE
-  (void)modelId;
-  return false;
-#else
-  return rac_qhexrt_catalog_model_requires_hf_auth(modelId.c_str()) == RAC_TRUE;
-#endif
-}
-
-std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-HybridRunAnywhereQHexRT::catalogRegisterModelProto(
-    const std::shared_ptr<ArrayBuffer> &requestBytes) {
-  auto request = copyArrayBuffer(requestBytes);
-  return Promise<std::shared_ptr<ArrayBuffer>>::async(
-      [request = std::move(request)]() {
-#if !RAC_QHEXRT_BACKEND_AVAILABLE
-        return ArrayBuffer::allocate(0);
-#else
-        rac_bool_t registered = RAC_FALSE;
-        ScopedProtoBuffer out;
-        const rac_result_t rc = rac_qhexrt_catalog_register_model_proto(
-            request.data(), request.size(), &registered, &out.value);
-        const rac_result_t status = rc != RAC_SUCCESS ? rc : out.value.status;
-        if (status != RAC_SUCCESS) {
-          const std::string detail =
-              out.value.error_message != nullptr ? out.value.error_message : "";
-          throw std::runtime_error(
-              "QHexRT device-aware model registration failed (code=" +
-              std::to_string(status) + ")" +
-              (detail.empty() ? "" : ": " + detail));
-        }
-        if (registered != RAC_TRUE) {
-          return ArrayBuffer::allocate(0);
-        }
-        if (out.value.data == nullptr || out.value.size == 0) {
-          throw std::runtime_error(
-              "QHexRT registration returned an empty ModelInfo payload");
-        }
-        return ArrayBuffer::copy(out.value.data, out.value.size);
-#endif
-      });
 }
 
 } // namespace margelo::nitro::runanywhere::qhexrt

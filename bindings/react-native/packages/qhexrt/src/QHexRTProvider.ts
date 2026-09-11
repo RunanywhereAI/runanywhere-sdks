@@ -146,24 +146,4 @@ export class QHexRTProvider {
     if (!isNativeQHexRTModuleAvailable()) return false;
     return getNativeQHexRTModule().isArchitectureSupported(arch);
   }
-
-  static modelSupportsArchitecture(
-    modelId: string,
-    arch: HexagonArch
-  ): boolean {
-    if (!isNativeQHexRTModuleAvailable()) return false;
-    return getNativeQHexRTModule().modelSupportsArchitecture(modelId, arch);
-  }
-
-  static modelRequiresHfAuth(modelId: string): boolean {
-    if (!isNativeQHexRTModuleAvailable()) return false;
-    return getNativeQHexRTModule().modelRequiresHfAuth(modelId);
-  }
-
-  static async registerModelForDeviceRaw(
-    requestBytes: ArrayBuffer
-  ): Promise<ArrayBuffer | null> {
-    if (!isNativeQHexRTModuleAvailable()) return null;
-    return getNativeQHexRTModule().catalogRegisterModelProto(requestBytes);
-  }
 }

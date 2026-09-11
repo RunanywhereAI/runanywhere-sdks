@@ -14,6 +14,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.NativeProtoException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
@@ -224,9 +225,11 @@ object CppBridgeModelRegistry {
      */
     fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
         val bytes =
-            RunAnywhereBridge.racRegisterModelFromUrlProto(
-                ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
-            ) ?: return null
+            mapNativeRegistrationFailure {
+                RunAnywhereBridge.racRegisterModelFromUrlProto(
+                    ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -240,9 +243,11 @@ object CppBridgeModelRegistry {
      */
     fun registerMultiFileModel(request: ProtoRegisterMultiFileModelRequest): ProtoModelInfo? {
         val bytes =
-            RunAnywhereBridge.racRegisterMultiFileModelProto(
-                ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
-            ) ?: return null
+            mapNativeRegistrationFailure {
+                RunAnywhereBridge.racRegisterMultiFileModelProto(
+                    ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -407,6 +412,13 @@ object CppBridgeModelRegistry {
         } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode $label proto: ${e.message}")
             null
+        }
+
+    private inline fun <T> mapNativeRegistrationFailure(block: () -> T): T =
+        try {
+            block()
+        } catch (error: NativeProtoException) {
+            throw SDKException.fromRACResult(error.resultCode) ?: error
         }
 
     /**

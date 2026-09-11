@@ -25,6 +25,11 @@ void main() {
       expect(model.url, startsWith('https://'), reason: model.id);
       expect(model.memoryBytes, greaterThan(0), reason: model.id);
       expect(
+        model.downloadBytes,
+        anyOf(isNull, greaterThan(0)),
+        reason: model.id,
+      );
+      expect(
         model.contextLength,
         anyOf(isNull, greaterThan(0)),
         reason: model.id,
@@ -33,7 +38,7 @@ void main() {
   });
 
   test(
-    'QHexRT requests preserve app-owned metadata for native registration',
+    'QHexRT definitions preserve app-owned explicit URL metadata',
     () {
       const rows = QHexRTModelCatalog.models;
 
@@ -50,7 +55,12 @@ void main() {
         expect(request.category, model.category);
         expect(request.source, ModelSource.MODEL_SOURCE_REMOTE);
         expect(request.memoryRequiredBytes.toInt(), model.memoryBytes);
-        expect(request.downloadSizeBytes.toInt(), model.memoryBytes);
+        expect(
+          request.hasDownloadSizeBytes()
+              ? request.downloadSizeBytes.toInt()
+              : null,
+          model.downloadBytes,
+        );
         expect(
           request.hasContextLength() ? request.contextLength : null,
           model.contextLength,
