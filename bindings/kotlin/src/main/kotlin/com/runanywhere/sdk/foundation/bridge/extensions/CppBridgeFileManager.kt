@@ -174,32 +174,57 @@ object CppBridgeFileManager {
 
         @Suppress("unused") // Called from JNI
         fun listDirectory(path: String): Array<String>? {
-            return File(path).list()
+            return try {
+                File(path).list()
+            } catch (_: Exception) {
+                null // sentinel: directory missing / unreadable
+            }
         }
 
         @Suppress("unused") // Called from JNI
         fun pathExists(path: String): Boolean {
-            return File(path).exists()
+            return try {
+                File(path).exists()
+            } catch (_: Exception) {
+                false
+            }
         }
 
         @Suppress("unused") // Called from JNI
         fun isDirectory(path: String): Boolean {
-            return File(path).isDirectory
+            return try {
+                File(path).isDirectory
+            } catch (_: Exception) {
+                false
+            }
         }
 
         @Suppress("unused") // Called from JNI
         fun getFileSize(path: String): Long {
-            val file = File(path)
-            return if (file.isFile) file.length() else -1L
+            return try {
+                val file = File(path)
+                if (file.isFile) file.length() else -1L
+            } catch (_: Exception) {
+                -1L
+            }
         }
 
         @Suppress("unused") // Called from JNI
-        fun getAvailableSpace(): Long = CppBridgeFileManager.availableSpace()
+        fun getAvailableSpace(): Long {
+            return try {
+                CppBridgeFileManager.availableSpace()
+            } catch (_: Exception) {
+                -1L
+            }
+        }
 
         @Suppress("unused") // Called from JNI
         fun getTotalSpace(): Long {
-            val baseDir = File(CppBridgeModelPaths.getBaseDirectory())
-            return baseDir.totalSpace
+            return try {
+                File(CppBridgeModelPaths.getBaseDirectory()).totalSpace
+            } catch (_: Exception) {
+                -1L
+            }
         }
     }
 }
