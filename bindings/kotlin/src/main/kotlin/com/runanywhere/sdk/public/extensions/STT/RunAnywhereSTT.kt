@@ -85,7 +85,7 @@ suspend fun RunAnywhere.transcribe(
     return result
 }
 
-@Deprecated("Use RunAnywhere.stt.transcribeStream(audio, options).")
+@Deprecated("Use RunAnywhere.stt.openStream(format, options).")
 fun RunAnywhere.transcribeStream(
     audio: Flow<ByteArray>,
     options: RASTTOptions = RASTTOptions.defaults(),

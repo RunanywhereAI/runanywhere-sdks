@@ -97,7 +97,7 @@ suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
         ),
     )
 
-@Deprecated("Use RunAnywhere.models.unload(category).")
+@Deprecated("Use RunAnywhere.models.unloadAll(category).")
 suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult {
     if (!isInitialized) {
         return ModelUnloadResult(
