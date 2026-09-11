@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/infrastructure/model_management/rac_model_compatibility.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -637,6 +638,39 @@ int test_remove_proto() {
     return 0;
 }
 
+// model_types.proto documents BOTH probe inputs the same way:
+//   available_ram_bytes      "0 = unknown -- commons will treat the requirement as satisfied"
+//   available_storage_bytes  "0 = unknown"
+// A platform that cannot probe free disk must therefore not have every model
+// reported as too large.
+int test_unknown_probe_values_do_not_block_compatibility() {
+    rac_model_registry_handle_t registry = create_registry();
+    ASSERT_TRUE(registry != nullptr);
+    ASSERT_TRUE(register_model_proto(
+        registry, build_full_model_proto("llama.compat", "Compat", "/models/llama.compat")));
+
+    // Both probes unknown.
+    rac_model_compatibility_result_t unknown = {};
+    ASSERT_EQ(rac_model_check_compatibility(registry, "llama.compat", /*available_ram=*/0,
+                                            /*available_storage=*/0, &unknown),
+              RAC_SUCCESS);
+    ASSERT_EQ(unknown.can_run, RAC_TRUE);
+    ASSERT_EQ(unknown.can_fit, RAC_TRUE);
+    ASSERT_EQ(unknown.is_compatible, RAC_TRUE);
+
+    // A real probe that is genuinely too small must still refuse, so the
+    // unknown-handling above cannot be mistaken for "always compatible".
+    rac_model_compatibility_result_t tight = {};
+    ASSERT_EQ(rac_model_check_compatibility(registry, "llama.compat", /*available_ram=*/0,
+                                            /*available_storage=*/1, &tight),
+              RAC_SUCCESS);
+    ASSERT_EQ(tight.can_fit, RAC_FALSE);
+    ASSERT_EQ(tight.is_compatible, RAC_FALSE);
+
+    rac_model_registry_destroy(registry);
+    return 0;
+}
+
 int test_canonical_result_shapes_and_typed_errors() {
     rac_model_registry_handle_t registry = create_registry();
     ASSERT_TRUE(registry != nullptr);
@@ -860,6 +894,7 @@ int main() {
         RUN(test_register_proto_preserves_proto_only_fields_on_resave);
         RUN(test_query_filters_and_downloaded_list_proto);
         RUN(test_remove_proto);
+        RUN(test_unknown_probe_values_do_not_block_compatibility);
         RUN(test_canonical_result_shapes_and_typed_errors);
         RUN(test_update_missing_and_invalid_bytes);
 #else
