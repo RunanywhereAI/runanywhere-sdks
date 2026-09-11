@@ -52,7 +52,7 @@ public extension RunAnywhere {
     }
 
     /// Stop current TTS synthesis.
-    @available(*, deprecated, renamed: "tts.stop()")
+    @available(*, deprecated, message: "Use the SpeechHandle returned by tts.speak(_:options:) to interrupt one utterance")
     static func stopSynthesis() async {
         await CppBridge.TTS.shared.stop()
     }
@@ -73,7 +73,7 @@ public extension RunAnywhere {
     }
 
     /// Stop current speech playback.
-    @available(*, deprecated, renamed: "tts.stop()")
+    @available(*, deprecated, message: "Use the SpeechHandle returned by tts.speak(_:options:) to interrupt one utterance")
     static func stopSpeaking() async {
         await stopSpeech()
     }
