@@ -340,6 +340,12 @@ struct OwnedToolParseResult {
     char* arguments_json = nullptr;
     char* clean_text = nullptr;
 
+    OwnedToolParseResult() = default;
+    OwnedToolParseResult(const OwnedToolParseResult&) = delete;
+    OwnedToolParseResult& operator=(const OwnedToolParseResult&) = delete;
+    OwnedToolParseResult(OwnedToolParseResult&&) = delete;
+    OwnedToolParseResult& operator=(OwnedToolParseResult&&) = delete;
+
     ~OwnedToolParseResult() {
         std::free(tool_name);
         std::free(arguments_json);
@@ -1648,9 +1654,10 @@ static ToolParseStatus parse_default_format(const char* llm_output, char** out_t
     }
 
     // Extract tool name and arguments
+    const std::unique_ptr<char, decltype(&std::free)> owned_normalized_json(normalized_json,
+                                                                           &std::free);
     const ToolParseStatus extract_status =
-        extract_tool_name_and_args(normalized_json, out_tool_name, out_args_json);
-    free(normalized_json);
+        extract_tool_name_and_args(owned_normalized_json.get(), out_tool_name, out_args_json);
     if (extract_status != ToolParseStatus::kSuccess) {
         return extract_status;
     }
