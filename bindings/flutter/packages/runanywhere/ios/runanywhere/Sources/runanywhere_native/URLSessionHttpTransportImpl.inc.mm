@@ -236,43 +236,65 @@ static std::vector<std::pair<std::string, std::string>> extractHeaders(NSHTTPURL
     return out;
 }
 
-static void writeResponse(int32_t status,
-                          NSData* bodyBytes,
-                          const std::vector<std::pair<std::string, std::string>>& headers,
-                          NSString* redirectedURL,
-                          uint64_t elapsedMs,
-                          rac_http_response_t* out) {
+static rac_result_t writeResponse(int32_t status,
+                                  NSData* bodyBytes,
+                                  const std::vector<std::pair<std::string, std::string>>& headers,
+                                  NSString* redirectedURL,
+                                  uint64_t elapsedMs,
+                                  rac_http_response_t* out) {
     std::memset(out, 0, sizeof(*out));
     out->status = status;
     out->elapsed_ms = elapsedMs;
 
     if (bodyBytes && bodyBytes.length > 0) {
         void* buf = std::malloc(bodyBytes.length);
-        if (buf) {
-            std::memcpy(buf, bodyBytes.bytes, bodyBytes.length);
-            out->body_bytes = reinterpret_cast<uint8_t*>(buf);
-            out->body_len = bodyBytes.length;
+        if (!buf) {
+            rac_http_response_free(out);
+            return RAC_ERROR_OUT_OF_MEMORY;
         }
+        std::memcpy(buf, bodyBytes.bytes, bodyBytes.length);
+        out->body_bytes = reinterpret_cast<uint8_t*>(buf);
+        out->body_len = bodyBytes.length;
     }
 
     if (!headers.empty()) {
         size_t count = headers.size();
-        size_t bytes = count * sizeof(rac_http_header_kv_t);
-        auto* kvs = static_cast<rac_http_header_kv_t*>(std::malloc(bytes));
-        if (kvs) {
-            std::memset(kvs, 0, bytes);
-            for (size_t i = 0; i < count; ++i) {
-                kvs[i].name = strdup(headers[i].first.c_str());
-                kvs[i].value = strdup(headers[i].second.c_str());
+        auto* kvs = static_cast<rac_http_header_kv_t*>(
+            std::calloc(count, sizeof(rac_http_header_kv_t)));
+        if (!kvs) {
+            rac_http_response_free(out);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        out->headers = kvs;
+        out->header_count = count;
+        for (size_t i = 0; i < count; ++i) {
+            kvs[i].name = strdup(headers[i].first.c_str());
+            if (!kvs[i].name) {
+                rac_http_response_free(out);
+                return RAC_ERROR_OUT_OF_MEMORY;
             }
-            out->headers = kvs;
-            out->header_count = count;
+            kvs[i].value = strdup(headers[i].second.c_str());
+            if (!kvs[i].value) {
+                rac_http_response_free(out);
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
         }
     }
 
     if (redirectedURL && redirectedURL.length > 0) {
-        out->redirected_url = strdup([redirectedURL UTF8String]);
+        const char* utf8 = [redirectedURL UTF8String];
+        if (!utf8) {
+            rac_http_response_free(out);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        out->redirected_url = strdup(utf8);
+        if (!out->redirected_url) {
+            rac_http_response_free(out);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
+
+    return RAC_SUCCESS;
 }
 
 static uint64_t monotonicNs() {
@@ -495,9 +517,8 @@ rac_result_t urlsession_request_send(void* /*user_data*/,
         redirected = finalURL;
     }
 
-    writeResponse((int32_t)httpResp.statusCode, capturedData, headers, redirected, elapsed,
-                  out_resp);
-    return RAC_SUCCESS;
+    return writeResponse((int32_t)httpResp.statusCode, capturedData, headers, redirected,
+                         elapsed, out_resp);
 }
 
 rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
@@ -614,9 +635,8 @@ rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
         headers.emplace_back("X-RAC-Range-Honored", honored ? "true" : "false");
     }
 
-    writeResponse((int32_t)delegate.response.statusCode, /*bodyBytes=*/nil, headers, redirected,
-                  elapsed, out_resp);
-    return RAC_SUCCESS;
+    return writeResponse((int32_t)delegate.response.statusCode, /*bodyBytes=*/nil, headers,
+                         redirected, elapsed, out_resp);
 }
 
 rac_result_t urlsession_request_stream(void* /*user_data*/,
