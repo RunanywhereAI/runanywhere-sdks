@@ -300,7 +300,6 @@ private struct RequestSnapshot {
 /// release via `rac_http_response_free` / `rac_free`. All allocations
 /// use `malloc` / `strdup` to match the libcurl default's ownership
 /// contract.
-///
 /// Allocation is all-or-nothing: when any buffer fails to allocate, the
 /// partial response is released via `rac_http_response_free` and the
 /// caller receives `RAC_ERROR_OUT_OF_MEMORY`.
