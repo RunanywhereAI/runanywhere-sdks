@@ -300,6 +300,10 @@ private struct RequestSnapshot {
 /// release via `rac_http_response_free` / `rac_free`. All allocations
 /// use `malloc` / `strdup` to match the libcurl default's ownership
 /// contract.
+///
+/// Allocation is all-or-nothing: when any buffer fails to allocate, the
+/// partial response is released via `rac_http_response_free` and the
+/// caller receives `RAC_ERROR_OUT_OF_MEMORY`.
 private enum ResponseWriter {
 
     static func write(
@@ -309,7 +313,7 @@ private enum ResponseWriter {
         redirectedURL: String?,
         elapsedMs: UInt64,
         into out: UnsafeMutablePointer<rac_http_response_t>
-    ) {
+    ) -> rac_result_t {
         // Zero the struct first so any early-return path leaves a
         // well-defined state.
         out.pointee = rac_http_response_t()
@@ -318,38 +322,51 @@ private enum ResponseWriter {
 
         // Body
         if let body = bodyBytes, !body.isEmpty {
-            if let buffer = malloc(body.count) {
-                let typed = buffer.assumingMemoryBound(to: UInt8.self)
-                _ = body.copyBytes(to: UnsafeMutableBufferPointer(start: typed, count: body.count))
-                out.pointee.body_bytes = typed
-                out.pointee.body_len = body.count
+            guard let buffer = malloc(body.count) else {
+                rac_http_response_free(out)
+                return RAC_ERROR_OUT_OF_MEMORY
             }
+            let typed = buffer.assumingMemoryBound(to: UInt8.self)
+            _ = body.copyBytes(to: UnsafeMutableBufferPointer(start: typed, count: body.count))
+            out.pointee.body_bytes = typed
+            out.pointee.body_len = body.count
         }
 
-        // Headers
+        // Headers. Zero-filled storage makes partial cleanup safe.
         if !headers.isEmpty {
             let count = headers.count
-            let byteCount = MemoryLayout<rac_http_header_kv_t>.stride * count
-            if let buffer = malloc(byteCount) {
-                let typed = buffer.assumingMemoryBound(to: rac_http_header_kv_t.self)
-                for (index, header) in headers.enumerated() {
-                    let namePtr = strdup(header.name)
-                    let valuePtr = strdup(header.value)
-                    typed[index] = rac_http_header_kv_t(
-                        name: UnsafePointer(namePtr),
-                        value: UnsafePointer(valuePtr)
-                    )
+            guard let buffer = calloc(count, MemoryLayout<rac_http_header_kv_t>.stride) else {
+                rac_http_response_free(out)
+                return RAC_ERROR_OUT_OF_MEMORY
+            }
+            let typed = buffer.assumingMemoryBound(to: rac_http_header_kv_t.self)
+            out.pointee.headers = typed
+            out.pointee.header_count = count
+            for (index, header) in headers.enumerated() {
+                guard let namePtr = strdup(header.name) else {
+                    rac_http_response_free(out)
+                    return RAC_ERROR_OUT_OF_MEMORY
                 }
-                out.pointee.headers = typed
-                out.pointee.header_count = count
+                typed[index].name = UnsafePointer(namePtr)
+                guard let valuePtr = strdup(header.value) else {
+                    rac_http_response_free(out)
+                    return RAC_ERROR_OUT_OF_MEMORY
+                }
+                typed[index].value = UnsafePointer(valuePtr)
             }
         }
 
         // Redirected URL (only populated when different from the
         // request URL — matches libcurl semantics)
         if let redirected = redirectedURL {
-            out.pointee.redirected_url = strdup(redirected)
+            guard let redirectedPtr = strdup(redirected) else {
+                rac_http_response_free(out)
+                return RAC_ERROR_OUT_OF_MEMORY
+            }
+            out.pointee.redirected_url = redirectedPtr
         }
+
+        return RAC_SUCCESS
     }
 
     static func extractHeaders(from httpResponse: HTTPURLResponse) -> [(name: String, value: String)] {
@@ -477,7 +494,7 @@ private enum RequestExecutor { // swiftlint:disable:this unused_declaration
             ? finalURL
             : nil
 
-        ResponseWriter.write(
+        return ResponseWriter.write(
             status: status,
             bodyBytes: body,
             headers: headers,
@@ -485,7 +502,6 @@ private enum RequestExecutor { // swiftlint:disable:this unused_declaration
             elapsedMs: elapsedMs,
             into: out
         )
-        return RAC_SUCCESS
     }
 
     static func stream(
@@ -592,7 +608,7 @@ private enum RequestExecutor { // swiftlint:disable:this unused_declaration
 
         // Streaming responses never populate body_bytes (per the
         // `rac_http_request_stream` contract).
-        ResponseWriter.write(
+        return ResponseWriter.write(
             status: Int32(httpResponse.statusCode),
             bodyBytes: nil,
             headers: headers,
@@ -600,7 +616,6 @@ private enum RequestExecutor { // swiftlint:disable:this unused_declaration
             elapsedMs: elapsedMs,
             into: out
         )
-        return RAC_SUCCESS
     }
 
     // MARK: - Helpers
