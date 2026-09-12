@@ -193,11 +193,19 @@ rac_result_t desktop_file_read(const char* path, void** out_data, size_t* out_si
 
     rac_result_t result = RAC_SUCCESS;
     void* buffer = nullptr;
+#if defined(_WIN32)
+    __int64 file_size = -1;
+    if (_fseeki64(f, 0, SEEK_END) == 0) {
+        file_size = _ftelli64(f);
+    }
+    if (file_size < 0 || _fseeki64(f, 0, SEEK_SET) != 0) {
+#else
     long file_size = -1;
     if (std::fseek(f, 0, SEEK_END) == 0) {
         file_size = std::ftell(f);
     }
     if (file_size < 0 || std::fseek(f, 0, SEEK_SET) != 0) {
+#endif
         result = RAC_ERROR_FILE_READ_FAILED;
     } else {
         // malloc so callers can release with rac_free (it wraps free()).
