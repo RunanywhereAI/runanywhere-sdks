@@ -70,7 +70,7 @@ async function probeAvailableStorageBytes(): Promise<number> {
     const estimate = await navigator.storage.estimate();
     const quota = Number(estimate.quota ?? 0);
     const usage = Number(estimate.usage ?? 0);
-    if (!(quota > 0)) return 0;
+    if (!Number.isFinite(quota) || !Number.isFinite(usage) || !(quota > 0)) return 0;
     const free = Math.trunc(quota - usage);
     return free > 0 ? free : KNOWN_EXHAUSTED_BYTES_SENTINEL;
   } catch {

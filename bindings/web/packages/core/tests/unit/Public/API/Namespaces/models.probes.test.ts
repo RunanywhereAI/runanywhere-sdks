@@ -87,6 +87,34 @@ describe('models platform probes', () => {
       const free = await probeAvailableStorageBytes();
       expect(free).toBe(0);
     });
+
+    it('returns 0 (unknown) when estimate usage is NaN', async () => {
+      vi.stubGlobal('navigator', {
+        storage: {
+          estimate: vi.fn().mockResolvedValue({
+            quota: 10_000_000,
+            usage: NaN,
+          }),
+        },
+      });
+
+      const free = await probeAvailableStorageBytes();
+      expect(free).toBe(0);
+    });
+
+    it('returns 0 (unknown) when estimate quota is NaN', async () => {
+      vi.stubGlobal('navigator', {
+        storage: {
+          estimate: vi.fn().mockResolvedValue({
+            quota: NaN,
+            usage: 5_000_000,
+          }),
+        },
+      });
+
+      const free = await probeAvailableStorageBytes();
+      expect(free).toBe(0);
+    });
   });
 
   describe('probeAvailableRamBytes', () => {
