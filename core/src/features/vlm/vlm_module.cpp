@@ -1007,8 +1007,12 @@ rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t r
     // of the options message, so the adapter no longer produces it.
     *out_prompt = out_request->prompt().c_str();
 
-    if (!rac::foundation::rac_vlm_image_from_proto(out_request->images(0), out_image) ||
-        !rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options)) {
+    const rac_result_t image_rc = rac::foundation::rac_vlm_image_from_proto(
+        out_request->images(0), out_image, out_error);
+    if (image_rc != RAC_SUCCESS) {
+        return image_rc;
+    }
+    if (!rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options)) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
                                           "failed to convert VLMGenerationRequest");
     }
@@ -1397,6 +1401,13 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         rc = check_lifecycle_model(request, ref, &error_buffer);
     }
     if (rc != RAC_SUCCESS) {
+        GeneratedStreamCtx error_ctx;
+        error_ctx.callback = callback;
+        error_ctx.user_data = user_data;
+        error_ctx.request_id = request.request_id();
+        dispatch_vlm_terminal_once(&error_ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_ERROR,
+                                   nullptr, error_buffer.error_message,
+                                   static_cast<int32_t>(rc));
         publish_failure(rc, "vlm.stream", error_buffer.error_message);
         rac_proto_buffer_free(&error_buffer);
         free_vlm_image(&image);
