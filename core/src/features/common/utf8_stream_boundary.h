@@ -44,6 +44,52 @@ inline size_t incomplete_utf8_tail(const std::string& text) {
     return 0;  // three continuations with no lead in reach: already complete
 }
 
+/**
+ * Per-stream UTF-8 assembler. `feed()` returns the bytes that are safe to hand
+ * on now, holding back a trailing partial character until the rest arrives;
+ * `flush()` releases whatever is left at end of stream.
+ *
+ * Shaped like `rac::tokens::StreamFilter` on purpose, and held alongside one:
+ * both VLM stream funnels need the same per-stream shaping, so the logic lives
+ * in one type rather than being written out at each callback.
+ *
+ * Both return a reference to a buffer owned by the assembler, valid until the
+ * next `feed()` / `flush()` on the same instance.
+ */
+class Utf8Assembler {
+   public:
+    const std::string& feed(const std::string& chunk) {
+        out_.clear();
+        pending_ += chunk;
+        const size_t hold = incomplete_utf8_tail(pending_);
+        if (pending_.size() > hold) {
+            out_.assign(pending_, 0, pending_.size() - hold);
+            pending_.erase(0, pending_.size() - hold);
+        }
+        return out_;
+    }
+
+    /**
+     * End of stream. A remainder here is a character the backend never
+     * finished emitting, so it cannot render; dropping it keeps every
+     * delivered chunk valid UTF-8. Callers that accumulate the unassembled
+     * text separately still have those bytes in their own total.
+     */
+    const std::string& flush() {
+        out_.clear();
+        const size_t hold = incomplete_utf8_tail(pending_);
+        if (pending_.size() > hold) {
+            out_.assign(pending_, 0, pending_.size() - hold);
+        }
+        pending_.clear();
+        return out_;
+    }
+
+   private:
+    std::string pending_;
+    std::string out_;
+};
+
 }  // namespace tokens
 }  // namespace rac
 
