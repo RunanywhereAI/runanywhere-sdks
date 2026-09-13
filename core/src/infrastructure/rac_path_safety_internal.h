@@ -12,8 +12,15 @@
 
 namespace rac::path {
 
-// True if `component` is a single safe path segment: non-empty, not "." or
-// "..", and free of '/' and '\\' separators.
+/**
+ * @brief Validates that a path component is safe and free of directory traversal tokens.
+ *
+ * Checks that `component` is non-empty, neither "." nor "..", and free of
+ * both forward-slash and backslash path separators.
+ *
+ * @param component Candidate path segment to validate.
+ * @return True if component is safe for concatenation, false otherwise.
+ */
 inline bool is_safe_path_segment(std::string_view component) {
     return !component.empty() && component != "." && component != ".." &&
            component.find('/') == std::string_view::npos &&

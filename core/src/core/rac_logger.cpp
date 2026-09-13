@@ -131,7 +131,14 @@ void format_message_with_metadata(char* buffer, size_t buffer_size, const char* 
     }
 }
 
-// Fallback to stderr
+/**
+ * @brief Fallback logging function that writes formatted log records to stderr.
+ *
+ * @param level Severity level of the log entry.
+ * @param category Log category name.
+ * @param message Main log message text.
+ * @param metadata Optional structured metadata including source file, line, error code.
+ */
 void log_to_stderr(rac_log_level_t level, const char* category, const char* message,
                    const rac_log_metadata_t* metadata) {
     const char* const level_str = level_to_string(level);

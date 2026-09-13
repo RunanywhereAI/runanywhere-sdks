@@ -97,9 +97,13 @@ struct ModelThinkingProfile {
 };
 
 /**
- * Resolves [ModelThinkingProfile] from the global model registry for call sites
- * that hold only a model id / path (the struct-vtable `rac_llm_generate*` path),
- * mirroring the id→path→basename lookup order the service factory uses.
+ * @brief Resolves [ModelThinkingProfile] from the global model registry.
+ *
+ * Resolves profile for call sites that hold only a model id or path,
+ * mirroring the id->path->basename lookup order the service factory uses.
+ *
+ * @param model_id Model identifier or filesystem path to lookup.
+ * @return Resolved ModelThinkingProfile with thinking support and framework.
  */
 inline ModelThinkingProfile model_thinking_profile_from_registry(const char* model_id) {
     ModelThinkingProfile profile;

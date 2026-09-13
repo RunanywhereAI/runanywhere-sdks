@@ -350,6 +350,17 @@ extern "C" rac_result_t rac_vlm_component_cleanup(rac_handle_t handle) {
     return rac_lifecycle_reset(component->lifecycle);
 }
 
+/**
+ * @brief Loads a vision-language model into the component by registry model identifier.
+ *
+ * Resolves the model from the global registry, derives its folder location, and initializes
+ * the underlying inference engine. Preserves the root path separator when local_path resides
+ * directly in the filesystem root.
+ *
+ * @param handle VLM component handle.
+ * @param model_id Unique identifier of the model to load.
+ * @return RAC_SUCCESS on successful loading, or an error code.
+ */
 extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
                                                            const char* model_id) {
     if (!handle)
@@ -378,7 +389,15 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
             strncpy(model_folder, model_info->local_path, sizeof(model_folder) - 1);
             char* last_sep = rac::path::find_last_path_separator(model_folder);
             if (last_sep) {
-                *last_sep = '\0';
+                if (last_sep == model_folder) {
+                    // Root-level path like "/model.gguf" or "\model.gguf": preserve the root separator
+                    *(last_sep + 1) = '\0';
+                } else if (last_sep == model_folder + 2 && model_folder[1] == ':') {
+                    // Windows drive root like "C:\model.gguf": preserve the drive root "C:\"
+                    *(last_sep + 1) = '\0';
+                } else {
+                    *last_sep = '\0';
+                }
             }
         }
     } else {

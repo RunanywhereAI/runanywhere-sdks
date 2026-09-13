@@ -31,6 +31,11 @@ namespace {
         }                                                                                      \
     } while (0)
 
+/**
+ * @brief Tests shared path separator search and filename extraction across platforms.
+ *
+ * @return 0 on success, non-zero on test assertion failure.
+ */
 int test_shared_path_separator_helpers() {
     using namespace rac::path;
 
@@ -83,9 +88,31 @@ int test_shared_path_separator_helpers() {
     }
     EXPECT_TRUE(std::strcmp(mutable_folder, "C:\\models\\vlm") == 0);
 
+    // 9. Root-level path parent derivation (POSIX and Windows root preservation)
+    char posix_root[64] = "/model.gguf";
+    char* posix_root_sep = find_last_path_separator(posix_root);
+    EXPECT_TRUE(posix_root_sep == posix_root);
+    if (posix_root_sep == posix_root) {
+        *(posix_root_sep + 1) = '\0';
+    }
+    EXPECT_TRUE(std::strcmp(posix_root, "/") == 0);
+
+    char win_root[64] = "C:\\model.gguf";
+    char* win_root_sep = find_last_path_separator(win_root);
+    EXPECT_TRUE(win_root_sep == win_root + 2);
+    if (win_root_sep == win_root + 2 && win_root[1] == ':') {
+        *(win_root_sep + 1) = '\0';
+    }
+    EXPECT_TRUE(std::strcmp(win_root, "C:\\") == 0);
+
     return 0;
 }
 
+/**
+ * @brief Tests MLX framework directory canonical layout and extraction.
+ *
+ * @return 0 on success, non-zero on test assertion failure.
+ */
 int test_mlx_framework_directory_uses_mlx_segment() {
     constexpr const char* kBase = "/tmp/runanywhere-model-path-test";
     constexpr const char* kModelId = "mlx-qwen3-0.6b-4bit";
