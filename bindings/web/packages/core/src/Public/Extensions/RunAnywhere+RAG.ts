@@ -1289,25 +1289,75 @@ interface SplitRAGChunk {
   tokenCount: number;
 }
 
+interface RAGTokenSpan {
+  startOffset: number;
+  endOffset: number;
+}
+
+function countCodePoints(str: string): number {
+  let count = 0;
+  for (const char of str) {
+    if (char) count++;
+  }
+  return count;
+}
+
+const CJK_SCRIPT_REGEX = /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u;
+
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
   if (matches.length === 0) return [];
   const size = Math.max(1, Math.floor(requestedSize));
   const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
   const stride = Math.max(1, size - overlap);
+
+  // Build the list of token spans. In whitespace-delimited scripts (English, etc.),
+  // each non-whitespace sequence is roughly one token. In scripts without spaces
+  // (CJK, etc.) or for oversized runs (long URLs, base64 blobs), a single regex
+  // match can exceed the chunk size budget. We enforce a character/code-point
+  // limit by splitting any token whose code-point count exceeds `size` on Unicode
+  // code-point boundaries (preventing surrogate pair corruption). Ordinary words
+  // in spaced languages (<= 40 characters) remain atomic tokens.
+  const tokens: RAGTokenSpan[] = [];
+  for (const match of matches) {
+    const matchText = match[0];
+    const matchStart = match.index ?? 0;
+    const cpCount = countCodePoints(matchText);
+    const isScriptWithoutSpaces = CJK_SCRIPT_REGEX.test(matchText);
+    const isOversized = cpCount > size && (isScriptWithoutSpaces || cpCount > 40);
+
+    if (!isOversized) {
+      tokens.push({
+        startOffset: matchStart,
+        endOffset: matchStart + matchText.length,
+      });
+    } else {
+      let currentOffset = matchStart;
+      for (const char of matchText) {
+        tokens.push({
+          startOffset: currentOffset,
+          endOffset: currentOffset + char.length,
+        });
+        currentOffset += char.length;
+      }
+    }
+  }
+
+  if (tokens.length === 0) return [];
+
   const chunks: SplitRAGChunk[] = [];
-  for (let start = 0; start < matches.length; start += stride) {
-    const end = Math.min(matches.length, start + size);
-    const startOffset = matches[start]!.index ?? 0;
-    const last = matches[end - 1]!;
-    const endOffset = (last.index ?? 0) + last[0].length;
+  for (let start = 0; start < tokens.length; start += stride) {
+    const end = Math.min(tokens.length, start + size);
+    const startOffset = tokens[start]!.startOffset;
+    const last = tokens[end - 1]!;
+    const endOffset = last.endOffset;
     chunks.push({
       text: text.slice(startOffset, endOffset),
       startOffset,
       endOffset,
       tokenCount: end - start,
     });
-    if (end === matches.length) break;
+    if (end === tokens.length) break;
   }
   return chunks;
 }
@@ -1961,6 +2011,7 @@ export const __testing__ = {
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
+  splitRAGText,
 };
 
 /**
