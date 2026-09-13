@@ -1320,6 +1320,33 @@ TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
     const std::string kept = quoted_cfg.voice_agent().generation().system_prompt();
     std::printf("[yaml] quoted system_prompt = %s\n", kept.c_str());
     CHECK(kept == "has # inside");
+
+    // Two apostrophes, one in the value and one in the comment. They balance,
+    // so quote tracking ends the line looking correct and the
+    // unterminated-quote fallback never runs. Only opening a quote at a token
+    // boundary keeps `Don't` from opening one at all.
+    const char* two =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: Don't use markdown  # don't forget\n";
+    runanywhere::v1::SolutionConfig two_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(two, &two_cfg) == RAC_SUCCESS);
+    const std::string two_prompt = two_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] two-apostrophe system_prompt = %s\n", two_prompt.c_str());
+    CHECK(two_prompt == "Don't use markdown");
+
+    // A genuinely unterminated quote must still reach the fallback, and a
+    // quoted scalar whose comment also contains an apostrophe must keep its
+    // own '#'.
+    const char* apos_comment =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: \"has # inside\"  # don't forget\n";
+    runanywhere::v1::SolutionConfig apos_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(apos_comment, &apos_cfg) == RAC_SUCCESS);
+    const std::string apos_kept = apos_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] quoted + apostrophe comment = %s\n", apos_kept.c_str());
+    CHECK(apos_kept == "has # inside");
 }
 
 // ---------------------------------------------------------------------------

@@ -107,14 +107,26 @@ class YamlParser {
             // keeps us honest for strings containing '#'.
             std::string clean;
             bool in_sq = false, in_dq = false;
-            for (char c : line) {
+            for (size_t i = 0; i < line.size(); ++i) {
+                const char c = line[i];
+                // A quote can only OPEN where a YAML token can start: begin of
+                // line, or after whitespace, ':' or '-'. It still CLOSES
+                // anywhere. Without this, the apostrophe in `Don't` opened a
+                // quote, and a second apostrophe later on the line (commonly in
+                // the comment, `# don't forget`) closed it again, leaving the
+                // tracking balanced and wrong so the '#' was never seen.
+                const char prev = i == 0 ? '\0' : line[i - 1];
+                const bool can_open =
+                    i == 0 || prev == ' ' || prev == '\t' || prev == ':' || prev == '-';
                 if (!in_dq && c == '\'') {
-                    in_sq = !in_sq;
+                    if (in_sq || can_open)
+                        in_sq = !in_sq;
                     clean.push_back(c);
                     continue;
                 }
                 if (!in_sq && c == '"') {
-                    in_dq = !in_dq;
+                    if (in_dq || can_open)
+                        in_dq = !in_dq;
                     clean.push_back(c);
                     continue;
                 }
