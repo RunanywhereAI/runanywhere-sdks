@@ -38,9 +38,12 @@ class ONNXEmbeddingProvider {
 
     // out_total_tokens (optional): receives the real, non-padding token count
     // consumed across the input(s). Nullptr-safe; existing callers are unaffected.
-    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr);
+    // normalize: if true (default), L2-normalizes to unit vector. If false, returns raw pooled vector.
+    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr,
+                             bool normalize = true);
     std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts,
-                                                size_t* out_total_tokens = nullptr);
+                                                size_t* out_total_tokens = nullptr,
+                                                bool normalize = true);
     size_t dimension() const noexcept;
     bool is_ready() const noexcept;
     const char* name() const noexcept;
