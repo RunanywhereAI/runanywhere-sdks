@@ -69,11 +69,11 @@ bool is_valid_utf8(const std::string& s) {
         size_t need = 0;
         if (c < 0x80) {
             need = 0;
-        } else if ((c & 0xE0) == 0xC0) {
+        } else if (c >= 0xC2 && c <= 0xDF) {
             need = 1;
-        } else if ((c & 0xF0) == 0xE0) {
+        } else if (c >= 0xE0 && c <= 0xEF) {
             need = 2;
-        } else if ((c & 0xF8) == 0xF0) {
+        } else if (c >= 0xF0 && c <= 0xF4) {
             need = 3;
         } else {
             return false;  // continuation byte or invalid lead
@@ -81,6 +81,15 @@ bool is_valid_utf8(const std::string& s) {
         for (size_t k = 1; k <= need; ++k) {
             if (i + k >= s.size() || (static_cast<unsigned char>(s[i + k]) & 0xC0) != 0x80) {
                 return false;  // truncated or malformed sequence
+            }
+        }
+        if (need > 0) {
+            const unsigned char second = static_cast<unsigned char>(s[i + 1]);
+            if ((c == 0xE0 && second < 0xA0) ||
+                (c == 0xED && second > 0x9F) ||
+                (c == 0xF0 && second < 0x90) ||
+                (c == 0xF4 && second > 0x8F)) {
+                return false;
             }
         }
         i += need + 1;
@@ -164,6 +173,39 @@ int main() {
         std::string truncated = flatten_and_truncate(single_cjk, 2);
         CHECK(truncated.empty(), "sub-character budget returns empty without partial code units");
         CHECK(is_valid_utf8(truncated), "sub-character result is valid UTF-8");
+    }
+
+    // --- flatten_and_truncate: reject malformed UTF-8 sequences ---
+    {
+        // Lone continuation byte (0x80..0xBF)
+        std::string lone_continuation = "Hello\x80World";
+        std::string res1 = flatten_and_truncate(lone_continuation, kMaxChunkChars);
+        CHECK(res1 == "HelloWorld", "lone continuation byte is dropped");
+        CHECK(is_valid_utf8(res1), "result is valid UTF-8");
+
+        // Overlong 2-byte encoding of ASCII (0xC0, 0xC1)
+        std::string overlong_2byte = "Over\xC0\xAFlong";
+        std::string res2 = flatten_and_truncate(overlong_2byte, kMaxChunkChars);
+        CHECK(res2 == "Overlong", "overlong 2-byte sequence is dropped");
+        CHECK(is_valid_utf8(res2), "result is valid UTF-8");
+
+        // Overlong 3-byte encoding (0xE0 with second byte < 0xA0)
+        std::string overlong_3byte = "Over\xE0\x80\xAFlong";
+        std::string res3 = flatten_and_truncate(overlong_3byte, kMaxChunkChars);
+        CHECK(res3 == "Overlong", "overlong 3-byte sequence is dropped");
+        CHECK(is_valid_utf8(res3), "result is valid UTF-8");
+
+        // UTF-16 surrogate code point (0xED with second byte > 0x9F)
+        std::string surrogate = "Surr\xED\xA0\x80ogate";
+        std::string res4 = flatten_and_truncate(surrogate, kMaxChunkChars);
+        CHECK(res4 == "Surrogate", "surrogate sequence is dropped");
+        CHECK(is_valid_utf8(res4), "result is valid UTF-8");
+
+        // Out-of-range codepoint > U+10FFFF (0xF4 with second byte > 0x8F, or lead > 0xF4)
+        std::string out_of_range = "Out\xF4\x90\x80\x80of\xF5\x80\x80\x80range";
+        std::string res5 = flatten_and_truncate(out_of_range, kMaxChunkChars);
+        CHECK(res5 == "Outofrange", "out-of-range codepoint is dropped");
+        CHECK(is_valid_utf8(res5), "result is valid UTF-8");
     }
 
     // --- parse: clean format ---

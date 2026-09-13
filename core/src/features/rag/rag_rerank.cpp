@@ -39,14 +39,17 @@ std::string flatten_and_truncate(const std::string& text, size_t max_chars) {
         size_t cp_len = 1;
         if (lead < 0x80) {
             cp_len = 1;
-        } else if ((lead & 0xE0) == 0xC0) {
+        } else if (lead >= 0xC2 && lead <= 0xDF) {
             cp_len = 2;
-        } else if ((lead & 0xF0) == 0xE0) {
+        } else if (lead >= 0xE0 && lead <= 0xEF) {
             cp_len = 3;
-        } else if ((lead & 0xF8) == 0xF0) {
+        } else if (lead >= 0xF0 && lead <= 0xF4) {
             cp_len = 4;
         } else {
-            cp_len = 1;
+            // Lone continuation byte (0x80..0xBF), overlong 2-byte lead (0xC0, 0xC1),
+            // or invalid lead (> 0xF4). Skip this malformed byte.
+            ++i;
+            continue;
         }
 
         if (i + cp_len > text.size()) {
@@ -59,6 +62,18 @@ std::string flatten_and_truncate(const std::string& text, size_t max_chars) {
                 valid = false;
                 break;
             }
+        }
+        if (valid && cp_len > 1) {
+            const unsigned char second = static_cast<unsigned char>(text[i + 1]);
+            // RFC 3629 / Unicode standard bounds:
+            // 0xE0: 0xA0..0xBF (reject overlong 0xE0 0x80..0x9F)
+            // 0xED: 0x80..0x9F (reject UTF-16 surrogates U+D800..U+DFFF -> 0xED 0xA0..0xBF)
+            // 0xF0: 0x90..0xBF (reject overlong 0xF0 0x80..0x8F)
+            // 0xF4: 0x80..0x8F (reject out-of-range > U+10FFFF -> 0xF4 0x90..0xBF)
+            valid = !(lead == 0xE0 && second < 0xA0) &&
+                    !(lead == 0xED && second > 0x9F) &&
+                    !(lead == 0xF0 && second < 0x90) &&
+                    !(lead == 0xF4 && second > 0x8F);
         }
         if (!valid) {
             ++i;
