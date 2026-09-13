@@ -156,6 +156,17 @@ test('embeddings: the normalize option reaches commons, and the ONNX engine hono
         Math.abs(magnitude(raw.vector) - 1) > 0.05,
         `normalize=NONE returns unnormalized vector: ${magnitude(raw.vector)}`
       );
+
+      // Multi-sub-batch coverage (>= 51 inputs) to force sub-batch chunking with normalize=NONE
+      const inputs = Array.from({ length: 51 }, (_, i) => `sample text batch item ${i}`);
+      const batchRaw = await sdk.embeddings.embed(inputs, { normalize: 'NONE' });
+      assert.equal(batchRaw.length, 51, 'received 51 embedding vectors');
+      for (const item of batchRaw) {
+        assert.ok(
+          Math.abs(magnitude(item.vector) - 1) > 0.05,
+          `sub-batch item is unnormalized: ${magnitude(item.vector)}`
+        );
+      }
     });
   }
 );

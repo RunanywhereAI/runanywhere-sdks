@@ -39,12 +39,28 @@ struct onnx_embeddings_handle {
 
 namespace {
 
+/**
+ * @brief No-op vtable initialization callback for ONNX embeddings backend.
+ *
+ * @param impl Backend implementation handle pointer.
+ * @param model_path Path to the embedding model on disk.
+ * @return RAC_SUCCESS.
+ */
 static rac_result_t onnx_embed_vtable_initialize(void* impl, const char* model_path) {
     (void)impl;
     (void)model_path;
     return RAC_SUCCESS;
 }
 
+/**
+ * @brief Vtable callback to compute embedding for a single text using ONNX backend.
+ *
+ * @param impl Pointer to onnx_embeddings_handle.
+ * @param text Input text string to embed.
+ * @param options Pointer to embeddings options including normalization mode.
+ * @param out_result Output struct to receive generated embedding vector.
+ * @return RAC_SUCCESS on success, or an error code.
+ */
 static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
                                             const rac_embeddings_options_t* options,
                                             rac_embeddings_result_t* out_result) {
@@ -98,6 +114,16 @@ static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
     }
 }
 
+/**
+ * @brief Vtable callback to compute embeddings for a batch of texts using ONNX backend.
+ *
+ * @param impl Pointer to onnx_embeddings_handle.
+ * @param texts Array of null-terminated text strings.
+ * @param num_texts Number of strings in texts array.
+ * @param options Pointer to embeddings options including normalization mode.
+ * @param out_result Output struct to receive generated embedding vectors.
+ * @return RAC_SUCCESS on success, or an error code.
+ */
 static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const* texts,
                                                   size_t num_texts,
                                                   const rac_embeddings_options_t* options,
