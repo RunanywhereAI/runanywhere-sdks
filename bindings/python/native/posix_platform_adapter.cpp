@@ -192,8 +192,8 @@ rac_result_t posix_secure_set(const char* key, const char* value, void*) {
         }
         off += static_cast<size_t>(w);
     }
-    ::close(fd);
-    return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+    int close_rc = ::close(fd);
+    return (ok && close_rc == 0) ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
 rac_result_t posix_secure_delete(const char* key, void*) {

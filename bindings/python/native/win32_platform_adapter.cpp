@@ -205,8 +205,8 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     size_t put = out.cbData ? fwrite(out.pbData, 1, out.cbData, f) : 0;
-    fclose(f);
-    bool ok = (put == out.cbData);
+    int close_rc = fclose(f);
+    bool ok = (put == out.cbData && close_rc == 0);
     LocalFree(out.pbData);
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
