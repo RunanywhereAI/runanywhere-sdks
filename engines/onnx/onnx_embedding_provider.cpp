@@ -550,6 +550,14 @@ class ONNXEmbeddingProvider::Impl {
 
     ~Impl() = default;
 
+    /**
+     * @brief Computes embedding vector for a single input text.
+     *
+     * @param text Input text string.
+     * @param out_total_tokens Optional pointer to receive non-padding token count.
+     * @param normalize True to L2-normalize to unit vector, false to return raw pooled vector.
+     * @return Float vector of embedding dimensions, or empty on failure.
+     */
     std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr,
                              bool normalize = true) {
         if (!ready_) {
@@ -638,6 +646,14 @@ class ONNXEmbeddingProvider::Impl {
         }
     }
 
+    /**
+     * @brief Computes embedding vectors for a batch of input texts.
+     *
+     * @param texts Vector of input text strings.
+     * @param out_total_tokens Optional pointer to receive total token count across batch.
+     * @param normalize True to L2-normalize to unit vector, false to return raw pooled vectors.
+     * @return Vector of embedding vectors corresponding to inputs.
+     */
     std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts,
                                                 size_t* out_total_tokens = nullptr,
                                                 bool normalize = true) {
@@ -703,6 +719,16 @@ class ONNXEmbeddingProvider::Impl {
         return std::min(aligned, static_cast<size_t>(512));
     }
 
+    /**
+     * @brief Executes a sub-batch of embedding inference.
+     *
+     * @param texts Complete list of texts.
+     * @param offset Start offset in texts list.
+     * @param count Number of items in the sub-batch.
+     * @param out_total_tokens Optional pointer to receive total token count.
+     * @param normalize True to L2-normalize to unit vector, false to return raw pooled vectors.
+     * @return Vector of embedding float vectors for this sub-batch.
+     */
     std::vector<std::vector<float>> embed_sub_batch(const std::vector<std::string>& texts,
                                                     size_t offset, size_t count,
                                                     size_t* out_total_tokens = nullptr,
@@ -892,25 +918,56 @@ ONNXEmbeddingProvider::~ONNXEmbeddingProvider() = default;
 ONNXEmbeddingProvider::ONNXEmbeddingProvider(ONNXEmbeddingProvider&&) noexcept = default;
 ONNXEmbeddingProvider& ONNXEmbeddingProvider::operator=(ONNXEmbeddingProvider&&) noexcept = default;
 
+/**
+ * @brief Computes embedding vector for a single input text.
+ *
+ * @param text Input text string.
+ * @param out_total_tokens Optional pointer to receive non-padding token count.
+ * @param normalize True to L2-normalize to unit vector, false to return raw pooled vector.
+ * @return Float vector of embedding dimensions, or empty on failure.
+ */
 std::vector<float> ONNXEmbeddingProvider::embed(const std::string& text, size_t* out_total_tokens,
                                                 bool normalize) {
     return impl_->embed(text, out_total_tokens, normalize);
 }
 
+/**
+ * @brief Computes embedding vectors for a batch of input texts.
+ *
+ * @param texts Vector of input text strings.
+ * @param out_total_tokens Optional pointer to receive total token count across batch.
+ * @param normalize True to L2-normalize to unit vectors, false to return raw pooled vectors.
+ * @return Vector of embedding vectors corresponding to inputs.
+ */
 std::vector<std::vector<float>>
 ONNXEmbeddingProvider::embed_batch(const std::vector<std::string>& texts, size_t* out_total_tokens,
                                    bool normalize) {
     return impl_->embed_batch(texts, out_total_tokens, normalize);
 }
 
+/**
+ * @brief Returns the output embedding vector dimension.
+ *
+ * @return Number of dimensions in the embedding vector.
+ */
 size_t ONNXEmbeddingProvider::dimension() const noexcept {
     return impl_->dimension();
 }
 
+/**
+ * @brief Checks if the ONNX runtime model session is loaded and ready for inference.
+ *
+ * @return True if model is loaded and ready.
+ */
 bool ONNXEmbeddingProvider::is_ready() const noexcept {
     return impl_->is_ready();
 }
 
+/**
+ * @brief Returns the provider backend name identifier.
+ *
+ * @return Human-readable provider name string.
+ */
 const char* ONNXEmbeddingProvider::name() const noexcept {
     return "ONNX-Embedding";
 }
