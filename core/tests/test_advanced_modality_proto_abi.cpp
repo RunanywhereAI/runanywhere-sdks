@@ -142,6 +142,16 @@ int test_vlm_raw_image_proto_adapter_validation() {
     CHECK(out.pixel_data == nullptr && out.data_size == 0,
           "rejected raw RGB publishes no pixel buffer");
 
+    runanywhere::v1::VLMImage long_rgb;
+    long_rgb.set_width(2);
+    long_rgb.set_height(1);
+    long_rgb.set_raw_rgb(std::string(7, '\x01'));
+    out = {};
+    CHECK(!rac::foundation::rac_vlm_image_from_proto(long_rgb, &out),
+          "long raw RGB payload is rejected");
+    CHECK(out.pixel_data == nullptr && out.data_size == 0,
+          "oversized raw RGB publishes no pixel buffer");
+
     runanywhere::v1::VLMImage zero_width_rgb;
     zero_width_rgb.set_width(0);
     zero_width_rgb.set_height(1);
@@ -205,6 +215,16 @@ int test_vlm_raw_image_proto_adapter_validation() {
               std::memcmp(out.pixel_data, expected_rgb, sizeof(expected_rgb)) == 0,
           "raw RGBA conversion drops alpha byte-for-byte");
     rac_free(const_cast<uint8_t*>(out.pixel_data));
+
+    runanywhere::v1::VLMImage long_rgba;
+    long_rgba.set_width(2);
+    long_rgba.set_height(1);
+    long_rgba.set_raw_rgba(std::string(9, '\x01'));
+    out = {};
+    CHECK(!rac::foundation::rac_vlm_image_from_proto(long_rgba, &out),
+          "long raw RGBA payload is rejected");
+    CHECK(out.pixel_data == nullptr && out.data_size == 0,
+          "oversized raw RGBA publishes no pixel buffer");
 
     return 0;
 }
