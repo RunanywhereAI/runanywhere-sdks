@@ -24,6 +24,18 @@
 namespace runanywhere {
 namespace rag {
 
+constexpr size_t kMaxChunkChars = 360;
+
+/**
+ * @brief Flatten whitespace (newlines/carriage returns/tabs) and truncate text
+ *        to at most `max_chars` bytes while backing off to a valid UTF-8 character boundary.
+ *
+ * @param text Input text to format and truncate.
+ * @param max_chars Maximum byte budget (default: kMaxChunkChars = 360).
+ * @return Formatted string guaranteed to end on a complete UTF-8 code point.
+ */
+std::string flatten_and_truncate(const std::string& text, size_t max_chars = kMaxChunkChars);
+
 /**
  * @brief Parse LLM scorer output into per-candidate scores.
  *

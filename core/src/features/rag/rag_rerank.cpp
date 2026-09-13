@@ -18,10 +18,6 @@
 namespace runanywhere {
 namespace rag {
 
-namespace {
-
-constexpr size_t kMaxChunkChars = 360;
-
 std::string flatten_and_truncate(const std::string& text, size_t max_chars) {
     std::string out;
     out.reserve(std::min(text.size(), max_chars));
@@ -42,8 +38,6 @@ std::string flatten_and_truncate(const std::string& text, size_t max_chars) {
     out.resize(cut);
     return out;
 }
-
-}  // namespace
 
 size_t parse_rerank_scores(const std::string& text, size_t n, std::vector<int>& scores) {
     scores.assign(n, 0);
