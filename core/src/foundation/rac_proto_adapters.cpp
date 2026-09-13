@@ -276,9 +276,24 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts
     if (!out)
         return false;
     *out = RAC_TTS_OPTIONS_DEFAULT;
+    bool language_owned = false;
+    auto fail = [&]() {
+        rac_free(const_cast<char*>(out->voice));
+        if (language_owned) {
+            rac_free(const_cast<char*>(out->language));
+        }
+        *out = RAC_TTS_OPTIONS_DEFAULT;
+        return false;
+    };
     out->voice = copy_string(in.voice());
-    if (!in.language_code().empty())
+    if (!in.voice().empty() && !out->voice)
+        return fail();
+    if (!in.language_code().empty()) {
         out->language = copy_string(in.language_code());
+        if (!out->language)
+            return fail();
+        language_owned = true;
+    }
     if (in.speed() > 0.0f)
         out->rate = in.speed();
     if (in.pitch() > 0.0f)
@@ -317,8 +332,19 @@ bool rac_tts_synthesis_metadata_from_proto(const ::runanywhere::v1::TTSSynthesis
                                            rac_tts_synthesis_metadata_t* out) {
     if (!out)
         return false;
+    *out = {};
+    auto fail = [&]() {
+        rac_free(const_cast<char*>(out->voice));
+        rac_free(const_cast<char*>(out->language));
+        *out = {};
+        return false;
+    };
     out->voice = copy_string(in.voice_id());
+    if (!in.voice_id().empty() && !out->voice)
+        return fail();
     out->language = copy_string(in.language_code());
+    if (!in.language_code().empty() && !out->language)
+        return fail();
     out->processing_time_ms = in.processing_time_ms();
     out->character_count = in.input_bytes();
     // Compute characters_per_second from processing_time_ms.
@@ -569,11 +595,20 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
     if (!out)
         return false;
     std::memset(out, 0, sizeof(*out));
+    auto fail = [&]() {
+        rac_free(const_cast<char*>(out->file_path));
+        rac_free(const_cast<uint8_t*>(out->pixel_data));
+        rac_free(const_cast<char*>(out->base64_data));
+        std::memset(out, 0, sizeof(*out));
+        return false;
+    };
     out->width = static_cast<uint32_t>(in.width());
     out->height = static_cast<uint32_t>(in.height());
     if (in.has_file_path()) {
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
         out->file_path = copy_string_required(in.file_path());
+        if (!out->file_path)
+            return fail();
     } else if (in.has_raw_rgb()) {
         // 3 bytes/px, tightly packed -- no alpha to drop.
         const ::std::string& src = in.raw_rgb();
@@ -584,7 +619,7 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
 
         uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
         if (!buf)
-            return false;
+            return fail();
         std::memcpy(buf, src.data(), rgb_size);
 
         out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
@@ -610,7 +645,7 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         }
         uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
         if (!buf)
-            return false;
+            return fail();
 
         const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
         const size_t pixels = rgb_size / 3;
@@ -626,6 +661,8 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
         out->base64_data = copy_string_required(in.base64());
+        if (!out->base64_data)
+            return fail();
         out->data_size = in.base64().size();
     } else if (in.has_data()) {
         // `data` (renamed from `encoded`) carries compressed JPEG/PNG/WEBP
