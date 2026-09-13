@@ -159,7 +159,10 @@ internal fun VadOptions.toProto(
     sampleRate: Int = AudioFormatSpec.DEFAULT_SAMPLE_RATE,
 ): VADOptions =
     VADOptions(
-        activation_threshold = activationThreshold ?: 0f,
+        // Leave it unset when the caller did not ask: `activation_threshold` is
+        // an `optional` proto field and commons reads its presence, so `?: 0f`
+        // turned every default VadOptions into an explicit 0.0 request.
+        activation_threshold = activationThreshold,
         min_speech_duration_ms = minSpeechMs,
         min_silence_duration_ms = minSilenceMs,
         prefix_padding_ms = prefixPaddingMs,
