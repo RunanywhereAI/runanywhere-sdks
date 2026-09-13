@@ -112,6 +112,27 @@ bool checked_raw_image_size(int32_t width, int32_t height, size_t bytes_per_pixe
     return true;
 }
 
+rac_result_t set_vlm_image_error(rac_proto_buffer_t* out_error, rac_result_t code,
+                                 const std::string& message) {
+    if (!out_error)
+        return code;
+    return rac_proto_buffer_set_error(out_error, code, message.c_str());
+}
+
+std::string raw_image_dimensions_error(const char* field, int32_t width, int32_t height,
+                                       size_t bytes_per_pixel) {
+    return std::string("VLMImage.") + field + " dimensions " + std::to_string(width) + "x" +
+           std::to_string(height) + " cannot produce a valid width*height*" +
+           std::to_string(bytes_per_pixel) + " byte length";
+}
+
+std::string raw_image_length_error(const char* field, size_t actual_size, size_t expected_size,
+                                   size_t bytes_per_pixel) {
+    return std::string("VLMImage.") + field + " length " + std::to_string(actual_size) +
+           " does not match width*height*" + std::to_string(bytes_per_pixel) + " = " +
+           std::to_string(expected_size);
+}
+
 // ---- Audio format enum mapping --------------------------------------------
 // Both enums share the same ordering for the formats they overlap on. The C
 // enum starts at PCM=0; proto starts at UNSPECIFIED=0 with PCM=1. Apply +1 / -1
@@ -565,26 +586,40 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMR
     return true;
 }
 
-bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_image_t* out) {
+rac_result_t rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in,
+                                      rac_vlm_image_t* out, rac_proto_buffer_t* out_error) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     std::memset(out, 0, sizeof(*out));
     out->width = static_cast<uint32_t>(in.width());
     out->height = static_cast<uint32_t>(in.height());
     if (in.has_file_path()) {
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
         out->file_path = copy_string_required(in.file_path());
+        if (!out->file_path) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.file_path");
+        }
     } else if (in.has_raw_rgb()) {
         // 3 bytes/px, tightly packed -- no alpha to drop.
         const ::std::string& src = in.raw_rgb();
         size_t rgb_size = 0;
-        if (!checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
-            src.size() != rgb_size)
-            return false;
+        if (!checked_raw_image_size(in.width(), in.height(), 3, &rgb_size)) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_dimensions_error("raw_rgb", in.width(), in.height(), 3));
+        }
+        if (src.size() != rgb_size) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_length_error("raw_rgb", src.size(), rgb_size, 3));
+        }
 
         uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
-        if (!buf)
-            return false;
+        if (!buf) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.raw_rgb pixel buffer");
+        }
         std::memcpy(buf, src.data(), rgb_size);
 
         out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
@@ -602,15 +637,21 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         size_t rgba_size = 0;
         size_t rgb_size = 0;
         if (!checked_raw_image_size(in.width(), in.height(), 4, &rgba_size) ||
-            !checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
-            src.size() != rgba_size) {
-            // Dimensions inconsistent with RGBA payload — refuse rather
-            // than read past the buffer.
-            return false;
+            !checked_raw_image_size(in.width(), in.height(), 3, &rgb_size)) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_dimensions_error("raw_rgba", in.width(), in.height(), 4));
+        }
+        if (src.size() != rgba_size) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_length_error("raw_rgba", src.size(), rgba_size, 4));
         }
         uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
-        if (!buf)
-            return false;
+        if (!buf) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.raw_rgba RGB buffer");
+        }
 
         const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
         const size_t pixels = rgb_size / 3;
@@ -626,6 +667,10 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
         out->base64_data = copy_string_required(in.base64());
+        if (!out->base64_data) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.base64");
+        }
         out->data_size = in.base64().size();
     } else if (in.has_data()) {
         // `data` (renamed from `encoded`) carries compressed JPEG/PNG/WEBP
@@ -636,13 +681,14 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         // the proto boundary so the caller sees a clean decoding error
         // instead of a backend crash. SDKs must decode containers to
         // RAW_RGB or supply a file path before calling C.
-        return false;
+        return set_vlm_image_error(out_error, RAC_ERROR_DECODING_ERROR,
+                                   "VLMImage.data requires decoding before native VLM dispatch");
     } else {
         // No source set — leave pointers NULL and pick FILE_PATH as the
         // safest default (matches RAC_VLM_IMAGE_FORMAT_FILE_PATH = 0).
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
     }
-    return true;
+    return RAC_SUCCESS;
 }
 
 // ===========================================================================
