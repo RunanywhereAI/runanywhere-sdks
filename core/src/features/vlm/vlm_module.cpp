@@ -24,6 +24,7 @@
 #include "core/internal/platform_compat.h"
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/common/special_token_filter.h"
+#include "features/common/utf8_stream_boundary.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
@@ -535,6 +536,12 @@ struct vlm_stream_context {
     // `<end_of_utterance>` across two callbacks, and neither half is
     // recognisable on its own.
     rac::tokens::StreamFilter filter;
+
+    // Holds back a trailing partial UTF-8 character between callbacks, so no
+    // chunk handed to the caller is invalid UTF-8. Accumulation into
+    // `cleaned_text` is deliberately not delayed, so the final result is
+    // unaffected.
+    rac::tokens::Utf8Assembler utf8;
 };
 
 /**
@@ -569,9 +576,15 @@ static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) 
     ctx->cleaned_text += cleaned;
     ctx->token_count++;
 
-    // Forward only non-empty cleaned tokens to the user callback
+    // Forward only non-empty cleaned tokens to the user callback, and only up
+    // to the last complete character: a piece may end mid-sequence, and its
+    // remaining bytes arrive on a later callback.
     if (!cleaned.empty() && ctx->token_callback) {
-        return ctx->token_callback(cleaned.c_str(), ctx->user_data);
+        const std::string& deliverable = ctx->utf8.feed(cleaned);
+        if (deliverable.empty()) {
+            return RAC_TRUE;  // whole chunk is a partial character; wait for the rest
+        }
+        return ctx->token_callback(deliverable.c_str(), ctx->user_data);
     }
 
     return RAC_TRUE;
@@ -653,8 +666,19 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     const std::string held_tail = ctx.filter.flush();
     if (!held_tail.empty()) {
         ctx.cleaned_text += held_tail;
-        if (token_callback) {
-            token_callback(held_tail.c_str(), user_data);
+    }
+
+    // Release whatever the assembler still holds. A remainder is a character
+    // the backend never finished emitting, so it cannot render; `cleaned_text`
+    // already carries those bytes, leaving the final result unchanged.
+    if (token_callback) {
+        std::string deliverable;
+        if (!held_tail.empty()) {
+            deliverable = ctx.utf8.feed(held_tail);
+        }
+        deliverable += ctx.utf8.flush();
+        if (!deliverable.empty()) {
+            token_callback(deliverable.c_str(), user_data);
         }
     }
 
@@ -1083,6 +1107,12 @@ struct GeneratedStreamCtx {
 
     // Per-stream sentinel filter; see vlm_stream_context::filter.
     rac::tokens::StreamFilter filter;
+
+    // Per-stream UTF-8 assembler; see vlm_stream_context::utf8. Required here
+    // too: `generation.token` and the VLM stream event's text are proto string
+    // fields, and a partial character makes the message invalid UTF-8 for the
+    // five SDKs that consume this path.
+    rac::tokens::Utf8Assembler utf8;
 };
 
 bool serialize_vlm_stream_event(const runanywhere::v1::VLMStreamEvent& event,
@@ -1167,24 +1197,31 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
         }
     }
 
+    // Emit only up to the last complete character. `generation.token` and the
+    // VLM stream event text are proto `string` fields, so a chunk cut through a
+    // multi-byte character is an invalid message for every SDK on this path.
+    // `ctx->text` above keeps the unassembled text, so the final result is
+    // unchanged and only chunk boundaries move.
+    const std::string emit = ctx->utf8.feed(display);
+
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* generation = event.mutable_generation();
     generation->set_kind(ctx->token_count == 1
                              ? runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED
                              : runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED);
-    generation->set_token(display);
+    generation->set_token(emit);
     generation->set_output_tokens(ctx->token_count);
     if (ctx->ref->model_id)
         generation->set_model_id(ctx->ref->model_id);
     publish_event(event);
 
-    if (display.empty()) {
+    if (emit.empty()) {
         return RAC_TRUE;
     }
 
     return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN,
-                                     display.c_str(), false, nullptr, nullptr, 0);
+                                     emit.c_str(), false, nullptr, nullptr, 0);
 }
 
 // Release whatever sentinel prefix the filter is still holding once the
@@ -1196,12 +1233,22 @@ void flush_held_stream_text(GeneratedStreamCtx* ctx) {
         return;
     }
     const std::string tail = ctx->filter.flush();
-    if (tail.empty()) {
+    if (!tail.empty()) {
+        ctx->text += tail;
+        ++ctx->token_count;
+    }
+    // Assemble the sentinel filter's tail, then release anything the UTF-8
+    // assembler still holds. A leftover partial character cannot render, and
+    // `ctx->text` already carries it.
+    std::string emit;
+    if (!tail.empty()) {
+        emit = ctx->utf8.feed(tail);
+    }
+    emit += ctx->utf8.flush();
+    if (emit.empty()) {
         return;
     }
-    ctx->text += tail;
-    ++ctx->token_count;
-    dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN, tail.c_str(),
+    dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN, emit.c_str(),
                               false, nullptr, nullptr, 0);
 }
 
