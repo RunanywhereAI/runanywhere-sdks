@@ -58,7 +58,7 @@ const KNOWN_EXHAUSTED_BYTES_SENTINEL = 1;
 function probeAvailableRamBytes(): number {
   if (typeof navigator === 'undefined') return 0;
   const deviceMemoryGiB = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  if (typeof deviceMemoryGiB !== 'number') return 0;
+  if (typeof deviceMemoryGiB !== 'number' || !Number.isFinite(deviceMemoryGiB)) return 0;
   if (deviceMemoryGiB <= 0) return KNOWN_EXHAUSTED_BYTES_SENTINEL;
   return Math.trunc(deviceMemoryGiB * BYTES_PER_GIB);
 }

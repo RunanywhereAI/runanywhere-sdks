@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { __testing__ } from '../../../../../src/Public/API/Namespaces/models';
+import { __testing__ } from '../../../../../src/Public/API/Namespaces/models.js';
 
 const {
   probeAvailableRamBytes,
@@ -119,6 +119,15 @@ describe('models platform probes', () => {
     it('returns 0 (unknown) when deviceMemory is not a number', () => {
       vi.stubGlobal('navigator', {
         deviceMemory: 'unknown',
+      });
+
+      const ram = probeAvailableRamBytes();
+      expect(ram).toBe(0);
+    });
+
+    it('returns 0 (unknown) when deviceMemory is NaN', () => {
+      vi.stubGlobal('navigator', {
+        deviceMemory: NaN,
       });
 
       const ram = probeAvailableRamBytes();
