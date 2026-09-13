@@ -47,11 +47,19 @@ interface CompatibilityModule extends EmscriptenRunanywhereModule {
   ): number;
 }
 
+/**
+ * Sentinel value (1 byte) representing a storage or RAM probe that is known
+ * and exhausted (zero or negative free space), distinguishing it from 0
+ * which commons treats as "unknown" (satisfying requirements).
+ */
+const KNOWN_EXHAUSTED_BYTES_SENTINEL = 1;
+
 /** Browser-reported available RAM in bytes, or 0 when unknown (commons contract). */
 function probeAvailableRamBytes(): number {
   if (typeof navigator === 'undefined') return 0;
   const deviceMemoryGiB = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  if (typeof deviceMemoryGiB !== 'number' || !(deviceMemoryGiB > 0)) return 0;
+  if (typeof deviceMemoryGiB !== 'number' || !Number.isFinite(deviceMemoryGiB)) return 0;
+  if (deviceMemoryGiB <= 0) return KNOWN_EXHAUSTED_BYTES_SENTINEL;
   return Math.trunc(deviceMemoryGiB * BYTES_PER_GIB);
 }
 
@@ -62,8 +70,9 @@ async function probeAvailableStorageBytes(): Promise<number> {
     const estimate = await navigator.storage.estimate();
     const quota = Number(estimate.quota ?? 0);
     const usage = Number(estimate.usage ?? 0);
-    if (!(quota > 0)) return 0;
-    return Math.max(0, Math.trunc(quota - usage));
+    if (!Number.isFinite(quota) || !Number.isFinite(usage) || !(quota > 0)) return 0;
+    const free = Math.trunc(quota - usage);
+    return free > 0 ? free : KNOWN_EXHAUSTED_BYTES_SENTINEL;
   } catch {
     return 0;
   }
@@ -529,5 +538,10 @@ function toProgressEvent(progress: DownloadProgress, operationId: string, sequen
   };
 }
 
-/** Test seam for the download progress mapping. */
-export const __testing__ = { toProgressEvent };
+/** Test seam for download progress mapping and platform probes. */
+export const __testing__ = {
+  toProgressEvent,
+  probeAvailableRamBytes,
+  probeAvailableStorageBytes,
+  KNOWN_EXHAUSTED_BYTES_SENTINEL,
+};
