@@ -41,7 +41,7 @@ extern "C" {
 /**
  * @brief Streaming callback for token-by-token generation
  *
- * @param token The generated token
+ * @param text_run The generated UTF-8-safe text run
  * @param user_data User-provided context
  * @return RAC_TRUE to continue, RAC_FALSE to stop
  */
@@ -196,7 +196,7 @@ RAC_API rac_bool_t rac_llm_component_supports_streaming(rac_handle_t handle);
  * @param handle Component handle
  * @param prompt Input prompt
  * @param options Generation options (can be NULL for defaults)
- * @param token_callback Called for each generated token
+ * @param Called for generated UTF-8 text runs (the final run may contain an incomplete trailing sequence).
  * @param complete_callback Called when generation completes
  * @param error_callback Called on error
  * @param user_data User context passed to callbacks
