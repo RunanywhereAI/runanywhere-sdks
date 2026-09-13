@@ -442,16 +442,16 @@ describe('splitRAGText', () => {
   });
 
   it('preserves existing behavior for whitespace-separated English words', () => {
-    const text = 'The quick brown fox jumps over the lazy dog';
+    const text = 'The big red dog sat on the rug now';
     const chunks = __testing__.splitRAGText(text, 3, 1);
 
     expect(chunks.length).toBe(4);
-    expect(chunks[0]!.text).toBe('The quick brown');
+    expect(chunks[0]!.text).toBe('The big red');
     expect(chunks[0]!.tokenCount).toBe(3);
-    expect(chunks[1]!.text).toBe('brown fox jumps');
+    expect(chunks[1]!.text).toBe('red dog sat');
     expect(chunks[1]!.tokenCount).toBe(3);
-    expect(chunks[2]!.text).toBe('jumps over the');
-    expect(chunks[3]!.text).toBe('the lazy dog');
+    expect(chunks[2]!.text).toBe('sat on the');
+    expect(chunks[3]!.text).toBe('the rug now');
   });
 
   it('handles mixed English and whitespace-free CJK content', () => {
@@ -474,6 +474,35 @@ describe('splitRAGText', () => {
     expect(chunks[0]!.text).toBe('人工智能');
     expect(chunks[0]!.startOffset).toBe(0);
     expect(chunks[0]!.endOffset).toBe(4);
+  });
+
+  it('splits non-CJK runs exceeding chunkSize into bounded chunks (#922)', () => {
+    // 24-character non-CJK token with chunkSize 8, overlap 2
+    const token = 'abcdefghijklmnopqrstuvwx';
+    const chunks = __testing__.splitRAGText(token, 8, 2);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(chunk.tokenCount).toBeLessThanOrEqual(8);
+      expect([...chunk.text].length).toBeLessThanOrEqual(8);
+      expect(token.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
+    }
+  });
+
+  it('bounds retrieved CJK context using token-aware fragmenting in boundedRAGContext (#922)', () => {
+    const cjkText = '人工智能机器学习深度学习自然语言处理计算机视觉强化学习';
+    const chunks = [
+      {
+        text: cjkText,
+        sourceDocument: 'CJKDoc',
+        score: 0.95,
+      },
+    ];
+    // Request only 10 tokens: should slice only the first 10 CJK code points
+    const context = __testing__.boundedRAGContext(chunks, 10);
+    expect(context).toContain('[Source 1: CJKDoc]');
+    expect(context).toContain('人工智能机器学习深度');
+    expect(context).not.toContain('强化学习');
   });
 });
 

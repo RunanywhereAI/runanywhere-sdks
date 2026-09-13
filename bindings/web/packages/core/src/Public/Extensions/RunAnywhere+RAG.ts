@@ -1282,6 +1282,7 @@ function normalizeCrossWasmDocument(document: RAGDocument): NormalizedCrossWasmD
   };
 }
 
+/** Represents a bounded chunk produced by splitRAGText. */
 interface SplitRAGChunk {
   text: string;
   startOffset: number;
@@ -1289,11 +1290,18 @@ interface SplitRAGChunk {
   tokenCount: number;
 }
 
+/** Represents the start and end byte/char offset of a token in the original text. */
 interface RAGTokenSpan {
   startOffset: number;
   endOffset: number;
 }
 
+/**
+ * Counts the number of Unicode code points in a string, correctly counting surrogate pairs as one code point.
+ *
+ * @param str - Input string to measure.
+ * @returns Total count of Unicode code points.
+ */
 function countCodePoints(str: string): number {
   let count = 0;
   for (const char of str) {
@@ -1302,8 +1310,16 @@ function countCodePoints(str: string): number {
   return count;
 }
 
-const CJK_SCRIPT_REGEX = /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u;
-
+/**
+ * Splits input text into sliding-window chunks bounded by token count and chunk overlap.
+ * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK text
+ * or long non-whitespace strings) by Unicode code points without breaking surrogate pairs.
+ *
+ * @param text - The raw input text to chunk.
+ * @param requestedSize - The desired maximum chunk size in tokens.
+ * @param requestedOverlap - The number of tokens that should overlap between consecutive chunks.
+ * @returns An array of chunks containing text slices, offsets, and token counts.
+ */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
   if (matches.length === 0) return [];
@@ -1316,15 +1332,14 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   // (CJK, etc.) or for oversized runs (long URLs, base64 blobs), a single regex
   // match can exceed the chunk size budget. We enforce a character/code-point
   // limit by splitting any token whose code-point count exceeds `size` on Unicode
-  // code-point boundaries (preventing surrogate pair corruption). Ordinary words
-  // in spaced languages (<= 40 characters) remain atomic tokens.
+  // code-point boundaries (preventing surrogate pair corruption). Tokens within
+  // the budget remain atomic.
   const tokens: RAGTokenSpan[] = [];
   for (const match of matches) {
     const matchText = match[0];
     const matchStart = match.index ?? 0;
     const cpCount = countCodePoints(matchText);
-    const isScriptWithoutSpaces = CJK_SCRIPT_REGEX.test(matchText);
-    const isOversized = cpCount > size && (isScriptWithoutSpaces || cpCount > 40);
+    const isOversized = cpCount > size;
 
     if (!isOversized) {
       tokens.push({
@@ -1362,6 +1377,14 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   return chunks;
 }
 
+/**
+ * Truncates and formats retrieved RAG search result chunks into a single context string,
+ * adhering to a maximum token budget using code-point-aware tokenization.
+ *
+ * @param chunks - Retrieved RAG search result chunks to format.
+ * @param requestedMaxTokens - Maximum allowable token budget for the formatted context.
+ * @returns Formatted context string with source attributions.
+ */
 function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number): string {
   const maxTokens = Math.max(1, Math.floor(requestedMaxTokens));
   const parts: string[] = [];
@@ -1372,11 +1395,11 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
   chunks.forEach((chunk, index) => {
     const available = maxTokens - used;
     if (available <= 0) return;
-    const words = chunk.text.split(/\s+/).filter(Boolean);
-    const text = words.slice(0, available).join(' ');
+    const [fragment] = splitRAGText(chunk.text, available, 0);
+    const text = fragment?.text ?? '';
     if (!text) return;
     parts.push(`[Source ${index + 1}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
-    used += Math.min(words.length, available);
+    used += fragment?.tokenCount ?? 0;
   });
   return parts.join('\n\n');
 }
@@ -2012,6 +2035,7 @@ export const __testing__ = {
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
   splitRAGText,
+  boundedRAGContext,
 };
 
 /**
