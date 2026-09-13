@@ -550,7 +550,8 @@ class ONNXEmbeddingProvider::Impl {
 
     ~Impl() = default;
 
-    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr) {
+    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr,
+                             bool normalize = true) {
         if (!ready_) {
             LOGE("Embedding provider not ready");
             return {};
@@ -623,9 +624,12 @@ class ONNXEmbeddingProvider::Impl {
                 mean_pooling(output_floats, attention_mask, pad_length, actual_hidden_dim);
 
             // 6. Normalize to unit vector
-            normalize_vector(pooled);
-
-            RAC_LOG_INFO(LOG_TAG, "Generated embedding: dim=%zu, norm=1.0", pooled.size());
+            if (normalize) {
+                normalize_vector(pooled);
+                RAC_LOG_INFO(LOG_TAG, "Generated embedding: dim=%zu, norm=1.0", pooled.size());
+            } else {
+                RAC_LOG_INFO(LOG_TAG, "Generated embedding: dim=%zu (unnormalized)", pooled.size());
+            }
             return pooled;
 
         } catch (const std::exception& e) {
@@ -635,7 +639,8 @@ class ONNXEmbeddingProvider::Impl {
     }
 
     std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts,
-                                                size_t* out_total_tokens = nullptr) {
+                                                size_t* out_total_tokens = nullptr,
+                                                bool normalize = true) {
         if (out_total_tokens) {
             *out_total_tokens = 0;
         }
@@ -645,7 +650,7 @@ class ONNXEmbeddingProvider::Impl {
 
         // Delegate to single embed for batch_size == 1
         if (texts.size() == 1) {
-            return {embed(texts[0], out_total_tokens)};
+            return {embed(texts[0], out_total_tokens, normalize)};
         }
 
         if (!ready_) {
@@ -666,7 +671,7 @@ class ONNXEmbeddingProvider::Impl {
                  (texts.size() + kMaxSubBatchSize - 1) / kMaxSubBatchSize, sub_batch_size);
 
             size_t sub_tokens = 0;
-            auto sub_results = embed_sub_batch(texts, offset, sub_batch_size, &sub_tokens);
+            auto sub_results = embed_sub_batch(texts, offset, sub_batch_size, &sub_tokens, normalize);
             if (sub_results.empty()) {
                 LOGE("Sub-batch embedding failed at offset %zu", offset);
                 return {};
@@ -700,7 +705,8 @@ class ONNXEmbeddingProvider::Impl {
 
     std::vector<std::vector<float>> embed_sub_batch(const std::vector<std::string>& texts,
                                                     size_t offset, size_t count,
-                                                    size_t* out_total_tokens = nullptr) {
+                                                    size_t* out_total_tokens = nullptr,
+                                                    bool normalize = true) {
         try {
             std::vector<std::vector<int64_t>> all_token_ids(count);
             size_t max_actual_len = 0;
@@ -785,7 +791,9 @@ class ONNXEmbeddingProvider::Impl {
                 const float* sentence_data = output_floats + i * stride;
                 auto pooled = mean_pooling(sentence_data, attention_masks[i], actual_seq_len,
                                            actual_hidden_dim);
-                normalize_vector(pooled);
+                if (normalize) {
+                    normalize_vector(pooled);
+                }
                 results[i] = std::move(pooled);
             }
 
@@ -884,13 +892,15 @@ ONNXEmbeddingProvider::~ONNXEmbeddingProvider() = default;
 ONNXEmbeddingProvider::ONNXEmbeddingProvider(ONNXEmbeddingProvider&&) noexcept = default;
 ONNXEmbeddingProvider& ONNXEmbeddingProvider::operator=(ONNXEmbeddingProvider&&) noexcept = default;
 
-std::vector<float> ONNXEmbeddingProvider::embed(const std::string& text, size_t* out_total_tokens) {
-    return impl_->embed(text, out_total_tokens);
+std::vector<float> ONNXEmbeddingProvider::embed(const std::string& text, size_t* out_total_tokens,
+                                                bool normalize) {
+    return impl_->embed(text, out_total_tokens, normalize);
 }
 
 std::vector<std::vector<float>>
-ONNXEmbeddingProvider::embed_batch(const std::vector<std::string>& texts, size_t* out_total_tokens) {
-    return impl_->embed_batch(texts, out_total_tokens);
+ONNXEmbeddingProvider::embed_batch(const std::vector<std::string>& texts, size_t* out_total_tokens,
+                                   bool normalize) {
+    return impl_->embed_batch(texts, out_total_tokens, normalize);
 }
 
 size_t ONNXEmbeddingProvider::dimension() const noexcept {
