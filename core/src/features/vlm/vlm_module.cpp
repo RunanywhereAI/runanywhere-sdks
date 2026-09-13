@@ -155,10 +155,15 @@ extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char*
             }
         }
 
+        const size_t dir_len = strlen(model_dir);
+        const bool has_trailing_sep =
+            dir_len > 0 && (model_dir[dir_len - 1] == '/' || model_dir[dir_len - 1] == '\\');
+        const char* const fmt = has_trailing_sep ? "%s%s" : "%s/%s";
+
         if (is_mmproj && out_mmproj_path[0] == '\0') {
-            snprintf(out_mmproj_path, mmproj_path_size, "%s/%s", model_dir, name);
+            snprintf(out_mmproj_path, mmproj_path_size, fmt, model_dir, name);
         } else if (!is_mmproj && out_model_path[0] == '\0') {
-            snprintf(out_model_path, model_path_size, "%s/%s", model_dir, name);
+            snprintf(out_model_path, model_path_size, fmt, model_dir, name);
         }
 
         // Stop once both are found

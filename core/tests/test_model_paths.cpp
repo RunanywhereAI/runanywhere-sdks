@@ -105,6 +105,24 @@ int test_shared_path_separator_helpers() {
     }
     EXPECT_TRUE(std::strcmp(win_root, "C:\\") == 0);
 
+    // 10. Root-level directory path concatenation does not duplicate separator
+    char resolved_posix[64];
+    const size_t posix_len = std::strlen(posix_root);
+    const bool posix_has_sep =
+        posix_len > 0 && (posix_root[posix_len - 1] == '/' || posix_root[posix_len - 1] == '\\');
+    std::snprintf(resolved_posix, sizeof(resolved_posix), posix_has_sep ? "%s%s" : "%s/%s",
+                  posix_root, "model.gguf");
+    EXPECT_TRUE(std::strcmp(resolved_posix, "/model.gguf") == 0);
+    EXPECT_TRUE(resolved_posix[0] == '/' && resolved_posix[1] != '/');
+
+    char resolved_win[64];
+    const size_t win_len = std::strlen(win_root);
+    const bool win_has_sep =
+        win_len > 0 && (win_root[win_len - 1] == '/' || win_root[win_len - 1] == '\\');
+    std::snprintf(resolved_win, sizeof(resolved_win), win_has_sep ? "%s%s" : "%s/%s",
+                  win_root, "model.gguf");
+    EXPECT_TRUE(std::strcmp(resolved_win, "C:\\model.gguf") == 0);
+
     return 0;
 }
 
