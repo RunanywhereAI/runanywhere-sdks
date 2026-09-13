@@ -36,13 +36,48 @@ class ONNXEmbeddingProvider {
     ONNXEmbeddingProvider(ONNXEmbeddingProvider&&) noexcept;
     ONNXEmbeddingProvider& operator=(ONNXEmbeddingProvider&&) noexcept;
 
-    // out_total_tokens (optional): receives the real, non-padding token count
-    // consumed across the input(s). Nullptr-safe; existing callers are unaffected.
-    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr);
+    /**
+     * @brief Computes embedding vector for a single input text.
+     *
+     * @param text Input text to embed.
+     * @param out_total_tokens Optional pointer to receive non-padding token count.
+     * @param normalize True to L2-normalize to unit vector, false to return raw pooled vector.
+     * @return Float vector of embedding dimensions, or empty on failure.
+     */
+    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr,
+                             bool normalize = true);
+
+    /**
+     * @brief Computes embedding vectors for a batch of input texts.
+     *
+     * @param texts List of input texts to embed.
+     * @param out_total_tokens Optional pointer to receive total token count.
+     * @param normalize True to L2-normalize to unit vectors, false to return raw pooled vectors.
+     * @return List of float vectors corresponding to input texts.
+     */
     std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts,
-                                                size_t* out_total_tokens = nullptr);
+                                                size_t* out_total_tokens = nullptr,
+                                                bool normalize = true);
+
+    /**
+     * @brief Returns the output embedding vector dimension.
+     *
+     * @return Number of dimensions in the embedding vector.
+     */
     size_t dimension() const noexcept;
+
+    /**
+     * @brief Checks if the ONNX runtime model session is loaded and ready for inference.
+     *
+     * @return True if model is loaded and ready.
+     */
     bool is_ready() const noexcept;
+
+    /**
+     * @brief Returns the provider backend name identifier.
+     *
+     * @return Human-readable provider name string.
+     */
     const char* name() const noexcept;
 
    private:

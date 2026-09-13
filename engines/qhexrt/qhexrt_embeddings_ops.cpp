@@ -8,7 +8,8 @@
  * `qhx_output.embedding` / `n_embedding`. This adapter copies that vector into the
  * RAC embeddings result (one `rac_embedding_vector_t` per input text). Mirrors the
  * STT/LLM adapters (session_open -> qhx_generate -> fill result). No chat template
- * is applied (embedding inputs are raw text).
+ * is applied (embedding inputs are raw text). Unnormalized vectors (normalize=NONE)
+ * are not supported by the baked plan and return RAC_ERROR_NOT_SUPPORTED.
  */
 
 #include "qhexrt_session.h"
@@ -100,16 +101,40 @@ rac_result_t qhexrt_embeddings_create(const char* model_id, const char* /*config
     return RAC_SUCCESS;
 }
 
+/**
+ * @brief No-op initialize callback for QHexRT embeddings backend.
+ *
+ * @param impl Implementation handle.
+ * @param model_path Path to model.
+ * @return RAC_SUCCESS.
+ */
 rac_result_t qhexrt_embeddings_initialize(void* /*impl*/, const char* /*model_path*/) {
     return RAC_SUCCESS;
 }
 
+/**
+ * @brief Computes embedding for a single text using QHexRT NPU engine.
+ *
+ * Rejects unnormalized requests (normalize=NONE) with RAC_ERROR_NOT_SUPPORTED as
+ * QHexRT HTP graphs produce fixed normalized output.
+ *
+ * @param impl Pointer to Session handle.
+ * @param text Text string to embed.
+ * @param options Pointer to embeddings options struct.
+ * @param out_result Output struct to receive generated embedding.
+ * @return RAC_SUCCESS on success, RAC_ERROR_NOT_SUPPORTED for normalize=NONE, or an error code.
+ */
 rac_result_t qhexrt_embeddings_embed(void* impl, const char* text,
-                                     const rac_embeddings_options_t* /*options*/,
+                                     const rac_embeddings_options_t* options,
                                      rac_embeddings_result_t* out_result) {
     auto* c = as_session(impl);
     if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (options != nullptr && options->normalize == RAC_EMBEDDINGS_NORMALIZE_NONE) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "qhexrt does not support unnormalized embeddings (normalize=NONE)");
+        return RAC_ERROR_NOT_SUPPORTED;
     }
     try {
         std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
@@ -140,12 +165,29 @@ rac_result_t qhexrt_embeddings_embed(void* impl, const char* text,
     }
 }
 
+/**
+ * @brief Computes embeddings for a batch of texts using QHexRT NPU engine.
+ *
+ * Rejects unnormalized requests (normalize=NONE) with RAC_ERROR_NOT_SUPPORTED.
+ *
+ * @param impl Pointer to Session handle.
+ * @param texts Array of text strings to embed.
+ * @param num_texts Number of items in texts array.
+ * @param options Pointer to embeddings options struct.
+ * @param out_result Output struct to receive generated embeddings.
+ * @return RAC_SUCCESS on success, RAC_ERROR_NOT_SUPPORTED for normalize=NONE, or an error code.
+ */
 rac_result_t qhexrt_embeddings_embed_batch(void* impl, const char* const* texts, size_t num_texts,
-                                           const rac_embeddings_options_t* /*options*/,
+                                           const rac_embeddings_options_t* options,
                                            rac_embeddings_result_t* out_result) {
     auto* c = as_session(impl);
     if (c == nullptr || out_result == nullptr || texts == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (options != nullptr && options->normalize == RAC_EMBEDDINGS_NORMALIZE_NONE) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "qhexrt does not support unnormalized embeddings (normalize=NONE)");
+        return RAC_ERROR_NOT_SUPPORTED;
     }
     if (num_texts == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;

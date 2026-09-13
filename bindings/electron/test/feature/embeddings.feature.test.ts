@@ -138,7 +138,7 @@ test('embeddings: a batch comes back in input order with a stable dimension',
   }
 );
 
-test('embeddings: the normalize option reaches commons, and the ONNX engine ignores it',
+test('embeddings: the normalize option reaches commons, and the ONNX engine honours it',
   { timeout: 600000, ...skipFor(EMBED_ID) },
   async () => {
     await withModels([EMBED_ID], async (sdk) => {
@@ -151,17 +151,22 @@ test('embeddings: the normalize option reaches commons, and the ONNX engine igno
         Math.abs(magnitude(l2.vector) - 1) < 0.01,
         `L2 vectors are unit length: ${magnitude(l2.vector)}`
       );
-      // NONE is supposed to return the raw pooled vector. It does not, and the
-      // reason is in the engine rather than in this SDK: the ONNX embedding
-      // provider calls normalize_vector(pooled) unconditionally on both the
-      // single and the batch path (onnx_embedding_provider.cpp:626 and :788)
-      // and never reads EmbeddingsOptions.normalize. The field travels on the
-      // wire now, so this records the state of the world today and fails the
-      // moment the engine starts honouring it.
+      // normalize=NONE returns the raw pooled vector without L2 normalization.
       assert.ok(
-        Math.abs(magnitude(raw.vector) - 1) < 0.01,
-        'normalize=NONE still comes back unit length: the ONNX engine always normalizes'
+        Math.abs(magnitude(raw.vector) - 1) > 0.05,
+        `normalize=NONE returns unnormalized vector: ${magnitude(raw.vector)}`
       );
+
+      // Multi-sub-batch coverage (>= 51 inputs) to force sub-batch chunking with normalize=NONE
+      const inputs = Array.from({ length: 51 }, (_, i) => `sample text batch item ${i}`);
+      const batchRaw = await sdk.embeddings.embed(inputs, { normalize: 'NONE' });
+      assert.equal(batchRaw.length, 51, 'received 51 embedding vectors');
+      for (const item of batchRaw) {
+        assert.ok(
+          Math.abs(magnitude(item.vector) - 1) > 0.05,
+          `sub-batch item is unnormalized: ${magnitude(item.vector)}`
+        );
+      }
     });
   }
 );
