@@ -69,9 +69,15 @@ fs::path utf8_path(const char* p) { return fs::path(utf8_to_wide(p)); }
 
 FILE* wfopen_utf8(const fs::path& p, const wchar_t* mode) { return _wfopen(p.c_str(), mode); }
 
-// The secure store is a flat key -> file namespace. Reject a key that could escape the store
-// directory (path separators, '..', or an absolute/drive path) so secure_set/get/delete cannot
-// touch an arbitrary file. Defense in depth: the Python facade validates too.
+/**
+ * @brief Validate that a secure store key is safe for use as a Windows filename.
+ *
+ * Rejects path traversal sequences, drive specifications, and absolute paths.
+ *
+ * @param key Key identifier string to validate.
+ * @return true If the key is non-null, non-empty, and safe to use as a filename.
+ * @return false If the key is null, empty, or contains forbidden path sequences.
+ */
 bool secure_key_ok(const char* key) {
     if (!key || !*key) return false;
     std::string k(key);
@@ -135,15 +141,26 @@ rac_result_t win_file_delete(const char* path, void*) {
     return ec ? RAC_ERROR_INTERNAL : RAC_SUCCESS;
 }
 
+/**
+ * @brief Resolve the absolute filesystem path for a Windows secure store key.
+ *
+ * @param key Key identifier string.
+ * @return std::filesystem::path Filesystem path to the encrypted secret file.
+ */
 fs::path secure_path(const char* key) {
     return fs::path(utf8_to_wide(g_secure_dir.c_str())) / fs::path(utf8_to_wide(key));
 }
 
-// Secure store backed by Windows DPAPI: values are encrypted with the current
-// user's credentials (CryptProtectData, no UI) before hitting disk and decrypted
-// on read, so a plaintext-file read cannot recover secrets. The description
-// string is bound into the blob; the CRYPTPROTECT_UI_FORBIDDEN flag keeps it
-// headless. Data is only decryptable by the same Windows user on this machine.
+/**
+ * @brief Retrieve and decrypt a DPAPI-encrypted secret from the Windows filesystem secure store.
+ *
+ * @param key Identifier of the secret to retrieve.
+ * @param out_value Destination pointer for allocated null-terminated decrypted string.
+ * @param user_data User data context pointer (unused).
+ * @return rac_result_t RAC_SUCCESS on success, RAC_ERROR_FILE_NOT_FOUND on clean miss,
+ *         RAC_ERROR_INVALID_ARGUMENT on invalid key or null out_value,
+ *         or RAC_ERROR_SECURE_STORAGE_FAILED on I/O or decryption failure.
+ */
 rac_result_t win_secure_get(const char* key, char** out_value, void*) {
     if (!key || !out_value) return RAC_ERROR_INVALID_ARGUMENT;
     if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
@@ -186,6 +203,18 @@ rac_result_t win_secure_get(const char* key, char** out_value, void*) {
     return RAC_SUCCESS;
 }
 
+/**
+ * @brief Encrypt via Windows DPAPI and persist a secret to the filesystem secure store.
+ *
+ * Ensures all encrypted bytes are written and the file handle is cleanly closed and flushed.
+ *
+ * @param key Identifier of the secret.
+ * @param value Null-terminated secret string to encrypt and store.
+ * @param user_data User data context pointer (unused).
+ * @return rac_result_t RAC_SUCCESS on successful DPAPI encryption, complete write, and clean close,
+ *         RAC_ERROR_SECURE_STORAGE_FAILED on encryption, file open, write, or close failure,
+ *         or RAC_ERROR_INVALID_ARGUMENT on null/unsafe key or null value.
+ */
 rac_result_t win_secure_set(const char* key, const char* value, void*) {
     if (!key || !value) return RAC_ERROR_INVALID_ARGUMENT;
     if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
@@ -205,12 +234,20 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     size_t put = out.cbData ? fwrite(out.pbData, 1, out.cbData, f) : 0;
-    fclose(f);
-    bool ok = (put == out.cbData);
+    int close_rc = fclose(f);
+    bool ok = (put == out.cbData && close_rc == 0);
     LocalFree(out.pbData);
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
+/**
+ * @brief Delete a secret from the Windows filesystem secure store.
+ *
+ * @param key Identifier of the secret to remove.
+ * @param user_data User data context pointer (unused).
+ * @return rac_result_t RAC_SUCCESS on success (including missing files),
+ *         or RAC_ERROR_INVALID_ARGUMENT on null or unsafe key.
+ */
 rac_result_t win_secure_delete(const char* key, void*) {
     if (!key) return RAC_ERROR_INVALID_ARGUMENT;
     if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
