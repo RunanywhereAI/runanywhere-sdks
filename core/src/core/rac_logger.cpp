@@ -14,6 +14,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_error_model.h"
 #include "rac/core/rac_platform_adapter.h"
 
@@ -59,21 +60,9 @@ const char* level_to_string(rac_log_level_t level) {
     }
 }
 
-// Extract filename from path
+// Extract filename from path (delegates to shared cross-platform helper)
 const char* filename_from_path(const char* path) {
-    if (!path)
-        return nullptr;
-    const char* last_slash = strrchr(path, '/');
-    const char* last_backslash = strrchr(path, '\\');
-    // Pick the later separator. Avoid comparing two pointers from unrelated
-    // arrays (UB when one is nullptr): explicitly handle the null cases.
-    const char* last_sep;
-    if (last_slash && last_backslash) {
-        last_sep = last_slash > last_backslash ? last_slash : last_backslash;
-    } else {
-        last_sep = last_slash ? last_slash : last_backslash;
-    }
-    return last_sep ? last_sep + 1 : path;
+    return rac::path::filename_from_path(path);
 }
 
 // Format message with metadata for platform adapter

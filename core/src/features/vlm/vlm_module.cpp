@@ -25,6 +25,7 @@
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/common/special_token_filter.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -375,7 +376,7 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
         } else {
             // It's a file path — use parent directory
             strncpy(model_folder, model_info->local_path, sizeof(model_folder) - 1);
-            char* last_sep = strrchr(model_folder, '/');
+            char* last_sep = rac::path::find_last_path_separator(model_folder);
             if (last_sep) {
                 *last_sep = '\0';
             }

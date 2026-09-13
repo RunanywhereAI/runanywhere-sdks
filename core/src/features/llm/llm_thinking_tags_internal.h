@@ -4,6 +4,7 @@
 #include <cstring>
 #include <string>
 
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -112,7 +113,7 @@ inline ModelThinkingProfile model_thinking_profile_from_registry(const char* mod
         rc = rac_get_model_by_path(model_id, &info);
     }
     if (rc != RAC_SUCCESS) {
-        const char* last_slash = std::strrchr(model_id, '/');
+        const char* last_slash = rac::path::find_last_path_separator(model_id);
         if (last_slash != nullptr && last_slash[1] != '\0') {
             rc = rac_get_model(last_slash + 1, &info);
         }

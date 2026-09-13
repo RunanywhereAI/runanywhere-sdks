@@ -17,6 +17,7 @@
 #include <string>
 
 #include "rac/core/rac_core.h"
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -91,11 +92,7 @@ inline rac_result_t resolve_model_reference(const char* model_id,
     }
 
     if (result != RAC_SUCCESS && options.lookup_last_path_component) {
-        const char* last_fwd = strrchr(model_id, '/');
-        const char* last_bck = strrchr(model_id, '\\');
-        const char* last_slash = (last_fwd && last_bck) ? std::max(last_fwd, last_bck)
-                                 : last_fwd             ? last_fwd
-                                                        : last_bck;
+        const char* last_slash = rac::path::find_last_path_separator(model_id);
         if (last_slash && last_slash[1] != '\0') {
             const char* extracted_id = last_slash + 1;
             RAC_LOG_DEBUG(options.log_cat, "Trying extracted model ID from path: %s", extracted_id);
@@ -244,6 +241,29 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
     }
 }
 
+// Whether plugin_hint_for_framework()'s answer is a hard requirement rather than a
+// preference.
+//
+// The priority fallback in create_plugin_service() exists for frameworks whose hint is
+// advisory — several engines can read the same bytes, so the next-best engine is a real
+// answer. That is not true when the framework names the on-disk *format*: nothing but
+// NeuRT can open an .mlmodelc/.mlpackage tree. Falling back by priority hands a Core ML
+// bundle to MLX (safetensors), Sherpa or ONNX, which can only produce a confusing
+// load-time error far from its cause — or, for a primitive where the fallback engine
+// happens to accept the path, a silently wrong model.
+//
+// This is not hypothetical. Before COREML was routed to NeuRT unconditionally it mapped
+// to `platform` for the primitives NeuRT did not serve, and `platform` really does serve
+// SYNTHESIZE; without this guard, routing COREML to NeuRT would have sent a Core ML TTS
+// request to MLX by priority (110 > 100) instead.
+//
+// NeuRT now fills tts_ops, so that particular case no longer fires -- but the guard is not
+// therefore obsolete. It is what keeps the NEXT unfilled slot from repeating the pattern,
+// which this engine has already done twice.
+//
+// Only COREML is strict here. The other format-determined frameworks (LLAMACPP, MLX,
+// QHEXRT) have the same argument available to them, but changing their behaviour is
+// outside the scope of the ABI-10 work and untested.
 /**
  * @brief Checks whether a framework requires its hinted engine strictly without priority fallback.
  *
