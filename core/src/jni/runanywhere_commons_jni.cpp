@@ -1675,47 +1675,69 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Create global reference to adapter
-    g_platform_adapter = env->NewGlobalRef(adapter);
-
-    // Cache method IDs
     jclass adapterClass = env->GetObjectClass(adapter);
 
-    g_method_log =
-        env->GetMethodID(adapterClass, "log", "(ILjava/lang/String;Ljava/lang/String;)V");
-    g_method_file_exists = env->GetMethodID(adapterClass, "fileExists", "(Ljava/lang/String;)Z");
-    g_method_file_read = env->GetMethodID(adapterClass, "fileRead", "(Ljava/lang/String;)[B");
-    g_method_file_write = env->GetMethodID(adapterClass, "fileWrite", "(Ljava/lang/String;[B)Z");
-    g_method_file_delete = env->GetMethodID(adapterClass, "fileDelete", "(Ljava/lang/String;)Z");
-    g_method_secure_get =
-        env->GetMethodID(adapterClass, "secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
-    g_method_secure_set =
-        env->GetMethodID(adapterClass, "secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
-    g_method_secure_delete =
-        env->GetMethodID(adapterClass, "secureDelete", "(Ljava/lang/String;)Z");
-    g_method_now_ms = env->GetMethodID(adapterClass, "nowMs", "()J");
+    // Resolve the nine required ids into locals BEFORE touching any global.
+    // Two reasons, both bugs that existed when this was written inline:
+    //
+    //  1. GetMethodID throws NoSuchMethodError when a lookup misses, so a
+    //     Kotlin-side rename or signature change leaves BOTH a null id and a
+    //     pending exception. Calling the next GetMethodID with that exception
+    //     still pending is undefined, so each lookup clears its own rather
+    //     than one ExceptionCheck covering all nine. A miss on `log` used to
+    //     leave the following eight lookups running under a pending throw.
+    //  2. Committing the global ref and the ids first meant a refusal still
+    //     installed the rejected adapter in g_platform_adapter, and
+    //     racAuthInit only tests that pointer for null, so it treated a
+    //     refused adapter as registered.
+    //
+    // Unlike fileListDirectory / isNonEmptyDirectory below, these nine are
+    // required by the adapter contract in rac_platform_adapter.h, so a miss is
+    // a build mismatch to report, not a capability to degrade.
+    const auto resolve_required = [&](const char* name, const char* sig) -> jmethodID {
+        const jmethodID id = env->GetMethodID(adapterClass, name, sig);
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        return id;
+    };
 
-    // GetMethodID throws NoSuchMethodError when a lookup misses, so a Kotlin-side
-    // rename or signature change leaves BOTH a null id and a pending exception.
-    // Neither is currently noticed: the pending exception is absorbed by the
-    // first optional-probe ExceptionCheck below (which then blames the probe and
-    // nulls it), and the null id is handed to Call*Method later, which is
-    // undefined behaviour. Unlike fileListDirectory / isNonEmptyDirectory, these
-    // nine are required by the adapter contract in rac_platform_adapter.h, so a
-    // miss is a build mismatch to report, not a capability to degrade.
-    if (env->ExceptionCheck() == JNI_TRUE) {
-        env->ExceptionClear();
-    }
-    if (g_method_log == nullptr || g_method_file_exists == nullptr ||
-        g_method_file_read == nullptr || g_method_file_write == nullptr ||
-        g_method_file_delete == nullptr || g_method_secure_get == nullptr ||
-        g_method_secure_set == nullptr || g_method_secure_delete == nullptr ||
-        g_method_now_ms == nullptr) {
+    const jmethodID m_log = resolve_required("log", "(ILjava/lang/String;Ljava/lang/String;)V");
+    const jmethodID m_file_exists = resolve_required("fileExists", "(Ljava/lang/String;)Z");
+    const jmethodID m_file_read = resolve_required("fileRead", "(Ljava/lang/String;)[B");
+    const jmethodID m_file_write = resolve_required("fileWrite", "(Ljava/lang/String;[B)Z");
+    const jmethodID m_file_delete = resolve_required("fileDelete", "(Ljava/lang/String;)Z");
+    const jmethodID m_secure_get =
+        resolve_required("secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
+    const jmethodID m_secure_set =
+        resolve_required("secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
+    const jmethodID m_secure_delete = resolve_required("secureDelete", "(Ljava/lang/String;)Z");
+    const jmethodID m_now_ms = resolve_required("nowMs", "()J");
+
+    if (m_log == nullptr || m_file_exists == nullptr || m_file_read == nullptr ||
+        m_file_write == nullptr || m_file_delete == nullptr || m_secure_get == nullptr ||
+        m_secure_set == nullptr || m_secure_delete == nullptr || m_now_ms == nullptr) {
         LOGe("racSetPlatformAdapter: platform adapter is missing a required method "
              "(log/fileExists/fileRead/fileWrite/fileDelete/secureGet/secureSet/secureDelete/"
              "nowMs); refusing to install a partially resolved adapter");
+        env->DeleteLocalRef(adapterClass);
+        // g_platform_adapter is still null from the teardown above, so
+        // racAuthInit's null test correctly reports "no adapter registered".
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
+
+    // Every required id resolved, so commit.
+    g_platform_adapter = env->NewGlobalRef(adapter);
+    g_method_log = m_log;
+    g_method_file_exists = m_file_exists;
+    g_method_file_read = m_file_read;
+    g_method_file_write = m_file_write;
+    g_method_file_delete = m_file_delete;
+    g_method_secure_get = m_secure_get;
+    g_method_secure_set = m_secure_set;
+    g_method_secure_delete = m_secure_delete;
+    g_method_now_ms = m_now_ms;
+
     // Optional Kotlin-side directory probes. Method lookup is
     // best-effort — older host apps that haven't been recompiled against the
     // new adapter surface will miss these IDs and commons will fall through
