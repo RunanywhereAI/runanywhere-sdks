@@ -233,11 +233,10 @@ public extension RunAnywhere {
 
         /// Load a model now instead of waiting for the first generation call.
         ///
-        /// Only `LoadOptions.backendPreferences.first` (equivalently the
-        /// deprecated `framework`) reaches commons today. `contextLength`,
-        /// `threads`, `accelerator`, and additional ordered `backendPreferences`
-        /// are not yet carried by the native load ABI, so passing them throws
-        /// rather than being silently dropped.
+        /// `contextLength` and the ordered `backendPreferences` list are
+        /// forwarded on `ModelLoadRequest`; a `required` backend preference is
+        /// rejected because `backend_preferences` carries framework enums only.
+        /// `threads` (retired) and `accelerator` still fail preflight.
         ///
         /// - Throws: `SDKException` when the model cannot be loaded, or when
         ///   `options` sets a placement knob the load ABI cannot honor yet.
