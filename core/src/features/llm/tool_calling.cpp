@@ -991,23 +991,23 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                         return args_status;
                     }
                     if (args_status == ToolParseStatus::kSuccess) {
+                        std::unique_ptr<char, decltype(&std::free)> owned_args_value(args_value,
+                                                                                    &std::free);
                         if (args_kind == JSON_VALUE_OBJECT) {
-                            *out_args_json = args_value;
+                            *out_args_json = owned_args_value.release();
                         } else {
                             // Wrap scalar/array/string in {"input": value} - escape the value for
                             // valid JSON
-                            std::string escaped_args = escape_json_string(args_value);
+                            std::string escaped_args = escape_json_string(owned_args_value.get());
                             size_t wrap_len = escaped_args.size() + 14;  // {"input":"" } + null
                             *out_args_json = static_cast<char*>(malloc(wrap_len));
                             if (!*out_args_json) {
-                                free(args_value);
                                 free(*out_tool_name);
                                 *out_tool_name = nullptr;
                                 return ToolParseStatus::kOutOfMemory;
                             }
                             snprintf(*out_args_json, wrap_len, R"({"input":"%s"})",
                                      escaped_args.c_str());
-                            free(args_value);
                         }
                         return ToolParseStatus::kSuccess;
                     }
@@ -1046,14 +1046,17 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                             return value_status;
                         }
                         if (value_status == ToolParseStatus::kSuccess) {
+                            const std::unique_ptr<char, decltype(&std::free)> owned_kval(
+                                kval, &std::free);
                             if (!first)
                                 flat_args += ",";
                             std::string escaped_key = escape_json_string(k.c_str());
-                            if (kval) {
+                            if (owned_kval) {
                                 switch (kval_kind) {
                                     case JSON_VALUE_STRING: {
                                         // Re-escape and re-quote strings
-                                        std::string escaped_val = escape_json_string(kval);
+                                        std::string escaped_val =
+                                            escape_json_string(owned_kval.get());
                                         flat_args += '"';
                                         flat_args += escaped_key;
                                         flat_args += "\":\"";
@@ -1070,11 +1073,10 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                                         flat_args += '"';
                                         flat_args += escaped_key;
                                         flat_args += "\":";
-                                        flat_args += kval;
+                                        flat_args += owned_kval.get();
                                         break;
                                 }
                             }
-                            free(kval);
                             first = false;
                         }
                     }
@@ -1114,30 +1116,28 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                 return value_status;
             }
             if (value_status == ToolParseStatus::kSuccess) {
+                std::unique_ptr<char, decltype(&std::free)> owned_value(value, &std::free);
                 *out_tool_name = static_cast<char*>(malloc(key.size() + 1));
                 if (!*out_tool_name) {
-                    free(value);
                     return ToolParseStatus::kOutOfMemory;
                 }
                 std::memcpy(*out_tool_name, key.c_str(), key.size() + 1);
 
                 if (kind == JSON_VALUE_OBJECT) {
                     // Value is object - use as arguments verbatim
-                    *out_args_json = value;
-                } else if (value) {
+                    *out_args_json = owned_value.release();
+                } else if (owned_value) {
                     // Value is string / scalar literal / array - wrap in {"input": value}
-                    std::string escaped_value = escape_json_string(value);
+                    std::string escaped_value = escape_json_string(owned_value.get());
                     size_t wrap_len = escaped_value.size() + 14;  // {"input":"" } + null
                     *out_args_json = static_cast<char*>(malloc(wrap_len));
                     if (!*out_args_json) {
-                        free(value);
                         free(*out_tool_name);
                         *out_tool_name = nullptr;
                         return ToolParseStatus::kOutOfMemory;
                     }
                     snprintf(*out_args_json, wrap_len, R"({"input":"%s"})",
                              escaped_value.c_str());
-                    free(value);
                 } else {
                     *out_args_json = static_cast<char*>(malloc(3));
                     if (!*out_args_json) {
