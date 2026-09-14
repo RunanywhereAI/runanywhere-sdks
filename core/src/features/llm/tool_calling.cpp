@@ -1322,7 +1322,7 @@ static bool lfm2_arguments_to_json(const std::string& args, std::string* out_jso
         }
         result[key] = parse_lfm2_argument_value(value);
     }
-    *out_json = result.dump();
+    *out_json = result.dump(-1, ' ', false, json::error_handler_t::replace);
     return true;
 }
 
