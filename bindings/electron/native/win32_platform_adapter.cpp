@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <system_error>
 
@@ -110,26 +111,34 @@ rac_result_t win_file_read(const char* path, void** out_data, size_t* out_size, 
     FILE* f = wfopen_utf8(utf8_path(path), L"rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
     // Use 64-bit seek/tell — plain ftell/long truncates files >2GB on Win32.
-    _fseeki64(f, 0, SEEK_END);
-    __int64 n = _ftelli64(f);
-    _fseeki64(f, 0, SEEK_SET);
-    if (n < 0) {
+    if (_fseeki64(f, 0, SEEK_END) != 0) {
         fclose(f);
         return RAC_ERROR_FILE_READ_FAILED;
     }
-    void* buf = rac_alloc(static_cast<size_t>(n));
+    __int64 n = _ftelli64(f);
+    if (n < 0 || static_cast<unsigned long long>(n) >
+                     static_cast<unsigned long long>(std::numeric_limits<size_t>::max())) {
+        fclose(f);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    if (_fseeki64(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    const size_t size = static_cast<size_t>(n);
+    void* buf = rac_alloc(size);
     if (!buf) {
         fclose(f);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    size_t got = fread(buf, 1, static_cast<size_t>(n), f);
+    size_t got = fread(buf, 1, size, f);
     fclose(f);
-    if (got != static_cast<size_t>(n)) {
+    if (got != size) {
         rac_free(buf);
         return RAC_ERROR_FILE_READ_FAILED;
     }
     *out_data = buf;
-    *out_size = static_cast<size_t>(n);
+    *out_size = size;
     return RAC_SUCCESS;
 }
 
