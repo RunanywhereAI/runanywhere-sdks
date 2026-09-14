@@ -353,6 +353,57 @@ struct OwnedToolParseResult {
     }
 };
 
+struct OwnedCString {
+    char* value = nullptr;
+
+    OwnedCString() = default;
+    OwnedCString(const OwnedCString&) = delete;
+    OwnedCString& operator=(const OwnedCString&) = delete;
+    OwnedCString(OwnedCString&&) = delete;
+    OwnedCString& operator=(OwnedCString&&) = delete;
+
+    ~OwnedCString() { std::free(value); }
+
+    char** out() { return &value; }
+    char* get() const { return value; }
+    explicit operator bool() const { return value != nullptr; }
+
+    void reset(char* replacement = nullptr) {
+        std::free(value);
+        value = replacement;
+    }
+};
+
+struct OwnedToolCall {
+    rac_tool_call_t value{};
+
+    OwnedToolCall() = default;
+    OwnedToolCall(const OwnedToolCall&) = delete;
+    OwnedToolCall& operator=(const OwnedToolCall&) = delete;
+    OwnedToolCall(OwnedToolCall&&) = delete;
+    OwnedToolCall& operator=(OwnedToolCall&&) = delete;
+
+    ~OwnedToolCall() { rac_tool_call_free(&value); }
+
+    rac_tool_call_t* out() { return &value; }
+    const rac_tool_call_t& get() const { return value; }
+};
+
+struct OwnedToolCallValidation {
+    rac_tool_call_validation_t value{};
+
+    OwnedToolCallValidation() = default;
+    OwnedToolCallValidation(const OwnedToolCallValidation&) = delete;
+    OwnedToolCallValidation& operator=(const OwnedToolCallValidation&) = delete;
+    OwnedToolCallValidation(OwnedToolCallValidation&&) = delete;
+    OwnedToolCallValidation& operator=(OwnedToolCallValidation&&) = delete;
+
+    ~OwnedToolCallValidation() { rac_tool_call_validation_free(&value); }
+
+    rac_tool_call_validation_t* out() { return &value; }
+    const rac_tool_call_validation_t& get() const { return value; }
+};
+
 /**
  * @brief Extract a JSON string value starting at the given position (must be after opening quote)
  *
@@ -853,10 +904,12 @@ static std::string validation_errors_to_json(const std::vector<std::string>& err
 // JSON NORMALIZATION
 // =============================================================================
 
-extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_normalized) {
+extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
+                                                       char** out_normalized) try {
     if (!json_str || !out_normalized) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_normalized = nullptr;
 
     // Valid JSON needs no repair. Parsing and re-serializing it first avoids
     // the permissive unquoted-key scanner ever mistaking array elements after
@@ -941,6 +994,16 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str, char*
     memcpy(*out_normalized, result.c_str(), result.size() + 1);
 
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    if (out_normalized) {
+        *out_normalized = nullptr;
+    }
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    if (out_normalized) {
+        *out_normalized = nullptr;
+    }
+    return RAC_ERROR_INTERNAL;
 }
 
 // =============================================================================
@@ -2204,7 +2267,7 @@ static rac_result_t set_tool_validation_proto_error(rac_proto_buffer_t* out_resu
 
 extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_bytes,
                                                   size_t request_proto_size,
-                                                  rac_proto_buffer_t* out_result) {
+                                                  rac_proto_buffer_t* out_result) try {
     if (!out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -2228,25 +2291,24 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
                                           "failed to parse ToolParseRequest");
     }
 
-    rac_tool_call_t parsed{};
+    OwnedToolCall parsed;
     const bool use_explicit_format = request.has_options() && request.options().has_format();
     const rac_result_t rc = use_explicit_format
                                 ? rac_tool_call_parse_with_format(
                                       request.text().c_str(),
                                       rac_tool_call_format_from_name(
                                           tool_format_key_from_proto(request.options().format())),
-                                      &parsed)
-                                : rac_tool_call_parse(request.text().c_str(), &parsed);
+                                      parsed.out())
+                                : rac_tool_call_parse(request.text().c_str(), parsed.out());
     if (rc != RAC_SUCCESS) {
-        rac_tool_call_free(&parsed);
         return set_tool_parse_proto_error(out_result, request.text(), "tool-call parsing failed",
                                           rc);
     }
 
     runanywhere::v1::ToolParseResult result;
-    const bool has_tool_call = parsed.has_tool_call == RAC_TRUE;
+    const bool has_tool_call = parsed.get().has_tool_call == RAC_TRUE;
     result.set_has_tool_call(has_tool_call);
-    result.set_remaining_text(parsed.clean_text ? parsed.clean_text : request.text());
+    result.set_remaining_text(parsed.get().clean_text ? parsed.get().clean_text : request.text());
 
     const auto append_parsed_call = [&result, &request](const rac_tool_call_t& call) {
         const int64_t call_number = call.call_id != 0 ? call.call_id : next_tool_call_id();
@@ -2265,7 +2327,7 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
     };
 
     if (has_tool_call) {
-        append_parsed_call(parsed);
+        append_parsed_call(parsed.get());
 
         // parallel_tool_calls: one model turn may emit several envelopes.
         // The C parser extracts one envelope per invocation, so re-parse the
@@ -2287,50 +2349,53 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
                 request.options().has_max_tool_calls() && request.options().max_tool_calls() > 0
                     ? request.options().max_tool_calls()
                     : 5;
-            std::string last_name = parsed.tool_name ? parsed.tool_name : "";
-            std::string last_args = parsed.arguments_json ? parsed.arguments_json : "{}";
-            std::string remainder = parsed.clean_text ? parsed.clean_text : "";
+            std::string last_name = parsed.get().tool_name ? parsed.get().tool_name : "";
+            std::string last_args =
+                parsed.get().arguments_json ? parsed.get().arguments_json : "{}";
+            std::string remainder = parsed.get().clean_text ? parsed.get().clean_text : "";
             while (!remainder.empty() && result.tool_calls_size() < budget) {
-                rac_tool_call_t next{};
+                OwnedToolCall next;
                 const rac_result_t next_rc =
                     use_explicit_format
                         ? rac_tool_call_parse_with_format(
                               remainder.c_str(),
                               rac_tool_call_format_from_name(
                                   tool_format_key_from_proto(request.options().format())),
-                              &next)
-                        : rac_tool_call_parse(remainder.c_str(), &next);
+                              next.out())
+                        : rac_tool_call_parse(remainder.c_str(), next.out());
                 if (next_rc != RAC_SUCCESS) {
-                    rac_tool_call_free(&next);
-                    rac_tool_call_free(&parsed);
                     return set_tool_parse_proto_error(
                         out_result, request.text(), "tool-call parsing failed", next_rc);
                 }
-                if (next.has_tool_call != RAC_TRUE) {
-                    rac_tool_call_free(&next);
+                if (next.get().has_tool_call != RAC_TRUE) {
                     break;
                 }
-                const std::string next_name = next.tool_name ? next.tool_name : "";
-                const std::string next_args = next.arguments_json ? next.arguments_json : "{}";
+                const std::string next_name =
+                    next.get().tool_name ? next.get().tool_name : "";
+                const std::string next_args =
+                    next.get().arguments_json ? next.get().arguments_json : "{}";
                 if (next_name == last_name && next_args == last_args) {
                     // Repetition, not a second distinct call — stop here
                     // rather than treat the stutter as further intent.
-                    rac_tool_call_free(&next);
                     break;
                 }
-                append_parsed_call(next);
-                remainder = next.clean_text ? next.clean_text : "";
+                append_parsed_call(next.get());
+                remainder = next.get().clean_text ? next.get().clean_text : "";
                 last_name = next_name;
                 last_args = next_args;
-                rac_tool_call_free(&next);
             }
             result.set_remaining_text(remainder);
         }
     }
     result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
-    rac_tool_call_free(&parsed);
     return copy_serialized_proto(result, out_result, "ToolParseResult");
 #endif
+} catch (const std::bad_alloc&) {
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_OUT_OF_MEMORY,
+                                      "tool-call parsing ran out of memory");
+} catch (...) {
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_INTERNAL,
+                                      "unexpected tool-call parsing failure");
 }
 
 // Shared implementation for rac_tool_call_format_prompt_proto and its grammar variant.
@@ -2339,7 +2404,7 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
 static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
                                              size_t request_proto_size,
                                              rac_tool_call_format_t format_override,
-                                             rac_proto_buffer_t* out_result) {
+                                             rac_proto_buffer_t* out_result) try {
     if (!out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -2379,7 +2444,7 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
         converted.format_key = "pythonic";
     }
 
-    char* prompt = nullptr;
+    OwnedCString prompt;
     rac_result_t rc = RAC_SUCCESS;
 
     // Honor ToolCallingOptions.tool_choice. When tool_choice is NONE we must
@@ -2414,7 +2479,7 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
     }
 
     if (suppress_tools && request.tool_results_size() == 0) {
-        prompt = dup_owned_string(request.user_prompt());
+        prompt.reset(dup_owned_string(request.user_prompt()));
         rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
     } else if (request.tool_results_size() == 0) {
         if (specific_tool) {
@@ -2424,15 +2489,15 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
                          "Generated compact SPECIFIC prompt tool='%s' format=%d bytes=%zu",
                          specific_tool->name().c_str(), static_cast<int>(converted.options.format),
                          compact_prompt.size());
-            prompt = dup_owned_string(compact_prompt);
+            prompt.reset(dup_owned_string(compact_prompt));
             rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         } else if (request.user_prompt().empty()) {
             rc = rac_tool_call_format_prompt_json_with_format_name(
-                effective_tools_json.c_str(), converted.format_key.c_str(), &prompt);
+                effective_tools_json.c_str(), converted.format_key.c_str(), prompt.out());
         } else {
             rc = rac_tool_call_build_initial_prompt(request.user_prompt().c_str(),
                                                     effective_tools_json.c_str(),
-                                                    &converted.options, &prompt);
+                                                    &converted.options, prompt.out());
         }
     } else {
         const auto& tool_result = request.tool_results(0);
@@ -2442,18 +2507,17 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
             (converted.options.keep_tools_available == RAC_TRUE && !suppress_tools) ? RAC_TRUE
                                                                                    : RAC_FALSE;
         std::string tools_prompt;
-        char* tools_prompt_raw = nullptr;
+        OwnedCString tools_prompt_raw;
         if (keep_tools == RAC_TRUE) {
             const rac_result_t tools_rc = rac_tool_call_format_prompt_json_with_format_name(
-                effective_tools_json.c_str(), converted.format_key.c_str(), &tools_prompt_raw);
+                effective_tools_json.c_str(), converted.format_key.c_str(),
+                tools_prompt_raw.out());
             if (tools_rc != RAC_SUCCESS) {
-                free(tools_prompt_raw);
                 return set_tool_prompt_format_proto_error(
                     out_result, converted.format_key, "tool prompt formatting failed", tools_rc);
             }
             if (tools_prompt_raw) {
-                tools_prompt = tools_prompt_raw;
-                free(tools_prompt_raw);
+                tools_prompt = tools_prompt_raw.get();
             }
         }
 
@@ -2476,7 +2540,7 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
                 tools_prompt.empty() ? nullptr : tools_prompt.c_str(),
                 tool_result.name().empty() ? tool_result.tool_call_id().c_str()
                                            : tool_result.name().c_str(),
-                payload.c_str(), keep_tools, &prompt);
+                payload.c_str(), keep_tools, prompt.out());
         } else {
             std::string followup;
             if (!tools_prompt.empty()) {
@@ -2504,7 +2568,7 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
                 followup += "Do not emit tool calls or tool tags. ";
             }
             followup += kToolResultGroundingRule;
-            prompt = dup_owned_string(followup);
+            prompt.reset(dup_owned_string(followup));
             rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         }
     }
@@ -2515,29 +2579,32 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
     // if none is made. Append one firm directive so the model actually calls,
     // WITHOUT reintroducing the global "ALWAYS use a tool" bias for AUTO callers.
     // Only on an initial, tool-advertising turn (not NONE, not a follow-up).
-    if (rc == RAC_SUCCESS && prompt != nullptr && !suppress_tools &&
+    if (rc == RAC_SUCCESS && prompt && !suppress_tools &&
         request.tool_results_size() == 0 &&
         converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED) {
-        std::string firm = prompt;
+        std::string firm = prompt.get();
         firm += "\n\nYou must call exactly one tool now.";
-        free(prompt);
-        prompt = dup_owned_string(firm);
+        prompt.reset(dup_owned_string(firm));
         rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
     }
 
     if (rc != RAC_SUCCESS) {
-        free(prompt);
         return set_tool_prompt_format_proto_error(out_result, converted.format_key,
                                                   "tool prompt formatting failed", rc);
     }
 
     runanywhere::v1::ToolPromptFormatResult result;
-    result.set_formatted_prompt(prompt ? prompt : "");
+    result.set_formatted_prompt(prompt ? prompt.get() : "");
     result.set_format(tool_format_proto_from_rac(converted.options.format));
     result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
-    free(prompt);
     return copy_serialized_proto(result, out_result, "ToolPromptFormatResult");
 #endif
+} catch (const std::bad_alloc&) {
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_OUT_OF_MEMORY,
+                                      "tool prompt formatting ran out of memory");
+} catch (...) {
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_INTERNAL,
+                                      "unexpected tool prompt formatting failure");
 }
 
 extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request_proto_bytes,
@@ -2559,7 +2626,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_grammar_proto(const uint8_t*
 
 extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_proto_bytes,
                                                      size_t request_proto_size,
-                                                     rac_proto_buffer_t* out_result) {
+                                                     rac_proto_buffer_t* out_result) try {
     if (!out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -2583,8 +2650,8 @@ extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_prot
                                           "failed to parse ToolCallValidationRequest");
     }
 
-    rac_tool_call_t call{};
-    rac_result_t rc = tool_call_proto_to_rac(request, &call);
+    OwnedToolCall call;
+    rac_result_t rc = tool_call_proto_to_rac(request, call.out());
     if (rc != RAC_SUCCESS) {
         return set_tool_validation_proto_error(
             out_result, "failed to convert ToolCall to validation input", rc);
@@ -2600,23 +2667,21 @@ extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_prot
         }
     }
 
-    rac_tool_call_validation_t validated{};
-    rc = rac_tool_call_validate_json(&call, tools_json.c_str(), &validated);
-    rac_tool_call_free(&call);
+    OwnedToolCallValidation validated;
+    rc = rac_tool_call_validate_json(call.out(), tools_json.c_str(), validated.out());
     if (rc != RAC_SUCCESS) {
-        rac_tool_call_validation_free(&validated);
         return set_tool_validation_proto_error(out_result, "tool-call validation failed", rc);
     }
 
     const std::vector<std::string> proto_errors = collect_proto_tool_validation_errors(request);
 
     runanywhere::v1::ToolCallValidationResult result;
-    add_tool_validation_errors_from_json(validated.validation_errors_json, &result);
+    add_tool_validation_errors_from_json(validated.get().validation_errors_json, &result);
     for (const auto& error : proto_errors) {
         result.add_validation_errors(error);
     }
 
-    const bool is_valid = validated.is_valid == RAC_TRUE && proto_errors.empty();
+    const bool is_valid = validated.get().is_valid == RAC_TRUE && proto_errors.empty();
     result.set_is_valid(is_valid);
     result.set_error_code(
         static_cast<int32_t>(is_valid ? RAC_SUCCESS : RAC_ERROR_VALIDATION_FAILED));
@@ -2624,19 +2689,24 @@ extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_prot
     if (matched_tool) {
         result.mutable_matched_tool()->CopyFrom(*matched_tool);
     }
-    if (validated.normalized_arguments_json) {
-        result.set_normalized_arguments_json(validated.normalized_arguments_json);
+    if (validated.get().normalized_arguments_json) {
+        result.set_normalized_arguments_json(validated.get().normalized_arguments_json);
     }
 
-    if (validated.error_message && validated.error_message[0] != '\0') {
-        result.set_error_message(validated.error_message);
+    if (validated.get().error_message && validated.get().error_message[0] != '\0') {
+        result.set_error_message(validated.get().error_message);
     } else if (!proto_errors.empty()) {
         result.set_error_message(proto_errors.front());
     }
 
-    rac_tool_call_validation_free(&validated);
     return copy_serialized_proto(result, out_result, "ToolCallValidationResult");
 #endif
+} catch (const std::bad_alloc&) {
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_OUT_OF_MEMORY,
+                                      "tool-call validation ran out of memory");
+} catch (...) {
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_INTERNAL,
+                                      "unexpected tool-call validation failure");
 }
 
 extern "C" void rac_tool_call_free(rac_tool_call_t* result) {
@@ -3426,18 +3496,20 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format_name(const 
 
 extern "C" rac_result_t
 rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_json,
-                                   const rac_tool_calling_options_t* options, char** out_prompt) {
+                                   const rac_tool_calling_options_t* options,
+                                   char** out_prompt) try {
     if (!user_prompt || !out_prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_prompt = nullptr;
 
     // Get format from options (default to DEFAULT)
     rac_tool_call_format_t format = options ? options->format : RAC_TOOL_FORMAT_DEFAULT;
 
     // Format tools prompt with the specified format
-    char* tools_prompt = nullptr;
+    OwnedCString tools_prompt;
     rac_result_t result =
-        rac_tool_call_format_prompt_json_with_format(tools_json, format, &tools_prompt);
+        rac_tool_call_format_prompt_json_with_format(tools_json, format, tools_prompt.out());
     if (result != RAC_SUCCESS) {
         return result;
     }
@@ -3457,8 +3529,8 @@ rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_js
     // caller's system prompt stands alone with no auto-injected tool guidance.
     if (options == nullptr || options->replace_system_prompt == 0 ||
         options->system_prompt == nullptr) {
-        if (tools_prompt && strlen(tools_prompt) > 0) {
-            full_prompt += tools_prompt;
+        if (tools_prompt && strlen(tools_prompt.get()) > 0) {
+            full_prompt += tools_prompt.get();
             full_prompt += "\n\n";
         }
     }
@@ -3467,8 +3539,6 @@ rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_js
     full_prompt += "User: ";
     full_prompt += user_prompt;
 
-    free(tools_prompt);
-
     *out_prompt = static_cast<char*>(malloc(full_prompt.size() + 1));
     if (!*out_prompt) {
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -3476,6 +3546,16 @@ rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_js
     memcpy(*out_prompt, full_prompt.c_str(), full_prompt.size() + 1);
 
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    if (out_prompt) {
+        *out_prompt = nullptr;
+    }
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    if (out_prompt) {
+        *out_prompt = nullptr;
+    }
+    return RAC_ERROR_INTERNAL;
 }
 
 static std::string web_evidence_text(const json& object, const char* key, size_t max_bytes) {
@@ -3561,10 +3641,11 @@ static std::string compact_web_evidence_json(const char* tool_result_json) {
 extern "C" rac_result_t
 rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char* tools_prompt,
                                     const char* tool_name, const char* tool_result_json,
-                                    rac_bool_t keep_tools_available, char** out_prompt) {
+                                    rac_bool_t keep_tools_available, char** out_prompt) try {
     if (!original_user_prompt || !tool_name || !out_prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_prompt = nullptr;
 
     std::string prompt;
     prompt.reserve(1024);
@@ -3631,6 +3712,16 @@ rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char
     memcpy(*out_prompt, prompt.c_str(), prompt.size() + 1);
 
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    if (out_prompt) {
+        *out_prompt = nullptr;
+    }
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    if (out_prompt) {
+        *out_prompt = nullptr;
+    }
+    return RAC_ERROR_INTERNAL;
 }
 
 // =============================================================================
