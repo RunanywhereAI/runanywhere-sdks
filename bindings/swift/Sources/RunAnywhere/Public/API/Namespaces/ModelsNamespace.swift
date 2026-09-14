@@ -498,6 +498,12 @@ extension RunAnywhere {
         } else if model.framework != .unspecified {
             request.framework = model.framework
         }
+        if let contextLength = options?.contextLength {
+            request.contextLength = Int32(clamping: contextLength)
+        }
+        // The full ordered list rides `backend_preferences`; `.framework` above
+        // stays pinned to the first entry for wire compatibility.
+        request.backendPreferences = options?.backendPreferences.map(\.backend) ?? []
         request.validateAvailability = true
 
         let result = await performLoad(request)
@@ -513,19 +519,26 @@ extension RunAnywhere {
 }
 
 private extension LoadOptions {
-    /// `backendPreferences.first` reaches commons through the same
-    /// `RAModelLoadRequest.framework` field the deprecated `framework:`
-    /// property already uses. Everything else the native load ABI cannot
-    /// carry yet — honoring it silently would violate the "every accepted
-    /// field is implemented end to end or fails preflight" contract.
+    /// `contextLength` and the ordered `backendPreferences` list reach commons
+    /// through `RAModelLoadRequest.context_length`/`.backend_preferences`;
+    /// `backendPreferences.first` also pins the legacy `.framework` field.
+    /// `threads` was retired from the load ABI (reserved tag 7) and
+    /// `accelerator` is not wired through this bridge, so both still fail
+    /// preflight. `required` cannot ride `backend_preferences` because that
+    /// field carries framework enums only — honoring it silently would violate
+    /// the "every accepted field is implemented end to end or fails preflight"
+    /// contract.
     func requireCarriableByLoadABI() throws {
+        if backendPreferences.contains(where: { $0.required }) {
+            throw SDKException.invalidConfiguration(
+                "LoadOptions.backendPreferences.required cannot be carried by ModelLoadRequest "
+                    + "because backend_preferences contains framework enums only. "
+                    + "Remove required or pass one preferred backend."
+            )
+        }
         var unsupported: [String] = []
-        if contextLength != nil { unsupported.append("contextLength") }
         if threads != nil { unsupported.append("threads") }
         if accelerator != nil { unsupported.append("accelerator") }
-        if backendPreferences.count > 1 {
-            unsupported.append("backendPreferences (only the first preference reaches commons; ordered fallback is not carried)")
-        }
         guard unsupported.isEmpty else {
             throw SDKException.invalidConfiguration(
                 "LoadOptions.\(unsupported.joined(separator: ", ")) cannot be carried by the native load ABI yet"

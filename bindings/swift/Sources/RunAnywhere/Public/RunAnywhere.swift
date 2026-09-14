@@ -633,13 +633,8 @@ extension RunAnywhere {
                     name: "generateStructured.constrained",
                     reason: "Engine-constrained decoding is not wired in yet; use .validationOnly or .repair"
                 ),
-                .init(name: "loadOptions.contextLength", reason: "Not carried by the native load ABI yet"),
                 .init(name: "loadOptions.threads", reason: "Not carried by the native load ABI yet"),
-                .init(name: "loadOptions.accelerator", reason: "Not carried by the native load ABI yet"),
-                .init(
-                    name: "loadOptions.backendPreferences.fallback",
-                    reason: "Only the first backend preference reaches commons; ordered fallback is not carried"
-                )
+                .init(name: "loadOptions.accelerator", reason: "Not carried by the native load ABI yet")
             ]
         )
     }
