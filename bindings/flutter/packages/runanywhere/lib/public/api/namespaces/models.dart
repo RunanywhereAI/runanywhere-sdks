@@ -256,30 +256,27 @@ class ModelsApi {
     if (model == null) {
       throw SDKException.modelNotFound(id);
     }
-    final result = await ModelGate.ensureLoaded(
+    final result = await ModelGate.load(
       modelId: id,
       category: model.category,
       options: options,
     );
     final preferences = options?.resolvedBackendPreferences ?? const [];
     final requestedBackend = preferences.isEmpty ? null : preferences.first;
-    final resultFramework = result?.framework;
+    final resultFramework = result.framework;
     final actualBackend =
-        resultFramework == null ||
-            resultFramework ==
-                InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
+        resultFramework == InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         ? model.framework
         : resultFramework;
-    final resultCategory = result?.category;
+    final resultCategory = result.category;
     final actualCategory =
-        resultCategory == null ||
-            resultCategory == ModelCategory.MODEL_CATEGORY_UNSPECIFIED
+        resultCategory == ModelCategory.MODEL_CATEGORY_UNSPECIFIED
         ? model.category
         : resultCategory;
-    final actualDevice = result?.actualDeviceKind ?? '';
-    final runtimeVersion = result?.runtimeVersion ?? '';
-    final abiVersion = result?.abiVersion ?? '';
-    final fallbackReason = result?.fallbackReason ?? '';
+    final actualDevice = result.actualDeviceKind;
+    final runtimeVersion = result.runtimeVersion;
+    final abiVersion = result.abiVersion;
+    final fallbackReason = result.fallbackReason;
     return LoadedModel(
       id: id,
       category: actualCategory,
