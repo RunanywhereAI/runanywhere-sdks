@@ -492,7 +492,7 @@ extension RunAnywhere {
         request.modelID = model.id
         request.category = category == .unspecified ? category.defaultLoadCategory : category
         request.forceReload = options?.forceReload ?? false
-        if let backend = options?.backendPreferences.first?.backend, backend != .unspecified {
+        if let backend = options?.backendPreferences.first?.backend {
             request.framework = backend
         } else if model.framework != .unspecified {
             request.framework = model.framework
