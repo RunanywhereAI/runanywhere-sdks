@@ -498,7 +498,12 @@ extension RunAnywhere {
             request.framework = model.framework
         }
         if let contextLength = options?.contextLength {
-            request.contextLength = Int32(clamping: contextLength)
+            guard let wireContextLength = Int32(exactly: contextLength) else {
+                throw SDKException.invalidConfiguration(
+                    "LoadOptions.contextLength must fit ModelLoadRequest.context_length (int32)"
+                )
+            }
+            request.contextLength = wireContextLength
         }
         // The full ordered list rides `backend_preferences`; `.framework` above
         // stays pinned to the first entry for wire compatibility.
