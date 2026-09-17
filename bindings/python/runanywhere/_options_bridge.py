@@ -165,11 +165,6 @@ def check_embed_options(options: Optional[EmbedOptions]) -> None:
     """
     if options is None:
         return
-    if not options.normalize:
-        raise SDKException.not_implemented(
-            "EmbedOptions.normalize: the bridge's embed() returns L2-normalized vectors and "
-            "binds no rac_embeddings_options_t"
-        )
     if options.pooling != PoolingMode.MEAN:
         raise SDKException.not_implemented(
             "EmbedOptions.pooling: the bridge binds no rac_embeddings_options_t"
