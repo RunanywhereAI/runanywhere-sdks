@@ -13,6 +13,7 @@ const _embedding = ModelCategory.MODEL_CATEGORY_EMBEDDING;
 const _stt = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
 const _tts = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
 const _hnpuDescription = 'Qualcomm Hexagon NPU model bundle.';
+final _racErrorNotFound = -ErrorCode.ERROR_CODE_NOT_FOUND.value;
 
 typedef QHexRTCatalogRegistrar =
     Future<ModelInfo?> Function(RegisterModelFromUrlRequest request);
@@ -29,6 +30,8 @@ class QHexRTCatalogModel {
     this.contextLength,
     this.supportsThinking = false,
     this.supportsLora = false,
+    this.excludedArchitectures = const <HexagonArch>{},
+    this.pinnedArchitecture,
   });
 
   final String id;
@@ -40,6 +43,15 @@ class QHexRTCatalogModel {
   final int? contextLength;
   final bool supportsThinking;
   final bool supportsLora;
+  final Set<HexagonArch> excludedArchitectures;
+  final HexagonArch? pinnedArchitecture;
+
+  bool isEligibleFor(NpuCapability capability) {
+    final architecture = capability.hexagonArch;
+    return capability.supported &&
+        !excludedArchitectures.contains(architecture) &&
+        (pinnedArchitecture == null || pinnedArchitecture == architecture);
+  }
 
   RegisterModelFromUrlRequest toRegistrationRequest() {
     final request = RegisterModelFromUrlRequest(
@@ -461,6 +473,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json',
       category: _stt,
       memoryBytes: 5491333979,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'moonshine_tiny',
@@ -564,6 +577,7 @@ abstract final class QHexRTModelCatalog {
       url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
       category: _tts,
       memoryBytes: 470739484,
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
     ),
     QHexRTCatalogModel(
       id: 'magpie_tts_357m',
@@ -604,17 +618,20 @@ abstract final class QHexRTModelCatalog {
     return !isQHexRT || registeredModelIds.contains(model.id);
   }
 
-  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice() async {
-    var eligible = false;
+  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice({
+    required bool backendRegistered,
+  }) {
+    var capability = NpuCapability();
     if (Platform.isAndroid && QHexRT.isAvailable) {
       try {
-        eligible = (await QHexRT.probeNpu()).qhexrtSupported;
+        capability = QHexRT.probeNpu();
       } catch (error) {
         debugPrint('QHexRT capability probe failed: $error');
       }
     }
     return registerWith(
-      deviceEligible: eligible,
+      deviceEligible: backendRegistered && capability.supported,
+      capability: capability,
       registrar: (request) => RunAnywhere.models.register(
         ModelRegistration.url(
           id: request.id,
@@ -642,6 +659,7 @@ abstract final class QHexRTModelCatalog {
   @visibleForTesting
   static Future<QHexRTCatalogSeedResult> registerWith({
     required bool deviceEligible,
+    NpuCapability? capability,
     required QHexRTCatalogRegistrar registrar,
   }) async {
     var registered = 0;
@@ -653,6 +671,10 @@ abstract final class QHexRTModelCatalog {
       skippedNative = models.length;
     } else {
       for (final model in models) {
+        if (capability != null && !model.isEligibleFor(capability)) {
+          skippedNative++;
+          continue;
+        }
         try {
           final saved = await registrar(model.toRegistrationRequest());
           if (saved == null) {
@@ -662,8 +684,12 @@ abstract final class QHexRTModelCatalog {
             registeredIds.add(saved.id);
           }
         } catch (error) {
-          failed++;
-          debugPrint('QHexRT catalog: ${model.id} failed: $error');
+          if (_isMissingManifest(error)) {
+            skippedNative++;
+          } else {
+            failed++;
+            debugPrint('QHexRT catalog: ${model.id} failed: $error');
+          }
         }
       }
     }
@@ -685,4 +711,7 @@ abstract final class QHexRTModelCatalog {
   static void resetForTesting() {
     snapshots.value = const QHexRTCatalogSnapshot();
   }
+
+  static bool _isMissingManifest(Object error) =>
+      error is SDKException && error.error.cAbiCode == _racErrorNotFound;
 }

@@ -22,7 +22,10 @@ import {
   requireInitialized,
 } from '../../../Foundation/Initialization/InitializedGuard';
 import { ensureServicesReady, ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
-import { SDKException } from '../../../Foundation/Errors/SDKException';
+import {
+  asNativeSDKException,
+  SDKException,
+} from '../../../Foundation/Errors/SDKException';
 import {
   ArchiveArtifact,
   ArchiveStructure,
@@ -195,11 +198,16 @@ export async function registerModel(
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
   });
 
-  const saved = arrayBufferToBytes(
-    await native.registerModelFromUrlProto(
-      encodeProtoMessage(request, RegisterModelFromUrlRequest),
-    ),
-  );
+  let saved: Uint8Array;
+  try {
+    saved = arrayBufferToBytes(
+      await native.registerModelFromUrlProto(
+        encodeProtoMessage(request, RegisterModelFromUrlRequest),
+      ),
+    );
+  } catch (error) {
+    throw await asNativeSDKException(error);
+  }
   if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,
@@ -372,11 +380,16 @@ export async function registerMultiFileModel(
       isOptional: !file.isRequired,
     })),
   });
-  const saved = arrayBufferToBytes(
-    await native.registerMultiFileModelProto(
-      encodeProtoMessage(message, RegisterMultiFileModelRequest),
-    ),
-  );
+  let saved: Uint8Array;
+  try {
+    saved = arrayBufferToBytes(
+      await native.registerMultiFileModelProto(
+        encodeProtoMessage(message, RegisterMultiFileModelRequest),
+      ),
+    );
+  } catch (error) {
+    throw await asNativeSDKException(error);
+  }
   if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,
