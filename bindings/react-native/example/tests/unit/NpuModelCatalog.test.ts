@@ -79,10 +79,10 @@ describe('React Native QHexRT catalog', () => {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
       memoryRequirementBytes: 2_046_527_848,
-      downloadSizeBytes: 2_046_527_848,
       contextLength: 1_024,
       supportsThinking: true,
     });
+    expect(registration).not.toHaveProperty('downloadSizeBytes');
     expect(registration).not.toHaveProperty('supportsLora');
   });
 

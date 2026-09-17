@@ -101,11 +101,11 @@ class QHexRTCatalogSeedResult {
   final Set<String> registeredModelIds;
 }
 
-/// Flutter's app-owned QHexRT definitions and native registration results.
+/// Flutter's app-owned QHexRT catalog rows and eligibility policy.
 ///
-/// URLs and presentation metadata stay in the example app. Device probing,
-/// architecture selection, model-ID materialization, and registry insertion
-/// stay in QHexRT's native catalog facade.
+/// The app registers eligible rows through the shared SDK model API. Native
+/// QHexRT owns device probing and logical-reference architecture-variant
+/// resolution.
 abstract final class QHexRTModelCatalog {
   static final ValueNotifier<QHexRTCatalogSnapshot> snapshots = ValueNotifier(
     const QHexRTCatalogSnapshot(),
@@ -554,6 +554,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
       category: _tts,
       memoryBytes: 44135896,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kitten_micro_0_8',
@@ -562,6 +563,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
       category: _tts,
       memoryBytes: 103930338,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kitten_mini_0_8',
@@ -570,6 +572,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
       category: _tts,
       memoryBytes: 184334815,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kokoro_en',
