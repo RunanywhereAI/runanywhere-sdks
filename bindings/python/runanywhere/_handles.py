@@ -436,13 +436,25 @@ class Embedder:
         self._handle = handle
         self._unloaded = False
 
-    def embed(self, text: str) -> np.ndarray:
+    def embed(
+        self,
+        text: str,
+        *,
+        normalize: Optional[bool] = None,
+        pooling: Optional[int] = None,
+    ) -> np.ndarray:
         """Return the embedding of ``text`` as a float32 array."""
-        return self._core.embed(self._handle, text)
+        return self._core.embed(self._handle, text, normalize, pooling)
 
-    def embed_batch(self, texts: List[str]) -> List[np.ndarray]:
+    def embed_batch(
+        self,
+        texts: List[str],
+        *,
+        normalize: Optional[bool] = None,
+        pooling: Optional[int] = None,
+    ) -> List[np.ndarray]:
         """Embed several texts, one array per input, in input order."""
-        return list(self._core.embed_batch(self._handle, texts))
+        return list(self._core.embed_batch(self._handle, texts, normalize, pooling))
 
     def unload(self) -> None:
         """Release the model. Idempotent."""

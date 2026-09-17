@@ -236,15 +236,26 @@ def test_aembed(sdk, sherpa_dir) -> None:
     assert len(vectors) == 1
 
 
-@pytest.mark.parametrize(
-    "options",
-    [EmbedOptions(normalize=False), EmbedOptions(pooling=PoolingMode.CLS)],
-)
-def test_unsupported_embed_options_raise(sdk, options) -> None:
+def test_unsupported_embed_options_raise(sdk) -> None:
     with pytest.raises(SDKException) as error:
-        ra.embeddings.embed(["a"], options)
+        ra.embeddings.embed(["a"], EmbedOptions(pooling=PoolingMode.CLS))
     assert error.value.code == ErrorCode.NOT_IMPLEMENTED
     assert "rac_embeddings_options_t" in str(error.value)
+
+
+def test_embed_normalize_false_returns_unnormalized_vector(sdk, sherpa_dir) -> None:
+    # Normalized vector has unit L2 norm (~1.0)
+    norm_vectors = ra.embeddings.embed(["a"], EmbedOptions(model=sherpa_dir, normalize=True))
+    assert len(norm_vectors) == 1
+    norm_mag = float(np.linalg.norm(norm_vectors[0].vector))
+    assert abs(norm_mag - 1.0) < 1e-4
+
+    # Raw / unnormalized vector retains raw magnitude (sqrt(14) ~ 3.74 for dimension=4)
+    raw_vectors = ra.embeddings.embed(["a"], EmbedOptions(model=sherpa_dir, normalize=False))
+    assert len(raw_vectors) == 1
+    raw_mag = float(np.linalg.norm(raw_vectors[0].vector))
+    assert abs(raw_mag - float(np.sqrt(14))) < 1e-4
+    np.testing.assert_array_equal(raw_vectors[0].vector, np.arange(4, dtype=np.float32))
 
 
 # --------------------------------------------------------------------------- vlm
