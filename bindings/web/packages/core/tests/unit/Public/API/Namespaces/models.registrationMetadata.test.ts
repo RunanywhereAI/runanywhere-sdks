@@ -33,13 +33,13 @@ describe('models.register metadata', () => {
       downloadSizeBytes: 1234,
       contextLength: 4096,
       source: ModelSource.MODEL_SOURCE_LOCAL,
-      description: 'Web metadata fixture',
+      metadata: { description: 'Web metadata fixture' },
     });
     expect(models.get('metadata-web')).toMatchObject({
       downloadSizeBytes: 1234,
       contextLength: 4096,
       source: ModelSource.MODEL_SOURCE_LOCAL,
-      description: 'Web metadata fixture',
+      metadata: { description: 'Web metadata fixture' },
     });
   });
 });

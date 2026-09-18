@@ -11,6 +11,7 @@ import {
   InferenceFramework,
   ModelFileRole,
   ModelInfo,
+  ModelInfoMetadata,
   ModelSource,
 } from '@runanywhere/proto-ts/model_types';
 
@@ -98,14 +99,16 @@ describe('cua_profile IDL round-trip', () => {
       downloadSizeBytes: 5678,
       contextLength: 8192,
       source: ModelSource.MODEL_SOURCE_BUILT_IN,
-      description: 'Archive metadata fixture',
+      metadata: ModelInfoMetadata.fromPartial({
+        description: 'Archive metadata fixture',
+      }),
     });
     const decoded = ModelInfo.decode(ModelInfo.encode(archive).finish());
     expect(decoded).toMatchObject({
       downloadSizeBytes: 5678,
       contextLength: 8192,
       source: ModelSource.MODEL_SOURCE_BUILT_IN,
-      description: 'Archive metadata fixture',
+      metadata: { description: 'Archive metadata fixture' },
     });
   });
 });
