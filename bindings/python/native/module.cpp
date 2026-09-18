@@ -1041,7 +1041,9 @@ char* dup_cstr(const std::string& s) {
 }
 
 void register_model(const std::string& model_id, const std::string& local_path, int32_t framework,
-                    int32_t category) {
+                    int32_t category, int64_t download_size_bytes, int32_t context_length,
+                    int32_t source, const std::optional<std::string>& description,
+                    const std::optional<std::string>& name) {
     if (!g_initialized.load()) throw std::runtime_error("not initialized");
     rac_model_registry_handle_t reg = rac_get_model_registry();
     if (!reg) throw std::runtime_error("global model registry unavailable");
@@ -1051,11 +1053,14 @@ void register_model(const std::string& model_id, const std::string& local_path, 
     // isDownloaded is derived from local_path being set; the RAG resolver reads
     // info->local_path directly, so a non-empty local_path is what matters.
     info->id = dup_cstr(model_id);
-    info->name = dup_cstr(model_id);
+    info->name = dup_cstr(name.value_or(model_id));
     info->local_path = dup_cstr(local_path);
     info->framework = static_cast<rac_inference_framework_t>(framework);
     info->category = static_cast<rac_model_category_t>(category);
-    info->source = RAC_MODEL_SOURCE_LOCAL;
+    info->download_size = download_size_bytes;
+    info->context_length = context_length;
+    info->source = static_cast<rac_model_source_t>(source);
+    if (description && !description->empty()) info->description = dup_cstr(*description);
 
     rac_result_t rc;
     {
@@ -1074,6 +1079,10 @@ py::dict model_info_to_dict(const rac_model_info_t* info) {
     d["local_path"] = info->local_path ? info->local_path : "";
     d["framework"] = static_cast<int32_t>(info->framework);
     d["category"] = static_cast<int32_t>(info->category);
+    d["download_size_bytes"] = info->download_size;
+    d["context_length"] = info->context_length;
+    d["source"] = static_cast<int32_t>(info->source);
+    d["description"] = info->description ? info->description : "";
     return d;
 }
 
@@ -2509,8 +2518,10 @@ PYBIND11_MODULE(_core, m) {
 
     // Model registry (id -> local_path) so RAG can resolve model ids to paths.
     m.def("register_model", &register_model, py::arg("model_id"), py::arg("local_path"),
-          py::arg("framework"), py::arg("category"),
-          "Register a model (id -> local_path + framework/category ints) into the "
+           py::arg("framework"), py::arg("category"), py::arg("download_size_bytes") = 0,
+           py::arg("context_length") = 0, py::arg("source") = RAC_MODEL_SOURCE_LOCAL,
+           py::arg("description") = py::none(), py::arg("name") = py::none(),
+           "Register a model (id -> local_path + metadata) into the "
           "global model registry so the RAG session ABI can resolve it.");
     m.def("get_model", &get_model, py::arg("model_id"),
           "Look up a registered model by id; returns a dict or None.");

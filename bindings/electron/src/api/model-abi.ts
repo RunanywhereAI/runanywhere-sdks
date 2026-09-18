@@ -11,6 +11,7 @@ import {
   CurrentModelRequest,
   CurrentModelResult,
   InferenceFramework as ProtoFramework,
+  ModelSource as ProtoModelSource,
   ModelCategory as ProtoCategory,
   ModelCompatibilityRequest,
   ModelCompatibilityResult,
@@ -39,7 +40,7 @@ import { ComponentLifecycleSnapshot, SDKComponent } from '@runanywhere/proto-ts/
 import type { SDKError } from '@runanywhere/proto-ts/errors';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
-import { InferenceFramework, ModelCategory } from './types';
+import { InferenceFramework, ModelCategory, ModelSource } from './types';
 import type { ModelInfo } from './types';
 
 const CATEGORY_TO_PROTO: Record<ModelCategory, ProtoCategory> = {
@@ -79,6 +80,18 @@ const FRAMEWORK_FROM_PROTO = new Map<ProtoFramework, InferenceFramework>(
   )
 );
 
+const SOURCE_TO_PROTO: Record<ModelSource, ProtoModelSource> = {
+  [ModelSource.REMOTE]: ProtoModelSource.MODEL_SOURCE_REMOTE,
+  [ModelSource.LOCAL]: ProtoModelSource.MODEL_SOURCE_LOCAL,
+  [ModelSource.BUILT_IN]: ProtoModelSource.MODEL_SOURCE_BUILT_IN,
+};
+
+const SOURCE_FROM_PROTO = new Map<ProtoModelSource, ModelSource>(
+  (Object.entries(SOURCE_TO_PROTO) as Array<[ModelSource, ProtoModelSource]>).map(
+    ([name, proto]) => [proto, name]
+  )
+);
+
 /** The proto ordinal for a public category name. */
 export function categoryToProto(category: ModelCategory): ProtoCategory {
   return CATEGORY_TO_PROTO[category] ?? ProtoCategory.MODEL_CATEGORY_UNSPECIFIED;
@@ -99,12 +112,23 @@ export function frameworkFromProto(framework: ProtoFramework): InferenceFramewor
   return FRAMEWORK_FROM_PROTO.get(framework);
 }
 
+/** The proto ordinal for a public model source. */
+export function sourceToProto(source: ModelSource): ProtoModelSource {
+  return SOURCE_TO_PROTO[source] ?? ProtoModelSource.MODEL_SOURCE_UNSPECIFIED;
+}
+
+/** The public source name for a proto ordinal, or undefined when unspecified. */
+export function sourceFromProto(source: ProtoModelSource): ModelSource | undefined {
+  return SOURCE_FROM_PROTO.get(source);
+}
+
 /**
  * A registry row as the public surface sees it. `downloaded` reads
  * `registry_status`, which the proto comment names as the only durable
  * downloaded-ness signal — a non-empty `local_path` survives file deletion.
  */
 export function toPublicModelInfo(model: ProtoModelInfo): ModelInfo {
+  const source = sourceFromProto(model.source);
   return {
     id: model.id,
     name: model.name || model.id,
@@ -113,6 +137,10 @@ export function toPublicModelInfo(model: ProtoModelInfo): ModelInfo {
     localPath: model.localPath || undefined,
     downloaded: model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
     sizeBytes: model.downloadSizeBytes ?? 0,
+    ...(model.downloadSizeBytes !== undefined ? { downloadSizeBytes: model.downloadSizeBytes } : {}),
+    ...(model.contextLength !== undefined ? { contextLength: model.contextLength } : {}),
+    ...(source !== undefined ? { source } : {}),
+    ...(model.description ? { description: model.description } : {}),
   };
 }
 
