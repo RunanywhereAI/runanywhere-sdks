@@ -44,6 +44,9 @@ extern "C" {
 // CONFIGURATION - Mirrors Swift's LlamaCPPGenerationConfig
 // =============================================================================
 
+/** `gpu_layers` value meaning "let llama.cpp decide". */
+#define RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO INT32_MIN
+
 /**
  * LlamaCPP-specific configuration.
  *
@@ -56,7 +59,12 @@ typedef struct rac_llm_llamacpp_config {
     /** Number of threads (0 = auto-detect) */
     int32_t num_threads;
 
-    /** Number of layers to offload to GPU (Metal on iOS/macOS) */
+    /**
+     * Number of layers to offload to GPU (Metal on iOS/macOS).
+     *
+     * `RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO` leaves placement to the fitting pass;
+     * `-1` offloads every layer; `0` pins the model to the CPU.
+     */
     int32_t gpu_layers;
 
     /** Batch size for prompt processing */
@@ -69,7 +77,7 @@ typedef struct rac_llm_llamacpp_config {
 static const rac_llm_llamacpp_config_t RAC_LLM_LLAMACPP_CONFIG_DEFAULT = {
     .context_size = 0,  // Auto-detect
     .num_threads = 0,   // Auto-detect
-    .gpu_layers = -1,   // All layers on GPU
+    .gpu_layers = RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO,   // Auto-fit
     .batch_size = 512};
 
 // =============================================================================
