@@ -219,6 +219,7 @@ export const models = {
       memoryRequirement: model.memoryRequiredBytes,
       downloadSizeBytes: model.sizeBytes,
       contextLength: model.contextLength,
+      source: model.source,
       supportsThinking: model.supportsThinking,
       supportsLora: model.supportsLora,
       cuaProfile: model.cuaProfile,

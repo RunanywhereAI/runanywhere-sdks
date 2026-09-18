@@ -78,9 +78,22 @@ test('models: registry seeding, filtering, registration, and residency', { timeo
       category: 'LANGUAGE',
       url: 'https://example.invalid/another.gguf',
       name: 'Registered By Test',
+      downloadSizeBytes: 1234,
+      contextLength: 4096,
+      source: 'LOCAL',
+      description: 'Registration metadata fixture',
     });
     assert.equal(registered.id, 'feature-test-registered');
     assert.equal(registered.category, 'LANGUAGE');
+    assert.equal(registered.downloadSizeBytes, 1234);
+    assert.equal(registered.contextLength, 4096);
+    assert.equal(registered.source, 'LOCAL');
+    assert.equal(registered.description, 'Registration metadata fixture');
+    const registeredReadBack = await sdk.models.get('feature-test-registered');
+    assert.equal(registeredReadBack?.downloadSizeBytes, 1234);
+    assert.equal(registeredReadBack?.contextLength, 4096);
+    assert.equal(registeredReadBack?.source, 'LOCAL');
+    assert.equal(registeredReadBack?.description, 'Registration metadata fixture');
     assert.ok(await sdk.models.get('feature-test-registered'));
 
     await sdk.models.unregister('feature-test-registered');

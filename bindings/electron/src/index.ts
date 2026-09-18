@@ -48,6 +48,7 @@ export {
   ImageMode,
   InferenceFramework,
   ModelCategory,
+  ModelSource,
   NormalizeMode,
   PoolingMode,
   ReasoningMode,
