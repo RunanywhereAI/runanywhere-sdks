@@ -28,7 +28,9 @@ and the local table become a fallback.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Optional
+
+from .inputs import ModelSource
 
 ModelType = Literal["llm", "vlm", "embedder", "stt", "tts"]
 
@@ -57,6 +59,10 @@ class CatalogEntry:
     params: str | None = None
     size_mb: int | None = None
     heavy: bool = False
+    download_size_bytes: int = 0
+    context_length: int = 0
+    source: Optional[ModelSource] = None
+    description: Optional[str] = None
 
 
 def _llm(

@@ -7,7 +7,7 @@
  * a default literal.
  */
 
-import type { InferenceFramework, ModelCategory, ModelFormat } from '@runanywhere/proto-ts/model_types';
+import type { InferenceFramework, ModelCategory, ModelFormat, ModelSource } from '@runanywhere/proto-ts/model_types';
 import type { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
@@ -276,6 +276,8 @@ export interface ModelRegistration {
   /** Peak resident memory the model needs, used by compatibility gates. */
   memoryRequiredBytes?: number;
   contextLength?: number;
+  /** Origin persisted with the registry row; defaults to remote in commons. */
+  source?: ModelSource;
   supportsThinking?: boolean;
   supportsLora?: boolean;
   /**

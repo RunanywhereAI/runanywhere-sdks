@@ -24,6 +24,7 @@ __all__ = [
     "ImageInput",
     "JsonSchema",
     "ModelCategory",
+    "ModelSource",
     "ModelRef",
     "ModelRegistration",
     "ModelFilter",
@@ -280,6 +281,13 @@ class InferenceFramework(IntEnum):
     UNKNOWN = 99
 
 
+class ModelSource(IntEnum):
+    """Origin of a registered model, mirroring commons' model source values."""
+
+    REMOTE = 0
+    LOCAL = 1
+
+
 @dataclass
 class ModelRegistration:
     """A model to add to the registry: one url, an archive, or a set of files.
@@ -296,7 +304,12 @@ class ModelRegistration:
     primary: Optional[str] = None
     framework: Optional[InferenceFramework] = None
     label: Optional[str] = None
+    # Legacy spelling retained for source compatibility; prefer download_size_bytes.
     size_bytes: int = 0
+    download_size_bytes: int = 0
+    context_length: int = 0
+    source: Optional[ModelSource] = None
+    description: Optional[str] = None
 
 
 @dataclass

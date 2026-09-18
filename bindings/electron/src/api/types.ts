@@ -140,6 +140,14 @@ export const InferenceFramework = {
 export type InferenceFramework =
   (typeof InferenceFramework)[keyof typeof InferenceFramework];
 
+/** Origin of a model artifact, preserved through Electron's structured-clone API. */
+export const ModelSource = {
+  REMOTE: 'REMOTE',
+  LOCAL: 'LOCAL',
+  BUILT_IN: 'BUILT_IN',
+} as const;
+export type ModelSource = (typeof ModelSource)[keyof typeof ModelSource];
+
 /** What an agent is doing during a voice turn. */
 export const AgentState = {
   LISTENING: 'LISTENING',
@@ -534,6 +542,10 @@ export interface ModelInfo {
   localPath?: string;
   downloaded: boolean;
   sizeBytes: number;
+  downloadSizeBytes?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   /** Parameter count as published, e.g. "1.5B". */
   parameters?: string;
 }
@@ -705,6 +717,10 @@ export interface ModelRegistration {
   name?: string;
   /** Engine to pin. Left to commons' format detection when omitted. */
   framework?: InferenceFramework;
+  downloadSizeBytes?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
 }
 
 /**

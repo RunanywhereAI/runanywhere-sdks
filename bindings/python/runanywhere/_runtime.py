@@ -33,7 +33,7 @@ from .catalog import CATALOG, is_catalog_id
 from .download import assert_remote_supported, model_status, models_root, resolve_model
 from .errors import SDKException
 from .events import SdkEvent, SdkEventKind, bus
-from .inputs import InferenceFramework, ModelCategory
+from .inputs import InferenceFramework, ModelCategory, ModelRegistration, ModelSource
 from .options import Environment, LoadOptions
 from .results import DownloadProgress, ModelInfo, ModelsState, ResolvedModel
 
@@ -350,10 +350,35 @@ class Runtime:
             )
         return resolved
 
-    def register_native(self, resolved: ResolvedModel, category: ModelCategory) -> None:
+    def register_native(
+        self,
+        resolved: ResolvedModel,
+        category: ModelCategory,
+        registration: Optional[ModelRegistration] = None,
+    ) -> None:
         """Register ``id -> path`` in the native model registry so commons can resolve it."""
         framework = _FRAMEWORK_FOR_CATEGORY.get(category, InferenceFramework.LLAMACPP)
-        self.core().register_model(resolved.id, resolved.primary, int(framework), int(category))
+        download_size = (
+            registration.download_size_bytes or registration.size_bytes
+            if registration is not None
+            else 0
+        )
+        source = (
+            registration.source
+            if registration is not None and registration.source is not None
+            else ModelSource.LOCAL
+        )
+        self.core().register_model(
+            resolved.id,
+            resolved.primary,
+            int(framework),
+            int(category),
+            download_size,
+            registration.context_length if registration is not None else 0,
+            int(source),
+            registration.description if registration is not None else None,
+            registration.label if registration is not None else None,
+        )
 
     def model_info(self, model_id: str) -> ModelInfo:
         """Describe a model from the catalog plus its on-disk state."""
@@ -368,6 +393,34 @@ class Runtime:
             size_bytes=(status.size_bytes if status else 0),
             local_path=os.path.join(models_root(), model_id) if status else None,
             framework=_FRAMEWORK_FOR_CATEGORY.get(category),
+            download_size_bytes=(entry.download_size_bytes if entry is not None else 0),
+            context_length=(entry.context_length if entry is not None else 0),
+            source=(entry.source if entry is not None else None),
+            description=(entry.description if entry is not None else None),
+        )
+
+    def registered_model_info(self, model_id: str) -> Optional[ModelInfo]:
+        """Read a local registration directly from commons' registry."""
+        if not self.is_ready:
+            return None
+        row = self.core().get_model(model_id)
+        if row is None:
+            return None
+        category = ModelCategory(int(row["category"]))
+        framework = InferenceFramework(int(row["framework"]))
+        local_path = str(row.get("local_path", row.get("path", "")) or "") or None
+        return ModelInfo(
+            id=str(row["id"]),
+            category=category,
+            name=str(row.get("name") or row["id"]),
+            downloaded=local_path is not None,
+            size_bytes=int(row.get("download_size_bytes", 0)),
+            local_path=local_path,
+            framework=framework,
+            download_size_bytes=int(row.get("download_size_bytes", 0)),
+            context_length=int(row.get("context_length", 0)),
+            source=ModelSource(int(row.get("source", int(ModelSource.LOCAL)))),
+            description=str(row.get("description") or "") or None,
         )
 
     # -- resident models -----------------------------------------------------
