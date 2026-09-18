@@ -33,6 +33,7 @@ import {
   ModelFormat,
   type ModelInfo,
   ModelInfo as ModelInfoCodec,
+  ModelInfoMetadata,
   ModelInfoList,
   ModelGetRequest,
   ModelGetResult,
@@ -314,7 +315,9 @@ export async function registerArchiveModel(
     ...(input.contextLength !== undefined && input.contextLength > 0
       ? { contextLength: input.contextLength }
       : {}),
-    ...(input.description !== undefined ? { description: input.description } : {}),
+    ...(input.description !== undefined
+      ? { metadata: ModelInfoMetadata.fromPartial({ description: input.description }) }
+      : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     ...(input.supportsThinking
       ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }

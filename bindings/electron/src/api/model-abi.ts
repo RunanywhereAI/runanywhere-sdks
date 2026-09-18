@@ -129,6 +129,7 @@ export function sourceFromProto(source: ProtoModelSource): ModelSource | undefin
  */
 export function toPublicModelInfo(model: ProtoModelInfo): ModelInfo {
   const source = sourceFromProto(model.source);
+  const description = model.metadata?.description;
   return {
     id: model.id,
     name: model.name || model.id,
@@ -140,7 +141,7 @@ export function toPublicModelInfo(model: ProtoModelInfo): ModelInfo {
     ...(model.downloadSizeBytes !== undefined ? { downloadSizeBytes: model.downloadSizeBytes } : {}),
     ...(model.contextLength !== undefined ? { contextLength: model.contextLength } : {}),
     ...(source !== undefined ? { source } : {}),
-    ...(model.description ? { description: model.description } : {}),
+    ...(description ? { description } : {}),
   };
 }
 

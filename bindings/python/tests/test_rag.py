@@ -27,6 +27,7 @@ from runanywhere import (  # noqa: E402
     Match,
     ModelCategory,
     ModelRef,
+    ModelSource,
     RagConfig,
     RagDocument,
     RagQueryOptions,
@@ -167,11 +168,21 @@ def test_open_registers_both_models_and_marshals_config(rag_core) -> None:
         "/tmp/minilm.onnx",
         int(InferenceFramework.ONNX),
         int(ModelCategory.EMBEDDING),
+        0,
+        0,
+        int(ModelSource.LOCAL),
+        None,
+        None,
     )
     assert registered["qwen"][1:] == (
         "/tmp/qwen.gguf",
         int(InferenceFramework.LLAMACPP),
         int(ModelCategory.LANGUAGE),
+        0,
+        0,
+        int(ModelSource.LOCAL),
+        None,
+        None,
     )
     config = rag_core.created_config
     assert config.embedding_model_id == "minilm" and config.llm_model_id == "qwen"
