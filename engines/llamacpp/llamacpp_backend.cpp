@@ -576,17 +576,33 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     }
 #else
     if (user_gpu_layers.has_value()) {
-        // common_fit_params fell back to n_gpu_layers=0 for non-SUCCESS outcomes;
-        // honouring the user override here reinstates the OOM risk the fit call
-        // was supposed to prevent. Log a warning so it's visible in the event of
-        // a subsequent crash/OOM, but keep honouring the user's explicit request.
-        if (fit_status != COMMON_PARAMS_FIT_STATUS_SUCCESS) {
-            const char* fit_label =
-                fit_status == COMMON_PARAMS_FIT_STATUS_FAILURE ? "FAILURE" : "ERROR";
-            RAC_LOG_WARNING("LLM.LlamaCpp",
-                            "Applying user gpu_layers=%d override despite "
-                            "common_fit_params %s — risk of OOM",
-                            *user_gpu_layers, fit_label);
+        // Honour an explicit user gpu_layers override, but warn when it defeats
+        // common_fit_params' safer placement:
+        // - on non-SUCCESS outcomes, the fit fell back to CPU-only defaults;
+        // - on SUCCESS, the override may widen GPU placement beyond what the fit chose.
+        // Keep honouring the explicit request, but make the increased OOM risk visible.
+        if (fit_status == COMMON_PARAMS_FIT_STATUS_SUCCESS) {
+           const int fitted_gpu_layers = model_params.n_gpu_layers;
+
+           const bool widens_gpu_placement = fitted_gpu_layers != -1 &&
+                (*user_gpu_layers == -1 || *user_gpu_layers > fitted_gpu_layers);
+
+            if (widens_gpu_placement) {
+                RAC_LOG_WARNING(
+                "LLM.LlamaCpp",
+                "Applying user gpu_layers=%d override widens GPU placement beyond "
+                "common_fit_params successful fit of %d layers — risk of OOM",
+                *user_gpu_layers, fitted_gpu_layers);
+            }
+        } else {
+          const char* fit_label =
+          fit_status == COMMON_PARAMS_FIT_STATUS_FAILURE ? "FAILURE" : "ERROR";
+
+          RAC_LOG_WARNING(
+          "LLM.LlamaCpp",
+          "Applying user gpu_layers=%d override despite "
+          "common_fit_params %s — risk of OOM",
+          *user_gpu_layers, fit_label);
         }
         model_params.n_gpu_layers = *user_gpu_layers;
         RAC_LOG_INFO("LLM.LlamaCpp", "Applying user GPU layers override: %d",
