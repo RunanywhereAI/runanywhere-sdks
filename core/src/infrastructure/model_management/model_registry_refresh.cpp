@@ -5,12 +5,13 @@
  * SRP split of model_registry.cpp (pure code-motion). Owns the platform-adapter
  * directory rescan (shared with discovery), the rac_model_registry_refresh_proto
  * entry point, artifact-type inference, and the fetch-assignments entry point
- * (see model_registry_internal.h). No behaviour change.
+ * (see model_registry_internal.h).
  */
 
 #include "model_registry_internal.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -275,6 +276,62 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
     return linked;
 }
 
+#ifdef RAC_HAVE_PROTOBUF
+bool clear_download_status_if_path_matches(rac_model_registry_handle_t handle,
+                                           const std::string& model_id,
+                                           const std::string& missing_path) {
+    std::lock_guard<std::mutex> lock(handle->mutex);
+    auto it = handle->models.find(model_id);
+    if (it == handle->models.end() || !it->second->local_path ||
+        missing_path != it->second->local_path) {
+        return false;
+    }
+
+    std::free(it->second->local_path);
+    it->second->local_path = nullptr;
+    it->second->updated_at = rac_get_current_time_ms();
+    return store_proto_snapshot_locked(handle, model_id, it->second,
+                                       /*preserve_proto_only_fields=*/true,
+                                       /*overwrite_registry_state=*/true) == RAC_SUCCESS;
+}
+
+// Clear registry state for downloaded models whose recorded artifact path no
+// longer exists. This intentionally never removes files; it only reconciles
+// the registry with the platform filesystem.
+int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
+    if (!handle) {
+        return 0;
+    }
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (!adapter || !adapter->file_exists) {
+        return 0;
+    }
+
+    std::vector<ModelInfo> models;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        models = collect_model_snapshots_locked(handle);
+    }
+
+    int32_t pruned = 0;
+    for (const ModelInfo& model : models) {
+        if (model.id().empty() || model.local_path().empty() ||
+            adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE) {
+            continue;
+        }
+
+        if (clear_download_status_if_path_matches(handle, model.id(), model.local_path())) {
+            ++pruned;
+            RAC_LOG_INFO("ModelRegistry", "Pruned vanished download for '%s'", model.id().c_str());
+        } else {
+            RAC_LOG_WARNING("ModelRegistry", "Failed to prune vanished download for '%s'",
+                            model.id().c_str());
+        }
+    }
+    return pruned;
+}
+#endif  // RAC_HAVE_PROTOBUF
+
 }  // namespace rac::infra::model_registry::detail
 
 rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle,
@@ -352,6 +409,14 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
         }
     }
 
+    if (request.prune_orphans()) {
+        const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+        if (adapter && adapter->file_exists) {
+            const int32_t pruned = prune_orphans_via_platform_adapter(handle);
+            RAC_LOG_INFO("ModelRegistry", "Refresh pruned %d vanished downloads", pruned);
+        }
+    }
+
     std::vector<ModelInfo> models;
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
@@ -382,8 +447,11 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
             "rescan_local requires platform filesystem callbacks in the C ABI refresh path");
     }
     if (request.prune_orphans()) {
-        result.add_warnings(
-            "prune_orphans requires platform filesystem callbacks in the C ABI refresh path");
+        const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+        if (!adapter || !adapter->file_exists) {
+            result.add_warnings(
+                "prune_orphans requires the platform file_exists callback in the C ABI refresh path");
+        }
     }
     if (!request.catalog_uri().empty()) {
         result.add_warnings(
