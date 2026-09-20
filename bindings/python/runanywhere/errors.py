@@ -7,6 +7,38 @@ from typing import Any, NoReturn
 from ._generated_errors import ErrorCategory, ErrorCode
 
 
+def category_for_code(code: int) -> ErrorCategory:
+    """Map a signed C ABI code or positive proto code to its canonical category."""
+    magnitude = abs(int(code))
+    if magnitude == 0:
+        return ErrorCategory.UNSPECIFIED
+    if 100 <= magnitude <= 109:
+        return ErrorCategory.CONFIGURATION
+    if 110 <= magnitude <= 129:
+        return ErrorCategory.MODEL
+    if 130 <= magnitude <= 149 or 220 <= magnitude <= 229:
+        return ErrorCategory.INTERNAL
+    if 150 <= magnitude <= 179:
+        return ErrorCategory.NETWORK
+    if 180 <= magnitude <= 219 or 280 <= magnitude <= 299 or 350 <= magnitude <= 369:
+        return ErrorCategory.IO
+    if 230 <= magnitude <= 249 or 300 <= magnitude <= 319:
+        return ErrorCategory.COMPONENT
+    if 250 <= magnitude <= 279 or 370 <= magnitude <= 379:
+        return ErrorCategory.VALIDATION
+    if 320 <= magnitude <= 349:
+        return ErrorCategory.AUTH
+    if 380 <= magnitude <= 389 or 700 <= magnitude <= 999:
+        return ErrorCategory.INTERNAL
+    if 400 <= magnitude <= 499:
+        return ErrorCategory.COMPONENT
+    if 500 <= magnitude <= 599:
+        return ErrorCategory.CONFIGURATION
+    if 600 <= magnitude <= 699:
+        return ErrorCategory.COMPONENT
+    return ErrorCategory.UNSPECIFIED
+
+
 class SDKException(Exception):
     """The single throwable type the SDK raises.
 
@@ -37,7 +69,7 @@ class SDKException(Exception):
         super().__init__(message or "SDK error")
         self.message = message or "SDK error"
         self.code = code
-        self.category = category if category is not None else ErrorCategory.UNSPECIFIED
+        self.category = category if category is not None else category_for_code(int(code))
         if c_abi_code is not None:
             self.c_abi_code = c_abi_code
         elif 0 < int(code) <= 899:
@@ -174,6 +206,7 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.STORAGE_ERROR,
             details if details is not None else "Storage error",
+            category=ErrorCategory.IO,
             nested_message=str(cause) if cause is not None else None,
         )
 
@@ -259,5 +292,6 @@ def raise_for_rac(rac_code: int, message: str | None = None) -> NoReturn:
     raise SDKException.of(
         code,
         message if message is not None else f"Native call failed (rac={rac_code})",
+        category=category_for_code(rac_code),
         c_abi_code=rac_code,
     )

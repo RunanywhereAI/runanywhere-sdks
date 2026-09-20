@@ -372,6 +372,24 @@ test('a structured native Error keeps numeric SDK fields over RPC', async () => 
   ]);
 });
 
+test('a structured native Error keeps serialized sdkError bytes over RPC', async () => {
+  const port = makePort();
+  const sdkError = new Uint8Array([8, 3, 18, 5, 109, 111, 100, 101, 108]);
+  const err = Object.assign(new Error('load_model failed: -111'), { sdkError });
+  const deps = makeDeps({
+    api: {
+      embed: () => {
+        throw err;
+      },
+    },
+  });
+
+  dispatch(port, { id: 24, method: 'embed', args: [] }, deps);
+  await tick();
+
+  assert.deepEqual(port.posts, [{ id: 24, ok: false, error: { name: 'Error', message: err.message, sdkError } }]);
+});
+
 test('a non-Error thrown value is String()-ified', async () => {
   const port = makePort();
   const deps = makeDeps({

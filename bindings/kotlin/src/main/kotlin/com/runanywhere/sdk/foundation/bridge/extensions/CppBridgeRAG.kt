@@ -13,7 +13,6 @@ import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGSearchResponse
 import ai.runanywhere.proto.v1.RAGStreamEvent
 import ai.runanywhere.proto.v1.RAGStatistics
-import ai.runanywhere.proto.v1.SDKError
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -240,15 +239,8 @@ object CppBridgeRAG {
         if (rc == RunAnywhereBridge.RAC_SUCCESS) {
             return SDKException.operation("racRagSessionCreateProto returned 0")
         }
-        val serialized = RunAnywhereBridge.racResultToProtoError(rc)
-        if (serialized != null) {
-            try {
-                return SDKException(SDKError.ADAPTER.decode(serialized))
-            } catch (_: Exception) {
-                // Fall through to the operation error if native serialization fails.
-            }
-        }
-        return SDKException.operation("RAG proto session create failed: $rc")
+        return SDKException.fromRACResult(rc)
+            ?: SDKException.operation("RAG proto session create failed: $rc")
     }
 
     private fun <M : Message<M, *>> decodeOrThrow(

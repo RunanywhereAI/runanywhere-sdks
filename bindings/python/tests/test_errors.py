@@ -12,6 +12,7 @@ from runanywhere.errors import (
     ErrorCode,
     SDKException,
     as_sdk_exception,
+    category_for_code,
     is_sdk_exception,
     raise_for_rac,
 )
@@ -52,8 +53,14 @@ def test_error_category_values():
 # --------------------------------------------------------------------------- #
 # Proto-backed category behavior                                               #
 # --------------------------------------------------------------------------- #
-def test_constructor_does_not_recreate_native_category_mapping():
-    assert SDKException(ErrorCode.MODEL_NOT_FOUND, "x").category == ErrorCategory.UNSPECIFIED
+def test_category_for_code_matches_canonical_ranges():
+    assert category_for_code(-111) == ErrorCategory.MODEL
+    assert category_for_code(-351) == ErrorCategory.IO
+    assert category_for_code(-371) == ErrorCategory.VALIDATION
+    assert category_for_code(-401) == ErrorCategory.COMPONENT
+    assert category_for_code(-501) == ErrorCategory.CONFIGURATION
+    assert category_for_code(-601) == ErrorCategory.COMPONENT
+    assert category_for_code(-12345) == ErrorCategory.UNSPECIFIED
 
 
 def test_from_proto_preserves_wire_category():
@@ -82,8 +89,7 @@ def test_error_code_covers_idl_surface():
 
 
 def test_category_defaults_applied_in_ctor():
-    # Categories are supplied by proto errors or explicit local factories.
-    assert SDKException(ErrorCode.MODEL_NOT_FOUND, "x").category == ErrorCategory.UNSPECIFIED
+    assert SDKException(ErrorCode.MODEL_NOT_FOUND, "x").category == ErrorCategory.MODEL
 
 
 # --------------------------------------------------------------------------- #
@@ -113,7 +119,7 @@ def test_raise_for_rac_maps_minus_111_to_model_load_failed():
     e = ei.value
     assert e.code == ErrorCode.MODEL_LOAD_FAILED
     assert e.c_abi_code == -111
-    assert e.category == ErrorCategory.UNSPECIFIED
+    assert e.category == ErrorCategory.MODEL
 
 
 def test_raise_for_rac_unknown_code_falls_back_to_unknown():
@@ -131,7 +137,7 @@ def test_raise_for_rac_custom_message():
     assert e.code == ErrorCode.CANCELLED
     assert str(e) == "user cancelled"
     assert e.c_abi_code == -380
-    assert e.category == ErrorCategory.UNSPECIFIED
+    assert e.category == ErrorCategory.INTERNAL
 
 
 # --------------------------------------------------------------------------- #
@@ -155,6 +161,10 @@ def test_recovery_suggestions():
         == "Free up storage space and try again."
     )
     assert SDKException(ErrorCode.GENERATION_FAILED, "x").recovery_suggestion is None
+
+
+def test_storage_error_is_io():
+    assert SDKException.storage_error().category == ErrorCategory.IO
 
 
 # --------------------------------------------------------------------------- #
