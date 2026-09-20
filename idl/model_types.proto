@@ -539,8 +539,9 @@ message ModelLoadRequest {
     bool               validate_availability = 5;
 
     // The one load knob every on-device runtime exposes. Unset or 0 means
-    // "take it from the model" (llama.cpp --ctx-size semantics) -- never a
-    // hardcoded small default. Carried by the native load ABI.
+    // "take it from the model" (llama.cpp --ctx-size semantics); positive
+    // values request an explicit context length, and negative values are
+    // invalid. Carried by the native load ABI.
     optional int32     context_length   = 6;
     reserved 7;  // threads: retired -- travelled an advisory JSON path, never
                  // a hard runtime guarantee
