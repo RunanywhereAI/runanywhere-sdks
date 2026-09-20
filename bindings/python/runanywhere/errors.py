@@ -132,7 +132,7 @@ class SDKException(Exception):
         try:
             category = ErrorCategory(err.category)
         except ValueError:
-            category = None
+            category = ErrorCategory.UNSPECIFIED
         field_path = err.param if err.HasField("param") else None
         return SDKException.of(
             code,

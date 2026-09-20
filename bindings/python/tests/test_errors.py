@@ -53,13 +53,38 @@ def test_error_category_values():
 # --------------------------------------------------------------------------- #
 # Proto-backed category behavior                                               #
 # --------------------------------------------------------------------------- #
-def test_category_for_code_matches_canonical_ranges():
-    assert category_for_code(-111) == ErrorCategory.MODEL
-    assert category_for_code(-351) == ErrorCategory.IO
-    assert category_for_code(-371) == ErrorCategory.VALIDATION
-    assert category_for_code(-401) == ErrorCategory.COMPONENT
-    assert category_for_code(-501) == ErrorCategory.CONFIGURATION
-    assert category_for_code(-601) == ErrorCategory.COMPONENT
+@pytest.mark.parametrize(
+    ("first", "last", "category"),
+    [
+        (100, 109, ErrorCategory.CONFIGURATION),
+        (110, 129, ErrorCategory.MODEL),
+        (130, 149, ErrorCategory.INTERNAL),
+        (150, 179, ErrorCategory.NETWORK),
+        (180, 219, ErrorCategory.IO),
+        (220, 229, ErrorCategory.INTERNAL),
+        (230, 249, ErrorCategory.COMPONENT),
+        (250, 279, ErrorCategory.VALIDATION),
+        (280, 299, ErrorCategory.IO),
+        (300, 319, ErrorCategory.COMPONENT),
+        (320, 349, ErrorCategory.AUTH),
+        (350, 369, ErrorCategory.IO),
+        (370, 379, ErrorCategory.VALIDATION),
+        (380, 389, ErrorCategory.INTERNAL),
+        (400, 499, ErrorCategory.COMPONENT),
+        (500, 599, ErrorCategory.CONFIGURATION),
+        (600, 699, ErrorCategory.COMPONENT),
+        (700, 999, ErrorCategory.INTERNAL),
+    ],
+)
+def test_category_for_code_matches_canonical_range_boundaries(
+    first, last, category
+):
+    assert category_for_code(first) == category
+    assert category_for_code(last) == category
+
+
+def test_category_for_code_preserves_zero_and_out_of_range_cases():
+    assert category_for_code(0) == ErrorCategory.UNSPECIFIED
     assert category_for_code(-12345) == ErrorCategory.UNSPECIFIED
 
 
@@ -78,6 +103,22 @@ def test_from_proto_preserves_wire_category():
     error = SDKException.from_proto(ProtoError())
     assert error.code == ErrorCode.ADAPTER_NOT_SET
     assert error.category == ErrorCategory.CONFIGURATION
+
+
+def test_from_proto_unknown_wire_category_is_unspecified():
+    class ProtoError:
+        code = ErrorCode.MODEL_LOAD_FAILED
+        category = 999
+        message = "unknown category"
+        c_abi_code = -111
+        nested_message = ""
+        param = ""
+
+        def HasField(self, field):
+            return field in {"c_abi_code", "nested_message", "param"}
+
+    error = SDKException.from_proto(ProtoError())
+    assert error.category == ErrorCategory.UNSPECIFIED
 
 
 def test_error_code_covers_idl_surface():
