@@ -7,38 +7,6 @@ from typing import Any, NoReturn
 from ._generated_errors import ErrorCategory, ErrorCode
 
 
-def category_for_code(code: int) -> ErrorCategory:
-    """Map an ErrorCode (positive) or ``rac_result_t`` (negative) to its ErrorCategory.
-
-    Faithful port of commons ``rac_result_to_proto_category`` in
-    ``rac_proto_adapters.cpp``. Unmapped failure codes return INTERNAL (not
-    UNSPECIFIED). AUTH is only 320–329; security codes 330–349 fall through to
-    INTERNAL, matching the C ABI.
-    """
-    # Normalize to negative rac_result_t for the commons range table.
-    if code > 0:
-        n = -code
-    else:
-        n = code
-    if n >= 0:
-        return ErrorCategory.UNSPECIFIED
-    if -179 <= n <= -150:
-        return ErrorCategory.NETWORK
-    if -279 <= n <= -250:
-        return ErrorCategory.VALIDATION
-    if -129 <= n <= -110:
-        return ErrorCategory.MODEL
-    if (-219 <= n <= -180) or (-299 <= n <= -280):
-        return ErrorCategory.IO
-    if -329 <= n <= -320:
-        return ErrorCategory.AUTH
-    if -109 <= n <= -100:
-        return ErrorCategory.CONFIGURATION
-    if (-249 <= n <= -230) or (-319 <= n <= -300):
-        return ErrorCategory.COMPONENT
-    return ErrorCategory.INTERNAL
-
-
 class SDKException(Exception):
     """The single throwable type the SDK raises.
 
@@ -69,7 +37,7 @@ class SDKException(Exception):
         super().__init__(message or "SDK error")
         self.message = message or "SDK error"
         self.code = code
-        self.category = category if category is not None else category_for_code(int(code))
+        self.category = category if category is not None else ErrorCategory.UNSPECIFIED
         if c_abi_code is not None:
             self.c_abi_code = c_abi_code
         elif 0 < int(code) <= 899:
@@ -156,6 +124,7 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.INVALID_INPUT,
             f"Invalid input: {details}" if details else "Invalid input",
+            category=ErrorCategory.VALIDATION,
         )
 
     @staticmethod
@@ -173,6 +142,7 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.MODEL_NOT_FOUND,
             f"Model not found: {model_id}" if model_id else "Model not found",
+            category=ErrorCategory.MODEL,
         )
 
     @staticmethod
@@ -182,6 +152,7 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.MODEL_LOAD_FAILED,
             f"Failed to load model: {model_id}" if model_id else "Failed to load model",
+            category=ErrorCategory.MODEL,
             nested_message=str(cause) if cause is not None else None,
         )
 
@@ -192,6 +163,7 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.GENERATION_FAILED,
             details if details is not None else "Generation failed",
+            category=ErrorCategory.INTERNAL,
             nested_message=str(cause) if cause is not None else None,
         )
 
@@ -218,6 +190,7 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.NOT_IMPLEMENTED,
             f"{feature} not implemented" if feature else "Not implemented",
+            category=ErrorCategory.INTERNAL,
         )
 
     @staticmethod
@@ -249,6 +222,7 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.UNKNOWN,
             details if details is not None else "Unknown error",
+            category=ErrorCategory.INTERNAL,
             nested_message=str(cause) if cause is not None else None,
         )
 

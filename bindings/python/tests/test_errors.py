@@ -12,7 +12,6 @@ from runanywhere.errors import (
     ErrorCode,
     SDKException,
     as_sdk_exception,
-    category_for_code,
     is_sdk_exception,
     raise_for_rac,
 )
@@ -51,67 +50,27 @@ def test_error_category_values():
 
 
 # --------------------------------------------------------------------------- #
-# category_for_code range table (verbatim port)                               #
+# Proto-backed category behavior                                               #
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize(
-    "code,expected",
-    [
-        (0, ErrorCategory.UNSPECIFIED),
-        (100, ErrorCategory.CONFIGURATION),
-        (109, ErrorCategory.CONFIGURATION),
-        (110, ErrorCategory.MODEL),
-        (111, ErrorCategory.MODEL),
-        (129, ErrorCategory.MODEL),
-        # Generation range is not named in commons → INTERNAL
-        (130, ErrorCategory.INTERNAL),
-        (149, ErrorCategory.INTERNAL),
-        (150, ErrorCategory.NETWORK),
-        (179, ErrorCategory.NETWORK),
-        (180, ErrorCategory.IO),
-        (182, ErrorCategory.IO),
-        (219, ErrorCategory.IO),
-        (220, ErrorCategory.INTERNAL),
-        (229, ErrorCategory.INTERNAL),
-        (230, ErrorCategory.COMPONENT),
-        (231, ErrorCategory.COMPONENT),
-        (249, ErrorCategory.COMPONENT),
-        (250, ErrorCategory.VALIDATION),
-        (259, ErrorCategory.VALIDATION),
-        (279, ErrorCategory.VALIDATION),
-        (280, ErrorCategory.IO),
-        (299, ErrorCategory.IO),
-        (300, ErrorCategory.COMPONENT),
-        (319, ErrorCategory.COMPONENT),
-        # AUTH is only 320–329; security 330–349 → INTERNAL (commons)
-        (320, ErrorCategory.AUTH),
-        (329, ErrorCategory.AUTH),
-        (330, ErrorCategory.INTERNAL),
-        (349, ErrorCategory.INTERNAL),
-        (350, ErrorCategory.INTERNAL),
-        (369, ErrorCategory.INTERNAL),
-        (370, ErrorCategory.INTERNAL),
-        (379, ErrorCategory.INTERNAL),
-        (380, ErrorCategory.INTERNAL),
-        (389, ErrorCategory.INTERNAL),
-        (400, ErrorCategory.INTERNAL),
-        (499, ErrorCategory.INTERNAL),
-        (500, ErrorCategory.INTERNAL),
-        (599, ErrorCategory.INTERNAL),
-        (600, ErrorCategory.INTERNAL),
-        (699, ErrorCategory.INTERNAL),
-        (700, ErrorCategory.INTERNAL),
-        (800, ErrorCategory.INTERNAL),
-        (804, ErrorCategory.INTERNAL),
-        (999, ErrorCategory.INTERNAL),
-        (1000, ErrorCategory.INTERNAL),
-        (-5, ErrorCategory.INTERNAL),
-        (-111, ErrorCategory.MODEL),
-        (-320, ErrorCategory.AUTH),
-        (-330, ErrorCategory.INTERNAL),
-    ],
-)
-def test_category_for_code(code, expected):
-    assert category_for_code(code) == expected
+def test_constructor_does_not_recreate_native_category_mapping():
+    assert SDKException(ErrorCode.MODEL_NOT_FOUND, "x").category == ErrorCategory.UNSPECIFIED
+
+
+def test_from_proto_preserves_wire_category():
+    class ProtoError:
+        code = ErrorCode.ADAPTER_NOT_SET
+        category = ErrorCategory.CONFIGURATION
+        message = "adapter missing"
+        c_abi_code = -500
+        nested_message = ""
+        param = ""
+
+        def HasField(self, field):
+            return field in {"c_abi_code", "nested_message", "param"}
+
+    error = SDKException.from_proto(ProtoError())
+    assert error.code == ErrorCode.ADAPTER_NOT_SET
+    assert error.category == ErrorCategory.CONFIGURATION
 
 
 def test_error_code_covers_idl_surface():
@@ -123,9 +82,8 @@ def test_error_code_covers_idl_surface():
 
 
 def test_category_defaults_applied_in_ctor():
-    # No explicit category -> derived from code via category_for_code.
-    assert SDKException(ErrorCode.MODEL_NOT_FOUND, "x").category == ErrorCategory.MODEL
-    assert SDKException(ErrorCode.INVALID_INPUT, "x").category == ErrorCategory.VALIDATION
+    # Categories are supplied by proto errors or explicit local factories.
+    assert SDKException(ErrorCode.MODEL_NOT_FOUND, "x").category == ErrorCategory.UNSPECIFIED
 
 
 # --------------------------------------------------------------------------- #
@@ -155,7 +113,7 @@ def test_raise_for_rac_maps_minus_111_to_model_load_failed():
     e = ei.value
     assert e.code == ErrorCode.MODEL_LOAD_FAILED
     assert e.c_abi_code == -111
-    assert e.category == ErrorCategory.MODEL
+    assert e.category == ErrorCategory.UNSPECIFIED
 
 
 def test_raise_for_rac_unknown_code_falls_back_to_unknown():
@@ -173,7 +131,7 @@ def test_raise_for_rac_custom_message():
     assert e.code == ErrorCode.CANCELLED
     assert str(e) == "user cancelled"
     assert e.c_abi_code == -380
-    assert e.category == ErrorCategory.INTERNAL
+    assert e.category == ErrorCategory.UNSPECIFIED
 
 
 # --------------------------------------------------------------------------- #
