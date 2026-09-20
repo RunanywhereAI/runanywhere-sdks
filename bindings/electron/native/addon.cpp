@@ -213,6 +213,11 @@ static bool g_audit_enabled = []() -> bool {
 
 std::map<int32_t, HandleAuditEntry> g_audit;
 
+void erase_audit_entry(int32_t id) {
+    std::lock_guard<std::mutex> lock(g_handles_mutex);
+    g_audit.erase(id);
+}
+
 rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
     std::lock_guard<std::mutex> lock(g_handles_mutex);
     auto it = map.find(id);
@@ -1583,8 +1588,9 @@ Napi::Value UnloadModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "unload_model", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_llm_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_llm_component_destroy(h);
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
             g_lora_applied.erase(hid);
         }
         return RAC_SUCCESS;
@@ -1898,7 +1904,7 @@ Napi::Value UnloadVlmModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "vlm unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_vlm_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_vlm_component_destroy(h);
         }
         return RAC_SUCCESS;
@@ -2079,7 +2085,7 @@ Napi::Value UnloadEmbeddingModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "embeddings unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_embed_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_embeddings_destroy(h);
         }
         return RAC_SUCCESS;
@@ -2399,7 +2405,7 @@ Napi::Value UnloadSttModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "stt unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_stt_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_stt_component_destroy(h);
         }
         return RAC_SUCCESS;
@@ -2686,7 +2692,7 @@ Napi::Value UnloadTtsVoice(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "tts unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_tts_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_tts_component_destroy(h);
         }
         return RAC_SUCCESS;
@@ -3240,7 +3246,7 @@ Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
         rac_handle_t h = take_handle_when_idle(g_vad_handles, hid);
         if (h) {
             ClearVadStreamSlot(hid, h);
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_vad_component_destroy(h);
         }
         return RAC_SUCCESS;
@@ -3368,7 +3374,7 @@ Napi::Value UnloadRerankModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "rerank unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_rerank_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_rerank_cleanup(h);
             rac_rerank_destroy(h);
         }
@@ -3517,7 +3523,7 @@ Napi::Value UnloadDiarizationModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "diarization unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_diar_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_diarization_cleanup(h);
             rac_diarization_destroy(h);
         }
@@ -3682,7 +3688,7 @@ Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
     return RunNativeCall(env, "segmentation unload", [hid]() {
         rac_handle_t h = take_handle_when_idle(g_seg_handles, hid);
         if (h) {
-            g_audit.erase(hid);
+            erase_audit_entry(hid);
             rac_segmentation_cleanup(h);
             rac_segmentation_destroy(h);
         }
@@ -4151,7 +4157,7 @@ Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
     rac_handle_t h = take_handle_when_idle(g_rag_handles, hid);
     if (h) {
-        g_audit.erase(hid);
+        erase_audit_entry(hid);
         rac_rag_session_destroy_proto(h);
     }
     return env.Undefined();

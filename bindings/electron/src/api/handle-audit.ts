@@ -123,11 +123,11 @@ export class HandleAuditor {
 
   /** Stop periodic audit sync. */
   stop(): void {
-    this.enabled = false;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    this.previousAudit = [];
   }
 
   /** Query native addon and compare against known handles. Returns detected leaks. */
@@ -141,7 +141,16 @@ export class HandleAuditor {
     if (typeof this.addon.handleAudit !== 'function') return [];
     const raw = this.addon.handleAudit();
     if (!Array.isArray(raw)) return [];
-    return raw as unknown as HandleAuditEntry[];
+    return raw.filter((entry): entry is HandleAuditEntry => {
+      if (typeof entry !== 'object' || entry === null) return false;
+      const candidate = entry as Record<string, unknown>;
+      return (
+        typeof candidate.id === 'number' &&
+        Number.isSafeInteger(candidate.id) &&
+        isHandleCategory(typeof candidate.category === 'string' ? candidate.category : '') &&
+        (candidate.model === undefined || typeof candidate.model === 'string')
+      );
+    });
   }
 
   /** Print a summary of audit changes. */

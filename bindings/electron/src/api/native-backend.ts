@@ -144,9 +144,11 @@ export class NativeBackend implements RaBackend {
   private downloadWatchDone: (() => void) | null = null;
   private loggingWatchDone: (() => void) | null = null;
   private readonly auditor: HandleAuditor | null;
+  private readonly auditDebug: boolean;
 
   constructor(private readonly addon: NativeAddon) {
     const auditEnv = process.env.RAC_HANDLE_AUDIT;
+    this.auditDebug = auditEnv === 'debug';
     this.auditor =
       auditEnv === 'warn' || auditEnv === 'debug' ? new HandleAuditor(addon) : null;
   }
@@ -177,13 +179,20 @@ export class NativeBackend implements RaBackend {
       await this.voiceClose(session).catch(() => undefined);
     }
     if (this.auditor) {
-      // Capture leaks before clearing handle state — getLeaks queries native audit
-      // against the snapshot of known slots and session maps.
-      const leaks = this.auditor.getLeaks(known);
-      for (const leak of leaks)
-        console.warn(`[handle-audit] shutdown leak: ${leak.details}`);
-      this.auditor.report('shutdown');
-      this.auditor.stop();
+      try {
+        if (this.auditDebug) {
+          // Capture leaks before clearing handle state — getLeaks queries native audit
+          // against the snapshot of known slots and session maps.
+          const leaks = this.auditor.getLeaks(known);
+          for (const leak of leaks)
+            console.warn(`[handle-audit] shutdown leak: ${leak.details}`);
+          this.auditor.report('shutdown');
+        }
+      } catch {
+        // Diagnostics must never prevent the native runtime from shutting down.
+      } finally {
+        this.auditor.stop();
+      }
     }
     await this.addon.shutdown();
   }
