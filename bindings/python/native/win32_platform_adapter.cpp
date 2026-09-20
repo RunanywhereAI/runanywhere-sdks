@@ -252,7 +252,9 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
     if (!dir_path || !in_out_count) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::path dir = utf8_path(dir_path);
-    if (!fs::is_directory(dir, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;
+    const bool is_directory = fs::is_directory(dir, ec);
+    if (ec) return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+    if (!is_directory) return RAC_ERROR_FILE_NOT_FOUND;
     const size_t cap = out_entries ? *in_out_count : 0;
     size_t written = 0, total = 0;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
