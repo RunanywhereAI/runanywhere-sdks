@@ -280,7 +280,7 @@ export type AcceleratorPolicy = 'auto' | 'cpu' | 'gpu' | 'npu';
 /** One ranked backend choice for {@link LoadOptions.backendPreferences}. */
 export interface BackendPreference {
   backend: InferenceFramework;
-  /** `true` fails the load instead of falling back past this entry. */
+  /** Hard fallback boundary. React Native rejects `true` until the load wire can carry it. */
   required?: boolean;
 }
 

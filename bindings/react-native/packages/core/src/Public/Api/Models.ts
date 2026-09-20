@@ -328,9 +328,9 @@ export const models = {
   /**
    * Load a model now instead of paying for it on the first generation.
    *
-   * Only `options.backendPreferences[0]` (equivalently the deprecated
-   * `framework`) reaches commons today; `contextLength`, `threads`, and a
-   * real `accelerator` choice are not yet carried by the native load ABI.
+   * `contextLength` and the ordered `backendPreferences` list are forwarded on
+   * `ModelLoadRequest`. A `required` backend preference is rejected because
+   * `backend_preferences` carries framework enums only.
    *
    * @throws SDKException when the model is unknown, or `options` sets a
    * placement knob the load ABI cannot honor yet.
@@ -343,7 +343,15 @@ export const models = {
         `LoadOptions.${unsupported.join(', ')} cannot be carried by the native load ABI yet`
       );
     }
-    const requestedBackend = resolvedBackendPreferences(options)[0];
+    if (options?.backendPreferences?.some((preference) => preference.required)) {
+      throw SDKException.invalidInput(
+        'LoadOptions.backendPreferences.required cannot be carried by ModelLoadRequest '
+          + 'because backend_preferences contains framework enums only. '
+          + 'Remove required or pass one preferred backend.'
+      );
+    }
+    const preferences = resolvedBackendPreferences(options);
+    const requestedBackend = preferences[0];
     const result = await loadModel(
       ModelLoadRequest.fromPartial({
         modelId: id,
@@ -351,6 +359,8 @@ export const models = {
         ...(requestedBackend ? { framework: requestedBackend.backend } : {}),
         forceReload: options?.forceReload ?? false,
         validateAvailability: true,
+        contextLength: options?.contextLength,
+        backendPreferences: preferences.map((preference) => preference.backend),
       })
     );
     if (result.error) {

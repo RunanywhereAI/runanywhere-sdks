@@ -551,6 +551,16 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "ModelLoadRequest.model_id is required");
     }
+    if (request.has_context_length() && request.context_length() < 0) {
+        ModelLoadResult result = detail::make_load_result(
+            false, request.model_id(),
+            request.has_category() ? request.category()
+                                   : runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED,
+            request.has_framework() ? request.framework()
+                                    : runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED,
+            "", {}, 0, "ModelLoadRequest.context_length must be non-negative");
+        return detail::copy_proto(result, out_result);
+    }
 
     uint8_t* model_bytes = nullptr;
     size_t model_size = 0;
