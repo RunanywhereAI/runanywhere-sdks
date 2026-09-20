@@ -203,7 +203,7 @@ The example covers chat/streaming, vision, embeddings, and a mic → STT → LLM
 
 ## Handle Leak Detection (RAC_HANDLE_AUDIT)
 
-When `RAC_HANDLE_AUDIT` is set to `warn` or `debug`, the native addon tracks every loaded handle in an internal audit table keyed by handle ID. On shutdown, handles that remain in the audit table (that is, were never properly unloaded) are reported as leaks. Any other value (including an empty string) disables tracking with zero runtime overhead.
+When `RAC_HANDLE_AUDIT` is set to `warn` or `debug`, the native addon tracks every loaded handle in an internal audit table keyed by handle ID. On shutdown, handles that remain in the audit table (that is, were never properly unloaded) are reported as leaks. Any other value (including an empty string) disables tracking and its bookkeeping.
 
 ### Usage
 
@@ -219,8 +219,8 @@ RAC_HANDLE_AUDIT=debug node dist/main.js
 
 | Value | Behavior |
 |---|---|
-| `off` (default) | Zero runtime overhead — no audit table, no extra mutex contention. |
-| `warn` | Records every handle ID + category at load time; erases at unload. Logs leaked handles during `Shutdown()`. |
+| `off` (default) | No audit table updates, reporting, or audit mutex contention. |
+| `warn` | Records every handle ID and tracked category at load time; erases at unload. Logs leaked handles during `Shutdown()`. |
 | `debug` | Same as `warn`, plus the TS `HandleAuditor` prints periodic delta reports (`+N / -M`) to stderr every 5 seconds. |
 
 ### Audit data shape
@@ -231,15 +231,16 @@ The native addon exposes `handleAudit()` returning:
 interface HandleAuditEntry {
   id: number;           // globally unique integer handle ID
   category: string;     // 'llm' | 'vlm' | 'embedding' | 'stt' | 'tts' | 'vad' | 'rag' | 'rerank' | 'diarization' | 'segmentation'
-  model?: string;       // model id or path passed to the load function
+  model?: string;       // model id or path; 'rag_session' for RAG sessions
 }
 ```
 
 ### Implementation details
 
-- Overhead: one `std::map<int32_t, HandleAuditEntry>` insert/erase per load/destroy, plus a `model_source` string allocation and the mutex used to protect the shared handle tables.
+- Tracked categories are `llm`, `vlm`, `embedding`, `stt`, `tts`, `vad`, `rag`, `rerank`, `diarization`, and `segmentation`.
+- Overhead when enabled: one `std::map<int32_t, HandleAuditEntry>` insert/erase per load/destroy and the mutex used to protect the shared handle tables.
 - The audit table is guarded by `g_handles_mutex` — the same mutex that protects all handle maps — so no additional locking is needed.
-- When `RAC_HANDLE_AUDIT=off`, a static flag evaluated once at module init avoids per-call `getenv()` overhead.
+- When `RAC_HANDLE_AUDIT` is not `warn` or `debug`, a static flag evaluated once at module init avoids audit bookkeeping and per-call `getenv()` overhead.
 
 ## Errors
 
