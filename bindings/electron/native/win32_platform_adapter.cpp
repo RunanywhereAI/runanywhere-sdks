@@ -126,7 +126,7 @@ rac_result_t win_file_read(const char* path, void** out_data, size_t* out_size, 
         return RAC_ERROR_FILE_READ_FAILED;
     }
     const size_t size = static_cast<size_t>(n);
-    void* buf = rac_alloc(size);
+    void* buf = rac_alloc(size > 0 ? size : 1);
     if (!buf) {
         fclose(f);
         return RAC_ERROR_OUT_OF_MEMORY;
