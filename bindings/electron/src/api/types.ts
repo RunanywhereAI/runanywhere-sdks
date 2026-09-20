@@ -1,11 +1,12 @@
 // types.ts — the v3 public vocabulary: enums, inputs, results, and events.
 //
-// Enum members are string constants rather than TypeScript `enum`s so every value
-// survives a structured clone across the contextBridge unchanged — the renderer
-// surface hands these exact objects to the page.
+// Local enum members are string constants rather than TypeScript `enum`s so every
+// value survives a structured clone across the contextBridge unchanged. Proto-backed
+// enums are re-exported from the generated bindings instead of being restated here.
 
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { SDKError } from '@runanywhere/proto-ts/errors';
+import { ModelSource } from '@runanywhere/proto-ts/model_types';
 import type {
   DownloadEvent as CanonicalDownloadEvent,
   GenerationEvent as CanonicalGenerationEvent,
@@ -140,13 +141,8 @@ export const InferenceFramework = {
 export type InferenceFramework =
   (typeof InferenceFramework)[keyof typeof InferenceFramework];
 
-/** Origin of a model artifact, preserved through Electron's structured-clone API. */
-export const ModelSource = {
-  REMOTE: 'REMOTE',
-  LOCAL: 'LOCAL',
-  BUILT_IN: 'BUILT_IN',
-} as const;
-export type ModelSource = (typeof ModelSource)[keyof typeof ModelSource];
+/** Canonical origin of a model artifact from `idl/model_types.proto`. */
+export { ModelSource };
 
 /** What an agent is doing during a voice turn. */
 export const AgentState = {

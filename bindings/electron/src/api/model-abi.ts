@@ -11,7 +11,7 @@ import {
   CurrentModelRequest,
   CurrentModelResult,
   InferenceFramework as ProtoFramework,
-  ModelSource as ProtoModelSource,
+  ModelSource,
   ModelCategory as ProtoCategory,
   ModelCompatibilityRequest,
   ModelCompatibilityResult,
@@ -40,7 +40,7 @@ import { ComponentLifecycleSnapshot, SDKComponent } from '@runanywhere/proto-ts/
 import type { SDKError } from '@runanywhere/proto-ts/errors';
 import type { RaBackend } from './backend';
 import { invokeProto } from './proto-abi';
-import { InferenceFramework, ModelCategory, ModelSource } from './types';
+import { InferenceFramework, ModelCategory } from './types';
 import type { ModelInfo } from './types';
 
 const CATEGORY_TO_PROTO: Record<ModelCategory, ProtoCategory> = {
@@ -80,18 +80,6 @@ const FRAMEWORK_FROM_PROTO = new Map<ProtoFramework, InferenceFramework>(
   )
 );
 
-const SOURCE_TO_PROTO: Record<ModelSource, ProtoModelSource> = {
-  [ModelSource.REMOTE]: ProtoModelSource.MODEL_SOURCE_REMOTE,
-  [ModelSource.LOCAL]: ProtoModelSource.MODEL_SOURCE_LOCAL,
-  [ModelSource.BUILT_IN]: ProtoModelSource.MODEL_SOURCE_BUILT_IN,
-};
-
-const SOURCE_FROM_PROTO = new Map<ProtoModelSource, ModelSource>(
-  (Object.entries(SOURCE_TO_PROTO) as Array<[ModelSource, ProtoModelSource]>).map(
-    ([name, proto]) => [proto, name]
-  )
-);
-
 /** The proto ordinal for a public category name. */
 export function categoryToProto(category: ModelCategory): ProtoCategory {
   return CATEGORY_TO_PROTO[category] ?? ProtoCategory.MODEL_CATEGORY_UNSPECIFIED;
@@ -112,14 +100,32 @@ export function frameworkFromProto(framework: ProtoFramework): InferenceFramewor
   return FRAMEWORK_FROM_PROTO.get(framework);
 }
 
-/** The proto ordinal for a public model source. */
-export function sourceToProto(source: ModelSource): ProtoModelSource {
-  return SOURCE_TO_PROTO[source] ?? ProtoModelSource.MODEL_SOURCE_UNSPECIFIED;
+/** Normalize a public model source before placing it on a proto request. */
+export function sourceToProto(source: ModelSource): ModelSource {
+  switch (source) {
+    case ModelSource.MODEL_SOURCE_REMOTE:
+    case ModelSource.MODEL_SOURCE_LOCAL:
+    case ModelSource.MODEL_SOURCE_BUILT_IN:
+      return source;
+    case ModelSource.MODEL_SOURCE_UNSPECIFIED:
+    case ModelSource.UNRECOGNIZED:
+    default:
+      return ModelSource.MODEL_SOURCE_UNSPECIFIED;
+  }
 }
 
-/** The public source name for a proto ordinal, or undefined when unspecified. */
-export function sourceFromProto(source: ProtoModelSource): ModelSource | undefined {
-  return SOURCE_FROM_PROTO.get(source);
+/** The canonical source for a proto ordinal, or undefined when it has no public value. */
+export function sourceFromProto(source: ModelSource): ModelSource | undefined {
+  switch (source) {
+    case ModelSource.MODEL_SOURCE_REMOTE:
+    case ModelSource.MODEL_SOURCE_LOCAL:
+    case ModelSource.MODEL_SOURCE_BUILT_IN:
+      return source;
+    case ModelSource.MODEL_SOURCE_UNSPECIFIED:
+    case ModelSource.UNRECOGNIZED:
+    default:
+      return undefined;
+  }
 }
 
 /**
