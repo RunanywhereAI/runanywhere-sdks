@@ -588,8 +588,10 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMR
 
 rac_result_t rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in,
                                       rac_vlm_image_t* out, rac_proto_buffer_t* out_error) {
-    if (!out)
-        return RAC_ERROR_NULL_POINTER;
+    if (!out) {
+        return set_vlm_image_error(out_error, RAC_ERROR_NULL_POINTER,
+                                   "VLMImage output is required");
+    }
     std::memset(out, 0, sizeof(*out));
     out->width = static_cast<uint32_t>(in.width());
     out->height = static_cast<uint32_t>(in.height());
