@@ -11,6 +11,7 @@ import * as path from 'path';
 
 import type { NativeAddon, UnavailablePlugin } from '../bridge';
 import { assertBackendEnginesRegistered } from '../backend/engines';
+import { HandleAuditor, type KnownHandleSet, type LoadSlotHandle, SLOT_TYPES } from './handle-audit';
 import { ErrorCode, SDKException } from '../errors';
 import {
   assertRemoteSupported,
@@ -142,8 +143,15 @@ export class NativeBackend implements RaBackend {
   private readonly storageAbi = new StorageAbi(this);
   private downloadWatchDone: (() => void) | null = null;
   private loggingWatchDone: (() => void) | null = null;
+  private readonly auditor: HandleAuditor | null;
+  private readonly auditDebug: boolean;
 
-  constructor(private readonly addon: NativeAddon) {}
+  constructor(private readonly addon: NativeAddon) {
+    const auditEnv = process.env.RAC_HANDLE_AUDIT;
+    this.auditDebug = auditEnv === 'debug';
+    this.auditor =
+      auditEnv === 'warn' || auditEnv === 'debug' ? new HandleAuditor(addon) : null;
+  }
 
   // ---- lifecycle ----
 
@@ -155,17 +163,36 @@ export class NativeBackend implements RaBackend {
     const base = opts.baseDir ?? path.join(os.homedir(), '.runanywhere');
     const secure = opts.secureDir ?? path.join(base, 'secure');
     await this.addon.initialize(secure, base);
+    // Start periodic audit once native init succeeds — handles loaded after this point are tracked.
+    this.auditor?.start();
   }
 
   async shutdown(): Promise<void> {
+    const known = this.getKnownHandleSet();
     this.slots.clear();
     this.vadHandle = null;
     this.ragSessions.clear();
     // Voice agents are destroyed rather than dropped: the destroy is what
     // unregisters the event callback and releases the stream, so a session left
     // open here would leave its `voiceEvents` promise pending forever.
-    for (const session of [...this.voiceSessions.keys()]) {
+    for (const session of [...known.voiceSessions.keys()]) {
       await this.voiceClose(session).catch(() => undefined);
+    }
+    if (this.auditor) {
+      try {
+        if (this.auditDebug) {
+          // Capture leaks before clearing handle state — getLeaks queries native audit
+          // against the snapshot of known slots and session maps.
+          const leaks = this.auditor.getLeaks(known);
+          for (const leak of leaks)
+            console.warn(`[handle-audit] shutdown leak: ${leak.details}`);
+          this.auditor.report('shutdown');
+        }
+      } catch {
+        // Diagnostics must never prevent the native runtime from shutting down.
+      } finally {
+        this.auditor.stop();
+      }
     }
     await this.addon.shutdown();
   }
@@ -1152,5 +1179,21 @@ export class NativeBackend implements RaBackend {
       case 'segmentation':
         return this.addon.unloadSegmentationModel(handle);
     }
+  }
+
+  /** Snapshot of all handles known to this backend — for cross-reference with audit. */
+  getKnownHandleSet(): KnownHandleSet {
+    const slotHandles = new Map<LoadSlotHandle, number>();
+    for (const [slot, entry] of this.slots.entries()) {
+      if (SLOT_TYPES.includes(slot as LoadSlotHandle)) {
+        slotHandles.set(slot as LoadSlotHandle, entry.handle);
+      }
+    }
+    return {
+      slotHandles,
+      vadHandle: this.vadHandle,
+      ragSessions: new Map(this.ragSessions),
+      voiceSessions: new Map(this.voiceSessions),
+    };
   }
 }

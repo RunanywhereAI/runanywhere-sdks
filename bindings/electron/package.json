@@ -58,7 +58,6 @@
     "build": "tsc -p tsconfig.json",
     "build:test": "tsc -p tsconfig.test.json",
     "build:scripts": "tsc -p tsconfig.scripts.json",
-    "build:native-smoke": "tsc -p tsconfig.native.json",
     "bundle:native": "tsc -p tsconfig.bundle.json && node dist-scripts/bundle-native.js",
     "pretest": "npm run build && npm run build:test",
     "test": "node --enable-source-maps --test \"dist-test/unit/**/*.test.js\"",
