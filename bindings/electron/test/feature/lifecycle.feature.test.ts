@@ -18,6 +18,7 @@ import {
   createRunAnywhere,
   NativeBackend,
   ModelAbi,
+  ModelSource,
   registerCatalog,
   clearCatalog,
 } from '../../dist';
@@ -80,19 +81,19 @@ test('models: registry seeding, filtering, registration, and residency', { timeo
       name: 'Registered By Test',
       downloadSizeBytes: 1234,
       contextLength: 4096,
-      source: 'LOCAL',
+      source: ModelSource.MODEL_SOURCE_LOCAL,
       description: 'Registration metadata fixture',
     });
     assert.equal(registered.id, 'feature-test-registered');
     assert.equal(registered.category, 'LANGUAGE');
     assert.equal(registered.downloadSizeBytes, 1234);
     assert.equal(registered.contextLength, 4096);
-    assert.equal(registered.source, 'LOCAL');
+    assert.equal(registered.source, ModelSource.MODEL_SOURCE_LOCAL);
     assert.equal(registered.description, 'Registration metadata fixture');
     const registeredReadBack = await sdk.models.get('feature-test-registered');
     assert.equal(registeredReadBack?.downloadSizeBytes, 1234);
     assert.equal(registeredReadBack?.contextLength, 4096);
-    assert.equal(registeredReadBack?.source, 'LOCAL');
+    assert.equal(registeredReadBack?.source, ModelSource.MODEL_SOURCE_LOCAL);
     assert.equal(registeredReadBack?.description, 'Registration metadata fixture');
     assert.ok(await sdk.models.get('feature-test-registered'));
 

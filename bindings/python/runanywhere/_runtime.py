@@ -414,7 +414,11 @@ class Runtime:
             category=category,
             name=str(row.get("name") or row["id"]),
             downloaded=local_path is not None,
-            size_bytes=int(row.get("download_size_bytes", 0)),
+            size_bytes=(
+                os.path.getsize(local_path)
+                if local_path is not None and os.path.isfile(local_path)
+                else 0
+            ),
             local_path=local_path,
             framework=framework,
             download_size_bytes=int(row.get("download_size_bytes", 0)),
