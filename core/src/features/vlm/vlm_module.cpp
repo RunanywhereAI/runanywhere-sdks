@@ -1385,6 +1385,12 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {
+        GeneratedStreamCtx error_ctx;
+        error_ctx.callback = callback;
+        error_ctx.user_data = user_data;
+        dispatch_vlm_terminal_once(&error_ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_ERROR,
+                                   nullptr, "no lifecycle VLM model loaded",
+                                   static_cast<int32_t>(rc));
         publish_failure(rc, "vlm.stream", "no lifecycle VLM model loaded");
         return rc;
     }
@@ -1420,6 +1426,13 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     }
     rac_proto_buffer_free(&error_buffer);
     if (!ref.ops || !ref.ops->process_stream) {
+        GeneratedStreamCtx error_ctx;
+        error_ctx.callback = callback;
+        error_ctx.user_data = user_data;
+        error_ctx.request_id = request.request_id();
+        dispatch_vlm_terminal_once(&error_ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_ERROR,
+                                   nullptr, "VLM streaming is not supported",
+                                   static_cast<int32_t>(RAC_ERROR_NOT_SUPPORTED));
         free_vlm_image(&image);
         // `prompt` points into `request.prompt()` (owned by the request
         // message, which outlives this scope) -- not a heap allocation, so
