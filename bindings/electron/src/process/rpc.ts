@@ -16,6 +16,7 @@ export interface RpcErrorPayload {
   code?: number;
   cAbiCode?: number;
   category?: number;
+  sdkError?: Uint8Array;
   nestedMessage?: string;
   fieldPath?: string;
 }

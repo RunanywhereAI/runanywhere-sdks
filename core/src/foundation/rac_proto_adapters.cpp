@@ -1077,27 +1077,45 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
 // ===========================================================================
 
 ::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code) {
-    // Non-negative codes (success / invalid) carry no error category.
     if (code >= 0)
         return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
-    if (code <= -150 && code >= -179)
-        return ::runanywhere::v1::ERROR_CATEGORY_NETWORK;
-    if (code <= -250 && code >= -279)
-        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
-    if (code <= -110 && code >= -129)
-        return ::runanywhere::v1::ERROR_CATEGORY_MODEL;
-    if ((code <= -180 && code >= -219) || (code <= -280 && code >= -299))
-        return ::runanywhere::v1::ERROR_CATEGORY_IO;
-    if (code <= -320 && code >= -329)
-        return ::runanywhere::v1::ERROR_CATEGORY_AUTH;
-    if (code <= -100 && code >= -109)
+
+    const int64_t magnitude = -static_cast<int64_t>(code);
+    if (magnitude >= 100 && magnitude <= 109)
         return ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
-    if ((code <= -230 && code >= -249) || (code <= -300 && code >= -319))
+    if (magnitude >= 110 && magnitude <= 129)
+        return ::runanywhere::v1::ERROR_CATEGORY_MODEL;
+    if (magnitude >= 130 && magnitude <= 149)
+        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
+    if (magnitude >= 150 && magnitude <= 179)
+        return ::runanywhere::v1::ERROR_CATEGORY_NETWORK;
+    if ((magnitude >= 180 && magnitude <= 219) || (magnitude >= 280 && magnitude <= 299))
+        return ::runanywhere::v1::ERROR_CATEGORY_IO;
+    if (magnitude >= 220 && magnitude <= 229)
+        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
+    if (magnitude >= 230 && magnitude <= 249)
         return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
-    // Any other negative code is an unmapped error -> INTERNAL (canonical
-    // fallback; rac_error_proto.cpp previously returned UNSPECIFIED here, the
-    // drift this consolidation fixes).
-    return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
+    if (magnitude >= 250 && magnitude <= 279)
+        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
+    if (magnitude >= 300 && magnitude <= 319)
+        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
+    if (magnitude >= 320 && magnitude <= 349)
+        return ::runanywhere::v1::ERROR_CATEGORY_AUTH;
+    if (magnitude >= 350 && magnitude <= 369)
+        return ::runanywhere::v1::ERROR_CATEGORY_IO;
+    if (magnitude >= 370 && magnitude <= 379)
+        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
+    if (magnitude >= 380 && magnitude <= 389)
+        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
+    if (magnitude >= 400 && magnitude <= 499)
+        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
+    if (magnitude >= 500 && magnitude <= 599)
+        return ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
+    if (magnitude >= 600 && magnitude <= 699)
+        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
+    if (magnitude >= 700 && magnitude <= 999)
+        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
+    return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
 }
 
 ::runanywhere::v1::ErrorCategory rac_category_to_proto(rac_error_category_t category) {

@@ -124,6 +124,7 @@ function rpcError(e: unknown): string | RpcErrorPayload {
       code?: unknown;
       cAbiCode?: unknown;
       category?: unknown;
+      sdkError?: unknown;
       nestedMessage?: unknown;
       fieldPath?: unknown;
     };
@@ -137,6 +138,7 @@ function rpcError(e: unknown): string | RpcErrorPayload {
       ...(typeof extra.category === 'number' && Number.isFinite(extra.category)
         ? { category: extra.category }
         : {}),
+      ...(extra.sdkError instanceof Uint8Array ? { sdkError: extra.sdkError } : {}),
       ...(typeof extra.nestedMessage === 'string' ? { nestedMessage: extra.nestedMessage } : {}),
       ...(typeof extra.fieldPath === 'string' ? { fieldPath: extra.fieldPath } : {}),
     };
@@ -154,6 +156,7 @@ function rpcError(e: unknown): string | RpcErrorPayload {
         ...(typeof obj.category === 'number' && Number.isFinite(obj.category)
           ? { category: obj.category }
           : {}),
+        ...(obj.sdkError instanceof Uint8Array ? { sdkError: obj.sdkError } : {}),
         ...(typeof obj.nestedMessage === 'string' ? { nestedMessage: obj.nestedMessage } : {}),
         ...(typeof obj.fieldPath === 'string' ? { fieldPath: obj.fieldPath } : {}),
       };

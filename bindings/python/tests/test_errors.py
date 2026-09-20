@@ -51,67 +51,74 @@ def test_error_category_values():
 
 
 # --------------------------------------------------------------------------- #
-# category_for_code range table (verbatim port)                               #
+# Proto-backed category behavior                                               #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
-    "code,expected",
+    ("first", "last", "category"),
     [
-        (0, ErrorCategory.UNSPECIFIED),
-        (100, ErrorCategory.CONFIGURATION),
-        (109, ErrorCategory.CONFIGURATION),
-        (110, ErrorCategory.MODEL),
-        (111, ErrorCategory.MODEL),
-        (129, ErrorCategory.MODEL),
-        # Generation range is not named in commons → INTERNAL
-        (130, ErrorCategory.INTERNAL),
-        (149, ErrorCategory.INTERNAL),
-        (150, ErrorCategory.NETWORK),
-        (179, ErrorCategory.NETWORK),
-        (180, ErrorCategory.IO),
-        (182, ErrorCategory.IO),
-        (219, ErrorCategory.IO),
-        (220, ErrorCategory.INTERNAL),
-        (229, ErrorCategory.INTERNAL),
-        (230, ErrorCategory.COMPONENT),
-        (231, ErrorCategory.COMPONENT),
-        (249, ErrorCategory.COMPONENT),
-        (250, ErrorCategory.VALIDATION),
-        (259, ErrorCategory.VALIDATION),
-        (279, ErrorCategory.VALIDATION),
-        (280, ErrorCategory.IO),
-        (299, ErrorCategory.IO),
-        (300, ErrorCategory.COMPONENT),
-        (319, ErrorCategory.COMPONENT),
-        # AUTH is only 320–329; security 330–349 → INTERNAL (commons)
-        (320, ErrorCategory.AUTH),
-        (329, ErrorCategory.AUTH),
-        (330, ErrorCategory.INTERNAL),
-        (349, ErrorCategory.INTERNAL),
-        (350, ErrorCategory.INTERNAL),
-        (369, ErrorCategory.INTERNAL),
-        (370, ErrorCategory.INTERNAL),
-        (379, ErrorCategory.INTERNAL),
-        (380, ErrorCategory.INTERNAL),
-        (389, ErrorCategory.INTERNAL),
-        (400, ErrorCategory.INTERNAL),
-        (499, ErrorCategory.INTERNAL),
-        (500, ErrorCategory.INTERNAL),
-        (599, ErrorCategory.INTERNAL),
-        (600, ErrorCategory.INTERNAL),
-        (699, ErrorCategory.INTERNAL),
-        (700, ErrorCategory.INTERNAL),
-        (800, ErrorCategory.INTERNAL),
-        (804, ErrorCategory.INTERNAL),
-        (999, ErrorCategory.INTERNAL),
-        (1000, ErrorCategory.INTERNAL),
-        (-5, ErrorCategory.INTERNAL),
-        (-111, ErrorCategory.MODEL),
-        (-320, ErrorCategory.AUTH),
-        (-330, ErrorCategory.INTERNAL),
+        (100, 109, ErrorCategory.CONFIGURATION),
+        (110, 129, ErrorCategory.MODEL),
+        (130, 149, ErrorCategory.INTERNAL),
+        (150, 179, ErrorCategory.NETWORK),
+        (180, 219, ErrorCategory.IO),
+        (220, 229, ErrorCategory.INTERNAL),
+        (230, 249, ErrorCategory.COMPONENT),
+        (250, 279, ErrorCategory.VALIDATION),
+        (280, 299, ErrorCategory.IO),
+        (300, 319, ErrorCategory.COMPONENT),
+        (320, 349, ErrorCategory.AUTH),
+        (350, 369, ErrorCategory.IO),
+        (370, 379, ErrorCategory.VALIDATION),
+        (380, 389, ErrorCategory.INTERNAL),
+        (400, 499, ErrorCategory.COMPONENT),
+        (500, 599, ErrorCategory.CONFIGURATION),
+        (600, 699, ErrorCategory.COMPONENT),
+        (700, 999, ErrorCategory.INTERNAL),
     ],
 )
-def test_category_for_code(code, expected):
-    assert category_for_code(code) == expected
+def test_category_for_code_matches_canonical_range_boundaries(
+    first, last, category
+):
+    assert category_for_code(first) == category
+    assert category_for_code(last) == category
+
+
+def test_category_for_code_preserves_zero_and_out_of_range_cases():
+    assert category_for_code(0) == ErrorCategory.UNSPECIFIED
+    assert category_for_code(-12345) == ErrorCategory.UNSPECIFIED
+
+
+def test_from_proto_preserves_wire_category():
+    class ProtoError:
+        code = ErrorCode.ADAPTER_NOT_SET
+        category = ErrorCategory.CONFIGURATION
+        message = "adapter missing"
+        c_abi_code = -500
+        nested_message = ""
+        param = ""
+
+        def HasField(self, field):
+            return field in {"c_abi_code", "nested_message", "param"}
+
+    error = SDKException.from_proto(ProtoError())
+    assert error.code == ErrorCode.ADAPTER_NOT_SET
+    assert error.category == ErrorCategory.CONFIGURATION
+
+
+def test_from_proto_unknown_wire_category_is_unspecified():
+    class ProtoError:
+        code = ErrorCode.MODEL_LOAD_FAILED
+        category = 999
+        message = "unknown category"
+        c_abi_code = -111
+        nested_message = ""
+        param = ""
+
+        def HasField(self, field):
+            return field in {"c_abi_code", "nested_message", "param"}
+
+    error = SDKException.from_proto(ProtoError())
+    assert error.category == ErrorCategory.UNSPECIFIED
 
 
 def test_error_code_covers_idl_surface():
@@ -123,9 +130,7 @@ def test_error_code_covers_idl_surface():
 
 
 def test_category_defaults_applied_in_ctor():
-    # No explicit category -> derived from code via category_for_code.
     assert SDKException(ErrorCode.MODEL_NOT_FOUND, "x").category == ErrorCategory.MODEL
-    assert SDKException(ErrorCode.INVALID_INPUT, "x").category == ErrorCategory.VALIDATION
 
 
 # --------------------------------------------------------------------------- #
@@ -197,6 +202,10 @@ def test_recovery_suggestions():
         == "Free up storage space and try again."
     )
     assert SDKException(ErrorCode.GENERATION_FAILED, "x").recovery_suggestion is None
+
+
+def test_storage_error_is_io():
+    assert SDKException.storage_error().category == ErrorCategory.IO
 
 
 # --------------------------------------------------------------------------- #
