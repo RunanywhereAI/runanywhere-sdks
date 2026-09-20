@@ -333,7 +333,7 @@ static size_t skip_whitespace(const char* str, size_t pos, size_t len) {
     return pos;
 }
 
-enum class ToolParseStatus { kNoMatch, kSuccess, kOutOfMemory };
+enum class ToolParseStatus { kNoMatch, kSuccess, kOutOfMemory, kInternalError };
 
 struct OwnedToolParseResult {
     char* tool_name = nullptr;
@@ -1712,6 +1712,9 @@ static ToolParseStatus parse_default_format(const char* llm_output, char** out_t
         (norm_result == RAC_SUCCESS && !normalized_json)) {
         return ToolParseStatus::kOutOfMemory;
     }
+    if (norm_result == RAC_ERROR_INTERNAL) {
+        return ToolParseStatus::kInternalError;
+    }
     if (norm_result != RAC_SUCCESS) {
         return ToolParseStatus::kNoMatch;
     }
@@ -1779,6 +1782,7 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     // Parse using the appropriate format parser
     OwnedToolParseResult parsed;
     ToolParseStatus parse_status = ToolParseStatus::kNoMatch;
+    rac_tool_call_format_t effective_format = format;
 
     try {
         switch (format) {
@@ -1798,6 +1802,9 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
                 if (parse_status == ToolParseStatus::kNoMatch) {
                     parse_status = parse_default_format(
                         llm_output, &parsed.tool_name, &parsed.arguments_json, &parsed.clean_text);
+                    if (parse_status == ToolParseStatus::kSuccess) {
+                        effective_format = RAC_TOOL_FORMAT_DEFAULT;
+                    }
                 }
                 break;
 
@@ -1819,6 +1826,9 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     if (parse_status == ToolParseStatus::kOutOfMemory) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
+    if (parse_status == ToolParseStatus::kInternalError) {
+        return RAC_ERROR_INTERNAL;
+    }
 
     if (parse_status == ToolParseStatus::kSuccess && parsed.tool_name && parsed.arguments_json &&
         parsed.clean_text) {
@@ -1829,7 +1839,7 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
         parsed.tool_name = nullptr;
         parsed.arguments_json = nullptr;
         parsed.clean_text = nullptr;
-        out_result->format = format;
+        out_result->format = effective_format;
         out_result->call_id = next_tool_call_id();
     } else {
         if (parse_status == ToolParseStatus::kSuccess) {
