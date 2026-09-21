@@ -1295,18 +1295,64 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   const size = Math.max(1, Math.floor(requestedSize));
   const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
   const stride = Math.max(1, size - overlap);
+
+  // If text contains tokens exceeding chunkSize (e.g. whitespace-free CJK scripts),
+  // split on code-point boundaries to keep chunks bounded.
+  const hasOversized = matches.some((m) => [...m[0]].length > size);
+  if (hasOversized && matches.length === 1) {
+    const chunks: SplitRAGChunk[] = [];
+    const codePoints = [...matches[0]![0]];
+    const baseIndex = matches[0]!.index ?? 0;
+    let charOffset = 0;
+    for (let c = 0; c < codePoints.length; c += stride) {
+      const slice = codePoints.slice(c, Math.min(codePoints.length, c + size)).join('');
+      const startOffset = baseIndex + charOffset;
+      const endOffset = startOffset + slice.length;
+      chunks.push({
+        text: slice,
+        startOffset,
+        endOffset,
+        tokenCount: 1,
+      });
+      charOffset += codePoints.slice(c, Math.min(codePoints.length, c + stride)).join('').length;
+      if (c + size >= codePoints.length) break;
+    }
+    return chunks;
+  }
+
   const chunks: SplitRAGChunk[] = [];
   for (let start = 0; start < matches.length; start += stride) {
     const end = Math.min(matches.length, start + size);
     const startOffset = matches[start]!.index ?? 0;
     const last = matches[end - 1]!;
     const endOffset = (last.index ?? 0) + last[0].length;
-    chunks.push({
-      text: text.slice(startOffset, endOffset),
-      startOffset,
-      endOffset,
-      tokenCount: end - start,
-    });
+    const chunkText = text.slice(startOffset, endOffset);
+
+    // If this chunk contains an oversized token, split it on code-point boundaries
+    const codePoints = [...chunkText];
+    if (codePoints.length > size && matches.slice(start, end).some((m) => [...m[0]].length > size)) {
+      let charOffset = 0;
+      for (let c = 0; c < codePoints.length; c += stride) {
+        const slice = codePoints.slice(c, Math.min(codePoints.length, c + size)).join('');
+        const subStart = startOffset + charOffset;
+        const subEnd = subStart + slice.length;
+        chunks.push({
+          text: slice,
+          startOffset: subStart,
+          endOffset: subEnd,
+          tokenCount: 1,
+        });
+        charOffset += codePoints.slice(c, Math.min(codePoints.length, c + stride)).join('').length;
+        if (c + size >= codePoints.length) break;
+      }
+    } else {
+      chunks.push({
+        text: chunkText,
+        startOffset,
+        endOffset,
+        tokenCount: end - start,
+      });
+    }
     if (end === matches.length) break;
   }
   return chunks;
@@ -1961,6 +2007,7 @@ export const __testing__ = {
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
+  splitRAGText,
 };
 
 /**
