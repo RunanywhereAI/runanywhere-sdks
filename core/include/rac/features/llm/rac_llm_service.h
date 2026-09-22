@@ -122,6 +122,15 @@ typedef struct rac_llm_service_ops {
      * TokenUsage.counts_estimated.
      */
     rac_result_t (*get_stream_token_counts)(void* impl, rac_llm_token_counts_t* out);
+
+    /**
+     * Stream a structured chat request (ABI v12). The request bytes MUST be a
+     * serialized runanywhere.v1.LLMGenerateRequest. Optional; commons falls
+     * back to generate_stream with the rendered current prompt when NULL.
+     */
+    rac_result_t (*generate_chat_stream)(void* impl, const uint8_t* request_proto_bytes,
+                                         size_t request_proto_size,
+                                         rac_llm_stream_callback_fn callback, void* user_data);
 } rac_llm_service_ops_t;
 
 // =============================================================================

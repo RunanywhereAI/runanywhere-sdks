@@ -1,8 +1,7 @@
 #include "llamacpp_backend.h"
 
-#include "llamacpp_logging.h"
-
 #include "common.h"
+#include "llamacpp_logging.h"
 // llama.cpp b9180 puts the model-memory fitting helper + status enum in a
 // dedicated header (common/fit.h). Include it explicitly so callers don't
 // rely on incidental re-export from common.h.
@@ -14,8 +13,6 @@
 
 // POSIX dirent/stat over a Win32 shim on MSVC (passthrough to <dirent.h>
 // elsewhere) — provides DIR/opendir/readdir/closedir + S_ISDIR. Mirrors sherpa.
-#include "core/internal/platform_compat.h"
-
 #include <algorithm>
 #include <chrono>
 #include <climits>
@@ -27,6 +24,8 @@
 #include <string>
 #include <sys/stat.h>
 #include <vector>
+
+#include "core/internal/platform_compat.h"
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -165,7 +164,9 @@ const std::vector<std::string> kBuiltinStopSequences = {
 // a real chat template must NOT get these — it can legitimately write
 // "\nuser:" inside prose or code.
 const std::vector<std::string> kFallbackFormatStopSequences = {
-    "\nuser:", "\nassistant:", "\nsystem:",
+    "\nuser:",
+    "\nassistant:",
+    "\nsystem:",
 };
 
 // Longest stop sequence in a list — the rolling stop_window only needs to
@@ -201,12 +202,10 @@ llama_sampler* build_sampler_chain(llama_model* model, const TextGenerationReque
         // Forward the OpenAI-style frequency/presence penalties
         // (idl/llm_options.proto:100-101) into the penalty sampler; 0.0 leaves
         // each disabled exactly as before.
-        llama_sampler_chain_add(
-            sampler, llama_sampler_init_penalties(
-                         llama_vocab_n_tokens(llama_model_get_vocab(model)),
-                         kRepeatPenaltyWindow, request.repetition_penalty,
-                                                  request.frequency_penalty,
-                                                  request.presence_penalty));
+        llama_sampler_chain_add(sampler, llama_sampler_init_penalties(
+                                             llama_vocab_n_tokens(llama_model_get_vocab(model)),
+                                             kRepeatPenaltyWindow, request.repetition_penalty,
+                                             request.frequency_penalty, request.presence_penalty));
 
         if (request.top_k > 0) {
             llama_sampler_chain_add(sampler, llama_sampler_init_top_k(request.top_k));
@@ -220,8 +219,8 @@ llama_sampler* build_sampler_chain(llama_model* model, const TextGenerationReque
         llama_sampler_chain_add(sampler, llama_sampler_init_temp(request.temperature));
         // Honor the deterministic seed (0 = backend default).
         llama_sampler_chain_add(
-            sampler, llama_sampler_init_dist(
-                         request.seed != 0 ? static_cast<uint32_t>(request.seed) : LLAMA_DEFAULT_SEED));
+            sampler, llama_sampler_init_dist(request.seed != 0 ? static_cast<uint32_t>(request.seed)
+                                                               : LLAMA_DEFAULT_SEED));
     } else {
         llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
     }
@@ -340,6 +339,15 @@ bool LlamaCppTextGeneration::is_ready() const {
 
 bool LlamaCppTextGeneration::is_ready_locked() const {
     return model_loaded_ && model_ != nullptr && context_ != nullptr;
+}
+
+void LlamaCppTextGeneration::clear_prompt_cache() {
+    cached_prompt_tokens_.clear();
+    if (context_) {
+        if (llama_memory_t mem = llama_get_memory(context_)) {
+            llama_memory_clear(mem, true);
+        }
+    }
 }
 
 bool LlamaCppTextGeneration::load_model(const std::string& model_path,
@@ -568,8 +576,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
                             *user_gpu_layers, fit_label);
         }
         model_params.n_gpu_layers = *user_gpu_layers;
-        RAC_LOG_INFO("LLM.LlamaCpp", "Applying user GPU layers override: %d",
-                     *user_gpu_layers);
+        RAC_LOG_INFO("LLM.LlamaCpp", "Applying user GPU layers override: %d", *user_gpu_layers);
     }
 #endif
 
@@ -598,9 +605,8 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     // reload before context creation so callers cannot accidentally select an
     // unsupported GPU path via auto-fit or an explicit gpu_layers override.
     char architecture[64] = {0};
-    const int32_t architecture_len =
-        llama_model_meta_val_str(model_, "general.architecture", architecture,
-                                 sizeof(architecture));
+    const int32_t architecture_len = llama_model_meta_val_str(model_, "general.architecture",
+                                                              architecture, sizeof(architecture));
     if (model_params.n_gpu_layers != 0 && architecture_len > 0 &&
         std::strcmp(architecture, "maple") == 0) {
         RAC_LOG_WARNING("LLM.LlamaCpp",
@@ -630,9 +636,9 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     // model_train_ctx still bounds it, so honoring it here cannot over-allocate.
     // Without this, `--context-length 16384` loaded fine, fit succeeded at
     // 16384, and then this line silently pinned the context back to 2048.
-    const int effective_context_cap =
-        user_context_size > 0 ? std::max(max_default_context_, user_context_size)
-                              : max_default_context_;
+    const int effective_context_cap = user_context_size > 0
+                                          ? std::max(max_default_context_, user_context_size)
+                                          : max_default_context_;
 
     if (ctx_params.n_ctx == 0) {
         ctx_params.n_ctx = std::min(model_train_ctx, effective_context_cap);
@@ -674,6 +680,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     sampler_ = llama_sampler_chain_init(sparams);
     llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
 
+    cached_prompt_tokens_.clear();
     model_loaded_ = true;
     RAC_LOG_INFO("LLM.LlamaCpp", "Model loaded successfully: context_size=%d", context_size_);
 
@@ -687,10 +694,12 @@ bool LlamaCppTextGeneration::is_model_loaded() const {
 
 bool LlamaCppTextGeneration::unload_model_internal() {
     if (!model_loaded_) {
+        clear_prompt_cache();
         return true;
     }
 
     RAC_LOG_INFO("LLM.LlamaCpp", "Unloading model");
+    clear_prompt_cache();
 
     // Clear LoRA adapters from context before freeing
     // (adapter memory is freed automatically with the model per llama.cpp API)
@@ -905,6 +914,7 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     int callback_pieces = 0;
     int decoded_tokens = 0;
     int prompt_tokens = 0;
+    int cached_prompt_tokens = 0;
     double prompt_eval_ms = 0.0;
 
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -917,7 +927,7 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
             callback_pieces++;
             return !cancel_requested_.load();
         },
-        &prompt_tokens, &prompt_eval_ms, &decoded_tokens);
+        &prompt_tokens, &cached_prompt_tokens, &prompt_eval_ms, &decoded_tokens);
     // The streaming callback flushes buffered chunks, not one call per token, so
     // callback_pieces under-counts. Use the decode loop's authoritative count;
     // fall back to the piece count only if the out-param wasn't populated.
@@ -931,6 +941,7 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     result.text = generated_text;
     result.tokens_generated = tokens_generated;
     result.prompt_tokens = prompt_tokens;
+    result.cached_prompt_tokens = cached_prompt_tokens;
     result.inference_time_ms = duration.count();
     result.prompt_eval_time_ms = prompt_eval_ms;
 
@@ -969,8 +980,7 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
     std::vector<std::string> stops_with_fallback;
     if (prompt_used_fallback_format_) {
         stops_with_fallback = kBuiltinStopSequences;
-        stops_with_fallback.insert(stops_with_fallback.end(),
-                                   kFallbackFormatStopSequences.begin(),
+        stops_with_fallback.insert(stops_with_fallback.end(), kFallbackFormatStopSequences.begin(),
                                    kFallbackFormatStopSequences.end());
         stops = &stops_with_fallback;
     }
@@ -1093,19 +1103,27 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
 
 bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& request,
                                              TextStreamCallback callback, int* out_prompt_tokens,
-                                             double* out_prompt_eval_ms, int* out_tokens_generated) {
+                                             int* out_cached_prompt_tokens,
+                                             double* out_prompt_eval_ms,
+                                             int* out_tokens_generated) {
     std::lock_guard<std::mutex> lock(mutex_);
+
+    if (out_prompt_tokens) {
+        *out_prompt_tokens = 0;
+    }
+    if (out_cached_prompt_tokens) {
+        *out_cached_prompt_tokens = 0;
+    }
+    if (out_prompt_eval_ms) {
+        *out_prompt_eval_ms = 0.0;
+    }
+    if (out_tokens_generated) {
+        *out_tokens_generated = 0;
+    }
 
     if (!is_ready_locked()) {
         RAC_LOG_ERROR("LLM.LlamaCpp", "Model not ready for generation");
         return false;
-    }
-
-    // Clear KV cache before each new generation to avoid position conflicts on
-    // sequential calls (fixes #356: SIGABRT on second decode on Android arm64).
-    llama_memory_t mem = llama_get_memory(context_);
-    if (mem) {
-        llama_memory_clear(mem, true);
     }
 
     // Honor the per-request thread hint (idl/llm_options.proto:119).
@@ -1134,6 +1152,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             if (!apply_lora_adapters()) {
                 RAC_LOG_ERROR("LLM.LlamaCpp",
                               "[LORA] Failed to re-apply adapters before generation");
+                clear_prompt_cache();
                 return false;
             }
         }
@@ -1165,9 +1184,8 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
                 // remaining history stays a valid user-first alternating
                 // sequence; never drop the final (current) user turn.
                 const size_t drop = std::min<size_t>(2, fitted.messages.size() - 1);
-                fitted.messages.erase(
-                    fitted.messages.begin(),
-                    fitted.messages.begin() + static_cast<std::ptrdiff_t>(drop));
+                fitted.messages.erase(fitted.messages.begin(),
+                                      fitted.messages.begin() + static_cast<std::ptrdiff_t>(drop));
                 dropped += static_cast<int>(drop);
                 prompt = build_prompt(fitted);
                 tokens_list = common_tokenize(context_, prompt, true, true);
@@ -1192,20 +1210,62 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     if (available_tokens <= 0) {
         RAC_LOG_ERROR("LLM.LlamaCpp", "Prompt too long: %d tokens, context size: %d", prompt_tokens,
                       n_ctx);
+        clear_prompt_cache();
         return false;
     }
 
+    size_t common_prefix = 0;
+    const size_t comparable = std::min(cached_prompt_tokens_.size(), tokens_list.size());
+    while (common_prefix < comparable &&
+           cached_prompt_tokens_[common_prefix] == tokens_list[common_prefix]) {
+        ++common_prefix;
+    }
+
+    // Exact repeats can use the final-prompt logits restored by the prior
+    // request's terminal cleanup. A shorter prompt ends before those logits,
+    // so its final token must be decoded again.
+    size_t decode_start = common_prefix;
+    if (decode_start == tokens_list.size() && cached_prompt_tokens_.size() != tokens_list.size() &&
+        decode_start > 0) {
+        --decode_start;
+    }
+
+    int cached_prompt_tokens = 0;
+    llama_memory_t mem = llama_get_memory(context_);
+    if (mem && !cached_prompt_tokens_.empty()) {
+        if (llama_memory_seq_rm(mem, 0, static_cast<llama_pos>(decode_start), -1)) {
+            cached_prompt_tokens = static_cast<int>(decode_start);
+        } else {
+            RAC_LOG_WARNING("LLM.LlamaCpp",
+                            "Prompt KV trim failed at position %zu; falling back to full prefill",
+                            decode_start);
+            llama_memory_clear(mem, true);
+            cached_prompt_tokens_.clear();
+            decode_start = 0;
+        }
+    } else {
+        if (mem) {
+            llama_memory_clear(mem, true);
+        }
+        cached_prompt_tokens_.clear();
+        decode_start = 0;
+    }
+
     const int effective_max_tokens = std::min(request.max_tokens, available_tokens);
-    RAC_LOG_INFO("LLM.LlamaCpp", "Generation: prompt_tokens=%d, max_tokens=%d, context=%d",
-                 prompt_tokens, effective_max_tokens, n_ctx);
+    RAC_LOG_INFO("LLM.LlamaCpp",
+                 "Generation: prompt_tokens=%d, cached_prompt_tokens=%d, max_tokens=%d, "
+                 "context=%d",
+                 prompt_tokens, cached_prompt_tokens, effective_max_tokens, n_ctx);
 
     const int n_batch = batch_size_ > 0 ? batch_size_ : n_ctx;
-    RAC_LOG_INFO("LLM.LlamaCpp", "generate_stream: processing %d prompt tokens in chunks of %d",
-                 prompt_tokens, n_batch);
+    RAC_LOG_INFO("LLM.LlamaCpp",
+                 "generate_stream: processing %d uncached prompt tokens in chunks of %d",
+                 prompt_tokens - static_cast<int>(decode_start), n_batch);
     llama_batch batch = llama_batch_init(n_batch, 0, 1);
 
     const auto prefill_start = std::chrono::steady_clock::now();
-    for (int chunk_start = 0; chunk_start < prompt_tokens; chunk_start += n_batch) {
+    for (int chunk_start = static_cast<int>(decode_start); chunk_start < prompt_tokens;
+         chunk_start += n_batch) {
         batch.n_tokens = 0;
         int chunk_end = std::min(chunk_start + n_batch, prompt_tokens);
         bool is_last_chunk = (chunk_end == prompt_tokens);
@@ -1219,8 +1279,13 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             RAC_LOG_ERROR("LLM.LlamaCpp", "llama_decode failed for prompt chunk [%d..%d)",
                           chunk_start, chunk_end);
             llama_batch_free(batch);
+            clear_prompt_cache();
             return false;
         }
+    }
+    cached_prompt_tokens_ = tokens_list;
+    if (out_cached_prompt_tokens) {
+        *out_cached_prompt_tokens = cached_prompt_tokens;
     }
     if (out_prompt_eval_ms) {
         *out_prompt_eval_ms = std::chrono::duration<double, std::milli>(
@@ -1232,14 +1297,14 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     // Configure sampler with request parameters — skip rebuild if params
     // unchanged
     {
-        const bool params_match =
-            sampler_ && cached_temperature_ == request.temperature &&
-            cached_top_p_ == request.top_p && cached_top_k_ == request.top_k &&
-            cached_repetition_penalty_ == request.repetition_penalty &&
-            cached_frequency_penalty_ == request.frequency_penalty &&
-            cached_presence_penalty_ == request.presence_penalty &&
-            cached_min_p_ == request.min_p && cached_seed_ == request.seed &&
-            cached_grammar_ == request.grammar;
+        const bool params_match = sampler_ && cached_temperature_ == request.temperature &&
+                                  cached_top_p_ == request.top_p &&
+                                  cached_top_k_ == request.top_k &&
+                                  cached_repetition_penalty_ == request.repetition_penalty &&
+                                  cached_frequency_penalty_ == request.frequency_penalty &&
+                                  cached_presence_penalty_ == request.presence_penalty &&
+                                  cached_min_p_ == request.min_p && cached_seed_ == request.seed &&
+                                  cached_grammar_ == request.grammar;
 
         if (!params_match) {
             if (sampler_) {
@@ -1296,8 +1361,28 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     //   3. rac_llm_stream.cpp: proto-byte event emitter
     // Deferred to avoid breaking changes to the stable ABI.
 
-    if (llama_memory_t post_mem = llama_get_memory(context_)) {
-        llama_memory_clear(post_mem, true);
+    bool prompt_cache_valid = !decode_failed_.load() && prompt_tokens > 0;
+    if (prompt_cache_valid) {
+        if (llama_memory_t post_mem = llama_get_memory(context_)) {
+            // Remove generated positions and re-decode the prompt's final
+            // token. This both retains the complete prompt KV and restores the
+            // logits needed for a zero-prefill exact-prefix hit on the next
+            // request.
+            prompt_cache_valid =
+                llama_memory_seq_rm(post_mem, 0, static_cast<llama_pos>(prompt_tokens - 1), -1);
+            if (prompt_cache_valid) {
+                batch.n_tokens = 0;
+                common_batch_add(batch, tokens_list.back(), prompt_tokens - 1, {0}, true);
+                prompt_cache_valid = llama_decode(context_, batch) == 0;
+            }
+        } else {
+            prompt_cache_valid = false;
+        }
+    }
+    if (!prompt_cache_valid) {
+        RAC_LOG_WARNING("LLM.LlamaCpp",
+                        "Generated-position cleanup was unsafe; invalidating prompt KV cache");
+        clear_prompt_cache();
     }
 
     llama_batch_free(batch);
@@ -1319,10 +1404,7 @@ bool LlamaCppTextGeneration::inject_system_prompt(const std::string& prompt) {
         return false;
     }
 
-    llama_memory_t mem = llama_get_memory(context_);
-    if (mem) {
-        llama_memory_clear(mem, true);
-    }
+    clear_prompt_cache();
 
     const auto tokens = common_tokenize(context_, prompt, true, true);
     const int n_tokens = static_cast<int>(tokens.size());
@@ -1355,6 +1437,7 @@ bool LlamaCppTextGeneration::inject_system_prompt(const std::string& prompt) {
                           "inject_system_prompt: llama_decode failed at chunk [%d..%d)",
                           chunk_start, chunk_end);
             llama_batch_free(batch);
+            clear_prompt_cache();
             return false;
         }
     }
@@ -1373,6 +1456,7 @@ bool LlamaCppTextGeneration::append_context(const std::string& text) {
         return false;
     }
 
+    cached_prompt_tokens_.clear();
     llama_memory_t mem = llama_get_memory(context_);
     const llama_pos start_pos = mem ? (llama_memory_seq_pos_max(mem, 0) + 1) : 0;
 
@@ -1405,6 +1489,7 @@ bool LlamaCppTextGeneration::append_context(const std::string& text) {
             RAC_LOG_ERROR("LLM.LlamaCpp", "append_context: llama_decode failed at chunk [%d..%d)",
                           chunk_start, chunk_end);
             llama_batch_free(batch);
+            clear_prompt_cache();
             return false;
         }
     }
@@ -1434,6 +1519,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
 
     cancel_requested_.store(false);
     decode_failed_ = false;
+    cached_prompt_tokens_.clear();
 
     const std::string prompt = build_prompt(request);
 
@@ -1442,6 +1528,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
 
     if (n_prompt <= 0) {
         RAC_LOG_ERROR("LLM.LlamaCpp", "generate_from_context: failed to tokenize prompt");
+        clear_prompt_cache();
         return result;
     }
 
@@ -1456,6 +1543,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
                       "generate_from_context: no space for generation (pos=%d, "
                       "prompt=%d, ctx=%d)",
                       static_cast<int>(current_pos), n_prompt, n_ctx);
+        clear_prompt_cache();
         return result;
     }
 
@@ -1481,6 +1569,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
                           "generate_from_context: llama_decode failed at chunk [%d..%d)",
                           chunk_start, chunk_end);
             llama_batch_free(batch);
+            clear_prompt_cache();
             return result;
         }
     }
@@ -1497,12 +1586,12 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
     // run_decode_loop(); the accumulator sink never cancels, so the shared
     // loop's callback-cancel branches are inert here. No timing on this path.
     std::string generated_text;
-    const int tokens_generated = run_decode_loop(
-        sampler, batch, static_cast<int>(current_pos) + n_prompt, effective_max_tokens,
-        [&generated_text](const std::string& chunk) -> bool {
-            generated_text += chunk;
-            return true;
-        });
+    const int tokens_generated =
+        run_decode_loop(sampler, batch, static_cast<int>(current_pos) + n_prompt,
+                        effective_max_tokens, [&generated_text](const std::string& chunk) -> bool {
+                            generated_text += chunk;
+                            return true;
+                        });
 
     llama_batch_free(batch);
     llama_sampler_free(sampler);
@@ -1512,6 +1601,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
     result.prompt_tokens = n_prompt;
 
     if (decode_failed_) {
+        clear_prompt_cache();
         result.finish_reason = "error";
     } else if (cancel_requested_.load()) {
         result.finish_reason = "cancelled";
@@ -1528,10 +1618,7 @@ void LlamaCppTextGeneration::clear_context() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (context_) {
-        llama_memory_t mem = llama_get_memory(context_);
-        if (mem) {
-            llama_memory_clear(mem, true);
-        }
+        clear_prompt_cache();
         RAC_LOG_INFO("LLM.LlamaCpp", "clear_context: KV cache cleared");
     }
 }
@@ -1564,6 +1651,7 @@ nlohmann::json LlamaCppTextGeneration::get_model_info() const {
 
 bool LlamaCppTextGeneration::recreate_context() {
     RAC_LOG_INFO("LLM.LlamaCpp", "Recreating context to accommodate LoRA adapters");
+    cached_prompt_tokens_.clear();
 
     // Free existing sampler and context
     if (sampler_) {
@@ -1631,6 +1719,7 @@ bool LlamaCppTextGeneration::apply_lora_adapters() {
         for (auto& entry : lora_adapters_) {
             entry.applied = false;
         }
+        clear_prompt_cache();
         return false;
     }
 
@@ -1789,8 +1878,7 @@ bool LlamaCppTextGeneration::remove_lora_adapter(const std::string& adapter_path
         return false;
     }
 
-    // Clear KV cache after adapter changes
-    llama_memory_clear(llama_get_memory(context_), true);
+    clear_prompt_cache();
 
     RAC_LOG_INFO("LLM.LlamaCpp", "LoRA adapter removed: %s (%zu remaining)", adapter_path.c_str(),
                  lora_adapters_.size());
@@ -1806,7 +1894,7 @@ void LlamaCppTextGeneration::clear_lora_adapters() {
 
     if (context_) {
         llama_set_adapters_lora(context_, nullptr, 0, nullptr);
-        llama_memory_clear(llama_get_memory(context_), true);
+        clear_prompt_cache();
     }
 
     // Release every adapter's underlying llama buffers before clearing the

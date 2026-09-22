@@ -12,6 +12,10 @@
 #ifndef RAC_OPENAI_TRANSLATION_H
 #define RAC_OPENAI_TRANSLATION_H
 
+namespace runanywhere::v1 {
+class LLMGenerateRequest;
+}
+
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -38,6 +42,10 @@ using Json = nlohmann::json;
  */
 std::string buildPromptFromOpenAI(const Json& messages, const Json& tools,
                                   const Json& toolChoice = "auto");
+
+/** Convert one validated OpenAI request to the canonical generation envelope. */
+runanywhere::v1::LLMGenerateRequest buildGenerateRequest(const Json& request,
+                                                         const std::string& modelId);
 
 /**
  * @brief Generate a unique tool call ID

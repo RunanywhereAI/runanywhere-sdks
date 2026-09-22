@@ -4,7 +4,7 @@
  *
  * Backend-neutral: registers a small in-test fake rerank engine (no model file,
  * no llama.cpp) and asserts:
- *   - RAC_PLUGIN_API_VERSION == 11 and the primitive/vtable-slot wiring.
+ *   - RAC_PLUGIN_API_VERSION == 12 and the primitive/vtable-slot wiring.
  *   - A registered rerank engine routes via rac_plugin_find(RAC_PRIMITIVE_RERANK)
  *     and rac_engine_vtable_slot() resolves rerank_ops.
  *   - Full RerankRequest → RerankResult proto round-trip through the component
@@ -181,7 +181,7 @@ int main() {
     // that actually protects rerank, because a promotion which shifted wire 11 would reroute every
     // rerank call silently. v10 promoted a RESERVED slot and left rerank's offset and wire value
     // untouched (locked by test_engine_vtable.cpp's 17-pointer tail assertion).
-    check(RAC_PLUGIN_API_VERSION == 11u, "RAC_PLUGIN_API_VERSION must be 11");
+    check(RAC_PLUGIN_API_VERSION == 12u, "RAC_PLUGIN_API_VERSION must be 12");
     check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_RERANK), "rerank") == 0,
           "rac_primitive_name(RAC_PRIMITIVE_RERANK) == \"rerank\"");
     check(static_cast<int>(RAC_PRIMITIVE_RERANK) == 11, "RAC_PRIMITIVE_RERANK wire value is 11");

@@ -2,6 +2,7 @@
 #include "openai_handler.h"
 
 #include "json_utils.h"
+#include "llm_service.pb.h"
 #include "openai_translation.h"
 #include "tool_calling.pb.h"
 
@@ -272,12 +273,14 @@ struct Generation {
     std::string finish = "stop";
     int32_t tokens = 0;
     int32_t promptTokens = 0;
+    int32_t cachedPromptTokens = 0;
     bool disconnected = false;
     bool timedOut = false;
     rac_result_t result = RAC_SUCCESS;
 };
 
-Generation generate(rac_handle_t handle, const std::string& prompt, GenerationOptions& options,
+Generation generate(rac_handle_t handle, const runanywhere::v1::LLMGenerateRequest& request,
+                    const std::string& fallbackPrompt, GenerationOptions& options,
                     int32_t timeoutSeconds, const std::function<bool(const char*)>& onToken,
                     const std::function<bool()>& connected) {
     Generation generation;
@@ -308,24 +311,31 @@ Generation generate(rac_handle_t handle, const std::string& prompt, GenerationOp
         const std::function<bool(const char*)>* onToken;
     } callback{&generation, &onToken};
     try {
-        generation.result = rac_llm_generate_stream(
-            handle, prompt.c_str(), &options.value,
-            [](const char* token, rac_bool_t final, const char* reason, int32_t count,
-               void* user) -> rac_bool_t {
-                auto& state = *static_cast<Callback*>(user);
-                if (final && reason && reason[0])
-                    state.generation->finish = reason;
-                if (!token || !token[0])
-                    return RAC_TRUE;
-                state.generation->raw += token;
-                state.generation->tokens += count > 0 ? count : 1;
-                if (!(*state.onToken)(token)) {
-                    state.generation->disconnected = true;
-                    return RAC_FALSE;
-                }
+        const auto streamCallback = [](const char* token, rac_bool_t final, const char* reason,
+                                       int32_t count, void* user) -> rac_bool_t {
+            auto& state = *static_cast<Callback*>(user);
+            if (final && reason && reason[0])
+                state.generation->finish = reason;
+            if (!token || !token[0])
                 return RAC_TRUE;
-            },
-            &callback);
+            state.generation->raw += token;
+            state.generation->tokens += count > 0 ? count : 1;
+            if (!(*state.onToken)(token)) {
+                state.generation->disconnected = true;
+                return RAC_FALSE;
+            }
+            return RAC_TRUE;
+        };
+        const auto* service = static_cast<const rac_llm_service_t*>(handle);
+        if (service->ops && service->ops->generate_chat_stream) {
+            const std::string bytes = request.SerializeAsString();
+            generation.result = service->ops->generate_chat_stream(
+                service->impl, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                streamCallback, &callback);
+        } else {
+            generation.result = rac_llm_generate_stream(handle, fallbackPrompt.c_str(),
+                                                        &options.value, streamCallback, &callback);
+        }
     } catch (...) {
         generation.result = RAC_ERROR_INTERNAL;
     }
@@ -343,6 +353,7 @@ Generation generate(rac_handle_t handle, const std::string& prompt, GenerationOp
         if (service->ops->get_stream_token_counts(service->impl, &counts) == RAC_SUCCESS) {
             generation.tokens = counts.completion_tokens;
             generation.promptTokens = counts.prompt_tokens;
+            generation.cachedPromptTokens = counts.cached_prompt_tokens;
         }
     }
     return generation;
@@ -361,6 +372,13 @@ Json chunk(const std::string& id, int64_t created, const std::string& model, con
         {"created", created},
         {"model", model},
         {"choices", Json::array({{{"index", 0}, {"delta", delta}, {"finish_reason", finish}}})}};
+}
+
+Json usageObject(const Generation& generation) {
+    return {{"prompt_tokens", generation.promptTokens},
+            {"completion_tokens", generation.tokens},
+            {"total_tokens", generation.promptTokens + generation.tokens},
+            {"prompt_tokens_details", {{"cached_tokens", generation.cachedPromptTokens}}}};
 }
 
 struct ActiveRequest {
@@ -438,13 +456,17 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& req, httplib::Re
         sendError(res, 503, "Server is stopping", "server_error");
         return;
     }
-    const auto prompt = translation::buildPromptFromOpenAI(
-        request["messages"], request.value("tools", Json::array()),
-        request.value("tool_choice", Json("auto")));
+    const auto* service = static_cast<const rac_llm_service_t*>(llmHandle_);
+    const auto prompt = service->ops && service->ops->generate_chat_stream
+                            ? std::string()
+                            : translation::buildPromptFromOpenAI(
+                                  request["messages"], request.value("tools", Json::array()),
+                                  request.value("tool_choice", Json("auto")));
+    const auto structuredRequest = translation::buildGenerateRequest(request, modelId_);
     GenerationOptions options(request, threads_);
     const auto generation = generate(
-        llmHandle_, prompt, options, timeoutSeconds_, [](const char*) { return true; },
-        [&req] { return !req.is_connection_closed(); });
+        llmHandle_, structuredRequest, prompt, options, timeoutSeconds_,
+        [](const char*) { return true; }, [&req] { return !req.is_connection_closed(); });
     totalTokensGenerated_ += generation.tokens;
     if (failed(generation)) {
         sendError(res, generation.timedOut ? 504 : 500,
@@ -461,23 +483,25 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& req, httplib::Re
         {"created", timestamp()},
         {"model", modelId_},
         {"choices", Json::array({{{"index", 0}, {"message", message}, {"finish_reason", finish}}})},
-        {"usage",
-         {{"prompt_tokens", generation.promptTokens},
-          {"completion_tokens", generation.tokens},
-          {"total_tokens", generation.promptTokens + generation.tokens}}}};
+        {"usage", usageObject(generation)}};
     res.set_content(response.dump(), "application/json");
 }
 
 void OpenAIHandler::processStreaming(const httplib::Request&, httplib::Response& res,
                                      const Json& request) {
-    const auto prompt = translation::buildPromptFromOpenAI(
-        request["messages"], request.value("tools", Json::array()),
-        request.value("tool_choice", Json("auto")));
+    const auto* service = static_cast<const rac_llm_service_t*>(llmHandle_);
+    const auto prompt = service->ops && service->ops->generate_chat_stream
+                            ? std::string()
+                            : translation::buildPromptFromOpenAI(
+                                  request["messages"], request.value("tools", Json::array()),
+                                  request.value("tool_choice", Json("auto")));
+    const auto structuredRequest = translation::buildGenerateRequest(request, modelId_);
     const std::string id = "chatcmpl-" + translation::generateToolCallId();
     const int64_t created = timestamp();
     res.set_header("Cache-Control", "no-cache");
-    res.set_chunked_content_provider("text/event-stream", [this, request, prompt, id, created](
-                                                              size_t, httplib::DataSink& sink) {
+    res.set_chunked_content_provider("text/event-stream", [this, request, structuredRequest, prompt,
+                                                           id, created](size_t,
+                                                                        httplib::DataSink& sink) {
         ActiveRequest active(activeRequests_);
         std::unique_lock lock(generationMutex_);
         const auto send = [&](const Json& value) {
@@ -511,7 +535,7 @@ void OpenAIHandler::processStreaming(const httplib::Request&, httplib::Response&
             };
             GenerationOptions options(request, threads_);
             const auto generation = generate(
-                llmHandle_, prompt, options, timeoutSeconds_,
+                llmHandle_, structuredRequest, prompt, options, timeoutSeconds_,
                 [&](const char* token) {
                     if (tools)
                         return !sink.is_writable || sink.is_writable();
@@ -552,12 +576,10 @@ void OpenAIHandler::processStreaming(const httplib::Request&, httplib::Response&
                 return false;
             if (request.contains("stream_options") && request["stream_options"].is_object() &&
                 request["stream_options"].value("include_usage", false)) {
-                auto usage = chunk(id, created, modelId_, Json::object());
-                usage["choices"] = Json::array();
-                usage["usage"] = {{"prompt_tokens", generation.promptTokens},
-                                  {"completion_tokens", generation.tokens},
-                                  {"total_tokens", generation.promptTokens + generation.tokens}};
-                if (!send(usage))
+                auto usageChunk = chunk(id, created, modelId_, Json::object());
+                usageChunk["choices"] = Json::array();
+                usageChunk["usage"] = usageObject(generation);
+                if (!send(usageChunk))
                     return false;
             }
         } catch (const std::exception& error) {

@@ -245,8 +245,8 @@ struct StreamCallbackData {
     bool got_final = false;
 };
 
-static rac_bool_t stream_callback(const char* token, rac_bool_t is_final, int32_t /*tokens_in_delta*/,
-                                  void* user_data) {
+static rac_bool_t stream_callback(const char* token, rac_bool_t is_final,
+                                  int32_t /*tokens_in_delta*/, void* user_data) {
     auto* data = static_cast<StreamCallbackData*>(user_data);
     if (token && std::strlen(token) > 0) {
         data->token_count++;
@@ -575,6 +575,142 @@ static TestResult test_generate_history_overflow() {
     return TEST_PASS();
 }
 
+struct CacheStreamData {
+    bool cancel_on_data = false;
+    bool cancellation_requested = false;
+};
+
+static rac_bool_t cache_stream_callback(const char* token, rac_bool_t /*is_final*/,
+                                        int32_t /*tokens_in_delta*/, void* user_data) {
+    auto* data = static_cast<CacheStreamData*>(user_data);
+    if (data->cancel_on_data && token != nullptr && token[0] != '\0') {
+        data->cancellation_requested = true;
+        return RAC_FALSE;
+    }
+    return RAC_TRUE;
+}
+
+static rac_result_t generate_for_cache(rac_handle_t handle, const std::string& prompt,
+                                       rac_llm_options_t* options, bool cancel_on_data,
+                                       rac_llm_token_counts_t* counts,
+                                       bool* cancellation_requested = nullptr) {
+    CacheStreamData callback_data;
+    callback_data.cancel_on_data = cancel_on_data;
+    const rac_result_t generation_result = rac_llm_llamacpp_generate_stream(
+        handle, prompt.c_str(), options, cache_stream_callback, &callback_data);
+    if (cancellation_requested != nullptr) {
+        *cancellation_requested = callback_data.cancellation_requested;
+    }
+    const rac_result_t counts_result = rac_llm_llamacpp_get_stream_token_counts(handle, counts);
+    return counts_result == RAC_SUCCESS ? generation_result : counts_result;
+}
+
+// =============================================================================
+// Test: prompt-prefix KV reuse and invalidation
+// =============================================================================
+
+static TestResult test_prompt_prefix_cache() {
+    TestResult result;
+    result.test_name = "prompt_prefix_cache";
+
+    std::string model_path = test_config::get_llm_model_path();
+    if (!test_config::require_model(model_path, result.test_name, result)) {
+        return result;
+    }
+    if (!setup()) {
+        result.passed = false;
+        result.details = "setup() failed";
+        return result;
+    }
+
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_llm_llamacpp_create(model_path.c_str(), nullptr, &handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_llm_llamacpp_create should succeed");
+
+    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+    options.max_tokens = 1;
+    options.temperature = 0.0f;
+
+    const std::string base = "Repeat this exact cache test phrase and answer with one word.";
+    const std::string extended = base + " The extension makes only the prompt suffix new.";
+    const std::string divergent =
+        "A completely different request should retain only template-level prefix tokens.";
+
+    rac_llm_token_counts_t first = {};
+    rc = generate_for_cache(handle, base, &options, false, &first);
+    ASSERT_EQ(rc, RAC_SUCCESS, "initial generation should succeed");
+    ASSERT_EQ(first.cached_prompt_tokens, 0, "initial generation should not reuse prompt KV");
+
+    rac_llm_token_counts_t exact = {};
+    rc = generate_for_cache(handle, base, &options, false, &exact);
+    ASSERT_EQ(rc, RAC_SUCCESS, "exact-repeat generation should succeed");
+    ASSERT_EQ(exact.prompt_tokens, first.prompt_tokens,
+              "exact repeat should preserve full logical prompt count");
+    ASSERT_EQ(exact.cached_prompt_tokens, exact.prompt_tokens,
+              "exact repeat should reuse the complete prompt");
+
+    options.top_k = 7;
+    rac_llm_token_counts_t sampling_changed = {};
+    rc = generate_for_cache(handle, base, &options, false, &sampling_changed);
+    ASSERT_EQ(rc, RAC_SUCCESS, "sampling-change generation should succeed");
+    ASSERT_EQ(sampling_changed.cached_prompt_tokens, sampling_changed.prompt_tokens,
+              "sampling changes must not invalidate prompt KV");
+
+    rac_llm_token_counts_t partial = {};
+    rc = generate_for_cache(handle, extended, &options, false, &partial);
+    ASSERT_EQ(rc, RAC_SUCCESS, "extended-prefix generation should succeed");
+    ASSERT_TRUE(partial.cached_prompt_tokens > 0,
+                "extended prompt should reuse a non-empty prefix");
+    ASSERT_TRUE(partial.cached_prompt_tokens < partial.prompt_tokens,
+                "extended prompt should decode only its new suffix");
+
+    rac_llm_token_counts_t diverged = {};
+    rc = generate_for_cache(handle, divergent, &options, false, &diverged);
+    ASSERT_EQ(rc, RAC_SUCCESS, "divergent generation should succeed");
+    ASSERT_TRUE(diverged.cached_prompt_tokens < partial.cached_prompt_tokens,
+                "divergent prompt should reuse less KV than a partial extension");
+
+    rac_llm_token_counts_t reprime = {};
+    rc = generate_for_cache(handle, extended, &options, false, &reprime);
+    ASSERT_EQ(rc, RAC_SUCCESS, "long-prompt reprime should succeed");
+
+    rac_llm_token_counts_t shorter = {};
+    rc = generate_for_cache(handle, base, &options, false, &shorter);
+    ASSERT_EQ(rc, RAC_SUCCESS, "shorter-prefix generation should succeed");
+    ASSERT_TRUE(shorter.cached_prompt_tokens > 0, "shorter prompt should retain its shared prefix");
+    ASSERT_TRUE(shorter.cached_prompt_tokens < shorter.prompt_tokens,
+                "shorter prompt should re-decode its final token for correct logits");
+
+    options.max_tokens = 64;
+    bool cancellation_requested = false;
+    rac_llm_token_counts_t cancelled = {};
+    rc = generate_for_cache(handle, base, &options, true, &cancelled, &cancellation_requested);
+    ASSERT_TRUE(cancellation_requested, "stream callback should request cancellation");
+    ASSERT_TRUE(rc != RAC_SUCCESS, "cancelled stream should report a generation error");
+
+    options.max_tokens = 1;
+    rac_llm_token_counts_t after_cancel = {};
+    rc = generate_for_cache(handle, base, &options, false, &after_cancel);
+    ASSERT_EQ(rc, RAC_SUCCESS, "generation after cancellation should succeed");
+    ASSERT_EQ(after_cancel.cached_prompt_tokens, after_cancel.prompt_tokens,
+              "proven cancellation cleanup should retain complete prompt KV");
+
+    rac_llm_llamacpp_destroy(handle);
+    handle = nullptr;
+    rc = rac_llm_llamacpp_create(model_path.c_str(), nullptr, &handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "model reload should succeed");
+
+    rac_llm_token_counts_t after_reload = {};
+    rc = generate_for_cache(handle, base, &options, false, &after_reload);
+    ASSERT_EQ(rc, RAC_SUCCESS, "generation after reload should succeed");
+    ASSERT_EQ(after_reload.cached_prompt_tokens, 0,
+              "model reload should invalidate the prompt cache");
+
+    rac_llm_llamacpp_destroy(handle);
+    teardown();
+    return TEST_PASS();
+}
+
 // =============================================================================
 // Main: register tests and dispatch via CLI args
 // =============================================================================
@@ -592,6 +728,7 @@ int main(int argc, char** argv) {
     suite.add("unload_reload", test_unload_reload);
     suite.add("generate_with_history", test_generate_with_history);
     suite.add("generate_history_overflow", test_generate_history_overflow);
+    suite.add("prompt_prefix_cache", test_prompt_prefix_cache);
 
     return suite.run(argc, argv);
 }
