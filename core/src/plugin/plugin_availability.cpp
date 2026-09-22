@@ -92,8 +92,19 @@ void rac_registry_record_plugin_unavailable(const char* name, const char* path,
             }
         }
         l.entries.push_back(Entry{std::move(key), path != nullptr ? path : "", status});
-        RAC_LOG_WARNING(LOG_CAT, "backend '%s' is unavailable (%d) — other backends keep serving",
-                        name, static_cast<int>(status));
+        // A capability-unsupported result is the documented silent-reject path:
+        // the plugin is simply not for this host (wrong OS, or a runtime the host
+        // does not provide — e.g. MLX on a C++-only build). Record it for
+        // diagnostics, but do not WARN — that is expected state, not a fault.
+        // Genuine load failures still warn.
+        if (status == RAC_ERROR_CAPABILITY_UNSUPPORTED) {
+            RAC_LOG_DEBUG(LOG_CAT, "backend '%s' is not available on this host (%d)", name,
+                          static_cast<int>(status));
+        } else {
+            RAC_LOG_WARNING(LOG_CAT,
+                            "backend '%s' is unavailable (%d) — other backends keep serving", name,
+                            static_cast<int>(status));
+        }
     } catch (...) {
         /* Ledger is best-effort telemetry; never let it fail a load path. */
     }

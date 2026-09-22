@@ -197,6 +197,8 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
 typedef struct rac_llm_token_counts {
     int32_t prompt_tokens;
     int32_t completion_tokens;
+    /** Prompt tokens reused from cache; included in prompt_tokens. */
+    int32_t cached_prompt_tokens;
 } rac_llm_token_counts_t;
 
 /**

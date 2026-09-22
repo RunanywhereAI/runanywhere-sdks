@@ -10,6 +10,7 @@
 #ifndef RAC_BACKENDS_RAC_MLX_H
 #define RAC_BACKENDS_RAC_MLX_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #if __has_include("rac/core/rac_error.h")
@@ -22,8 +23,8 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #else
-#include "rac_embeddings_service.h"
 #include "rac_diarization_service.h"
+#include "rac_embeddings_service.h"
 #include "rac_error.h"
 #include "rac_llm_service.h"
 #include "rac_stt_service.h"
@@ -64,6 +65,10 @@ typedef rac_result_t (*rac_mlx_llm_generate_stream_fn)(rac_handle_t handle, cons
                                                        const rac_llm_options_t* options,
                                                        rac_llm_stream_callback_fn callback,
                                                        void* callback_user_data, void* user_data);
+
+typedef rac_result_t (*rac_mlx_llm_generate_chat_stream_fn)(
+    rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_llm_stream_callback_fn callback, void* callback_user_data, void* user_data);
 
 typedef rac_result_t (*rac_mlx_vlm_process_fn)(rac_handle_t handle, const rac_vlm_image_t* image,
                                                const char* prompt, const rac_vlm_options_t* options,
@@ -115,12 +120,11 @@ typedef rac_result_t (*rac_mlx_tts_info_fn)(rac_handle_t handle, rac_tts_info_t*
 typedef rac_result_t (*rac_mlx_diarize_fn)(rac_handle_t handle, const float* samples,
                                            size_t sample_count,
                                            const rac_diarization_options_t* options,
-                                           rac_diarization_result_t* out_result,
-                                           void* user_data);
+                                           rac_diarization_result_t* out_result, void* user_data);
 
 typedef rac_result_t (*rac_mlx_diarization_stream_create_fn)(
-    rac_handle_t handle, const rac_diarization_options_t* options,
-    rac_handle_t* out_stream_handle, void* user_data);
+    rac_handle_t handle, const rac_diarization_options_t* options, rac_handle_t* out_stream_handle,
+    void* user_data);
 
 typedef rac_result_t (*rac_mlx_diarization_stream_feed_fn)(
     rac_handle_t handle, rac_handle_t stream_handle, const float* samples, size_t sample_count,
@@ -159,14 +163,25 @@ typedef struct rac_mlx_callbacks {
     rac_mlx_cleanup_fn cleanup;
     rac_mlx_destroy_fn destroy;
     void* user_data;
+
+    /**
+     * Structured LLM stream callback (optional). Appended for ABI compatibility;
+     * rac_mlx_set_callbacks probes struct_size before reading this slot.
+     */
+    rac_mlx_llm_generate_chat_stream_fn llm_generate_chat_stream;
 } rac_mlx_callbacks_t;
 
+#define RAC_MLX_CALLBACKS_LEGACY_SIZE \
+    ((uint32_t)offsetof(rac_mlx_callbacks_t, llm_generate_chat_stream))
+
 /**
- * Record true prompt/completion counts for the active MLX stream on this
- * thread. Called from Swift after generateStream finishes; read by
- * get_stream_token_counts. No-op when no stream is active on the calling thread.
+ * Record true prompt/completion/cache counts for the active MLX stream on this
+ * thread. cached_prompt_tokens is included in prompt_tokens. Called from Swift
+ * after generateStream finishes; read by get_stream_token_counts. No-op when
+ * no stream is active on the calling thread.
  */
-RAC_API void rac_mlx_note_stream_token_counts(int32_t prompt_tokens, int32_t completion_tokens);
+RAC_API void rac_mlx_note_stream_token_counts(int32_t prompt_tokens, int32_t completion_tokens,
+                                              int32_t cached_prompt_tokens);
 
 RAC_API rac_result_t rac_mlx_set_callbacks(const rac_mlx_callbacks_t* callbacks);
 RAC_API rac_bool_t rac_mlx_is_available(void);

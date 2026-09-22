@@ -12,6 +12,10 @@
 #ifndef RAC_OPENAI_TRANSLATION_H
 #define RAC_OPENAI_TRANSLATION_H
 
+namespace runanywhere::v1 {
+class LLMGenerateRequest;
+}
+
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -36,7 +40,12 @@ using Json = nlohmann::json;
  * @param tools OpenAI tools array (can be empty)
  * @return Formatted prompt string for LLM
  */
-std::string buildPromptFromOpenAI(const Json& messages, const Json& tools);
+std::string buildPromptFromOpenAI(const Json& messages, const Json& tools,
+                                  const Json& toolChoice = "auto");
+
+/** Convert one validated OpenAI request to the canonical generation envelope. */
+runanywhere::v1::LLMGenerateRequest buildGenerateRequest(const Json& request,
+                                                         const std::string& modelId);
 
 /**
  * @brief Generate a unique tool call ID
@@ -49,13 +58,8 @@ std::string generateToolCallId();
 // Message Formatting
 // =============================================================================
 
-/**
- * @brief Extract the last user message from OpenAI messages
- *
- * @param messages OpenAI messages array
- * @return Last user message content, or empty string if none
- */
-std::string extractLastUserMessage(const Json& messages);
+/** Extract string or text-part content after request validation. */
+std::string messageText(const Json& message);
 
 /**
  * @brief Build a simple prompt from messages (no tools)
