@@ -11,12 +11,13 @@ private struct DeterministicTokenizer: Tokenizer {
   var unknownToken: String? { nil }
   func encode(text: String, addSpecialTokens: Bool) -> [Int] { [] }
   func decode(tokenIds: [Int], skipSpecialTokens: Bool) -> String {
-    tokenIds.map { String(UnicodeScalar($0)!) }.joined()
+    tokenIds.map { UnicodeScalar($0).map(String.init) ?? "\u{FFFD}" }.joined()
   }
   func convertTokenToId(_ token: String) -> Int? { nil }
   func convertIdToToken(_ id: Int) -> String? { nil }
   func applyChatTemplate(
-    messages: [[String: any Sendable]], tools: [[String: any Sendable]]?,
+    messages: [[String: any Sendable]],
+    tools: [[String: any Sendable]]?,
     additionalContext: [String: any Sendable]?
   ) throws -> [Int] { [] }
 }
@@ -43,19 +44,22 @@ private final class ScriptedModel: Module, LanguageModel, KVCacheDimensionProvid
     let tokens = inputs.asArray(Int.self)
     var logits = [Float](repeating: -100, count: tokens.count * 128)
     let next: [Int: Int] = [
-      1: 97, 97: 98, 98: 60, 60: 69, 69: 78, 78: 68, 68: 62, 62: 120, 120: 120,
+      1: 97, 97: 98, 98: 60, 60: 69, 69: 78, 78: 68, 68: 62, 62: 120, 120: 120
     ]
     for (index, token) in tokens.enumerated() { logits[index * 128 + (next[token] ?? 120)] = 100 }
     return MLXArray(logits, [1, tokens.count, 128])
   }
 }
-@main struct CancellationUsageRegression {
+@main
+struct CancellationUsageRegression {
   static func main() async throws {
     try await Device.withDefaultDevice(.cpu) {
       let (events, producer) = generateTask(
         promptTokenCount: 37,
         modelConfiguration: ModelConfiguration(id: "hermetic/cancellation"),
-        tokenizer: DeterministicTokenizer(), iterator: DelayedTokens())
+        tokenizer: DeterministicTokenizer(),
+        iterator: DelayedTokens()
+      )
       var chunks = 0
       var info: GenerateCompletionInfo?
       for await event in events {
@@ -74,17 +78,21 @@ private final class ScriptedModel: Module, LanguageModel, KVCacheDimensionProvid
       guard case .cancelled = info?.stopReason else {
         fatalError("missing cancellation terminal info")
       }
-      print(
-        "Pinned MLX generateLoopTask: cancellation retained prompt=37 completion=\(chunks), final info received"
-      )
+      let cancellationResult =
+        "Pinned MLX generateLoopTask: cancellation retained prompt=37 completion=\(chunks), final info received\n"
+      FileHandle.standardOutput.write(Data(cancellationResult.utf8))
 
       let iterator = try TokenIterator(
         input: LMInput(tokens: MLXArray([Int](repeating: 1, count: 37))),
-        model: ScriptedModel(), parameters: GenerateParameters(maxTokens: 1000, temperature: 0))
+        model: ScriptedModel(),
+        parameters: GenerateParameters(maxTokens: 1000, temperature: 0)
+      )
       let (rawEvents, rawProducer) = generateTokenTask(
         promptTokenCount: 37,
         modelConfiguration: ModelConfiguration(id: "hermetic/raw-cancellation"),
-        tokenizer: DeterministicTokenizer(), iterator: iterator)
+        tokenizer: DeterministicTokenizer(),
+        iterator: iterator
+      )
       var stopFilter = MLXTextStopFilter(stopStrings: ["<END>"])
       var output = ""
       var rawTokenCount = 0
@@ -94,7 +102,7 @@ private final class ScriptedModel: Module, LanguageModel, KVCacheDimensionProvid
         case .token(let token):
           rawTokenCount += 1
           guard !stopFilter.stopped else { continue }
-          output += stopFilter.process(String(UnicodeScalar(token)!))
+          output += stopFilter.process(UnicodeScalar(token).map(String.init) ?? "\u{FFFD}")
           if stopFilter.stopped { rawProducer.cancel() }
         case .info(let completion): rawInfo = completion
         }
@@ -106,9 +114,9 @@ private final class ScriptedModel: Module, LanguageModel, KVCacheDimensionProvid
       precondition(rawInfo?.generationTokenCount == rawTokenCount)
       precondition(rawTokenCount >= 7 && rawTokenCount < 1000)
       guard case .cancelled = rawInfo?.stopReason else { fatalError("missing raw terminal info") }
-      print(
-        "Pinned MLX raw generation: textual stop retained prompt=37 completion=\(rawTokenCount), output=ab, no tail"
-      )
+      let stopResult =
+        "Pinned MLX raw generation: textual stop retained prompt=37 completion=\(rawTokenCount), output=ab, no tail\n"
+      FileHandle.standardOutput.write(Data(stopResult.utf8))
     }
   }
 }

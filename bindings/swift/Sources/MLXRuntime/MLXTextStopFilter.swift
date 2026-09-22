@@ -23,17 +23,18 @@ struct MLXTextStopFilter {
         }
         var held = 0
         for stop in stops {
-            let limit = min(pending.count, stop.count - 1)
+            let pendingScalars = pending.unicodeScalars
+            let stopScalars = stop.unicodeScalars
+            let limit = min(pendingScalars.count, stopScalars.count - 1)
             if limit > held {
-                for size in stride(from: limit, through: held + 1, by: -1) {
-                    if pending.suffix(size) == stop.prefix(size) {
-                        held = size
-                        break
-                    }
+                for size in stride(from: limit, through: held + 1, by: -1)
+                    where pendingScalars.suffix(size).elementsEqual(stopScalars.prefix(size)) {
+                    held = size
+                    break
                 }
             }
         }
-        let end = pending.index(pending.endIndex, offsetBy: -held)
+        let end = pending.unicodeScalars.index(pending.unicodeScalars.endIndex, offsetBy: -held)
         let text = String(pending[..<end])
         pending = String(pending[end...])
         return text

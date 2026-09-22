@@ -1075,17 +1075,34 @@ private final class MLXSession: @unchecked Sendable {
         onToken: @escaping @Sendable (String) -> Bool
     ) async throws -> MLXGenerationMetrics {
         let prepared = try await container.prepare(input: input)
-        let events = try await container.generate(input: prepared, parameters: parameters)
+        let (events, generationTask) = try await container.perform(nonSendable: prepared) { context, input in
+            let iterator = try TokenIterator(
+                input: input,
+                model: context.model,
+                parameters: parameters
+            )
+            return MLXLMCommon.generateTask(
+                promptTokenCount: input.text.tokens.size,
+                modelConfiguration: context.configuration,
+                tokenizer: context.tokenizer,
+                iterator: iterator
+            )
+        }
         var metrics = MLXGenerationMetrics()
         let started = Date()
+        var consumerStopped = false
+        var externallyCancelled = false
 
-        generationLoop: for await event in events {
-            if isCancelled { throw CancellationError() }
+        for await event in events {
+            if isCancelled || Task.isCancelled {
+                externallyCancelled = true
+                generationTask.cancel()
+            }
             switch event {
             case .chunk(let text):
-                if !onToken(text) {
-                    cancel()
-                    break generationLoop
+                if !externallyCancelled && !consumerStopped && !onToken(text) {
+                    consumerStopped = true
+                    generationTask.cancel()
                 }
             case .info(let info):
                 metrics.promptTokens = info.promptTokenCount
@@ -1098,6 +1115,9 @@ private final class MLXSession: @unchecked Sendable {
                 throw RejectedToolCallError(rejection)
             }
         }
+        await generationTask.value
+        if externallyCancelled || isCancelled || Task.isCancelled { throw CancellationError() }
+        if consumerStopped { cancel() }
         if metrics.totalTimeMs == 0 {
             metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
         }
