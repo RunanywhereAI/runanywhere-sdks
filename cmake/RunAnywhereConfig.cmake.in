@@ -32,8 +32,9 @@ set(RunAnywhere_HAS_SERVER @RUNANYWHERE_KIT_HAS_SERVER@)
 set(RunAnywhere_HAS_DESKTOP_ADAPTER @RUNANYWHERE_KIT_HAS_DESKTOP_ADAPTER@)
 
 include(CMakeFindDependencyMacro)
+# The server target exposes Threads::Threads on every platform, including Windows.
+find_dependency(Threads)
 if(NOT WIN32)
-    find_dependency(Threads)
     find_dependency(ZLIB)
     find_dependency(CURL)
 endif()
