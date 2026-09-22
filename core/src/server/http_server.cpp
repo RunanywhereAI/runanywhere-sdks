@@ -68,8 +68,12 @@ rac_result_t HttpServer::start(const rac_server_config_t& config) {
         }
 
         // Validate config
-        if (!config.model_path) {
-            RAC_LOG_ERROR("Server", "model_path is required");
+        if (!config.model_path || config.context_size < 0 || config.threads < 0 ||
+            config.request_timeout_seconds <= 0 || config.max_concurrent_requests <= 0 ||
+            (config.gpu_layers != RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO && config.gpu_layers != -1 &&
+             config.gpu_layers != 0)) {
+            RAC_LOG_ERROR("Server",
+                          "Invalid server configuration (GPU layers supports auto, -1, or 0)");
             return RAC_ERROR_INVALID_ARGUMENT;
         }
 
@@ -94,6 +98,11 @@ rac_result_t HttpServer::start(const rac_server_config_t& config) {
 
         // Create HTTP server
         server_ = std::make_unique<httplib::Server>();
+        server_->new_task_queue = [this] {
+            return new httplib::ThreadPool(static_cast<size_t>(config_.max_concurrent_requests));
+        };
+        server_->set_read_timeout(config_.request_timeout_seconds, 0);
+        server_->set_write_timeout(config_.request_timeout_seconds, 0);
 
         // Setup CORS if enabled
         if (config.enable_cors == RAC_TRUE) {
@@ -150,6 +159,9 @@ rac_result_t HttpServer::stop() {
     RAC_LOG_INFO("Server", "Stopping server...");
 
     shouldStop_ = true;
+    if (handler_) {
+        handler_->requestStop();
+    }
 
     if (server_) {
         server_->stop();
@@ -161,6 +173,7 @@ rac_result_t HttpServer::stop() {
 
     unloadModel();
 
+    handler_.reset();
     server_.reset();
     running_ = false;
 
@@ -186,9 +199,9 @@ void HttpServer::getStatus(rac_server_status_t& status) const {
     status.host = tl_host.c_str();
     status.port = config_.port;
     status.model_id = tl_model_id.c_str();
-    status.active_requests = activeRequests_;
+    status.active_requests = handler_ ? handler_->getActiveRequests() : 0;
     status.total_requests = totalRequests_;
-    status.total_tokens_generated = totalTokensGenerated_;
+    status.total_tokens_generated = handler_ ? handler_->getTotalTokensGenerated() : 0;
 
     if (running_) {
         auto now = std::chrono::steady_clock::now();
@@ -220,7 +233,9 @@ void HttpServer::setErrorCallback(rac_server_error_callback_fn callback, void* u
 
 void HttpServer::setupRoutes() {
     // Create handler with LLM handle
-    auto handler = std::make_shared<OpenAIHandler>(llmHandle_, modelId_);
+    auto handler = std::make_shared<OpenAIHandler>(llmHandle_, modelId_, config_.threads,
+                                                   config_.request_timeout_seconds);
+    handler_ = handler;
 
     // GET /v1/models
     server_->Get("/v1/models",
