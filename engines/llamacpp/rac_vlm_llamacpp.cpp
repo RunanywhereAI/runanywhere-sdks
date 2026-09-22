@@ -1027,8 +1027,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     }
 
     // Initialize llama backend
-    llama_backend_init();
     runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
+    llama_backend_init();
 
     // Load model
     int gpu_layers = backend->config.gpu_layers;

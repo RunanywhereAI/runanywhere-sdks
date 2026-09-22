@@ -254,8 +254,8 @@ bool LlamaCppBackend::initialize(const nlohmann::json& config) {
 
     config_ = config;
 
-    llama_backend_init();
     runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
+    llama_backend_init();
 
     if (config.contains("num_threads")) {
         num_threads_ = config["num_threads"].get<int>();

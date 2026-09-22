@@ -493,8 +493,8 @@ rac_result_t llamacpp_rerank_create(const char* model_id, const char* /*config_j
         return RAC_ERROR_NULL_POINTER;
     }
     *output = nullptr;
-    llama_backend_init();
     runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
+    llama_backend_init();
     auto handle = std::make_unique<LlamaCppRerankHandle>();
     handle->model_id = model_id;
     const unsigned int hardware_threads = std::thread::hardware_concurrency();
