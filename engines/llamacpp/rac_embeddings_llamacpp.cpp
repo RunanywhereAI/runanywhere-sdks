@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "llamacpp_logging.h"
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -539,6 +540,7 @@ void llamacpp_embeddings_destroy(void* implementation) {
 void ensure_llama_backend_initialized() {
     static std::once_flag backend_once;
     std::call_once(backend_once, []() { llama_backend_init(); });
+    runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
 }
 
 rac_result_t llamacpp_embeddings_create(const char* model_id, const char* /*config_json*/,
