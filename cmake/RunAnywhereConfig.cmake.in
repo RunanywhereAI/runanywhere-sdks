@@ -103,6 +103,7 @@ if(NOT TARGET RunAnywhere::commons)
     # library is staged as lib/onnxruntime.lib and already in EXTRA_LIBS.
     if(NOT WIN32)
         file(GLOB _kit_dylibs
+            "${RunAnywhere_THIRD_PARTY_DIR}/libsherpa-onnx-c-api.so"
             "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.dylib"
             "${RunAnywhere_THIRD_PARTY_DIR}/libonnxruntime.so")
         list(APPEND _runanywhere_kit_extra ${_kit_dylibs})
