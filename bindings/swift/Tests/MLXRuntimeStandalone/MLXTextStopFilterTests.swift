@@ -27,6 +27,28 @@ struct MLXTextStopFilterTests {
         precondition(unicode.process("hi🛑") == "hi")
         precondition(unicode.process("終tail") == "")
         precondition(unicode.stopped)
-        print("MLX text stop filter: 5 regression cases passed")
+        // Token boundaries may occur anywhere in a textual terminator. Every
+        // split must preserve the complete commons tool frame and stop before
+        // trailing model text reaches the ABI callback.
+        let generated = tool + "<end>discarded"
+        for boundary in 0...generated.count {
+            let index = generated.index(generated.startIndex, offsetBy: boundary)
+            var filter = MLXTextStopFilter(stopStrings: ["<end>"])
+            let first = filter.process(String(generated[..<index]))
+            let second = filter.process(String(generated[index...]))
+            precondition(first + second + filter.finish() == tool)
+            precondition(filter.stopped)
+        }
+
+        var overlap = MLXTextStopFilter(stopStrings: ["ABAB", "BABA"])
+        precondition(overlap.process("textABA") == "text")
+        precondition(overlap.process("BABAtail").isEmpty)
+        precondition(overlap.stopped && overlap.finish().isEmpty)
+
+        var falsePrefix = MLXTextStopFilter(stopStrings: ["<end>"])
+        precondition(falsePrefix.process("safe<en") == "safe")
+        precondition(falsePrefix.process("ough>") == "<enough>")
+        precondition(!falsePrefix.stopped && falsePrefix.finish().isEmpty)
+        print("MLX text stop filter: 8 regression cases passed (including every token boundary)")
     }
 }

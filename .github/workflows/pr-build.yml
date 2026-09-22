@@ -130,6 +130,12 @@ jobs:
         run: cmake --build --preset macos-debug
       - name: Test
         run: ctest --preset macos-debug
+      - name: MLX raw text stop regressions (no model required)
+        run: |
+          swiftc bindings/swift/Sources/MLXRuntime/MLXTextStopFilter.swift \
+            bindings/swift/Tests/MLXRuntimeStandalone/MLXTextStopFilterTests.swift \
+            -o "$RUNNER_TEMP/mlx-text-stop-tests"
+          "$RUNNER_TEMP/mlx-text-stop-tests"
 
   macos-release:
     # Keep the release compile on the canonical Apple toolchain too. Metal is

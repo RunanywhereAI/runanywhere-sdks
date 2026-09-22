@@ -1006,35 +1006,46 @@ private final class MLXSession: @unchecked Sendable {
             throw MLXRuntimeError.notLoaded(modelID)
         }
 
+        let configuration = await container.configuration
+        // Harmony and Onyx own token-level framing, reasoning channels and
+        // semantic stop tokens. Keep their decoder in place for ordinary SDK
+        // generation; commons' text protocol applies to the other formats.
+        if configuration.toolCallFormat == .gptOSS || configuration.toolCallFormat == .atem {
+            return try await streamFramedProtocol(
+                container: container, input: input, parameters: parameters, onToken: onToken)
+        }
+
         let prepared = try await container.prepare(input: input)
-        // This ABI carries raw generated text. Commons owns tool-call parsing;
-        // MLX-LM's decoded generate() intercepts tool frames, dropping valid
-        // calls and rejecting commons' {"tool": ...} protocol as malformed.
-        let events = try await container.perform(nonSendable: prepared) { context, input in
-            try MLXLMCommon.generateTokens(input: input, parameters: parameters, context: context)
+        // Commons owns text tool-call parsing. MLX-LM's decoded generate()
+        // would intercept these frames before commons receives them.
+        let (events, generationTask) = try await container.perform(nonSendable: prepared) { context, input in
+            try MLXLMCommon.generateTokensTask(input: input, parameters: parameters, context: context)
         }
         var detokenizer = NaiveStreamingDetokenizer(tokenizer: await container.tokenizer)
-        var stopFilter = MLXTextStopFilter(
-            stopStrings: (await container.configuration).effectiveStopStrings)
+        var stopFilter = MLXTextStopFilter(stopStrings: configuration.effectiveStopStrings)
         var consumerStopped = false
+        var externallyCancelled = false
         var metrics = MLXGenerationMetrics()
         let started = Date()
 
-        generationLoop: for await event in events {
-            if isCancelled {
-                throw CancellationError()
+        for await event in events {
+            if isCancelled || Task.isCancelled {
+                externallyCancelled = true
+                generationTask.cancel()
             }
             switch event {
             case .token(let tokenID):
+                // Cancel the producer at a textual stop, then drain its final
+                // usage event without forwarding already-buffered token IDs.
+                guard !externallyCancelled && !consumerStopped && !stopFilter.stopped else { continue }
                 detokenizer.append(token: tokenID)
                 guard let decoded = detokenizer.next() else { continue }
                 let text = stopFilter.process(decoded)
                 if !text.isEmpty && !onToken(text) {
                     consumerStopped = true
-                    cancel()
-                    break generationLoop
+                    generationTask.cancel()
                 }
-                if stopFilter.stopped { break generationLoop }
+                if stopFilter.stopped { generationTask.cancel() }
             case .info(let info):
                 metrics.promptTokens = info.promptTokenCount
                 metrics.completionTokens = info.generationTokenCount
@@ -1042,10 +1053,50 @@ private final class MLXSession: @unchecked Sendable {
                 metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
             }
         }
+        // Do not let the next request use the model until GPU work has settled.
+        await generationTask.value
+        if externallyCancelled || isCancelled || Task.isCancelled { throw CancellationError() }
 
         let remaining = stopFilter.finish()
         if !consumerStopped && !remaining.isEmpty && !onToken(remaining) {
-            cancel()
+            consumerStopped = true
+        }
+        if consumerStopped { cancel() }
+        if metrics.totalTimeMs == 0 {
+            metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
+        }
+        return metrics
+    }
+
+    private func streamFramedProtocol(
+        container: ModelContainer,
+        input: consuming sending UserInput,
+        parameters: GenerateParameters,
+        onToken: @escaping @Sendable (String) -> Bool
+    ) async throws -> MLXGenerationMetrics {
+        let prepared = try await container.prepare(input: input)
+        let events = try await container.generate(input: prepared, parameters: parameters)
+        var metrics = MLXGenerationMetrics()
+        let started = Date()
+
+        generationLoop: for await event in events {
+            if isCancelled { throw CancellationError() }
+            switch event {
+            case .chunk(let text):
+                if !onToken(text) {
+                    cancel()
+                    break generationLoop
+                }
+            case .info(let info):
+                metrics.promptTokens = info.promptTokenCount
+                metrics.completionTokens = info.generationTokenCount
+                metrics.tokensPerSecond = Float(info.tokensPerSecond)
+                metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
+            case .toolCall:
+                break
+            case .rejectedToolCall(let rejection):
+                throw RejectedToolCallError(rejection)
+            }
         }
         if metrics.totalTimeMs == 0 {
             metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
