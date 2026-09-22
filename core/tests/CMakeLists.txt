@@ -378,6 +378,7 @@ rac_link_archive_deps(test_tool_calling_session_proto)
 target_compile_features(test_tool_calling_session_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_session_proto)
 add_test(NAME tool_calling_session_proto_tests COMMAND test_tool_calling_session_proto)
+set_tests_properties(tool_calling_session_proto_tests PROPERTIES TIMEOUT 90)
 
 # --- Synchronous tool-calling run loop --------------------------------
 # Mirrors the session proto test setup but exercises the single-call API
@@ -394,6 +395,7 @@ rac_link_archive_deps(test_tool_calling_run_loop)
 target_compile_features(test_tool_calling_run_loop PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_run_loop)
 add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
+set_tests_properties(tool_calling_run_loop_tests PROPERTIES TIMEOUT 90)
 
 # --- TC-1: tool-call grammar derivation --------------------------------
 # Pure-function test over build_tool_call_grammar() (no mock LLM plugin
