@@ -125,7 +125,7 @@ jobs:
       - name: Install ninja + protobuf
         run: brew install ninja protobuf
       - name: Configure
-        run: cmake --preset macos-debug
+        run: cmake --preset macos-debug -DRAC_BUILD_SERVER=ON
       - name: Build
         run: cmake --build --preset macos-debug
       - name: Test
@@ -164,7 +164,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install ninja
         run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - run: cmake --preset linux-debug
+      - run: cmake --preset linux-debug -DRAC_BUILD_SERVER=ON
       - run: cmake --build --preset linux-debug
       - run: ctest --preset linux-debug
 
@@ -173,7 +173,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - run: cmake --preset linux-asan
+      - run: cmake --preset linux-asan -DRAC_BUILD_SERVER=ON
       - run: cmake --build --preset linux-asan
       - run: ctest --preset linux-asan
 
