@@ -1007,35 +1007,46 @@ private final class MLXSession: @unchecked Sendable {
         }
 
         let prepared = try await container.prepare(input: input)
-        let events = try await container.generate(input: prepared, parameters: parameters)
+        // This ABI carries raw generated text. Commons owns tool-call parsing;
+        // MLX-LM's decoded generate() intercepts tool frames, dropping valid
+        // calls and rejecting commons' {"tool": ...} protocol as malformed.
+        let events = try await container.perform(nonSendable: prepared) { context, input in
+            try MLXLMCommon.generateTokens(input: input, parameters: parameters, context: context)
+        }
+        var detokenizer = NaiveStreamingDetokenizer(tokenizer: await container.tokenizer)
+        var stopFilter = MLXTextStopFilter(
+            stopStrings: (await container.configuration).effectiveStopStrings)
+        var consumerStopped = false
         var metrics = MLXGenerationMetrics()
         let started = Date()
 
-        for await event in events {
+        generationLoop: for await event in events {
             if isCancelled {
                 throw CancellationError()
             }
             switch event {
-            case .chunk(let token):
-                if !onToken(token) {
+            case .token(let tokenID):
+                detokenizer.append(token: tokenID)
+                guard let decoded = detokenizer.next() else { continue }
+                let text = stopFilter.process(decoded)
+                if !text.isEmpty && !onToken(text) {
+                    consumerStopped = true
                     cancel()
-                    break
+                    break generationLoop
                 }
+                if stopFilter.stopped { break generationLoop }
             case .info(let info):
                 metrics.promptTokens = info.promptTokenCount
                 metrics.completionTokens = info.generationTokenCount
                 metrics.tokensPerSecond = Float(info.tokensPerSecond)
                 metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
-            case .toolCall:
-                break
-            case .rejectedToolCall(let rejection):
-                // Do not leak the rejection's raw model output through logs or
-                // flatten it into ordinary response text. Callers receive the
-                // non-sensitive LocalizedError provided by MLX-LM.
-                throw RejectedToolCallError(rejection)
             }
         }
 
+        let remaining = stopFilter.finish()
+        if !consumerStopped && !remaining.isEmpty && !onToken(remaining) {
+            cancel()
+        }
         if metrics.totalTimeMs == 0 {
             metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
         }
