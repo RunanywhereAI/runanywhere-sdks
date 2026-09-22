@@ -335,18 +335,11 @@ RAC_COMMONS_VERSION=0.1.1
 # Never compute these locally — a local build's bytes are never the published ones.
 NEURUN_REPO=RunanywhereAI/neurun
 
-# TEMP(wally-harness-ane-cut): Wally's current public harness release does not
-# consume NeuRT: its ANE LLM rows and `ane-` model prefix are disabled, and the
-# public desktop kit does not ship the private overlay. The shared SDK release
-# still packages NeuRT for Apple bindings and Electron, however, so ABI v12
-# cannot ship with this ABI-v11 pin. Cut an ABI-v12 NeuRT release and replace
-# its tag, ABI receipt and all three published checksums together before merging
-# the ABI-v12 SDK change.
-NEURT_RELEASE_TAG=v0.20.35
-NEURT_RAC_ABI_VERSION=11
-NEURT_MACOS_ARM64_SHA256=576f356e8bde6a54dd64f4a22f6dce947338fa6ba49fc9a51fd0f79756b3710b
-NEURT_IOS_ARM64_SHA256=bf4f945e988c133abe6e45a8652ae30323e841454a54668034e294e6c8985267
-NEURT_IOS_ARM64_SIMULATOR_SHA256=c14fe5bfc2375fa6dd4227b6e6a63682d1fdff2acd5d1bb19c93fbf03cd817dd
+NEURT_RELEASE_TAG=v0.20.37
+NEURT_RAC_ABI_VERSION=12
+NEURT_MACOS_ARM64_SHA256=e0ade6a725b344248376d22d2d32dab34da11f08969ea4b6a798dcced5af5f62
+NEURT_IOS_ARM64_SHA256=bf376fc4d4f1b5a7cd5c8bb660a52c1ef676a1e885b7abd5fed49724e64cf129
+NEURT_IOS_ARM64_SIMULATOR_SHA256=d2eeb6043ccd77f39091056f46cc71c4c31df41a0d8f727eac6e667781d76fde
 
 QHEXRT_RELEASE_TAG=v0.20.31
 QHEXRT_ARM64_V8A_SHA256=1c49bfa5dd6546a34b63f79f6be90ff26a04da40832d3c0dbfe4ed35aef3fcd6
