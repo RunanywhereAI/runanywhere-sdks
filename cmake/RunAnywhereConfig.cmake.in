@@ -155,4 +155,21 @@ foreach(_opt mlx neurt qhexrt)
     endif()
 endforeach()
 
+# rac_server: plain static archive, not part of the rac_backend_ family above
+# (different name, no whole-archive ctor-registration need — it's linked by
+# ordinary symbol reference from cmd_serve.cpp). Same overlay-discovery rule:
+# presence of the archive is the source of truth, independent of HAS_SERVER
+# recorded at package time.
+set(_server_lib
+    "${RunAnywhere_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}rac_server${CMAKE_STATIC_LIBRARY_SUFFIX}")
+if(EXISTS "${_server_lib}")
+    set(RunAnywhere_HAS_SERVER TRUE)
+    if(NOT TARGET RunAnywhere::server)
+        add_library(RunAnywhere::server STATIC IMPORTED)
+        set_target_properties(RunAnywhere::server PROPERTIES
+            IMPORTED_LOCATION "${_server_lib}"
+            INTERFACE_LINK_LIBRARIES "RunAnywhere::commons;Threads::Threads")
+    endif()
+endif()
+
 set(RunAnywhere_FOUND TRUE)
