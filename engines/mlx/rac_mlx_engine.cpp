@@ -627,6 +627,18 @@ rac_result_t llm_get_info(void* impl, rac_llm_info_t* out_info) {
     out_info->current_model =
         session && !session->model_id.empty() ? session->model_id.c_str() : nullptr;
     out_info->context_length = 0;
+    if (session && session->initialized) {
+        rac_mlx_callbacks_t callbacks = {};
+        if (runanywhere::commons::mlx::snapshot_callbacks(&callbacks) &&
+            callbacks.context_length != nullptr) {
+            int32_t context_length = 0;
+            if (callbacks.context_length(session->swift_handle, &context_length,
+                                         callbacks.user_data) == RAC_SUCCESS &&
+                context_length > 0) {
+                out_info->context_length = context_length;
+            }
+        }
+    }
     return RAC_SUCCESS;
 }
 
