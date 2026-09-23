@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Characterizes which `LoadOptions` fields `ModelGate.load()` warns about
-// because the commons load ABI has no wire path for them yet
-// (PR #605 review issue 8).
+// because the commons load ABI has no wire path for them (only `threads`,
+// retired at `ModelLoadRequest` reserved tag 7). The placement knobs the IDL
+// does carry (`contextLength`, `useGpu`/`accelerator`,
+// `backendPreferences`/`framework`) must not be reported as ignored.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
@@ -43,21 +45,21 @@ void main() {
       );
     });
 
-    test('reports contextLength, threads, and useGpu individually', () {
+    test('reports only threads as not carried by the load ABI', () {
       expect(
         ignoredLoadOptionKnobs(const LoadOptions(contextLength: 4096)),
-        ['contextLength'],
+        isEmpty,
       );
       expect(ignoredLoadOptionKnobs(const LoadOptions(threads: 4)), ['threads']);
-      expect(ignoredLoadOptionKnobs(const LoadOptions(useGpu: true)), ['useGpu']);
+      expect(ignoredLoadOptionKnobs(const LoadOptions(useGpu: true)), isEmpty);
     });
 
-    test('combines every ignored knob in a stable order', () {
+    test('combines ignored knobs in a stable order', () {
       expect(
         ignoredLoadOptionKnobs(
           const LoadOptions(contextLength: 4096, threads: 4, useGpu: false),
         ),
-        ['contextLength', 'threads', 'useGpu'],
+        ['threads'],
       );
     });
   });
@@ -77,11 +79,11 @@ void main() {
 
     test('a warning-level logger is available for ModelGate to log through', () {
       final logger = SDKLogger('ModelGate');
-      logger.warning('LoadOptions contextLength are not carried by the commons load ABI yet');
+      logger.warning('LoadOptions threads is not carried by the commons load ABI');
 
       expect(recorder.entries, hasLength(1));
       expect(recorder.entries.single.level, LogLevel.LOG_LEVEL_WARNING);
-      expect(recorder.entries.single.message, contains('contextLength'));
+      expect(recorder.entries.single.message, contains('threads'));
     });
   });
 }
