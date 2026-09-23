@@ -254,12 +254,21 @@ rac_result_t win_get_memory_info(rac_memory_info_t* out, void*) {
     return RAC_SUCCESS;
 }
 
+rac_result_t filesystem_error_to_rac(const std::error_code& ec, rac_result_t fallback) {
+    if (ec == std::errc::no_such_file_or_directory) return RAC_ERROR_FILE_NOT_FOUND;
+    if (ec == std::errc::permission_denied) return RAC_ERROR_PERMISSION_DENIED;
+    if (ec == std::errc::no_space_on_device) return RAC_ERROR_STORAGE_FULL;
+    return fallback;
+}
+
 rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entries,
                           size_t* in_out_count, void*) {
     if (!dir_path || !in_out_count) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::path dir = utf8_path(dir_path);
-    if (!fs::is_directory(dir, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;
+    const bool is_directory = fs::is_directory(dir, ec);
+    if (ec) return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+    if (!is_directory) return RAC_ERROR_FILE_NOT_FOUND;
     const size_t cap = out_entries ? *in_out_count : 0;
     size_t written = 0, total = 0;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
@@ -279,6 +288,7 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
         }
         ++written;
     }
+    if (ec) return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
     *in_out_count = out_entries ? written : total;
     return RAC_SUCCESS;
 }
