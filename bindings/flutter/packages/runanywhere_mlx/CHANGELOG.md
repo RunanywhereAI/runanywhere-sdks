@@ -1,3 +1,7 @@
+## [0.20.38] - 2026-09-23
+
+- MLX reports the context length from the loaded model configuration.
+
 ## [0.20.37] - 2026-09-22
 
 - Version bump to keep the backend package in lockstep with the SDK release.

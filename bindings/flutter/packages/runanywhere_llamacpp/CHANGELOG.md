@@ -5,6 +5,11 @@ All notable changes to the RunAnywhere LlamaCpp Backend will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.38] - 2026-09-23
+
+- Version bump to keep the backend package in lockstep with the SDK release.
+  The server now exposes llama.cpp's fitted context length to its caller.
+
 ## [0.20.37] - 2026-09-22
 
 - Version bump to keep the backend package in lockstep with the SDK release.
