@@ -772,6 +772,7 @@ private final class MLXSession: @unchecked Sendable {
         MLXSessionCoordinator.register(self)
     }
 
+    // swiftlint:disable:next strict_fileprivate
     fileprivate var loadedContextLength: Int {
         lock.withLock { $0.contextLength }
     }
