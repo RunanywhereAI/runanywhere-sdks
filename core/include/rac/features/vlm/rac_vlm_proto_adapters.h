@@ -16,6 +16,7 @@
 
 #include "rac/core/rac_types.h"
 #include "rac/features/vlm/rac_vlm_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 
@@ -44,7 +45,8 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
 void rac_vlm_options_free_owned(rac_vlm_options_t* options);
 
 bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMResult* out);
-bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_image_t* out);
+rac_result_t rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in,
+                                      rac_vlm_image_t* out, rac_proto_buffer_t* out_error);
 
 }  // namespace rac::foundation
 
