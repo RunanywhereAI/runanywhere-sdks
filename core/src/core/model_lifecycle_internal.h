@@ -101,6 +101,10 @@ struct LoadedModel {
     std::string fallback_reason;
     runanywhere::v1::ModelCategory category{runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED};
     runanywhere::v1::ModelInfo model;
+    // Context-length intent used to create this resident backend. Zero means
+    // model/default context, matching ModelLoadRequest semantics. This is not
+    // an observation of the context length the engine ultimately allocated.
+    int32_t requested_context_length{0};
     int64_t loaded_at_ms{0};
     int64_t updated_at_ms{0};
     std::string error_message;
