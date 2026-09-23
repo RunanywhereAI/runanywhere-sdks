@@ -383,7 +383,7 @@ pip install runanywhere==0.20.11
 <br/>
 
 ```console
-$ wally pull qwen3
+$ wally models pull qwen3
 pulling qwen3-0.6b ▕████████████▏ 100%  639 MB/639 MB  32 MB/s
 $ wally run qwen3 "Reply with exactly: RCLI WORKS" --no-think
 RCLI WORKS
