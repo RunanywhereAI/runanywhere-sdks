@@ -541,7 +541,7 @@ reply = client.chat.completions.create(
 )
 ```
 
-Endpoints: `/v1/chat/completions` (streaming and non-streaming, text and vision), `/v1/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`, `/v1/audio/speech`, and `/v1/models`. `wally serve` offers the same on port 8080.
+Endpoints: `/v1/chat/completions` (streaming and non-streaming, text and vision), `/v1/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`, `/v1/audio/speech`, and `/v1/models`. `wally serve` is LLM-only: it serves one model on port 8080 with `/v1/chat/completions` and `/v1/models`.
 
 ---
 
@@ -679,7 +679,7 @@ runanywhere-sdks/
 | Flutter | 3.44+ (Dart 3.12+) |
 | Electron | Windows x64 (preview) |
 | Python | 3.9+ on Windows, macOS, Linux (3.12+ recommended) |
-| wally | macOS arm64, Linux x86_64 / aarch64, Windows x86_64 |
+| wally | macOS arm64, Linux x86_64, Windows x86_64 |
 
 Hexagon NPU: Snapdragon with Hexagon v75 / v79 / v81, Android arm64.
 MLX: Apple silicon, physical devices.
