@@ -15,6 +15,18 @@ export interface WebCapabilities {
   hasWebGPU: boolean;
   /** WebGPU adapter info (if available) */
   gpuAdapterInfo?: Record<string, string>;
+  /**
+   * `shader-f16` WebGPU feature on the requested adapter. Many quantized-LLM
+   * WebGPU kernels require it, so its absence changes which models can run
+   * on GPU. `false` when WebGPU is unavailable or adapter request failed.
+   */
+  hasShaderF16: boolean;
+  /**
+   * `adapter.limits.maxBufferSize` in bytes. There is no standard VRAM query
+   * on the web platform, so this is the closest available proxy for GPU
+   * capacity. Undefined when WebGPU is unavailable or adapter request failed.
+   */
+  gpuMaxBufferSizeBytes?: number;
   /** The acceleration mode actually in use by the WASM module ('webgpu' | 'cpu'). */
   activeAcceleration: AccelerationMode;
   /** SharedArrayBuffer available (needed for pthreads/multithreaded WASM) */
@@ -39,6 +51,7 @@ export interface WebCapabilities {
 export async function detectCapabilities(): Promise<WebCapabilities> {
   const capabilities: WebCapabilities = {
     hasWebGPU: false,
+    hasShaderF16: false,
     activeAcceleration: 'cpu',
     hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
     isCrossOriginIsolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
@@ -64,6 +77,10 @@ export async function detectCapabilities(): Promise<WebCapabilities> {
             description: info.description ?? '',
           };
         } catch { /* adapter info not available */ }
+        try {
+          capabilities.hasShaderF16 = adapter.features?.has('shader-f16') ?? false;
+          capabilities.gpuMaxBufferSizeBytes = adapter.limits?.maxBufferSize;
+        } catch { /* features/limits not available on this adapter */ }
       }
     } catch {
       logger.debug('WebGPU detection failed');
@@ -125,4 +142,6 @@ interface GPUAdapterWithInfo {
     architecture?: string;
     description?: string;
   }>;
+  features?: { has: (name: string) => boolean };
+  limits?: { maxBufferSize?: number };
 }

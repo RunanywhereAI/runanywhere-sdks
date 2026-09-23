@@ -16,6 +16,7 @@ import {
 import { SDKCore } from '../SDKCore.js';
 import { solutions } from '../Extensions/RunAnywhere+Solutions.js';
 import { CUA } from '../Extensions/RunAnywhere+CUA.js';
+import { Hardware } from '../Extensions/RunAnywhere+Hardware.js';
 import { setHfToken } from '../Extensions/RunAnywhere+HuggingFace.js';
 import { AudioInput, ImageInput, RagDocument } from './Inputs.js';
 import type { SdkEvent } from './Events.js';
@@ -380,6 +381,9 @@ export const RunAnywhere = {
    * Swift's `RunAnywhere.CUA`.
    */
   CUA,
+
+  /** Browser hardware details (WebGPU, memory, cores, …) used to choose model sizes and acceleration. */
+  Hardware,
 
   /** Set the Hugging Face token used for gated downloads, or clear it with `null`. */
   setHuggingFaceToken: setHfToken,
