@@ -5,6 +5,7 @@
 #undef google
 #include "openai_handler.h"
 #include "openai_translation.h"
+#include "rac/server/rac_server.h"
 
 #include <atomic>
 #include <chrono>
@@ -372,6 +373,15 @@ void test_serialization_and_timeout() {
     fixture.handler.requestStop();
     check(fixture.post(base())->status == 503, "shutdown rejects new inference");
 }
+
+void test_server_context_query_requires_running_model() {
+    check(rac_server_get_context_length(nullptr) == RAC_ERROR_INVALID_ARGUMENT,
+          "context query rejects null output");
+    int32_t contextLength = -1;
+    check(rac_server_get_context_length(&contextLength) == RAC_ERROR_SERVER_NOT_RUNNING,
+          "context query rejects stopped server");
+    check(contextLength == 0, "failed context query clears output");
+}
 }  // namespace
 int main() {
     try {
@@ -380,6 +390,7 @@ int main() {
         test_validation_and_choices();
         test_structured_history_and_fallback();
         test_serialization_and_timeout();
+        test_server_context_query_requires_running_model();
         std::printf("OpenAI server: %d assertions passed\n", assertions);
         return 0;
     } catch (const std::exception& error) {

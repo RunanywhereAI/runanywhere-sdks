@@ -18,7 +18,11 @@
 #include <android/log.h>
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "RAC_LLM_SVC", __VA_ARGS__)
 #else
-#define ALOGD(...) fprintf(stderr, __VA_ARGS__)
+#define ALOGD(...)                    \
+    do {                              \
+        fprintf(stderr, __VA_ARGS__); \
+        fputc('\n', stderr);           \
+    } while (0)
 #endif
 
 #include "../common/rac_service_factory_internal.h"
