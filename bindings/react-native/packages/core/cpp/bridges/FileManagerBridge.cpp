@@ -103,6 +103,17 @@ static rac_result_t posixDeletePath(const char* path, int recursive, void* /*use
     }
 }
 
+// Free a directory-entry array produced by posixListDirectory. Shared by the
+// rollback path below and the registered free_entries callback so a partially
+// filled array is never leaked.
+static void freeEntryArray(char** entries, size_t count) {
+    if (!entries) return;
+    for (size_t i = 0; i < count; i++) {
+        free(entries[i]);
+    }
+    free(entries);
+}
+
 static rac_result_t posixListDirectory(const char* path, char*** outEntries,
                                         size_t* outCount, void* /*userData*/) {
     if (!path || !outEntries || !outCount) return RAC_ERROR_NULL_POINTER;
@@ -135,14 +146,22 @@ static rac_result_t posixListDirectory(const char* path, char*** outEntries,
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    // Second pass: fill entries
+    // Second pass: fill entries. A failed strdup rolls the whole listing back —
+    // commons must never receive a "successful" array with a null slot, since it
+    // strcmp()s every entry and would crash on the null.
     rewinddir(dir);
     size_t i = 0;
     while ((entry = readdir(dir)) != nullptr && i < count) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-        entries[i] = strdup(entry->d_name);
+        char* copy = strdup(entry->d_name);
+        if (copy == nullptr) {
+            closedir(dir);
+            freeEntryArray(entries, i);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        entries[i] = copy;
         i++;
     }
     closedir(dir);
@@ -153,11 +172,7 @@ static rac_result_t posixListDirectory(const char* path, char*** outEntries,
 }
 
 static void posixFreeEntries(char** entries, size_t count, void* /*userData*/) {
-    if (!entries) return;
-    for (size_t i = 0; i < count; i++) {
-        free(entries[i]);
-    }
-    free(entries);
+    freeEntryArray(entries, count);
 }
 
 static rac_bool_t posixPathExists(const char* path, rac_bool_t* outIsDirectory,
