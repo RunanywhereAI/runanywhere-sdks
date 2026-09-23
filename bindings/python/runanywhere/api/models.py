@@ -57,6 +57,10 @@ def _entry(registration: ModelRegistration) -> CatalogEntry:
         primary=primary,
         archive=registration.archive,
         label=registration.label,
+        download_size_bytes=(registration.download_size_bytes or registration.size_bytes),
+        context_length=registration.context_length,
+        source=registration.source,
+        description=registration.description,
     )
 
 
@@ -81,9 +85,9 @@ class Models:
 
     def get(self, id: str) -> Optional[ModelInfo]:
         """Describe one model, or None when it is unknown."""
-        if id not in CATALOG:
-            return None
-        return runtime.model_info(id)
+        if id in CATALOG:
+            return runtime.model_info(id)
+        return runtime.registered_model_info(id)
 
     def register(self, model: ModelRegistration) -> ModelInfo:
         """Add a model to the catalog so it can be downloaded and loaded by id.
@@ -99,7 +103,7 @@ class Models:
         if model.path:
             resolved = runtime.resolve(model.path)
             resolved.id = model.id
-            runtime.register_native(resolved, model.category)
+            runtime.register_native(resolved, model.category, model)
             return ModelInfo(
                 id=model.id,
                 category=model.category,
@@ -108,6 +112,10 @@ class Models:
                 size_bytes=(os.path.getsize(model.path) if os.path.isfile(model.path) else 0),
                 local_path=model.path,
                 framework=model.framework,
+                download_size_bytes=(model.download_size_bytes or model.size_bytes),
+                context_length=model.context_length,
+                source=model.source,
+                description=model.description,
             )
         CATALOG[model.id] = _entry(model)
         return runtime.model_info(model.id)

@@ -593,10 +593,19 @@ class FakeCore:
         self._record("unload_diffusion_model", handle)
 
     # -- registry ------------------------------------------------------------
-    def register_model(self, model_id: str, local_path: str, framework: int, category: int) -> None:
-        self._record("register_model", model_id, local_path, framework, category)
+    def register_model(
+        self, model_id: str, local_path: str, framework: int, category: int,
+        download_size_bytes: int = 0, context_length: int = 0, source: int = 1,
+        description: object = None, name: object = None,
+    ) -> None:
+        self._record(
+            "register_model", model_id, local_path, framework, category,
+            download_size_bytes, context_length, source, description, name,
+        )
         self._registry[model_id] = {
-            "id": model_id, "path": local_path, "framework": framework, "category": category
+            "id": model_id, "path": local_path, "framework": framework, "category": category,
+            "download_size_bytes": download_size_bytes, "context_length": context_length,
+            "source": source, "description": description or "", "name": name or model_id,
         }
 
     def get_model(self, model_id: str):

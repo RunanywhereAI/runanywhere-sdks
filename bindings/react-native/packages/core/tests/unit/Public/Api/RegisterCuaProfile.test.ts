@@ -10,6 +10,9 @@ import {
   RegisterMultiFileModelRequest,
   InferenceFramework,
   ModelFileRole,
+  ModelInfo,
+  ModelInfoMetadata,
+  ModelSource,
 } from '@runanywhere/proto-ts/model_types';
 
 describe('cua_profile IDL round-trip', () => {
@@ -66,5 +69,46 @@ describe('cua_profile IDL round-trip', () => {
     );
     expect(decoded.cuaProfile).toBe('fara');
     expect(decoded.files).toHaveLength(2);
+  });
+
+  it('preserves registration metadata for multi-file requests', () => {
+    const request = RegisterMultiFileModelRequest.fromPartial({
+      id: 'metadata-bundle',
+      name: 'Metadata Bundle',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      downloadSizeBytes: 1234,
+      contextLength: 4096,
+      source: ModelSource.MODEL_SOURCE_LOCAL,
+      description: 'Multi-file metadata fixture',
+    });
+    const decoded = RegisterMultiFileModelRequest.decode(
+      RegisterMultiFileModelRequest.encode(request).finish()
+    );
+    expect(decoded).toMatchObject({
+      downloadSizeBytes: 1234,
+      contextLength: 4096,
+      source: ModelSource.MODEL_SOURCE_LOCAL,
+      description: 'Multi-file metadata fixture',
+    });
+  });
+
+  it('preserves registration metadata for archive ModelInfo', () => {
+    const archive = ModelInfo.fromPartial({
+      id: 'metadata-archive',
+      name: 'Metadata Archive',
+      downloadSizeBytes: 5678,
+      contextLength: 8192,
+      source: ModelSource.MODEL_SOURCE_BUILT_IN,
+      metadata: ModelInfoMetadata.fromPartial({
+        description: 'Archive metadata fixture',
+      }),
+    });
+    const decoded = ModelInfo.decode(ModelInfo.encode(archive).finish());
+    expect(decoded).toMatchObject({
+      downloadSizeBytes: 5678,
+      contextLength: 8192,
+      source: ModelSource.MODEL_SOURCE_BUILT_IN,
+      metadata: { description: 'Archive metadata fixture' },
+    });
   });
 });

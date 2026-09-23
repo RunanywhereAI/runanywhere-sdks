@@ -33,6 +33,7 @@ import {
   ModelFormat,
   type ModelInfo,
   ModelInfo as ModelInfoCodec,
+  ModelInfoMetadata,
   ModelInfoList,
   ModelGetRequest,
   ModelGetResult,
@@ -125,6 +126,11 @@ export interface RegisterMultiFileModelInput {
   framework: InferenceFramework;
   modality?: ModelCategory;
   memoryRequirement?: number;
+  /** Exact combined remote artifact bytes, when known. */
+  downloadSize?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   /**
    * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
    * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
@@ -231,6 +237,11 @@ export interface RegisterArchiveModelInput {
   /** Caller override; inferred from the URL extension when omitted. */
   archiveType?: ArchiveType;
   memoryRequirement?: number;
+  /** Exact archive bytes, when known. */
+  downloadSize?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   supportsThinking?: boolean;
   supportsLora?: boolean;
   /** Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`). */
@@ -289,7 +300,7 @@ export async function registerArchiveModel(
     preferredFramework: input.framework,
     format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     downloadUrl: input.url,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
+    ...(input.source !== undefined ? { source: input.source } : {}),
     // `ModelInfo.artifactType` is deleted outright — the oneof arm
     // (`archive` here) is itself the artifact-type signal now.
     archive,
@@ -297,6 +308,15 @@ export async function registerArchiveModel(
     supportsLora: input.supportsLora ?? false,
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
+      : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
+      : {}),
+    ...(input.contextLength !== undefined && input.contextLength > 0
+      ? { contextLength: input.contextLength }
+      : {}),
+    ...(input.description !== undefined
+      ? { metadata: ModelInfoMetadata.fromPartial({ description: input.description }) }
       : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     ...(input.supportsThinking
@@ -346,6 +366,14 @@ export async function registerMultiFileModel(
           memoryRequiredBytes: input.memoryRequirement,
         }
       : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
+      : {}),
+    ...(input.contextLength !== undefined && input.contextLength > 0
+      ? { contextLength: input.contextLength }
+      : {}),
+    ...(input.source !== undefined ? { source: input.source } : {}),
+    ...(input.description !== undefined ? { description: input.description } : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     // ModelFileDescriptor.isRequired was renamed isOptional — NOT a bare
     // rename, the boolean polarity inverts too (required=true means

@@ -1,11 +1,12 @@
 // types.ts — the v3 public vocabulary: enums, inputs, results, and events.
 //
-// Enum members are string constants rather than TypeScript `enum`s so every value
-// survives a structured clone across the contextBridge unchanged — the renderer
-// surface hands these exact objects to the page.
+// Local enum members are string constants rather than TypeScript `enum`s so every
+// value survives a structured clone across the contextBridge unchanged. Proto-backed
+// enums are re-exported from the generated bindings instead of being restated here.
 
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { SDKError } from '@runanywhere/proto-ts/errors';
+import { ModelSource } from '@runanywhere/proto-ts/model_types';
 import type {
   DownloadEvent as CanonicalDownloadEvent,
   GenerationEvent as CanonicalGenerationEvent,
@@ -139,6 +140,9 @@ export const InferenceFramework = {
 } as const;
 export type InferenceFramework =
   (typeof InferenceFramework)[keyof typeof InferenceFramework];
+
+/** Canonical origin of a model artifact from `idl/model_types.proto`. */
+export { ModelSource };
 
 /** What an agent is doing during a voice turn. */
 export const AgentState = {
@@ -534,6 +538,10 @@ export interface ModelInfo {
   localPath?: string;
   downloaded: boolean;
   sizeBytes: number;
+  downloadSizeBytes?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   /** Parameter count as published, e.g. "1.5B". */
   parameters?: string;
 }
@@ -705,6 +713,10 @@ export interface ModelRegistration {
   name?: string;
   /** Engine to pin. Left to commons' format detection when omitted. */
   framework?: InferenceFramework;
+  downloadSizeBytes?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
 }
 
 /**
