@@ -68,7 +68,8 @@ typedef struct rac_server_config {
      * Number of GPU layers to offload. Defaults to
      * RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO, which leaves placement to
      * llama.cpp's own fitting pass; -1 offloads every layer and 0 pins the
-     * model to the CPU.
+     * model to the CPU. Other values are rejected: the generic backend load
+     * contract exposes placement policy rather than an exact layer count.
      */
     int32_t gpu_layers;
 
@@ -97,7 +98,8 @@ static const rac_server_config_t RAC_SERVER_CONFIG_DEFAULT = {.host = "127.0.0.1
                                                               .model_id = RAC_NULL,
                                                               .context_size = 8192,
                                                               .threads = 4,
-                                                              .gpu_layers = RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO,
+                                                              .gpu_layers =
+                                                                  RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO,
                                                               .enable_cors = RAC_TRUE,
                                                               .cors_origins = "*",
                                                               .request_timeout_seconds = 300,

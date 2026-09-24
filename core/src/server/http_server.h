@@ -26,6 +26,8 @@
 namespace rac {
 namespace server {
 
+class OpenAIHandler;
+
 /**
  * @brief HTTP Server implementation
  *
@@ -120,6 +122,7 @@ class HttpServer {
 
     // Server state
     std::unique_ptr<httplib::Server> server_;
+    std::shared_ptr<OpenAIHandler> handler_;
     std::thread serverThread_;
     std::atomic<bool> running_{false};
     std::atomic<bool> shouldStop_{false};

@@ -7,5 +7,6 @@
 #define MLX_BACKEND_H
 
 #include "rac_mlx.h"
+#include "rac/backends/rac_mlx_chat_bridge.h"
 
 #endif /* MLX_BACKEND_H */

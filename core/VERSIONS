@@ -14,7 +14,7 @@
 # =============================================================================
 
 # Project version (read from VERSION file, but also defined here for scripts)
-PROJECT_VERSION=0.20.36
+PROJECT_VERSION=0.20.37
 
 # =============================================================================
 # Platform Deployment Targets
@@ -335,11 +335,11 @@ RAC_COMMONS_VERSION=0.1.1
 # Never compute these locally — a local build's bytes are never the published ones.
 NEURUN_REPO=RunanywhereAI/neurun
 
-NEURT_RELEASE_TAG=v0.20.35
-NEURT_RAC_ABI_VERSION=11
-NEURT_MACOS_ARM64_SHA256=576f356e8bde6a54dd64f4a22f6dce947338fa6ba49fc9a51fd0f79756b3710b
-NEURT_IOS_ARM64_SHA256=bf4f945e988c133abe6e45a8652ae30323e841454a54668034e294e6c8985267
-NEURT_IOS_ARM64_SIMULATOR_SHA256=c14fe5bfc2375fa6dd4227b6e6a63682d1fdff2acd5d1bb19c93fbf03cd817dd
+NEURT_RELEASE_TAG=v0.20.37
+NEURT_RAC_ABI_VERSION=12
+NEURT_MACOS_ARM64_SHA256=9492f9ff593424a802ff98c967a3dfc35d5b1fd3f857bfef1674cd7e5c082c43
+NEURT_IOS_ARM64_SHA256=dbf7ef0f576aa8096b2783d9099ccd22c67cd26241276cbf255470956d05b4a0
+NEURT_IOS_ARM64_SIMULATOR_SHA256=139ee6bac48702f6e7b33531bd5dddbd3d1db4ce174392d807a01deeafc8e041
 
 QHEXRT_RELEASE_TAG=v0.20.31
 QHEXRT_ARM64_V8A_SHA256=1c49bfa5dd6546a34b63f79f6be90ff26a04da40832d3c0dbfe4ed35aef3fcd6

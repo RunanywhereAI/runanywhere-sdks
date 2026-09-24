@@ -15,6 +15,7 @@ import { toPublicVlmMetrics } from '../../dist/api/vlm-abi';
 
 const FULL_USAGE: TokenUsage = {
   inputTokens: 12,
+  cachedInputTokens: 8,
   outputTokens: 34,
   totalTokens: 46,
   decodeTokensPerSecond: 57.5,
