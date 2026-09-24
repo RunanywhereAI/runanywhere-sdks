@@ -184,11 +184,14 @@ elseif(RAC_PLATFORM_WINDOWS)
     endif()
 
     # ggml's MSVC ARM backend is an explicit FATAL_ERROR ("use clang").
-    # Windows-on-ARM hosts still report CMAKE_SYSTEM_PROCESSOR=ARM64 even
-    # when vcvarsall amd64 has selected Hostx64/x64/cl.exe, which is how
-    # the cpp-desktop-windows-x64 kit is built on Snapdragon boxes under
-    # Prism. Force AMD64 so ggml takes the AVX path, not ARM.
-    if(MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64")
+    # clang-cl also sets MSVC but is what ggml asks for, so the native
+    # windows-arm64 kit builds with it. Windows-on-ARM hosts still report
+    # CMAKE_SYSTEM_PROCESSOR=ARM64 even when vcvarsall amd64 has selected
+    # Hostx64/x64/cl.exe, which is how the cpp-desktop-windows-x64 kit is
+    # built on Snapdragon boxes under Prism. Force AMD64 so ggml takes the
+    # AVX path, not ARM.
+    if(MSVC AND NOT CMAKE_C_COMPILER_ID STREQUAL "Clang"
+       AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64")
         if(CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
            OR CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$"
            OR CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
