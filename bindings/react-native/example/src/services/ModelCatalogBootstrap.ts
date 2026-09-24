@@ -111,6 +111,29 @@ export async function registerAll(
         memoryRequirementBytes: 2_497_281_312,
         supportsThinking: true,
       }),
+      // MiniCPM5 (OpenBMB) — thinking-capable, phone-scale.
+      // Standard LlamaForCausalLM arch (GGUF `general.architecture` = "llama"),
+      // so the pinned llama.cpp fork loads both sizes with no engine change.
+      // The chat template travels inside the GGUF's `tokenizer.chat_template`
+      // and uses the default <think>/</think> markers, so neither row needs a
+      // custom ThinkingTagPattern.
+      registerModel({
+        id: 'minicpm5-1b-q4_k_m',
+        name: 'MiniCPM5 1B Q4_K_M',
+        url: 'https://huggingface.co/openbmb/MiniCPM5-1B-GGUF/resolve/main/MiniCPM5-1B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        // Exact artifact Content-Length, like every other llama.cpp row here.
+        memoryRequirementBytes: 688_065_920,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'minicpm5-2b-q4_k_m',
+        name: 'MiniCPM5 2B Q4_K_M',
+        url: 'https://huggingface.co/openbmb/MiniCPM5-2B-GGUF/resolve/main/MiniCPM5-2B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 1_561_318_368,
+        supportsThinking: true,
+      }),
       // LFM2 / LFM2.5 (Liquid AI)
       // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
       // (153 MB vs 149 MB): 4 MB buys K-quant mixed precision on the
