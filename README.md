@@ -108,13 +108,11 @@ print(ra.llm.generate("Explain on-device AI in one sentence.",
                       LlmOptions(model="qwen2.5-0.5b")).text)
 ```
 
-Prefer a terminal? Install the CLI from [RunanywhereAI/RCLI](https://github.com/RunanywhereAI/RCLI) — it consumes the C++ desktop kit this repo publishes:
+Prefer a terminal? Install the CLI from [RunanywhereAI/wally](https://github.com/RunanywhereAI/wally) — it consumes the C++ desktop kit this repo publishes:
 
 ```bash
-brew install runanywhereai/tap/rcli
-# or
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.sh | sh
-rcli run qwen3 "Explain on-device AI in one sentence."
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/wally/main/install.sh | sh
+wally run qwen3 "Explain on-device AI in one sentence."
 ```
 
 Building for mobile, web, or desktop? Every platform below speaks the same API.
@@ -380,39 +378,33 @@ pip install runanywhere==0.20.11
 </details>
 
 <details>
-<summary><b>rcli</b> (terminal)</summary>
+<summary><b>wally</b> (terminal)</summary>
 
 <br/>
 
 ```console
-$ rcli pull qwen3
+$ wally models pull qwen3
 pulling qwen3-0.6b ▕████████████▏ 100%  639 MB/639 MB  32 MB/s
-$ rcli run qwen3 "Reply with exactly: RCLI WORKS" --no-think
+$ wally run qwen3 "Reply with exactly: RCLI WORKS" --no-think
 RCLI WORKS
-$ rcli tts --text "RunAnywhere runs models on device." --output hello.wav
-$ rcli stt --input hello.wav
- Run anywhere runs models on device.
-$ rcli voice --input question.wav --output reply.wav   # full STT > LLM > TTS turn
-$ rcli serve qwen3        # OpenAI-compatible API on :8080
+$ wally serve qwen3        # OpenAI-compatible API on :8080
 ```
 
-Also: `rcli run --image photo.jpg` (VLM), `rcli vad`, `rcli embed`, `rcli image` (diffusion, Apple), `rcli lora`, and `--json` on everything.
+Also: `--json` on every command.
 
 Install (macOS Apple Silicon, Linux x86_64):
 
 ```bash
-brew install runanywhereai/tap/rcli
-# or
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/wally/main/install.sh | sh
 ```
 
 Windows (x64):
 
 ```powershell
-irm https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/RunanywhereAI/wally/main/install.ps1 | iex
 ```
 
-[CLI README](https://github.com/RunanywhereAI/RCLI)
+[CLI README](https://github.com/RunanywhereAI/wally)
 
 </details>
 
@@ -429,7 +421,7 @@ irm https://raw.githubusercontent.com/RunanywhereAI/RCLI/main/install.ps1 | iex
 | **Web** | Chromium, Safari, Firefox | Beta | npm (`@runanywhere/web`) | [SDK README](bindings/web/) |
 | **Electron** | Windows x64 desktop | Preview | [Build from source](bindings/electron/) | [SDK README](bindings/electron/) |
 | **Python** | Windows, macOS, Linux | Alpha | pip (`runanywhere`) | [SDK README](bindings/python/) |
-| **rcli** | macOS, Linux, Windows | Stable | Homebrew / install script | [RCLI](https://github.com/RunanywhereAI/RCLI) |
+| **wally** | macOS, Linux, Windows | Stable | install script | [wally](https://github.com/RunanywhereAI/wally) |
 
 All SDKs ship on one version line, currently **0.20.29**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
 
@@ -437,7 +429,7 @@ All SDKs ship on one version line, currently **0.20.29**, from a single C++ core
 
 ## Features
 
-| Feature | Swift | Kotlin | Flutter | RN | Web | Electron | Python | rcli |
+| Feature | Swift | Kotlin | Flutter | RN | Web | Electron | Python | wally |
 |---------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | LLM generation + streaming | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Vision language models (VLM) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
@@ -532,7 +524,7 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
 
 ## OpenAI-compatible server
 
-The Python SDK and rcli both expose the local runtime as a drop-in OpenAI API, so anything that speaks the OpenAI client works against models running on your machine:
+The Python SDK and wally both expose the local runtime as a drop-in OpenAI API, so anything that speaks the OpenAI client works against models running on your machine:
 
 ```bash
 pip install "runanywhere[server]"
@@ -549,7 +541,7 @@ reply = client.chat.completions.create(
 )
 ```
 
-Endpoints: `/v1/chat/completions` (streaming and non-streaming, text and vision), `/v1/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`, `/v1/audio/speech`, and `/v1/models`. `rcli serve` offers the same on port 8080.
+Endpoints: `/v1/chat/completions` (streaming and non-streaming, text and vision), `/v1/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`, `/v1/audio/speech`, and `/v1/models`. `wally serve` is LLM-only: it serves one model on port 8080 with `/v1/chat/completions` and `/v1/models`.
 
 ---
 
@@ -687,7 +679,7 @@ runanywhere-sdks/
 | Flutter | 3.44+ (Dart 3.12+) |
 | Electron | Windows x64 (preview) |
 | Python | 3.9+ on Windows, macOS, Linux (3.12+ recommended) |
-| rcli | macOS arm64, Linux x86_64 / aarch64, Windows x86_64 |
+| wally | macOS arm64, Linux x86_64, Windows x86_64 |
 
 Hexagon NPU: Snapdragon with Hexagon v75 / v79 / v81, Android arm64.
 MLX: Apple silicon, physical devices.
