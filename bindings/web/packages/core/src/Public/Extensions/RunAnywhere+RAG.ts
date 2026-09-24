@@ -1289,17 +1289,42 @@ interface SplitRAGChunk {
   tokenCount: number;
 }
 
-function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
-  const matches = [...text.matchAll(/\S+/g)];
-  if (matches.length === 0) return [];
-  const size = Math.max(1, Math.floor(requestedSize));
-  const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
-  const stride = Math.max(1, size - overlap);
+function splitOversizedToken(
+  tokenText: string,
+  baseOffset: number,
+  size: number,
+  stride: number,
+): SplitRAGChunk[] {
   const chunks: SplitRAGChunk[] = [];
-  for (let start = 0; start < matches.length; start += stride) {
-    const end = Math.min(matches.length, start + size);
-    const startOffset = matches[start]!.index ?? 0;
-    const last = matches[end - 1]!;
+  const codePoints = [...tokenText];
+  let charOffset = 0;
+  for (let c = 0; c < codePoints.length; c += stride) {
+    const slice = codePoints.slice(c, Math.min(codePoints.length, c + size)).join('');
+    const startOffset = baseOffset + charOffset;
+    const endOffset = startOffset + slice.length;
+    chunks.push({
+      text: slice,
+      startOffset,
+      endOffset,
+      tokenCount: 1,
+    });
+    charOffset += codePoints.slice(c, Math.min(codePoints.length, c + stride)).join('').length;
+    if (c + size >= codePoints.length) break;
+  }
+  return chunks;
+}
+
+function chunkNormalTokens(
+  normalMatches: RegExpMatchArray[],
+  text: string,
+  size: number,
+  stride: number,
+): SplitRAGChunk[] {
+  const chunks: SplitRAGChunk[] = [];
+  for (let start = 0; start < normalMatches.length; start += stride) {
+    const end = Math.min(normalMatches.length, start + size);
+    const startOffset = normalMatches[start]!.index ?? 0;
+    const last = normalMatches[end - 1]!;
     const endOffset = (last.index ?? 0) + last[0].length;
     chunks.push({
       text: text.slice(startOffset, endOffset),
@@ -1307,8 +1332,46 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
       endOffset,
       tokenCount: end - start,
     });
-    if (end === matches.length) break;
+    if (end === normalMatches.length) break;
   }
+  return chunks;
+}
+
+const CJK_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\uac00-\ud7af]/u;
+
+function isOversizedToken(tokenText: string, size: number): boolean {
+  const len = [...tokenText].length;
+  if (len <= size) return false;
+  return CJK_REGEX.test(tokenText) || len > Math.max(size, 100);
+}
+
+function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
+  const matches = [...text.matchAll(/\S+/g)];
+  if (matches.length === 0) return [];
+  const size = Math.max(1, Math.floor(requestedSize));
+  const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
+  const stride = Math.max(1, size - overlap);
+
+  const chunks: SplitRAGChunk[] = [];
+  let normalBuffer: RegExpMatchArray[] = [];
+
+  const flushNormal = (): void => {
+    if (normalBuffer.length > 0) {
+      chunks.push(...chunkNormalTokens(normalBuffer, text, size, stride));
+      normalBuffer = [];
+    }
+  };
+
+  for (const match of matches) {
+    if (isOversizedToken(match[0], size)) {
+      flushNormal();
+      chunks.push(...splitOversizedToken(match[0], match.index ?? 0, size, stride));
+    } else {
+      normalBuffer.push(match);
+    }
+  }
+  flushNormal();
+
   return chunks;
 }
 
@@ -1961,6 +2024,7 @@ export const __testing__ = {
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
+  splitRAGText,
 };
 
 /**
