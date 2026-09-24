@@ -11,6 +11,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <string>
 
 #include "../common/rac_service_factory_internal.h"
@@ -24,6 +25,30 @@ namespace {
 
 const rac_vlm_service_ops_t* vlm_ops(const rac_engine_vtable_t* vt) {
     return vt ? vt->vlm_ops : nullptr;
+}
+
+rac_result_t validate_image(const rac_vlm_image_t* image) {
+    if (image->format != RAC_VLM_IMAGE_FORMAT_RGB_PIXELS) {
+        return RAC_SUCCESS;
+    }
+    if (!image->pixel_data || image->width == 0 || image->height == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    constexpr size_t kRgbBytesPerPixel = 3;
+    const size_t width = static_cast<size_t>(image->width);
+    const size_t height = static_cast<size_t>(image->height);
+    const size_t max_size = std::numeric_limits<size_t>::max();
+    if (width > max_size / height) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const size_t pixels = width * height;
+    if (pixels > max_size / kRgbBytesPerPixel ||
+        image->data_size != pixels * kRgbBytesPerPixel) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    return RAC_SUCCESS;
 }
 
 }  // namespace
@@ -146,6 +171,11 @@ rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t* image, 
     if (!handle || !image || !prompt || !out_result)
         return RAC_ERROR_NULL_POINTER;
 
+    const rac_result_t validation_result = validate_image(image);
+    if (validation_result != RAC_SUCCESS) {
+        return validation_result;
+    }
+
     auto* service = static_cast<rac_vlm_service_t*>(handle);
     if (!service->ops || !service->ops->process) {
         return RAC_ERROR_NOT_SUPPORTED;
@@ -159,6 +189,11 @@ rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_image_t* 
                                     rac_vlm_stream_callback_fn callback, void* user_data) {
     if (!handle || !image || !prompt || !callback)
         return RAC_ERROR_NULL_POINTER;
+
+    const rac_result_t validation_result = validate_image(image);
+    if (validation_result != RAC_SUCCESS) {
+        return validation_result;
+    }
 
     auto* service = static_cast<rac_vlm_service_t*>(handle);
     if (!service->ops || !service->ops->process_stream) {
