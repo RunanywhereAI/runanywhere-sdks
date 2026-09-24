@@ -1020,8 +1020,10 @@ set(RAC_FEATURES_SOURCES
     # Result memory management (weak symbol fallbacks)
     # On MSVC, each service .cpp already provides strong definitions,
     # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)
-    # must be excluded to avoid LNK2005 duplicate symbol errors.
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:src/features/result_free.cpp>
+    # must be excluded to avoid LNK2005 duplicate symbol errors. clang-cl
+    # counts: it defines _MSC_VER, which drops the weak attribute, but its
+    # compiler id is Clang, so test the MSVC variable rather than the id.
+    $<$<NOT:$<BOOL:${MSVC}>>:src/features/result_free.cpp>
 )
 
 # Desktop platform adapter (native filesystem + libcurl) — desktop hosts only
