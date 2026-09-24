@@ -344,6 +344,38 @@ describe('CrossWasmRAGProvider', () => {
   });
 });
 
+describe('renderRAGPrompt', () => {
+  it('fills both placeholder styles in a custom template', () => {
+    expect(__testing__.renderRAGPrompt(
+      'Q: {{query}} / {query}\nC: {{context}} / {context}',
+      'the docs',
+      'why?',
+    )).toBe('Q: why? / why?\nC: the docs / the docs');
+  });
+
+  it('uses the default template when none is configured', () => {
+    expect(__testing__.renderRAGPrompt(undefined, 'the docs', 'why?')).toBe(
+      'Use the context below to answer.\n\nContext:\nthe docs\n\nQuestion: why?',
+    );
+  });
+
+  it('inserts context and query verbatim when they contain $ sequences', () => {
+    const context = "$$E=mc^2$$ costs $& or $' or $1";
+    const query = 'is $$ special?';
+    expect(__testing__.renderRAGPrompt('{context}|{query}', context, query)).toBe(
+      `${context}|${query}`,
+    );
+  });
+
+  it('does not substitute placeholders that appear inside context or query', () => {
+    const context = 'GET /search?q={query} and {{context}}';
+    const query = 'what is {context}?';
+    expect(__testing__.renderRAGPrompt('{{context}}\n{query}', context, query)).toBe(
+      `${context}\n${query}`,
+    );
+  });
+});
+
 function installBackendSpies() {
   // Cross-WASM RAG ranks chunks via commons `rac_embeddings_similarity`.
   // Register a math-only WASM stub so retrieval never fabricates cosine in TS.

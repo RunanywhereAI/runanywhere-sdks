@@ -1333,11 +1333,13 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
 
 function renderRAGPrompt(template: string | undefined, context: string, query: string): string {
   const fallback = 'Use the context below to answer.\n\nContext:\n{context}\n\nQuestion: {query}';
-  return (template?.trim() || fallback)
-    .replaceAll('{{context}}', context)
-    .replaceAll('{{query}}', query)
-    .replaceAll('{context}', context)
-    .replaceAll('{query}', query);
+  // One pass with a function replacer: substituted text is never re-scanned
+  // for placeholders, and `$` sequences in it are not replacement patterns.
+  return (template?.trim() || fallback).replace(
+    /\{\{(context|query)\}\}|\{(context|query)\}/g,
+    (_match, doubled: string | undefined, single: string | undefined) =>
+      (doubled ?? single) === 'context' ? context : query,
+  );
 }
 
 function nowMs(): number {
@@ -1961,6 +1963,7 @@ export const __testing__ = {
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
+  renderRAGPrompt,
 };
 
 /**
