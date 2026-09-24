@@ -113,6 +113,7 @@ public enum MLX {
         callbacks.destroy = mlxDestroy
         callbacks.user_data = nil
         callbacks.llm_generate_chat_stream = nil
+        callbacks.context_length = mlxContextLength
 
         let clearCancelResult = ra_mlx_set_clear_cancel_callback(mlxClearCancellation, nil)
         guard clearCancelResult == RAC_SUCCESS else {
@@ -769,6 +770,11 @@ private final class MLXSession: @unchecked Sendable {
         self.kind = kind
         self.modelID = modelID
         MLXSessionCoordinator.register(self)
+    }
+
+    // swiftlint:disable:next strict_fileprivate
+    fileprivate var loadedContextLength: Int {
+        lock.withLock { $0.contextLength }
     }
 
     func load(modelPath: String, resetCancellation: Bool = true) async throws {
@@ -2364,6 +2370,19 @@ private let mlxInitialize: rac_mlx_initialize_fn = { handle, modelPathPtr, _ in
         recordMLXFailure("MLX model load", error: error, modelPath: modelPath)
         return RAC_ERROR_MODEL_LOAD_FAILED
     }
+}
+
+private let mlxContextLength: rac_mlx_context_length_fn = { handle, outContextLength, _ in
+    guard let session = session(from: handle), let outContextLength else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let contextLength = session.loadedContextLength
+    guard contextLength > 0, contextLength <= Int(Int32.max) else {
+        outContextLength.pointee = 0
+        return RAC_ERROR_BACKEND_UNAVAILABLE
+    }
+    outContextLength.pointee = Int32(contextLength)
+    return RAC_SUCCESS
 }
 
 private let mlxLLMGenerate: rac_mlx_llm_generate_fn = { handle, promptPtr, options, outResult, _ in

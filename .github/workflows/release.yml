@@ -381,7 +381,9 @@ jobs:
   native_linux:
     needs: validate
     if: ${{ !inputs.publish_from_run_id }}
-    runs-on: ubuntu-latest
+    # Keep published Linux binaries runnable on Ubuntu 22.04. ubuntu-latest
+    # currently resolves to 24.04 and raises the ABI floor to GLIBC_2.38.
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7

@@ -317,7 +317,8 @@ endif()
 # never registers the program() fallback.
 # -----------------------------------------------------------------------------
 set(_RAC_FORCE_BUNDLED_BZIP2 OFF)
-if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS"
+   OR RAC_PACKAGE_CPP_DESKTOP)
     set(_RAC_FORCE_BUNDLED_BZIP2 ON)
 endif()
 

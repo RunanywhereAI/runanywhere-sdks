@@ -1120,6 +1120,7 @@ _rac_runtime_unregister
 _rac_sdk_get_environment
 _rac_sdk_is_initialized
 _rac_sdk_reset
+_rac_server_get_context_length
 _rac_server_get_status
 _rac_server_is_running
 _rac_server_set_error_callback
