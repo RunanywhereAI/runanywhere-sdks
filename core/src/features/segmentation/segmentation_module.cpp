@@ -192,12 +192,15 @@ rac_result_t validate_request(const runanywhere::v1::SegmentationRequest& reques
     if (request.has_options()) {
         out_options->include_diagnostic_rgba =
             request.options().include_diagnostic_rgba() ? RAC_TRUE : RAC_FALSE;
+        out_options->include_confidence =
+            request.options().include_confidence() ? RAC_TRUE : RAC_FALSE;
     }
     return RAC_SUCCESS;
 }
 
 rac_result_t result_to_proto(const rac_segmentation_result_t& source, uint32_t expected_width,
                              uint32_t expected_height, bool diagnostic_requested,
+                             bool confidence_requested,
                              const char* fallback_model_id,
                              runanywhere::v1::SegmentationResult* out) {
     if (!out) {
@@ -218,6 +221,11 @@ rac_result_t result_to_proto(const rac_segmentation_result_t& source, uint32_t e
     if ((diagnostic_requested &&
          (!source.diagnostic_rgba || source.diagnostic_rgba_size != rgba_size)) ||
         (!diagnostic_requested && source.diagnostic_rgba_size != 0)) {
+        return RAC_ERROR_ENCODING_ERROR;
+    }
+    if ((confidence_requested &&
+         (!source.confidence_mask || source.confidence_mask_size != pixels)) ||
+        (!confidence_requested && source.confidence_mask_size != 0)) {
         return RAC_ERROR_ENCODING_ERROR;
     }
     if (source.class_summary_count > 0 && !source.class_summaries) {
@@ -270,6 +278,9 @@ rac_result_t result_to_proto(const rac_segmentation_result_t& source, uint32_t e
     if (diagnostic_requested) {
         out->set_diagnostic_rgba(source.diagnostic_rgba, source.diagnostic_rgba_size);
     }
+    if (confidence_requested) {
+        out->set_confidence_mask_u8(source.confidence_mask, source.confidence_mask_size);
+    }
     out->set_processing_time_ms(source.processing_time_ms);
     out->set_model_id(source.model_id ? source.model_id
                                       : (fallback_model_id ? fallback_model_id : ""));
@@ -309,7 +320,8 @@ rac_result_t segment_with_service(rac_handle_t service, const char* model_id,
 
     runanywhere::v1::SegmentationResult result;
     rc = result_to_proto(raw, image.width, image.height,
-                         options.include_diagnostic_rgba == RAC_TRUE, model_id, &result);
+                         options.include_diagnostic_rgba == RAC_TRUE,
+                         options.include_confidence == RAC_TRUE, model_id, &result);
     if (rc == RAC_SUCCESS) {
         rc = rac::proto::copy_message(result, out_result, "failed to serialize SegmentationResult");
     } else {

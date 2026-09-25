@@ -411,6 +411,9 @@ export function toSegmentationResult(
     ...(result.diagnosticRgba && result.diagnosticRgba.byteLength > 0
       ? { diagnosticImage: result.diagnosticRgba }
       : {}),
+    ...(result.confidenceMaskU8 && result.confidenceMaskU8.byteLength > 0
+      ? { confidenceMask: result.confidenceMaskU8 }
+      : {}),
   };
 }
 

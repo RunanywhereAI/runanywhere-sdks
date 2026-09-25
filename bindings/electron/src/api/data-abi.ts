@@ -117,7 +117,7 @@ export function toSegmentationRequest(
       // proto3 zero value IS the default; SEGMENTATION_DEFAULTS names it once.
       includeDiagnosticRgba:
         options.includeDiagnosticImage ?? SEGMENTATION_DEFAULTS.includeDiagnosticImage,
-      includeConfidence: false,
+      includeConfidence: options.includeConfidence ?? SEGMENTATION_DEFAULTS.includeConfidence,
     },
   });
 }

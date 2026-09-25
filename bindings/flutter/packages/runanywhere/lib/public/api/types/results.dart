@@ -631,6 +631,7 @@ class SegmentationResult {
     required this.height,
     required this.classes,
     this.diagnosticImage,
+    this.confidenceMask,
   });
 
   /// Build from the generated segmentation result.
@@ -656,6 +657,9 @@ class SegmentationResult {
       diagnosticImage: proto.hasDiagnosticRgba()
           ? Uint8List.fromList(proto.diagnosticRgba)
           : null,
+      confidenceMask: proto.hasConfidenceMaskU8()
+          ? Uint8List.fromList(proto.confidenceMaskU8)
+          : null,
     );
   }
 
@@ -673,6 +677,9 @@ class SegmentationResult {
 
   /// Class-colour RGBA overlay, when requested.
   final Uint8List? diagnosticImage;
+
+  /// Chosen-class probabilities as 0..255 bytes, when requested.
+  final Uint8List? confidenceMask;
 }
 
 /// One retrieved chunk and its similarity to the query.

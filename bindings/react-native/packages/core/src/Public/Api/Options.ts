@@ -341,7 +341,10 @@ export function toSegmentationOptions(
   options?: SegmentationOptions
 ): SegmentationOptionsMessage {
   return SegmentationOptionsMessage.fromPartial(
-    defined({ includeDiagnosticRgba: options?.includeDiagnosticImage })
+    defined({
+      includeDiagnosticRgba: options?.includeDiagnosticImage,
+      includeConfidence: options?.includeConfidence,
+    })
   );
 }
 

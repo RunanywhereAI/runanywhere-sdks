@@ -849,7 +849,7 @@ export class NativeBackend implements RaBackend {
 
   async segment(
     img: { data: Uint8Array; width: number; height: number; pixelFormat?: number },
-    options: { includeDiagnosticImage?: boolean }
+    options: { includeDiagnosticImage?: boolean; includeConfidence?: boolean }
   ): Promise<NativeSegmentation> {
     return this.addon.segment(this.handleFor('segmentation'), img, options);
   }

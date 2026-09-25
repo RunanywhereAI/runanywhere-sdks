@@ -161,6 +161,7 @@ def segment(
     pixel_format: int | None = ...,
     stride_bytes: int | None = ...,
     include_diagnostic_rgba: bool | None = ...,
+    include_confidence: bool | None = ...,
 ) -> dict[str, Any]: ...
 def unload_segmentation_model(handle: int) -> None: ...
 

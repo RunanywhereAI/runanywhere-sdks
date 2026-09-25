@@ -490,6 +490,14 @@ rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& i
     if (!out_result->class_mask) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
+    if (options.include_confidence == RAC_TRUE) {
+        out_result->confidence_mask = static_cast<uint8_t*>(std::malloc(pixel_count));
+        if (!out_result->confidence_mask) {
+            rac_segmentation_result_free(out_result);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        out_result->confidence_mask_size = pixel_count;
+    }
     std::vector<uint64_t> counts(class_count, 0);
     const size_t max_y = logits_height - 1;
     const size_t max_x = logits_width - 1;
@@ -516,6 +524,7 @@ rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& i
 
             uint16_t best_class = 0;
             float best_value = -std::numeric_limits<float>::infinity();
+            double probability_denominator = 0.0;
             for (size_t class_id = 0; class_id < class_count; ++class_id) {
                 const size_t plane = class_id * logits_plane;
                 const float top = logit_at(plane + y0 * logits_width + x0) * (1.0f - wx) +
@@ -524,11 +533,26 @@ rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& i
                                      logit_at(plane + y1 * logits_width + x1) * wx;
                 const float value = top * (1.0f - wy) + bottom * wy;
                 if (value > best_value) {
+                    if (options.include_confidence == RAC_TRUE) {
+                        probability_denominator = std::isfinite(best_value)
+                                                      ? probability_denominator *
+                                                                std::exp(best_value - value) +
+                                                            1.0
+                                                      : 1.0;
+                    }
                     best_value = value;
                     best_class = static_cast<uint16_t>(class_id);
+                } else if (options.include_confidence == RAC_TRUE) {
+                    probability_denominator += std::exp(value - best_value);
                 }
             }
-            out_result->class_mask[y * image.width + x] = best_class;
+            const size_t pixel_index = y * image.width + x;
+            out_result->class_mask[pixel_index] = best_class;
+            if (options.include_confidence == RAC_TRUE) {
+                const long quantized = std::lround(255.0 / probability_denominator);
+                out_result->confidence_mask[pixel_index] =
+                    static_cast<uint8_t>(std::clamp(quantized, 0L, 255L));
+            }
             ++counts[best_class];
         }
     }

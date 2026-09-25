@@ -205,6 +205,7 @@ internal fun ProtoSegmentationResult.toSegmentationResult(): SegmentationResult 
                 )
             },
         diagnosticImage = diagnostic_rgba?.toByteArray(),
+        confidenceMask = confidence_mask_u8?.toByteArray(),
     )
 
 internal fun RAGSearchResult.toMatch(): Match =

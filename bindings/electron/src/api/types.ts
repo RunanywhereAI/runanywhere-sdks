@@ -490,6 +490,8 @@ export interface ClassInfo {
 export interface SegmentationResult {
   /** One class id per pixel, row-major. */
   classMask: Uint16Array;
+  /** Winning-class probability per source pixel, scaled from 0 through 255 when requested. */
+  confidenceMask?: Uint8Array;
   width: number;
   height: number;
   classes: ClassInfo[];

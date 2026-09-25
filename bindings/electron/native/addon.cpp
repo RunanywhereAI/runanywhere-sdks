@@ -3469,7 +3469,7 @@ struct SegmentationResultBox {
 
 // segment(handleId, { data, width, height, pixelFormat, strideBytes },
 // options?) ->
-//   { width, height, classMask: Uint16Array, classes, diagnosticRgba? }.
+//   { width, height, classMask: Uint16Array, classes, diagnosticRgba?, confidenceMask? }.
 Napi::Value Segment(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsObject()) {
@@ -3507,6 +3507,10 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
         if (o.Has("includeDiagnosticImage")) {
             opts.include_diagnostic_rgba =
                 o.Get("includeDiagnosticImage").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
+        }
+        if (o.Has("includeConfidence")) {
+            opts.include_confidence =
+                o.Get("includeConfidence").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
         }
     }
     auto pixels = std::make_shared<std::vector<uint8_t>>(data, data + data_size);
@@ -3555,7 +3559,11 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
             out.Set("classes", classes);
             if (result.diagnostic_rgba && result.diagnostic_rgba_size) {
                 out.Set("diagnosticRgba", Napi::Buffer<uint8_t>::Copy(e, result.diagnostic_rgba,
-                                                                      result.diagnostic_rgba_size));
+                                                                       result.diagnostic_rgba_size));
+            }
+            if (result.confidence_mask && result.confidence_mask_size) {
+                out.Set("confidenceMask", Napi::Buffer<uint8_t>::Copy(e, result.confidence_mask,
+                                                                        result.confidence_mask_size));
             }
             return out;
         },
