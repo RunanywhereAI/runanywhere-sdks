@@ -328,10 +328,11 @@ def test_cancelling_agenerate_cancels_a_pending_async_executor(sdk, gguf) -> Non
     # Cancelling the caller must reach the executor coroutine the worker thread is
     # waiting on, rather than leaving it (and the thread) running after the caller left.
     outcome = []
-    started = asyncio.Event()
+    # Created inside run(): before 3.10 an Event binds the loop current at construction.
+    state = {}
 
     async def executor(arguments):
-        started.set()
+        state["started"].set()
         try:
             await asyncio.wait_for(asyncio.Event().wait(), timeout=2)
             outcome.append("finished")
@@ -351,9 +352,10 @@ def test_cancelling_agenerate_cancels_a_pending_async_executor(sdk, gguf) -> Non
         sdk.generate_typed = next_deltas  # type: ignore[method-assign]
 
         async def run():
+            state["started"] = asyncio.Event()
             generation = ra.llm.agenerate("Weather in Paris?", _opts(gguf))
             task = asyncio.ensure_future(generation)
-            await asyncio.wait_for(started.wait(), timeout=2)
+            await asyncio.wait_for(state["started"].wait(), timeout=2)
             task.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await task
