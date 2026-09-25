@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+import contextlib
+import contextvars
 import json
+import threading
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional
 
 from .. import _generation
@@ -160,9 +164,45 @@ class Llm:
         text, opts = prepare(prompt, options)
         tools = _active_tools(opts, self.tools)
         if tools:
-            for event in self._with_tools(text, opts, tools):
-                yield event
-            return
+            # The tool loop is synchronous: step it on a worker thread so it does not block
+            # this event loop, and hand coroutine executors back to this loop to await.
+            loop = asyncio.get_running_loop()
+            stop = _ToolLoopStop()
+            steps = self._with_tools(text, opts, tools, loop=loop, stop=stop)
+            done = object()
+            finished = False
+            step: Optional[asyncio.Future] = None
+            try:
+                while True:
+                    ctx = contextvars.copy_context()
+                    step = loop.run_in_executor(None, ctx.run, next, steps, done)
+                    # Shielded so a cancelled caller still owns the running step below.
+                    event = await asyncio.shield(step)
+                    if event is done:
+                        finished = True
+                        return
+                    yield event
+            finally:
+                # Cancelled or closed early: the worker may still be inside a step.
+                # Cancel the executor it is waiting on and stop it before the next tool,
+                # and stop the model call it may be blocked in.
+                if not finished:
+                    stop.set()
+                    if step is not None and not step.done():
+                        model = runtime.llm_if_resident()
+                        if model is not None:
+                            model.cancel()
+                        # A separate task owns the running step and closes the loop once it
+                        # returns, so a second cancellation here cannot drop it.
+                        cleanup = asyncio.ensure_future(_finish_step(step, steps))
+                        _STEP_CLEANUPS.add(cleanup)
+                        cleanup.add_done_callback(_STEP_CLEANUPS.discard)
+                        # Wait for a cancelled model call so its generation guard is free when
+                        # we return, but not for a synchronous tool: nothing can interrupt it.
+                        if not stop.in_sync_tool():
+                            await asyncio.shield(cleanup)
+                    else:
+                        steps.close()
         inner = self._aplain(text, opts)
         try:
             async for event in inner:
@@ -249,7 +289,12 @@ class Llm:
         return _parse_call(reply, {t.name for t in tools})
 
     def _with_tools(
-        self, text: str, opts: LlmOptions, tools: List[ToolDefinition]
+        self,
+        text: str,
+        opts: LlmOptions,
+        tools: List[ToolDefinition],
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+        stop: Optional["_ToolLoopStop"] = None,
     ) -> Iterator[GenerationEvent]:
         """Run the tool loop, then stream the model's final answer."""
         request_id = runtime.new_request_id()
@@ -259,6 +304,8 @@ class Llm:
         prompt = text
         for _ in range(max(1, opts.max_tool_calls)):
             call = self._one_call(prompt, opts, tools)
+            if stop is not None and stop.is_set():
+                return
             if call is None:
                 break
             fingerprint = (call.name, json.dumps(call.arguments, sort_keys=True, default=str))
@@ -269,9 +316,26 @@ class Llm:
             seen.add(fingerprint)
             executor = self.tools.executor(call.name)
             if executor is not None:
-                outcome = executor(call.arguments)
+                if stop is not None:
+                    stop.enter_tool()
+                    if stop.is_set():
+                        stop.exit_tool()
+                        return
+                try:
+                    outcome = executor(call.arguments)
+                finally:
+                    if stop is not None:
+                        stop.exit_tool()
                 if asyncio.iscoroutine(outcome):
-                    outcome = asyncio.run(outcome)
+                    if loop is not None:
+                        # Called from agenerate_stream's worker thread: await it on the
+                        # caller's loop (asyncio.run cannot nest inside a running loop).
+                        try:
+                            outcome = (stop or _ToolLoopStop()).run(outcome, loop)
+                        except concurrent.futures.CancelledError:
+                            return
+                    else:
+                        outcome = asyncio.run(outcome)
                 call.result = outcome if isinstance(outcome, dict) else {"value": outcome}
             calls.append(call)
             yield GenerationEvent(
@@ -305,6 +369,65 @@ class Llm:
                 tool_call=event.tool_call,
                 result=event.result,
             )
+
+
+class _ToolLoopStop:
+    """Lets ``agenerate_stream`` stop a tool loop its worker thread is still running.
+
+    ``asyncio.to_thread`` cannot interrupt the thread, so on cancellation the caller
+    sets this. It cancels the executor coroutine the worker is waiting on, and the
+    worker returns before it runs another tool.
+    """
+
+    def __init__(self) -> None:
+        self._stopped = threading.Event()
+        self._pending: Optional[concurrent.futures.Future] = None
+        self._in_tool = False
+
+    def enter_tool(self) -> None:
+        """The worker is about to call an executor; for a sync one, nothing can interrupt it."""
+        self._in_tool = True
+
+    def exit_tool(self) -> None:
+        self._in_tool = False
+
+    def in_sync_tool(self) -> bool:
+        """True while the worker is inside an executor call (not awaiting a coroutine one)."""
+        return self._in_tool
+
+    def is_set(self) -> bool:
+        return self._stopped.is_set()
+
+    def set(self) -> None:
+        self._stopped.set()
+        pending = self._pending
+        if pending is not None:
+            pending.cancel()
+
+    def run(self, coro: Awaitable[Any], loop: asyncio.AbstractEventLoop) -> Any:
+        """Await ``coro`` on ``loop`` from the worker; CancelledError once stopped."""
+        future = asyncio.run_coroutine_threadsafe(coro, loop)  # type: ignore[arg-type]
+        self._pending = future
+        if self._stopped.is_set():
+            future.cancel()
+        try:
+            return future.result()
+        finally:
+            self._pending = None
+
+
+#: Cleanup tasks for cancelled tool-loop steps, kept referenced until they finish.
+_STEP_CLEANUPS: set[asyncio.Future] = set()
+
+
+async def _finish_step(step: asyncio.Future[Any], steps: Iterator[GenerationEvent]) -> None:
+    """Wait for a cancelled tool-loop step to return, then close the loop it was running."""
+    # Already unwinding: the step's result or error is not ours to report.
+    with contextlib.suppress(BaseException):
+        await step
+    # Still running only if this task was cancelled (loop shutdown): the worker keeps it.
+    if step.done():
+        steps.close()
 
 
 def _structured(result: GenerationResult) -> StructuredResult:
