@@ -147,6 +147,8 @@ export interface SegmentationResult {
   classes: ClassInfo[];
   /** RGBA preview, present when `includeDiagnosticImage` was set. */
   diagnosticImage?: Uint8Array;
+  /** Chosen-class probabilities as 0..255 bytes, when requested. */
+  confidenceMask?: Uint8Array;
 }
 
 /** One retrieved chunk of a RAG corpus. */

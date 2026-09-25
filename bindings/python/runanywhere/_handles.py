@@ -602,21 +602,21 @@ class SegmentationModel:
         pixel_format: int = 1,
         stride_bytes: int = 0,
         include_diagnostic_rgba: bool = False,
+        include_confidence: bool = False,
     ) -> dict:
         """Segment packed RGB/RGBA pixels; returns ``{width, height, class_mask, classes}``."""
         if not hasattr(self._core, "segment"):
             raise _rebuild_gap(
                 "segmentation.segment", "load_segmentation_model / segment"
             )
-        return self._core.segment(
-            self._handle,
-            data,
-            width,
-            height,
-            pixel_format=pixel_format,
-            stride_bytes=stride_bytes or None,
-            include_diagnostic_rgba=include_diagnostic_rgba,
-        )
+        kwargs = {
+            "pixel_format": pixel_format,
+            "stride_bytes": stride_bytes or None,
+            "include_diagnostic_rgba": include_diagnostic_rgba,
+        }
+        if include_confidence:
+            kwargs["include_confidence"] = True
+        return self._core.segment(self._handle, data, width, height, **kwargs)
 
     def unload(self) -> None:
         """Release the model. Idempotent."""

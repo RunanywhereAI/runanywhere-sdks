@@ -117,6 +117,7 @@ void rac_segmentation_result_free(rac_segmentation_result_t* result) {
     }
     std::free(result->class_mask);
     std::free(result->diagnostic_rgba);
+    std::free(result->confidence_mask);
     if (result->class_summaries) {
         for (size_t i = 0; i < result->class_summary_count; ++i) {
             std::free(result->class_summaries[i].label);

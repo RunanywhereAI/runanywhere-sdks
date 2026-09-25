@@ -182,6 +182,7 @@ export interface DiarizationOptions {
 /** Semantic-segmentation knobs. */
 export interface SegmentationOptions {
   includeDiagnosticImage?: boolean;
+  includeConfidence?: boolean;
 }
 
 /** Turn-taking knobs of a voice session. */
