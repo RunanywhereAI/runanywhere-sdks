@@ -586,7 +586,19 @@ interface Served {
 
 // Serve `body` from a localhost server. Records each request's Range header in
 // `seen`. `ignoreRange` makes it reply 200 (full) even when a Range is sent.
-function serve(body: Buffer, opts: { ignoreRange?: boolean } = {}): Promise<Served> {
+// `rangeResponse` allows malformed and partial 206 responses to be tested.
+function serve(
+  body: Buffer,
+  opts: {
+    ignoreRange?: boolean;
+    rangeResponse?: {
+      contentRange?: string | null;
+      contentLength?: number | null;
+      bodyStart?: number;
+      bodyEnd?: number;
+    };
+  } = {}
+): Promise<Served> {
   const seen: Array<string | null> = [];
   const server = http.createServer((req, res) => {
     seen.push(req.headers.range ?? null);
@@ -595,11 +607,21 @@ function serve(body: Buffer, opts: { ignoreRange?: boolean } = {}): Promise<Serv
     if (m) {
       const start = parseInt(m[1], 10);
       if (start >= body.length) { res.writeHead(416, { 'Content-Range': `bytes */${body.length}` }); res.end(); return; }
+      const rangeResponse = opts.rangeResponse ?? {};
+      const bodyStart = rangeResponse.bodyStart ?? start;
+      const bodyEnd = rangeResponse.bodyEnd ?? body.length - 1;
+      const rangeBody = body.subarray(bodyStart, bodyEnd + 1);
+      const contentRange = rangeResponse.contentRange === null
+        ? undefined
+        : (rangeResponse.contentRange ?? `bytes ${bodyStart}-${bodyEnd}/${body.length}`);
+      const contentLength = rangeResponse.contentLength === null
+        ? undefined
+        : String(rangeResponse.contentLength ?? rangeBody.length);
       res.writeHead(206, {
-        'Content-Length': String(body.length - start),
-        'Content-Range': `bytes ${start}-${body.length - 1}/${body.length}`,
+        ...(contentLength ? { 'Content-Length': contentLength } : {}),
+        ...(contentRange ? { 'Content-Range': contentRange } : {}),
       });
-      res.end(body.subarray(start));
+      res.end(rangeBody);
       return;
     }
     res.writeHead(200, { 'Content-Length': String(body.length) });
@@ -637,6 +659,121 @@ test('downloadFile resumes an interrupted .part with a Range request', async () 
     await download.downloadFile(url, dest);
     assert.deepEqual(fs.readFileSync(dest), body, 'resumed file matches the original bytes');
     assert.ok(seen.includes('bytes=3000-'), 'sent a Range from the .part size');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile validates the range length from Content-Range when Content-Length is absent', async () => {
+  const body = Buffer.from('v'.repeat(8000));
+  const { server, url } = await serve(body, { rangeResponse: { contentLength: null } });
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  fs.writeFileSync(dest + '.part', body.subarray(0, 3000));
+  try {
+    await download.downloadFile(url, dest);
+    assert.deepEqual(fs.readFileSync(dest), body, 'Content-Range supplies the expected response span');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile rejects a 206 whose Content-Range starts at a different offset', async () => {
+  const body = Buffer.from('r'.repeat(8000));
+  const { server, url } = await serve(body, {
+    rangeResponse: { contentRange: 'bytes 0-4999/8000', contentLength: 5000, bodyStart: 0, bodyEnd: 4999 },
+  });
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  const partial = body.subarray(0, 3000);
+  fs.writeFileSync(dest + '.part', partial);
+  try {
+    await assert.rejects(download.downloadFile(url, dest), /invalid Content-Range/);
+    assert.equal(fs.existsSync(dest), false, 'a mismatched range must not be published');
+    assert.deepEqual(fs.readFileSync(dest + '.part'), partial, 'the old partial must remain untouched');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile rejects a 206 with no Content-Range before appending', async () => {
+  const body = Buffer.from('s'.repeat(8000));
+  const { server, url } = await serve(body, { rangeResponse: { contentRange: null } });
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  const partial = body.subarray(0, 3000);
+  fs.writeFileSync(dest + '.part', partial);
+  try {
+    await assert.rejects(download.downloadFile(url, dest), /invalid Content-Range/);
+    assert.equal(fs.existsSync(dest), false);
+    assert.deepEqual(fs.readFileSync(dest + '.part'), partial);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile rejects malformed Content-Range and mismatched Content-Length', async () => {
+  const body = Buffer.from('t'.repeat(8000));
+  const dir = freshTempRoot();
+  const partial = body.subarray(0, 3000);
+  try {
+    for (const [name, rangeResponse, expectedError] of [
+      ['malformed', { contentRange: 'bytes 3000-7999/*' }, /invalid Content-Range/],
+      ['wrong-length', { contentRange: 'bytes 3000-7999/8000', contentLength: 4999 }, /Content-Length does not match Content-Range/],
+    ] as const) {
+      const { server, url } = await serve(body, { rangeResponse });
+      const dest = path.join(dir, `${name}.bin`);
+      fs.writeFileSync(dest + '.part', partial);
+      try {
+        await assert.rejects(download.downloadFile(url, dest), expectedError);
+        assert.equal(fs.existsSync(dest), false);
+        assert.deepEqual(fs.readFileSync(dest + '.part'), partial);
+      } finally {
+        server.close();
+        fs.rmSync(dest + '.part', { force: true });
+      }
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile does not publish a valid but incomplete 206 range', async () => {
+  const body = Buffer.from('u'.repeat(8000));
+  const { server, url } = await serve(body, {
+    rangeResponse: { contentRange: 'bytes 3000-4999/8000', contentLength: 2000, bodyStart: 3000, bodyEnd: 4999 },
+  });
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  const partial = body.subarray(0, 3000);
+  fs.writeFileSync(dest + '.part', partial);
+  try {
+    await assert.rejects(download.downloadFile(url, dest), /incomplete download/);
+    assert.equal(fs.existsSync(dest), false, 'a partial representation must not be published');
+    assert.deepEqual(fs.readFileSync(dest + '.part'), body.subarray(0, 5000), 'validated contiguous bytes remain resumable');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile removes overlong 206 bytes from the partial before rejecting', async () => {
+  const body = Buffer.from('w'.repeat(8000));
+  const { server, url } = await serve(body, {
+    rangeResponse: { contentRange: 'bytes 3000-4999/8000', contentLength: null, bodyStart: 3000, bodyEnd: 7999 },
+  });
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  const partial = body.subarray(0, 3000);
+  fs.writeFileSync(dest + '.part', partial);
+  try {
+    await assert.rejects(download.downloadFile(url, dest), /incomplete download/);
+    assert.equal(fs.existsSync(dest), false);
+    assert.deepEqual(fs.readFileSync(dest + '.part'), partial, 'unverified excess bytes must not remain resumable');
   } finally {
     server.close();
     fs.rmSync(dir, { recursive: true, force: true });
