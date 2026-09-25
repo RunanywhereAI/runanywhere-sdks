@@ -399,15 +399,24 @@ test('an unknown reply id is ignored (no throw, no cross-talk)', { skip: SKIP },
 // A re-forked host starts uninitialised, so the preload replays initialize() and,
 // once the gate is open again, re-runs the auth setup when the app configured a
 // control plane. Calls made after the restart must still settle.
-// An authenticated SdkInitResult: the control plane is on, so auth.retry() posts.
-const authenticated = SdkInitResult.encode(
-  SdkInitResult.fromPartial({ httpApplicable: true, hasCompletedHttpSetup: true })
-).finish();
+// The first host could not finish the HTTP setup (offline), and the replacement
+// host's retry succeeds. Commons reports no token, so auth.state() takes its status
+// from the retry's outcome: it only reads 'authenticated' once the retry has applied.
+const initResult = (hasCompletedHttpSetup: boolean) =>
+  SdkInitResult.encode(SdkInitResult.fromPartial({ httpApplicable: true, hasCompletedHttpSetup })).finish();
+const noToken = {
+  authenticated: false,
+  needsRefresh: false,
+  expiresAtUnixSec: 0,
+  userId: '',
+  organizationId: '',
+  deviceRegistered: false,
+};
 const controlPlaneReplies = {
   'v3.hasControlPlane': true,
   'v3.devicePersistentId': 'device-1',
-  'v3.configureControlPlane': authenticated,
-  'v3.retryControlPlane': authenticated,
+  'v3.configureControlPlane': initResult(false),
+  'v3.retryControlPlane': initResult(true),
 };
 for (const controlPlane of [undefined, { apiKey: 'sk-test', baseUrl: 'https://cp.example.test' }]) {
   test(`calls after a host restart settle (control plane ${controlPlane ? 'on' : 'off'})`, { skip: SKIP }, async () => {
@@ -418,7 +427,7 @@ for (const controlPlane of [undefined, { apiKey: 'sk-test', baseUrl: 'https://cp
       cp?: { apiKey?: string }
     ) => Promise<void>;
     const first = connect(state);
-    const replies = { 'v3.version': '1.0.0', ...(controlPlane ? controlPlaneReplies : {}) };
+    const replies = { 'v3.version': '1.0.0', 'v3.authState': noToken, ...(controlPlane ? controlPlaneReplies : {}) };
     await Promise.all([initialize('/sec', '/base', controlPlane), pump(first, replies)]);
     assert.equal(
       first.posts.some((m) => m.method === 'v3.configureControlPlane'),
@@ -438,9 +447,19 @@ for (const controlPlane of [undefined, { apiKey: 'sk-test', baseUrl: 'https://cp
 
     assert.ok(settled, `version() is still pending; posted: ${replacement.posts.map((m) => m.method).join(', ')}`);
     assert.equal(await version, '1.0.0');
-    for (const msg of replacement.posts.filter((m) => m.method === retry)) {
-      replacement.onmessage!({ data: { id: msg.id, ok: true, result: replies[retry as keyof typeof replies] } });
+    const auth = exposed.runanywhere.auth as { state(): Promise<{ status: string }> };
+    if (controlPlane) {
+      const before = auth.state();
+      await pump(replacement, replies, new Set([retry]));
+      assert.equal((await before).status, 'offline', 'the held retry has not applied yet');
     }
+
+    // Release the retry (and answer the authState read that follows it), then the
+    // page must see the control-plane state the retry restored.
+    await pump(replacement, replies);
+    const after = auth.state();
+    await pump(replacement, replies);
+    assert.equal((await after).status, controlPlane ? 'authenticated' : 'disabled');
     const init = replacement.posts.find((m) => m.method === 'v3.initialize');
     assert.deepEqual(init?.args, [{ secureDir: '/sec', baseDir: '/base' }]);
     assert.equal(
