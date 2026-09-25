@@ -160,12 +160,19 @@ function connect(state: FakeState): FakePort {
 // v3 initialize() is a handshake rather than one call: v3.initialize, then
 // v3.version, then the secure-store round trip that mints a device id. Answer
 // every request as it is posted so the promise can settle.
-async function pump(port: FakePort, replies: Record<string, unknown> = {}): Promise<void> {
+// Methods named in `hold` are left unanswered, so a test can check what settles while
+// they are still in flight.
+async function pump(
+  port: FakePort,
+  replies: Record<string, unknown> = {},
+  hold: ReadonlySet<string> = new Set()
+): Promise<void> {
   let answered = 0;
   for (let i = 0; i < 16; i++) {
     await tick();
     while (answered < port.posts.length) {
       const msg = port.posts[answered++];
+      if (hold.has(msg.method)) continue;
       port.onmessage!({
         data: { id: msg.id, ok: true, result: replies[msg.method] },
       });
@@ -425,10 +432,15 @@ for (const controlPlane of [undefined, { apiKey: 'sk-test', baseUrl: 'https://cp
     const version = exposed.runanywhere.version();
     let settled = false;
     version.then(() => (settled = true), () => (settled = true));
-    await pump(replacement, { ...replies, version: '1.0.0' });
+    // Leave the auth retry unanswered: calls made after the restart must not wait for it.
+    const retry = 'v3.retryControlPlane';
+    await pump(replacement, { ...replies, version: '1.0.0' }, new Set([retry]));
 
     assert.ok(settled, `version() is still pending; posted: ${replacement.posts.map((m) => m.method).join(', ')}`);
     assert.equal(await version, '1.0.0');
+    for (const msg of replacement.posts.filter((m) => m.method === retry)) {
+      replacement.onmessage!({ data: { id: msg.id, ok: true, result: replies[retry as keyof typeof replies] } });
+    }
     const init = replacement.posts.find((m) => m.method === 'v3.initialize');
     assert.deepEqual(init?.args, [{ secureDir: '/sec', baseDir: '/base' }]);
     assert.equal(
