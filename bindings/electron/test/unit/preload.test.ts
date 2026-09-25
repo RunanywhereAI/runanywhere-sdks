@@ -387,3 +387,32 @@ test('an unknown reply id is ignored (no throw, no cross-talk)', { skip: SKIP },
   port.onmessage!({ data: { id: msg.id, ok: true, result: 'real' } });
   assert.equal(await p, 'real');
 });
+
+// A re-forked host starts uninitialised, so the preload replays initialize() and,
+// when the app configured a control plane, re-runs the auth setup before it
+// reopens the gate. Calls made after the restart must still settle.
+for (const controlPlane of [undefined, { apiKey: 'sk-test' }]) {
+  test(`calls after a host restart settle (control plane ${controlPlane ? 'on' : 'off'})`, { skip: SKIP }, async () => {
+    const { exposed, state } = freshPreload();
+    const initialize = exposed.runanywhere.initialize as (
+      secureDir?: string,
+      baseDir?: string,
+      cp?: { apiKey?: string }
+    ) => Promise<void>;
+    const first = connect(state);
+    await Promise.all([initialize('/sec', '/base', controlPlane), pump(first, { 'v3.version': '1.0.0' })]);
+
+    // The utility host dies and main delivers a replacement port.
+    state.ipcOn['runanywhere-host-exited']!({ ports: [] });
+    const replacement = connect(state);
+    const version = exposed.runanywhere.version();
+    let settled = false;
+    version.then(() => (settled = true), () => (settled = true));
+    await pump(replacement, { 'v3.version': '1.0.0', version: '1.0.0' });
+
+    assert.ok(settled, `version() is still pending; posted: ${replacement.posts.map((m) => m.method).join(', ')}`);
+    assert.equal(await version, '1.0.0');
+    const init = replacement.posts.find((m) => m.method === 'v3.initialize');
+    assert.deepEqual(init?.args, [{ secureDir: '/sec', baseDir: '/base' }]);
+  });
+}

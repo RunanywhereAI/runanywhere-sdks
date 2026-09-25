@@ -111,12 +111,18 @@ ipcRenderer.on('runanywhere-port', (event) => {
         args: [{ secureDir, baseDir }],
       });
     })
-      // The fresh host has no tokens, so re-run the HTTP setup on it. The v3
-      // facade is already `ready`, which is why this is a retry rather than a
-      // second initialize.
-      .then(() => (cp ? v3.auth.retry().then(() => undefined) : undefined))
-      .catch(() => { /* surfaced by the caller's next request */ })
-      .finally(() => markReady());
+      .then(
+        () => {
+          markReady();
+          // The fresh host has no tokens, so re-run the HTTP setup on it. The v3
+          // facade is already `ready`, which is why this is a retry rather than a
+          // second initialize. It goes through send(), which waits on `ready`, so
+          // it can only start once the gate is open: awaiting it before
+          // markReady() would deadlock every call made after the restart.
+          if (cp) void v3.auth.retry().catch(() => { /* reported by auth.state() */ });
+        },
+        () => markReady() /* surfaced by the caller's next request */
+      );
     return;
   }
   markReady();
