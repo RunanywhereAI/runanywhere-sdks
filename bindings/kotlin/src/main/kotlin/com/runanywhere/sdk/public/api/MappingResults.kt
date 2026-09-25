@@ -203,7 +203,7 @@ internal fun ProtoSegmentationResult.toSegmentationResult(): SegmentationResult 
                     // Commons owns SegmentationClassSummary.fraction (tag 5).
                     fraction = summary.fraction,
                 )
-        },
+            },
         diagnosticImage = diagnostic_rgba?.toByteArray(),
         confidenceMask = confidence_mask_u8?.toByteArray(),
     )
