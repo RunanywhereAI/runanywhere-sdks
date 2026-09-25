@@ -160,9 +160,16 @@ class Llm:
         text, opts = prepare(prompt, options)
         tools = _active_tools(opts, self.tools)
         if tools:
-            for event in self._with_tools(text, opts, tools):
+            # The tool loop is synchronous: step it on a worker thread so it does not block
+            # this event loop, and hand coroutine executors back to this loop to await.
+            loop = asyncio.get_running_loop()
+            steps = self._with_tools(text, opts, tools, loop=loop)
+            done = object()
+            while True:
+                event = await asyncio.to_thread(next, steps, done)
+                if event is done:
+                    return
                 yield event
-            return
         inner = self._aplain(text, opts)
         try:
             async for event in inner:
@@ -249,7 +256,11 @@ class Llm:
         return _parse_call(reply, {t.name for t in tools})
 
     def _with_tools(
-        self, text: str, opts: LlmOptions, tools: List[ToolDefinition]
+        self,
+        text: str,
+        opts: LlmOptions,
+        tools: List[ToolDefinition],
+        loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> Iterator[GenerationEvent]:
         """Run the tool loop, then stream the model's final answer."""
         request_id = runtime.new_request_id()
@@ -271,7 +282,12 @@ class Llm:
             if executor is not None:
                 outcome = executor(call.arguments)
                 if asyncio.iscoroutine(outcome):
-                    outcome = asyncio.run(outcome)
+                    if loop is not None:
+                        # Called from agenerate_stream's worker thread: await it on the
+                        # caller's loop (asyncio.run cannot nest inside a running loop).
+                        outcome = asyncio.run_coroutine_threadsafe(outcome, loop).result()
+                    else:
+                        outcome = asyncio.run(outcome)
                 call.result = outcome if isinstance(outcome, dict) else {"value": outcome}
             calls.append(call)
             yield GenerationEvent(

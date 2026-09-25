@@ -262,6 +262,40 @@ def test_registered_tool_is_executed_and_the_loop_continues(sdk, gguf) -> None:
         ra.llm.tools.unregister("get_weather")
 
 
+def test_async_executor_runs_under_agenerate(sdk, gguf) -> None:
+    # A coroutine executor must be awaited on the caller's loop, not via asyncio.run()
+    # (which cannot be called while that loop is running).
+    calls = []
+
+    async def executor(arguments):
+        calls.append((arguments, asyncio.get_running_loop()))
+        await asyncio.sleep(0)
+        return {"temp_c": 21}
+
+    ra.llm.tools.register(_weather_tool(), executor)
+    try:
+        # First reply is a tool call; after the observation the model answers.
+        replies = [['{"name": "get_weather", "arguments": {"city": "Paris"}}'], ["21C"], ["21C"]]
+
+        def next_deltas(_handle, prompt, on_delta, **kwargs):
+            for token in replies.pop(0) if replies else ["done"]:
+                on_delta(token, False)
+
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
+
+        async def run():
+            result = await ra.llm.agenerate("Weather in Paris?", _opts(gguf))
+            return result, asyncio.get_running_loop()
+
+        result, loop = asyncio.run(run())
+        assert [args for args, _ in calls] == [{"city": "Paris"}]
+        assert calls[0][1] is loop
+        assert result.tool_calls and result.tool_calls[0].result == {"temp_c": 21}
+        assert result.text == "21C"
+    finally:
+        ra.llm.tools.unregister("get_weather")
+
+
 def test_tool_without_an_executor_finishes_with_tool_calls(sdk, gguf) -> None:
     sdk.tokens = ['{"name": "get_weather", "arguments": {"city": "Paris"}}']
     options = _opts(gguf, tools=[_weather_tool()])
