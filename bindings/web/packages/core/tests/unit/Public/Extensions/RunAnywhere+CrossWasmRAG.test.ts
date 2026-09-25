@@ -342,6 +342,168 @@ describe('CrossWasmRAGProvider', () => {
       clearModelOwnedByBackendWorker('onnx-local-llm', 'onnx');
     }
   });
+
+  it('ingests whitespace-free CJK document into multiple bounded chunks for embedding (#922)', async () => {
+    installBackendSpies();
+    let embeddedTexts: string[] = [];
+    vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
+      async (request: EmbeddingsRequest): Promise<EmbeddingsResult> => {
+        embeddedTexts = [...request.texts];
+        return embeddingsResult(
+          request.texts.map((text: string, index: number) => vector([1, 0], text, index)),
+        );
+      },
+    );
+
+    const provider = __testing__.createCrossWasmRAGProvider();
+    await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+      chunkSize: 64,
+      chunkOverlap: 8,
+    }));
+
+    // 500-character CJK string with zero whitespace:
+    // "机器学习是人工智能的一个分支致力于通过计算方法利用经验来改善系统自身的性能" repeated
+    const cjkSentence = '机器学习是人工智能的一个分支致力于通过计算方法利用经验来改善系统自身的性能';
+    const longCjkDoc = cjkSentence.repeat(15); // ~555 characters, no spaces
+    expect(longCjkDoc.length).toBeGreaterThan(500);
+    expect(/\s/.test(longCjkDoc)).toBe(false);
+
+    await provider.ragIngest(longCjkDoc, JSON.stringify({ docId: 'cjk-doc' }));
+
+    // Must have split into multiple bounded chunks, not one single 555-character chunk
+    expect(embeddedTexts.length).toBeGreaterThan(1);
+    for (const chunkText of embeddedTexts) {
+      expect([...chunkText].length).toBeLessThanOrEqual(64);
+    }
+    await provider.ragDestroyPipeline();
+  });
+});
+
+describe('splitRAGText', () => {
+  it('splits whitespace-free CJK document into multiple bounded chunks (#922)', () => {
+    const cjkSentence = '机器学习是人工智能的一个分支致力于通过计算方法利用经验来改善性能';
+    const doc = cjkSentence.repeat(16); // 512 characters, no spaces
+    const chunkSize = 100;
+    const chunkOverlap = 20;
+
+    const chunks = __testing__.splitRAGText(doc, chunkSize, chunkOverlap);
+
+    // Stride is 80 (100 - 20). 512 chars with stride 80 -> ~7 chunks
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBe(7);
+
+    // Every chunk must be bounded by chunkSize in code points
+    for (let i = 0; i < chunks.length; i += 1) {
+      const chunk = chunks[i]!;
+      const codePointCount = [...chunk.text].length;
+      expect(codePointCount).toBeLessThanOrEqual(chunkSize);
+      expect(chunk.endOffset - chunk.startOffset).toBe(chunk.text.length);
+      expect(doc.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
+      expect(chunk.tokenCount).toBe(codePointCount);
+    }
+
+    // Overlap checks between consecutive chunks
+    for (let i = 0; i < chunks.length - 1; i += 1) {
+      const current = chunks[i]!;
+      const next = chunks[i + 1]!;
+      const currentCodePoints = [...current.text];
+      const nextCodePoints = [...next.text];
+      const tail = currentCodePoints.slice(currentCodePoints.length - chunkOverlap).join('');
+      const head = nextCodePoints.slice(0, chunkOverlap).join('');
+      expect(tail).toBe(head);
+    }
+
+    // First chunk starts at 0, last chunk covers through the end
+    expect(chunks[0]!.startOffset).toBe(0);
+    expect(chunks[chunks.length - 1]!.endOffset).toBe(doc.length);
+  });
+
+  it('never cuts across Unicode surrogate pairs on code-point boundaries (#922)', () => {
+    // 🦀 (U+1F980) and 𠮷 (U+20BB7) are 2 UTF-16 code units each
+    const textWithSurrogates = '你好🦀𠮷世界'.repeat(20); // 120 code points, 160 code units
+    const chunkSize = 15;
+    const chunkOverlap = 3;
+
+    const chunks = __testing__.splitRAGText(textWithSurrogates, chunkSize, chunkOverlap);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      // Code point count bounded
+      expect([...chunk.text].length).toBeLessThanOrEqual(chunkSize);
+      // No unpaired / broken surrogate sequences
+      const candidate = chunk.text as unknown as { isWellFormed?: () => boolean };
+      if (typeof candidate.isWellFormed === 'function') {
+        expect(candidate.isWellFormed()).toBe(true);
+      }
+      expect(textWithSurrogates.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
+    }
+  });
+
+  it('preserves existing behavior for whitespace-separated English words', () => {
+    const text = 'The big red dog sat on the rug now';
+    const chunks = __testing__.splitRAGText(text, 3, 1);
+
+    expect(chunks.length).toBe(4);
+    expect(chunks[0]!.text).toBe('The big red');
+    expect(chunks[0]!.tokenCount).toBe(3);
+    expect(chunks[1]!.text).toBe('red dog sat');
+    expect(chunks[1]!.tokenCount).toBe(3);
+    expect(chunks[2]!.text).toBe('sat on the');
+    expect(chunks[3]!.text).toBe('the rug now');
+  });
+
+  it('handles mixed English and whitespace-free CJK content', () => {
+    const cjk = '机器学习人工智能模型训练'.repeat(10); // 120 CJK chars
+    const mixed = `Header Title: ${cjk} Footer Note`;
+    const chunks = __testing__.splitRAGText(mixed, 30, 5);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(chunk.tokenCount).toBeLessThanOrEqual(30);
+      expect([...chunk.text].length).toBeLessThanOrEqual(50);
+      expect(mixed.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
+    }
+  });
+
+  it('returns a single chunk when whitespace-free CJK is smaller than chunkSize', () => {
+    const shortCjk = '人工智能'; // 4 chars
+    const chunks = __testing__.splitRAGText(shortCjk, 10, 2);
+    expect(chunks.length).toBe(1);
+    expect(chunks[0]!.text).toBe('人工智能');
+    expect(chunks[0]!.startOffset).toBe(0);
+    expect(chunks[0]!.endOffset).toBe(4);
+  });
+
+  it('splits non-CJK runs exceeding chunkSize into bounded chunks (#922)', () => {
+    // 24-character non-CJK token with chunkSize 8, overlap 2
+    const token = 'abcdefghijklmnopqrstuvwx';
+    const chunks = __testing__.splitRAGText(token, 8, 2);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(chunk.tokenCount).toBeLessThanOrEqual(8);
+      expect([...chunk.text].length).toBeLessThanOrEqual(8);
+      expect(token.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
+    }
+  });
+
+  it('bounds retrieved CJK context using token-aware fragmenting in boundedRAGContext (#922)', () => {
+    const cjkText = '人工智能机器学习深度学习自然语言处理计算机视觉强化学习';
+    const chunks = [
+      {
+        text: cjkText,
+        sourceDocument: 'CJKDoc',
+        score: 0.95,
+      },
+    ];
+    // Request only 10 tokens: should slice only the first 10 CJK code points
+    const context = __testing__.boundedRAGContext(chunks, 10);
+    expect(context).toContain('[Source 1: CJKDoc]');
+    expect(context).toContain('人工智能机器学习深度');
+    expect(context).not.toContain('强化学习');
+  });
 });
 
 function installBackendSpies() {
