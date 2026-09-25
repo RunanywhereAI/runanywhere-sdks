@@ -6,6 +6,7 @@ import asyncio
 import os
 import sys
 import threading
+from typing import Any, Callable
 
 _PKG_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PKG_PARENT not in sys.path:
@@ -415,18 +416,20 @@ def test_cancelling_agenerate_during_the_model_call_frees_the_model(sdk, gguf) -
     in_model = threading.Event()
     cancelled = threading.Event()
 
-    async def executor(arguments):
+    async def executor(arguments: dict[str, Any]) -> dict[str, Any]:
         return {"temp_c": 21}
 
     ra.llm.tools.register(_weather_tool(), executor)
     real_cancel = sdk.cancel_generate
     try:
 
-        def cancel_generate(handle):
+        def cancel_generate(handle: int) -> None:
             cancelled.set()
             real_cancel(handle)
 
-        def next_deltas(_handle, prompt, on_delta, **kwargs):
+        def next_deltas(
+            _handle: int, prompt: str, on_delta: Callable[[str, bool], Any], **kwargs: Any
+        ) -> None:
             if not in_model.is_set():
                 in_model.set()
                 # Stands in for a native call that only returns once it is cancelled.
@@ -436,7 +439,7 @@ def test_cancelling_agenerate_during_the_model_call_frees_the_model(sdk, gguf) -
         sdk.cancel_generate = cancel_generate  # type: ignore[method-assign]
         sdk.generate_typed = next_deltas  # type: ignore[method-assign]
 
-        async def run():
+        async def run() -> tuple[bool, str]:
             task = asyncio.ensure_future(ra.llm.agenerate("Weather in Paris?", _opts(gguf)))
             await asyncio.to_thread(in_model.wait, 5)
             task.cancel()
@@ -450,6 +453,95 @@ def test_cancelling_agenerate_during_the_model_call_frees_the_model(sdk, gguf) -
     finally:
         cancelled.set()
         sdk.cancel_generate = real_cancel  # type: ignore[method-assign]
+        ra.llm.tools.unregister("get_weather")
+
+
+def test_cancelling_agenerate_does_not_wait_for_a_blocking_sync_executor(sdk, gguf) -> None:
+    # Nothing can interrupt a synchronous executor, so a cancelled caller must not be held
+    # until it returns; the loop is still stopped before any further model call.
+    in_tool = threading.Event()
+    release = threading.Event()
+    calls = []
+
+    def executor(arguments: dict[str, Any]) -> dict[str, Any]:
+        calls.append(arguments)
+        in_tool.set()
+        release.wait(timeout=5)
+        return {"temp_c": 21}
+
+    ra.llm.tools.register(_weather_tool(), executor)
+    try:
+        replies = ['{"name": "get_weather", "arguments": {"city": "Paris"}}']
+
+        def next_deltas(
+            _handle: int, prompt: str, on_delta: Callable[[str, bool], Any], **kwargs: Any
+        ) -> None:
+            on_delta(replies.pop(0) if replies else "answer", False)
+
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
+
+        async def run() -> float:
+            loop = asyncio.get_running_loop()
+            task = asyncio.ensure_future(ra.llm.agenerate("Weather in Paris?", _opts(gguf)))
+            await asyncio.to_thread(in_tool.wait, 5)
+            started = loop.time()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, timeout=2)
+            return loop.time() - started
+
+        assert asyncio.run(run()) < 1.0
+        assert calls == [{"city": "Paris"}]
+    finally:
+        release.set()
+        ra.llm.tools.unregister("get_weather")
+
+
+def test_a_second_cancel_during_cleanup_still_frees_the_model(sdk, gguf) -> None:
+    # Cancelling again while cleanup waits for the model call must not abandon the running
+    # step: once it returns, the tool loop is closed and the generation guard is released.
+    in_final = threading.Event()
+    release = threading.Event()
+    seen = []
+
+    async def executor(arguments: dict[str, Any]) -> dict[str, Any]:
+        return {"temp_c": 21}
+
+    ra.llm.tools.register(_weather_tool(), executor)
+    try:
+
+        def next_deltas(
+            _handle: int, prompt: str, on_delta: Callable[[str, bool], Any], **kwargs: Any
+        ) -> None:
+            seen.append(prompt)
+            if len(seen) == 2:
+                # The final answer: a native call that ignores cancel until released.
+                in_final.set()
+                release.wait(timeout=5)
+            on_delta("no tool needed", False)
+
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
+
+        async def run() -> str:
+            task = asyncio.ensure_future(ra.llm.agenerate("Weather in Paris?", _opts(gguf)))
+            await asyncio.to_thread(in_final.wait, 5)
+            task.cancel()
+            await asyncio.sleep(0.05)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            release.set()
+            no_tools = _opts(gguf, tool_choice=ToolChoice(ToolChoiceMode.NONE))
+            for _ in range(100):
+                try:
+                    return (await ra.llm.agenerate("hi", no_tools)).text
+                except SDKException:
+                    await asyncio.sleep(0.02)
+            return "model still busy"
+
+        assert asyncio.run(run()) == "no tool needed"
+    finally:
+        release.set()
         ra.llm.tools.unregister("get_weather")
 
 

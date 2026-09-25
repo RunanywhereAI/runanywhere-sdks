@@ -185,18 +185,23 @@ class Llm:
             finally:
                 # Cancelled or closed early: the worker may still be inside a step.
                 # Cancel the executor it is waiting on and stop it before the next tool,
-                # stop the model call it may be blocked in, and wait for it to return so
-                # the model's generation guard is released before we do.
+                # and stop the model call it may be blocked in.
                 if not finished:
                     stop.set()
                     if step is not None and not step.done():
                         model = runtime.llm_if_resident()
                         if model is not None:
                             model.cancel()
-                        # Already unwinding: its result or error is not ours to report.
-                        with contextlib.suppress(BaseException):
-                            await asyncio.shield(step)
-                    if step is None or step.done():
+                        # A separate task owns the running step and closes the loop once it
+                        # returns, so a second cancellation here cannot drop it.
+                        cleanup = asyncio.ensure_future(_finish_step(step, steps))
+                        _STEP_CLEANUPS.add(cleanup)
+                        cleanup.add_done_callback(_STEP_CLEANUPS.discard)
+                        # Wait for a cancelled model call so its generation guard is free when
+                        # we return, but not for a synchronous tool: nothing can interrupt it.
+                        if not stop.in_sync_tool():
+                            await asyncio.shield(cleanup)
+                    else:
                         steps.close()
         inner = self._aplain(text, opts)
         try:
@@ -311,7 +316,16 @@ class Llm:
             seen.add(fingerprint)
             executor = self.tools.executor(call.name)
             if executor is not None:
-                outcome = executor(call.arguments)
+                if stop is not None:
+                    stop.enter_tool()
+                    if stop.is_set():
+                        stop.exit_tool()
+                        return
+                try:
+                    outcome = executor(call.arguments)
+                finally:
+                    if stop is not None:
+                        stop.exit_tool()
                 if asyncio.iscoroutine(outcome):
                     if loop is not None:
                         # Called from agenerate_stream's worker thread: await it on the
@@ -368,6 +382,18 @@ class _ToolLoopStop:
     def __init__(self) -> None:
         self._stopped = threading.Event()
         self._pending: Optional[concurrent.futures.Future] = None
+        self._in_tool = False
+
+    def enter_tool(self) -> None:
+        """The worker is about to call an executor; for a sync one, nothing can interrupt it."""
+        self._in_tool = True
+
+    def exit_tool(self) -> None:
+        self._in_tool = False
+
+    def in_sync_tool(self) -> bool:
+        """True while the worker is inside an executor call (not awaiting a coroutine one)."""
+        return self._in_tool
 
     def is_set(self) -> bool:
         return self._stopped.is_set()
@@ -388,6 +414,20 @@ class _ToolLoopStop:
             return future.result()
         finally:
             self._pending = None
+
+
+#: Cleanup tasks for cancelled tool-loop steps, kept referenced until they finish.
+_STEP_CLEANUPS: set[asyncio.Future] = set()
+
+
+async def _finish_step(step: asyncio.Future[Any], steps: Iterator[GenerationEvent]) -> None:
+    """Wait for a cancelled tool-loop step to return, then close the loop it was running."""
+    # Already unwinding: the step's result or error is not ours to report.
+    with contextlib.suppress(BaseException):
+        await step
+    # Still running only if this task was cancelled (loop shutdown): the worker keeps it.
+    if step.done():
+        steps.close()
 
 
 def _structured(result: GenerationResult) -> StructuredResult:
