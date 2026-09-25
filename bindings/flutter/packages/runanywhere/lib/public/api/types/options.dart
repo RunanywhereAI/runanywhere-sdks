@@ -21,6 +21,8 @@ import 'package:runanywhere/generated/rag.pb.dart' show RAGConfiguration;
 import 'package:runanywhere/generated/segmentation.pb.dart' as seg_pb;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show StructuredOutputOptions;
+import 'package:runanywhere/generated/structured_output.pbenum.dart'
+    as so_pb;
 import 'package:runanywhere/generated/stt_options.pb.dart' show STTOptions;
 import 'package:runanywhere/generated/thinking_tag_pattern.pb.dart'
     as think_pb;
@@ -145,7 +147,11 @@ class ToolChoice {
 /// Schema constraint applied to a generation's output.
 class StructuredOutput {
   /// Constrain output to [schema].
-  const StructuredOutput({required this.schema, this.strict = true});
+  const StructuredOutput({
+    required this.schema,
+    this.mode = StructuredOutputMode.constrained,
+    this.strict = true,
+  });
 
   /// JSON Schema the output must satisfy, as raw JSON Schema text.
   ///
@@ -157,6 +163,9 @@ class StructuredOutput {
   /// callers must already hold the schema as text.
   final String schema;
 
+  /// How the schema constraint is enforced during generation.
+  final StructuredOutputMode mode;
+
   /// True rejects output that does not validate instead of repairing it.
   ///
   /// `StructuredOutputOptions.strict_mode` was deleted outright — this knob
@@ -165,8 +174,24 @@ class StructuredOutput {
   final bool strict;
 
   /// Build the generated structured-output options.
-  StructuredOutputOptions toProto() =>
-      StructuredOutputOptions(schema: schema, includeSchemaInPrompt: true);
+  StructuredOutputOptions toProto() {
+    final proto = StructuredOutputOptions(
+      schema: schema,
+      includeSchemaInPrompt: true,
+    );
+    switch (mode) {
+      case StructuredOutputMode.constrained:
+        proto.mode = so_pb.StructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED;
+        break;
+      case StructuredOutputMode.validationOnly:
+        proto.mode = so_pb.StructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY;
+        break;
+      case StructuredOutputMode.repair:
+        proto.mode = so_pb.StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR;
+        break;
+    }
+    return proto;
+  }
 }
 
 /// Sampling, prompting, reasoning, and tool controls for `llm` and `vlm`.
@@ -303,6 +328,47 @@ class LlmOptions {
     }
     return proto;
   }
+
+  /// Create a copy with modified fields.
+  LlmOptions copyWith({
+    String? model,
+    int? maxOutputTokens,
+    double? temperature,
+    double? topP,
+    int? topK,
+    double? minP,
+    double? frequencyPenalty,
+    double? presencePenalty,
+    double? repetitionPenalty,
+    int? seed,
+    List<String>? stopSequences,
+    String? systemPrompt,
+    ReasoningOptions? reasoning,
+    StructuredOutput? structuredOutput,
+    List<ToolDefinition>? tools,
+    ToolChoice? toolChoice,
+    int? maxToolCalls,
+    bool? autoExecute,
+  }) => LlmOptions(
+    model: model ?? this.model,
+    maxOutputTokens: maxOutputTokens ?? _argMaxOutputTokens,
+    temperature: temperature ?? _argTemperature,
+    topP: topP ?? _argTopP,
+    topK: topK ?? this.topK,
+    minP: minP ?? this.minP,
+    frequencyPenalty: frequencyPenalty ?? this.frequencyPenalty,
+    presencePenalty: presencePenalty ?? this.presencePenalty,
+    repetitionPenalty: repetitionPenalty ?? _argRepetitionPenalty,
+    seed: seed ?? this.seed,
+    stopSequences: stopSequences ?? this.stopSequences,
+    systemPrompt: systemPrompt ?? this.systemPrompt,
+    reasoning: reasoning ?? this.reasoning,
+    structuredOutput: structuredOutput ?? this.structuredOutput,
+    tools: tools ?? this.tools,
+    toolChoice: toolChoice ?? this.toolChoice,
+    maxToolCalls: maxToolCalls ?? _argMaxToolCalls,
+    autoExecute: autoExecute ?? this.autoExecute,
+  );
 
   /// Build the generated VLM request envelope for [prompt] over [images].
   ///
@@ -840,7 +906,7 @@ class LoadOptions {
 
 /// Enforcement level `llm.generateStructured` applies to its schema.
 enum StructuredOutputMode {
-  /// Engine-constrained decoding; fails preflight until wired in.
+  /// Engine-constrained decoding (GBNF grammar sampling).
   constrained,
 
   /// Generate freely, then validate against the schema.

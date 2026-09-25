@@ -15,7 +15,10 @@ import {
   ReasoningOptions as ReasoningOptionsMessage,
   ThinkingTagPattern,
 } from '@runanywhere/proto-ts/thinking_tag_pattern';
-import { StructuredOutputOptions } from '@runanywhere/proto-ts/structured_output';
+import {
+  StructuredOutputMode as ProtoStructuredOutputMode,
+  StructuredOutputOptions,
+} from '@runanywhere/proto-ts/structured_output';
 import {
   ToolCallingOptions,
   ToolChoiceMode,
@@ -121,18 +124,21 @@ function toReasoningOptions(
   });
 }
 
-/**
- * `strict_mode` was deleted from `StructuredOutputOptions` outright (idl
- * comment: "Not read by commons"). `structured.strict` has no wire
- * counterpart to carry it in; only `schema` and `includeSchemaInPrompt`
- * survive.
- */
 function toStructuredOutputOptions(
   structured: StructuredOutput
 ): StructuredOutputOptions {
+  let mode: ProtoStructuredOutputMode | undefined;
+  if (structured.mode === 'constrained') {
+    mode = ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED;
+  } else if (structured.mode === 'validationOnly') {
+    mode = ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY;
+  } else if (structured.mode === 'repair') {
+    mode = ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR;
+  }
   return StructuredOutputOptions.fromPartial({
     schema: structured.schema,
     includeSchemaInPrompt: true,
+    ...(mode !== undefined ? { mode } : {}),
   });
 }
 
