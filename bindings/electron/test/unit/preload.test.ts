@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { isSDKException, ErrorCodes } from '../../dist/errors';
 import { registerCatalog, clearCatalog } from '../../dist/catalog';
+import { SdkInitResult } from '@runanywhere/proto-ts/sdk_init';
 
 let electronPath: string | null = null;
 try {
@@ -389,9 +390,19 @@ test('an unknown reply id is ignored (no throw, no cross-talk)', { skip: SKIP },
 });
 
 // A re-forked host starts uninitialised, so the preload replays initialize() and,
-// when the app configured a control plane, re-runs the auth setup before it
-// reopens the gate. Calls made after the restart must still settle.
-for (const controlPlane of [undefined, { apiKey: 'sk-test' }]) {
+// once the gate is open again, re-runs the auth setup when the app configured a
+// control plane. Calls made after the restart must still settle.
+// An authenticated SdkInitResult: the control plane is on, so auth.retry() posts.
+const authenticated = SdkInitResult.encode(
+  SdkInitResult.fromPartial({ httpApplicable: true, hasCompletedHttpSetup: true })
+).finish();
+const controlPlaneReplies = {
+  'v3.hasControlPlane': true,
+  'v3.devicePersistentId': 'device-1',
+  'v3.configureControlPlane': authenticated,
+  'v3.retryControlPlane': authenticated,
+};
+for (const controlPlane of [undefined, { apiKey: 'sk-test', baseUrl: 'https://cp.example.test' }]) {
   test(`calls after a host restart settle (control plane ${controlPlane ? 'on' : 'off'})`, { skip: SKIP }, async () => {
     const { exposed, state } = freshPreload();
     const initialize = exposed.runanywhere.initialize as (
@@ -400,7 +411,13 @@ for (const controlPlane of [undefined, { apiKey: 'sk-test' }]) {
       cp?: { apiKey?: string }
     ) => Promise<void>;
     const first = connect(state);
-    await Promise.all([initialize('/sec', '/base', controlPlane), pump(first, { 'v3.version': '1.0.0' })]);
+    const replies = { 'v3.version': '1.0.0', ...(controlPlane ? controlPlaneReplies : {}) };
+    await Promise.all([initialize('/sec', '/base', controlPlane), pump(first, replies)]);
+    assert.equal(
+      first.posts.some((m) => m.method === 'v3.configureControlPlane'),
+      Boolean(controlPlane),
+      'the control plane is configured only when the app supplied one'
+    );
 
     // The utility host dies and main delivers a replacement port.
     state.ipcOn['runanywhere-host-exited']!({ ports: [] });
@@ -408,11 +425,16 @@ for (const controlPlane of [undefined, { apiKey: 'sk-test' }]) {
     const version = exposed.runanywhere.version();
     let settled = false;
     version.then(() => (settled = true), () => (settled = true));
-    await pump(replacement, { 'v3.version': '1.0.0', version: '1.0.0' });
+    await pump(replacement, { ...replies, version: '1.0.0' });
 
     assert.ok(settled, `version() is still pending; posted: ${replacement.posts.map((m) => m.method).join(', ')}`);
     assert.equal(await version, '1.0.0');
     const init = replacement.posts.find((m) => m.method === 'v3.initialize');
     assert.deepEqual(init?.args, [{ secureDir: '/sec', baseDir: '/base' }]);
+    assert.equal(
+      replacement.posts.some((m) => m.method === 'v3.retryControlPlane'),
+      Boolean(controlPlane),
+      'the fresh host re-runs control-plane auth only when one was configured'
+    );
   });
 }
