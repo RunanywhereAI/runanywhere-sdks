@@ -409,6 +409,50 @@ def test_cancelling_agenerate_during_the_model_call_skips_the_tool(sdk, gguf) ->
         ra.llm.tools.unregister("get_weather")
 
 
+def test_cancelling_agenerate_during_the_model_call_frees_the_model(sdk, gguf) -> None:
+    # A cancelled caller must stop the model call its worker thread is blocked in and
+    # wait for it, or the next generation on the model fails with "already in progress".
+    in_model = threading.Event()
+    cancelled = threading.Event()
+
+    async def executor(arguments):
+        return {"temp_c": 21}
+
+    ra.llm.tools.register(_weather_tool(), executor)
+    real_cancel = sdk.cancel_generate
+    try:
+
+        def cancel_generate(handle):
+            cancelled.set()
+            real_cancel(handle)
+
+        def next_deltas(_handle, prompt, on_delta, **kwargs):
+            if not in_model.is_set():
+                in_model.set()
+                # Stands in for a native call that only returns once it is cancelled.
+                cancelled.wait(timeout=2)
+            on_delta("ok", False)
+
+        sdk.cancel_generate = cancel_generate  # type: ignore[method-assign]
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
+
+        async def run():
+            task = asyncio.ensure_future(ra.llm.agenerate("Weather in Paris?", _opts(gguf)))
+            await asyncio.to_thread(in_model.wait, 5)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            was_cancelled = cancelled.is_set()
+            no_tools = _opts(gguf, tool_choice=ToolChoice(ToolChoiceMode.NONE))
+            return was_cancelled, (await ra.llm.agenerate("hi", no_tools)).text
+
+        assert asyncio.run(run()) == (True, "ok")
+    finally:
+        cancelled.set()
+        sdk.cancel_generate = real_cancel  # type: ignore[method-assign]
+        ra.llm.tools.unregister("get_weather")
+
+
 def test_tool_without_an_executor_finishes_with_tool_calls(sdk, gguf) -> None:
     sdk.tokens = ['{"name": "get_weather", "arguments": {"city": "Paris"}}']
     options = _opts(gguf, tools=[_weather_tool()])

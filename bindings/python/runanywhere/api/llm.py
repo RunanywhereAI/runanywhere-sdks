@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextlib
+import contextvars
 import json
 import threading
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional
@@ -169,18 +171,33 @@ class Llm:
             steps = self._with_tools(text, opts, tools, loop=loop, stop=stop)
             done = object()
             finished = False
+            step: Optional[asyncio.Future] = None
             try:
                 while True:
-                    event = await asyncio.to_thread(next, steps, done)
+                    ctx = contextvars.copy_context()
+                    step = loop.run_in_executor(None, ctx.run, next, steps, done)
+                    # Shielded so a cancelled caller still owns the running step below.
+                    event = await asyncio.shield(step)
                     if event is done:
                         finished = True
                         return
                     yield event
             finally:
                 # Cancelled or closed early: the worker may still be inside a step.
-                # Cancel the executor it is waiting on and stop it before the next tool.
+                # Cancel the executor it is waiting on and stop it before the next tool,
+                # stop the model call it may be blocked in, and wait for it to return so
+                # the model's generation guard is released before we do.
                 if not finished:
                     stop.set()
+                    if step is not None and not step.done():
+                        model = runtime.llm_if_resident()
+                        if model is not None:
+                            model.cancel()
+                        # Already unwinding: its result or error is not ours to report.
+                        with contextlib.suppress(BaseException):
+                            await asyncio.shield(step)
+                    if step is None or step.done():
+                        steps.close()
         inner = self._aplain(text, opts)
         try:
             async for event in inner:
