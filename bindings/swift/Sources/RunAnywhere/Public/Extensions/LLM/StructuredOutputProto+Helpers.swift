@@ -11,18 +11,18 @@ import Foundation
 // MARK: - RAStructuredOutputOptions
 
 extension RAStructuredOutputOptions {
-    /// `RAJSONSchema`/`strictMode`/`jsonSchema`/`mode` were all deleted
-    /// outright (idl/structured_output.proto): the message shrunk to just
-    /// `includeSchemaInPrompt` plus a `schema`/`grammar`/`regex` oneof of
-    /// raw strings, so `schema` here is JSON Schema text directly rather
-    /// than a typed tree to serialize.
+    /// Ergonomic factory for `RAStructuredOutputOptions`.
     public static func defaults(
         schema: String,
-        includeSchemaInPrompt: Bool = true
+        includeSchemaInPrompt: Bool = true,
+        mode: RAStructuredOutputMode = .unspecified
     ) -> RAStructuredOutputOptions {
         var options = RAStructuredOutputOptions()
         options.schema = schema
         options.includeSchemaInPrompt = includeSchemaInPrompt
+        if mode != .unspecified {
+            options.mode = mode
+        }
         return options
     }
 }

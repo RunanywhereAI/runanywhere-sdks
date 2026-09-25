@@ -338,10 +338,9 @@ export const llm = {
    * Generate a value that conforms to `schema`.
    *
    * `mode` picks how the schema is enforced:
-   * - `'validationOnly'` (default): generate freely, then validate.
+   * - `'constrained'` (default): engine-constrained decoding (GBNF grammar sampling).
+   * - `'validationOnly'`: generate freely, then validate against the schema.
    * - `'repair'`: validate, then retry once with a repair instruction if invalid.
-   * - `'constrained'`: engine-constrained decoding — fails preflight until a
-   *   constrained-decoding engine is wired in.
    *
    * `StructuredOutputRequest` and the standalone
    * `rac_structured_output_generate_proto` ABI are deleted outright: idl's
@@ -359,14 +358,8 @@ export const llm = {
     prompt: string,
     schema: JsonSchema,
     options?: LlmOptions,
-    mode: StructuredOutputMode = 'validationOnly'
+    mode: StructuredOutputMode = 'constrained'
   ): Promise<StructuredResult<T>> {
-    if (mode === 'constrained') {
-      throw SDKException.notImplemented(
-        "llm.generateStructured(mode: 'constrained') needs engine-level constrained decoding, " +
-          "which is not wired in yet; use 'validationOnly' or 'repair'"
-      );
-    }
     const native = await preflight();
     const requestId = nextRequestId('structured');
     if (options?.model) {
@@ -377,7 +370,11 @@ export const llm = {
     }
     const effectiveOptions: LlmOptions = {
       ...options,
-      structuredOutput: { schema, strict: options?.structuredOutput?.strict },
+      structuredOutput: {
+        schema,
+        mode,
+        strict: options?.structuredOutput?.strict,
+      },
     };
 
     const extract = async (text: string): Promise<StructuredOutputResult> => {

@@ -600,20 +600,12 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
 
 // Small base models (e.g. SmolLM2-360M)
 // cannot reliably produce structured JSON from a free-form prompt because
-// they have not been instruction-tuned on the "schema → JSON" task and the
-// llama.cpp backend currently does not pipe a grammar/json-mode parameter
-// through to the sampler. The system prompt below was hardened with an
-// explicit start-token cue ("Your reply must begin with %s ...") so the
-// model is more likely to emit JSON on the very first token instead of
-// echoing the prompt. The proper fix is grammar-constrained decoding:
-//
-//   TODO(cluster-12 follow-up): plumb rac_llm_options_t.grammar (or a
-//   schema-derived GBNF grammar) through rac_llm_llamacpp_generate and
-//   wire it to llama_sampler_init_grammar(). Until that lands, base
-//   models will produce best-effort (sometimes lenient) JSON output —
-//   tests should accept either a successful JSON parse or, for known
-//   base models, a prompt-echo PASS as documented in
-//   cross-platform-e2e-test-catalog.md.
+// they have not been instruction-tuned on the "schema → JSON" task.
+// The system prompt below is hardened with an explicit start-token cue
+// ("Your reply must begin with %s ...") so the model is more likely to
+// emit JSON on the very first token instead of echoing the prompt.
+// On the ordinary LLM generate path, schema-derived GBNF grammar is also
+// piped through to the sampler when constrained decoding is enabled.
 
 extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
                                                                 char** out_prompt) {

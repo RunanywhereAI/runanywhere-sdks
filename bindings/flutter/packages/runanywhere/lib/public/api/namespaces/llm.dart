@@ -115,38 +115,39 @@ class LlmApi {
   /// Generate a completion constrained to [schema].
   ///
   /// [mode] picks how the schema is enforced:
-  /// - [StructuredOutputMode.validationOnly] (default): generate freely, then validate.
+  /// - [StructuredOutputMode.constrained] (default): engine-constrained decoding (GBNF grammar sampling).
+  /// - [StructuredOutputMode.validationOnly]: generate freely, then validate against the schema.
   /// - [StructuredOutputMode.repair]: validate, then retry once with a repair instruction if invalid.
-  /// - [StructuredOutputMode.constrained]: engine-constrained decoding — fails
-  ///   preflight until a constrained-decoding engine is wired in.
   ///
   /// Throws [SDKException] when [mode] cannot be honored, generation fails,
   /// or the output cannot be parsed against the schema.
   Future<StructuredResult> generateStructured(
     String prompt,
     String schema, {
-    StructuredOutputMode mode = StructuredOutputMode.validationOnly,
+    StructuredOutputMode mode = StructuredOutputMode.constrained,
     LlmOptions? options,
   }) async {
-    if (mode == StructuredOutputMode.constrained) {
-      throw SDKException.featureNotAvailable(
-        'llm.generateStructured(mode: constrained) needs engine-level '
-        'constrained decoding, which is not wired in yet; use validationOnly or repair',
-      );
-    }
     await ModelGate.ensureLoaded(
       modelId: options?.model,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     );
-    final effective = options ?? LlmOptions();
+    final effective = (options ?? LlmOptions()).copyWith(
+      structuredOutput: StructuredOutput(schema: schema, mode: mode),
+    );
     final model =
         await ModelGate.currentId(ModelCategory.MODEL_CATEGORY_LANGUAGE) ?? '';
-    var proto = await RunAnywhereStructuredOutput.generateStructured(
+    final protoOptions = effective.toProto(
+      registeredTools: RunAnywhereTools.shared.getRegisteredTools(),
+    );
+    final generation =
+        await RunAnywhereStructuredOutput.generateWithStructuredOutput(
       prompt: prompt,
+      structuredOutput: protoOptions.structuredOutput,
+      options: protoOptions,
+    );
+    var proto = RunAnywhereLLM.shared.extractStructuredOutput(
+      text: generation.text,
       schema: schema,
-      options: effective.toProto(
-        registeredTools: RunAnywhereTools.shared.getRegisteredTools(),
-      ),
     );
     if (mode == StructuredOutputMode.repair && !proto.validation.isValid) {
       final repairPrompt =
@@ -155,12 +156,15 @@ class LlmApi {
           'Reply again with ONLY JSON that satisfies this schema.\n\n'
           'Previous invalid answer: '
           '${proto.hasRawText() ? proto.rawText : ''}';
-      proto = await RunAnywhereStructuredOutput.generateStructured(
+      final repairGeneration =
+          await RunAnywhereStructuredOutput.generateWithStructuredOutput(
         prompt: repairPrompt,
+        structuredOutput: protoOptions.structuredOutput,
+        options: protoOptions,
+      );
+      proto = RunAnywhereLLM.shared.extractStructuredOutput(
+        text: repairGeneration.text,
         schema: schema,
-        options: effective.toProto(
-          registeredTools: RunAnywhereTools.shared.getRegisteredTools(),
-        ),
       );
     }
     return StructuredResult.fromProto(
