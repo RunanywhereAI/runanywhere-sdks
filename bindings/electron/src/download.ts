@@ -48,6 +48,31 @@ export interface ResolvedModel {
 const DOWNLOAD_IDLE_MS = 60_000;
 const JSON_IDLE_MS = 30_000;
 
+interface ByteContentRange {
+  start: number;
+  end: number;
+  total: number;
+}
+
+/** Parse the single byte range carried by an HTTP 206 response. */
+function parseByteContentRange(value: string | string[] | undefined): ByteContentRange | null {
+  if (typeof value !== 'string') return null;
+  const match = /^bytes\s+(\d+)-(\d+)\/(\d+)$/i.exec(value.trim());
+  if (!match) return null;
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  const total = Number(match[3]);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || !Number.isSafeInteger(total)) return null;
+  if (start > end || end >= total) return null;
+  return { start, end, total };
+}
+
+function parseContentLength(value: string | string[] | undefined): number | null {
+  if (typeof value !== 'string' || !/^\d+$/.test(value.trim())) return null;
+  const length = Number(value.trim());
+  return Number.isSafeInteger(length) ? length : null;
+}
+
 export function modelsRoot(): string {
   return path.join(os.homedir(), '.runanywhere', 'models');
 }
@@ -242,11 +267,34 @@ export function downloadFile(
           reject(new Error(`HTTP ${code} for ${u}`));
           return;
         }
-        // 206 => resuming (its content-length is the REMAINING bytes); 200 => the
-        // server ignored Range, so restart from scratch (truncate the `.part`).
+        // A 206 body can only be recombined with the existing `.part` after its
+        // Content-Range proves that it starts at the requested offset and
+        // describes a valid single range of the selected representation.
         const resuming = code === 206 && startAt > 0;
-        const len = parseInt((res.headers['content-length'] as string) || '0', 10);
-        const total = resuming ? startAt + len : len;
+        const contentRange = code === 206 ? parseByteContentRange(res.headers['content-range']) : null;
+        if (code === 206 && (!contentRange || contentRange.start !== startAt)) {
+          res.resume();
+          reject(new Error(`invalid Content-Range for download of ${u}`));
+          return;
+        }
+        const contentLength = parseContentLength(res.headers['content-length']);
+        const rangeLength = contentRange ? contentRange.end - contentRange.start + 1 : 0;
+        if (contentRange && res.headers['content-length'] !== undefined && contentLength === null) {
+          res.resume();
+          reject(new Error(`invalid Content-Length for ${u}`));
+          return;
+        }
+        if (contentRange && contentLength !== null && contentLength !== rangeLength) {
+          res.resume();
+          reject(new Error(`Content-Length does not match Content-Range for ${u}`));
+          return;
+        }
+        // Keep the existing full-response behavior; strict parsing is needed for
+        // 206 metadata, while 200 responses may omit Content-Length.
+        const len = contentRange
+          ? rangeLength
+          : parseInt((res.headers['content-length'] as string) || '0', 10);
+        const total = contentRange ? contentRange.total : len;
         // Fail fast and legibly instead of filling the volume and dying on ENOSPC.
         try {
           assertEnoughSpace(total - startAt, path.dirname(dest));
@@ -256,6 +304,7 @@ export function downloadFile(
           return;
         }
         let received = resuming ? startAt : 0;
+        let responseReceived = 0;
         const out = fs.createWriteStream(tmp, { flags: resuming ? 'a' : 'w' });
         // res.pipe(out) does NOT forward source errors to the destination, so a
         // mid-stream TCP reset / TLS error would otherwise settle nothing and the
@@ -272,6 +321,7 @@ export function downloadFile(
         res.on('aborted', () => fail(new Error(`connection aborted for ${u}`)));
         out.on('error', fail);
         res.on('data', (chunk: Buffer) => {
+          responseReceived += chunk.length;
           received += chunk.length;
           try {
             onProgress?.({
@@ -286,10 +336,23 @@ export function downloadFile(
         });
         res.pipe(out);
         out.on('finish', () => {
-          // A clean-but-early EOF (proxy cutoff, disk-full) still fires 'finish';
-          // reject on a byte-count mismatch so a truncated file is never renamed.
-          if (total > 0 && received !== total) {
-            fail(new Error(`incomplete download for ${u}: got ${received} of ${total} bytes`));
+          // A clean-but-early EOF (proxy cutoff, disk-full) still fires 'finish'.
+          // Check both the returned range span and the complete representation so
+          // a shorter valid range stays resumable but is never published early.
+          if ((contentRange && responseReceived !== rangeLength) || (total > 0 && received !== total)) {
+            const error = new Error(`incomplete download for ${u}: got ${received} of ${total} bytes`);
+            out.close(() => {
+              if (contentRange && responseReceived > rangeLength) {
+                try {
+                  // Do not leave bytes beyond the declared range in `.part`:
+                  // a later 416 size check could otherwise finalize corruption.
+                  fs.truncateSync(tmp, startAt);
+                } catch {
+                  try { fs.rmSync(tmp, { force: true }); } catch { /* preserve the original download error */ }
+                }
+              }
+              reject(error);
+            });
             return;
           }
           out.close(() => finalize(resolve, reject));
