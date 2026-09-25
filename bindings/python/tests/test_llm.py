@@ -296,6 +296,117 @@ def test_async_executor_runs_under_agenerate(sdk, gguf) -> None:
         ra.llm.tools.unregister("get_weather")
 
 
+def test_async_executor_runs_under_sync_generate(sdk, gguf) -> None:
+    # With no running loop, generate() runs a coroutine executor to completion itself.
+    calls = []
+
+    async def executor(arguments):
+        calls.append(arguments)
+        await asyncio.sleep(0)
+        return {"temp_c": 21}
+
+    ra.llm.tools.register(_weather_tool(), executor)
+    try:
+        call = '{"name": "get_weather", "arguments": {"city": "Paris"}}'
+        replies = [[call], ["21C"], ["21C"]]
+
+        def next_deltas(_handle, prompt, on_delta, **kwargs):
+            for token in replies.pop(0) if replies else ["done"]:
+                on_delta(token, False)
+
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
+
+        result = ra.llm.generate("Weather in Paris?", _opts(gguf))
+        assert calls == [{"city": "Paris"}]
+        assert result.tool_calls and result.tool_calls[0].result == {"temp_c": 21}
+        assert result.text == "21C"
+    finally:
+        ra.llm.tools.unregister("get_weather")
+
+
+def test_cancelling_agenerate_cancels_a_pending_async_executor(sdk, gguf) -> None:
+    # Cancelling the caller must reach the executor coroutine the worker thread is
+    # waiting on, rather than leaving it (and the thread) running after the caller left.
+    outcome = []
+    started = asyncio.Event()
+
+    async def executor(arguments):
+        started.set()
+        try:
+            await asyncio.wait_for(asyncio.Event().wait(), timeout=2)
+            outcome.append("finished")
+        except asyncio.CancelledError:
+            outcome.append("cancelled")
+            raise
+        except asyncio.TimeoutError:
+            outcome.append("timed out")
+        return {"temp_c": 21}
+
+    ra.llm.tools.register(_weather_tool(), executor)
+    try:
+
+        def next_deltas(_handle, prompt, on_delta, **kwargs):
+            on_delta('{"name": "get_weather", "arguments": {"city": "Paris"}}', False)
+
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
+
+        async def run():
+            generation = ra.llm.agenerate("Weather in Paris?", _opts(gguf))
+            task = asyncio.ensure_future(generation)
+            await asyncio.wait_for(started.wait(), timeout=2)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            for _ in range(50):
+                if outcome:
+                    break
+                await asyncio.sleep(0.01)
+            # Read it here: asyncio.run's shutdown would cancel a leftover task anyway.
+            return list(outcome)
+
+        assert asyncio.run(run()) == ["cancelled"]
+    finally:
+        ra.llm.tools.unregister("get_weather")
+
+
+def test_cancelling_agenerate_during_the_model_call_skips_the_tool(sdk, gguf) -> None:
+    # If the caller is cancelled while the worker is still in the model call, the
+    # worker must not go on to run the tool the model picked.
+    calls = []
+    in_model = threading.Event()
+    release = threading.Event()
+
+    async def executor(arguments):
+        calls.append(arguments)
+        return {"temp_c": 21}
+
+    ra.llm.tools.register(_weather_tool(), executor)
+    try:
+
+        def next_deltas(_handle, prompt, on_delta, **kwargs):
+            in_model.set()
+            release.wait(timeout=5)
+            on_delta('{"name": "get_weather", "arguments": {"city": "Paris"}}', False)
+
+        sdk.generate_typed = next_deltas  # type: ignore[method-assign]
+
+        async def run():
+            generation = ra.llm.agenerate("Weather in Paris?", _opts(gguf))
+            task = asyncio.ensure_future(generation)
+            await asyncio.to_thread(in_model.wait, 5)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            release.set()
+            await asyncio.sleep(0.2)
+
+        asyncio.run(run())
+        assert calls == []
+    finally:
+        release.set()
+        ra.llm.tools.unregister("get_weather")
+
+
 def test_tool_without_an_executor_finishes_with_tool_calls(sdk, gguf) -> None:
     sdk.tokens = ['{"name": "get_weather", "arguments": {"city": "Paris"}}']
     options = _opts(gguf, tools=[_weather_tool()])

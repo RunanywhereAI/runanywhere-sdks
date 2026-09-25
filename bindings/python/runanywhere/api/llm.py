@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
+import threading
 from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Iterator, List, Optional
 
 from .. import _generation
@@ -163,13 +165,22 @@ class Llm:
             # The tool loop is synchronous: step it on a worker thread so it does not block
             # this event loop, and hand coroutine executors back to this loop to await.
             loop = asyncio.get_running_loop()
-            steps = self._with_tools(text, opts, tools, loop=loop)
+            stop = _ToolLoopStop()
+            steps = self._with_tools(text, opts, tools, loop=loop, stop=stop)
             done = object()
-            while True:
-                event = await asyncio.to_thread(next, steps, done)
-                if event is done:
-                    return
-                yield event
+            finished = False
+            try:
+                while True:
+                    event = await asyncio.to_thread(next, steps, done)
+                    if event is done:
+                        finished = True
+                        return
+                    yield event
+            finally:
+                # Cancelled or closed early: the worker may still be inside a step.
+                # Cancel the executor it is waiting on and stop it before the next tool.
+                if not finished:
+                    stop.set()
         inner = self._aplain(text, opts)
         try:
             async for event in inner:
@@ -261,6 +272,7 @@ class Llm:
         opts: LlmOptions,
         tools: List[ToolDefinition],
         loop: Optional[asyncio.AbstractEventLoop] = None,
+        stop: Optional["_ToolLoopStop"] = None,
     ) -> Iterator[GenerationEvent]:
         """Run the tool loop, then stream the model's final answer."""
         request_id = runtime.new_request_id()
@@ -270,6 +282,8 @@ class Llm:
         prompt = text
         for _ in range(max(1, opts.max_tool_calls)):
             call = self._one_call(prompt, opts, tools)
+            if stop is not None and stop.is_set():
+                return
             if call is None:
                 break
             fingerprint = (call.name, json.dumps(call.arguments, sort_keys=True, default=str))
@@ -285,7 +299,10 @@ class Llm:
                     if loop is not None:
                         # Called from agenerate_stream's worker thread: await it on the
                         # caller's loop (asyncio.run cannot nest inside a running loop).
-                        outcome = asyncio.run_coroutine_threadsafe(outcome, loop).result()
+                        try:
+                            outcome = (stop or _ToolLoopStop()).run(outcome, loop)
+                        except concurrent.futures.CancelledError:
+                            return
                     else:
                         outcome = asyncio.run(outcome)
                 call.result = outcome if isinstance(outcome, dict) else {"value": outcome}
@@ -321,6 +338,39 @@ class Llm:
                 tool_call=event.tool_call,
                 result=event.result,
             )
+
+
+class _ToolLoopStop:
+    """Lets ``agenerate_stream`` stop a tool loop its worker thread is still running.
+
+    ``asyncio.to_thread`` cannot interrupt the thread, so on cancellation the caller
+    sets this. It cancels the executor coroutine the worker is waiting on, and the
+    worker returns before it runs another tool.
+    """
+
+    def __init__(self) -> None:
+        self._stopped = threading.Event()
+        self._pending: Optional[concurrent.futures.Future] = None
+
+    def is_set(self) -> bool:
+        return self._stopped.is_set()
+
+    def set(self) -> None:
+        self._stopped.set()
+        pending = self._pending
+        if pending is not None:
+            pending.cancel()
+
+    def run(self, coro: Awaitable[Any], loop: asyncio.AbstractEventLoop) -> Any:
+        """Await ``coro`` on ``loop`` from the worker; CancelledError once stopped."""
+        future = asyncio.run_coroutine_threadsafe(coro, loop)  # type: ignore[arg-type]
+        self._pending = future
+        if self._stopped.is_set():
+            future.cancel()
+        try:
+            return future.result()
+        finally:
+            self._pending = None
 
 
 def _structured(result: GenerationResult) -> StructuredResult:
