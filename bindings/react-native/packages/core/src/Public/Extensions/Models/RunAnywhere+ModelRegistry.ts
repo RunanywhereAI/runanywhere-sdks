@@ -22,7 +22,10 @@ import {
   requireInitialized,
 } from '../../../Foundation/Initialization/InitializedGuard';
 import { ensureServicesReady, ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
-import { SDKException } from '../../../Foundation/Errors/SDKException';
+import {
+  asNativeSDKException,
+  SDKException,
+} from '../../../Foundation/Errors/SDKException';
 import {
   ArchiveArtifact,
   ArchiveStructure,
@@ -86,6 +89,11 @@ export interface RegisterModelInput {
   framework: InferenceFramework;
   /** Estimated runtime RAM, used for compatibility checks. */
   memoryRequirement?: number;
+  /** Exact remote artifact bytes, when known. */
+  downloadSize?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   /** Optional model category (Swift shorthand defaults to LANGUAGE). */
   modality?: ModelCategory;
   /** Optional artifact archive type hint. */
@@ -172,22 +180,34 @@ export async function registerModel(
     name: input.name,
     framework: input.framework,
     category: modality,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
+    ...(input.source !== undefined ? { source: input.source } : {}),
     ...(input.id !== undefined ? { id: input.id } : {}),
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
       : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
+      : {}),
+    ...(input.contextLength !== undefined && input.contextLength > 0
+      ? { contextLength: input.contextLength }
+      : {}),
+    ...(input.description ? { description: input.description } : {}),
     ...(input.supportsThinking ? { supportsThinking: true } : {}),
     ...(input.supportsLora ? { supportsLora: true } : {}),
     ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
   });
 
-  const saved = arrayBufferToBytes(
-    await native.registerModelFromUrlProto(
-      encodeProtoMessage(request, RegisterModelFromUrlRequest),
-    ),
-  );
+  let saved: Uint8Array;
+  try {
+    saved = arrayBufferToBytes(
+      await native.registerModelFromUrlProto(
+        encodeProtoMessage(request, RegisterModelFromUrlRequest),
+      ),
+    );
+  } catch (error) {
+    throw await asNativeSDKException(error);
+  }
   if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,
@@ -360,11 +380,16 @@ export async function registerMultiFileModel(
       isOptional: !file.isRequired,
     })),
   });
-  const saved = arrayBufferToBytes(
-    await native.registerMultiFileModelProto(
-      encodeProtoMessage(message, RegisterMultiFileModelRequest),
-    ),
-  );
+  let saved: Uint8Array;
+  try {
+    saved = arrayBufferToBytes(
+      await native.registerMultiFileModelProto(
+        encodeProtoMessage(message, RegisterMultiFileModelRequest),
+      ),
+    );
+  } catch (error) {
+    throw await asNativeSDKException(error);
+  }
   if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,
