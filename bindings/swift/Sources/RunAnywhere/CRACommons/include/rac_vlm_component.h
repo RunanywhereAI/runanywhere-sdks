@@ -163,7 +163,12 @@ RAC_API rac_bool_t rac_vlm_component_supports_streaming(rac_handle_t handle);
  * @param image Image input
  * @param prompt Text prompt
  * @param options Generation options (can be NULL for defaults)
- * @param token_callback Called for each generated token
+ * @param token_callback Called with the next run of decoded text. Not one call
+ *                       per token: a chunk is emitted only up to its last
+ *                       complete UTF-8 character, so a token whose bytes finish
+ *                       a character started by the previous token arrives
+ *                       merged with it, and a token that only starts one is
+ *                       held until it is complete.
  * @param complete_callback Called when generation completes
  * @param error_callback Called on error
  * @param user_data User context passed to callbacks
