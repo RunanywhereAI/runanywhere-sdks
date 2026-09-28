@@ -63,6 +63,14 @@ final class SolutionsSurfaceTests: XCTestCase {
         _ = (runConfig, runBytes, runYaml)
     }
 
+    /// Pin the RAG runtime-dependency attachment surface added for #914.
+    func testSolutionHandleExposesRagSessionAttachment() {
+        let attach: (SolutionHandle, RagSession) async throws -> Void = { handle, session in
+            try await handle.attachRagSession(session)
+        }
+        _ = attach
+    }
+
     /// The generated handle descriptor carries its canonical fields.
     func testGeneratedSolutionHandleCarriesCanonicalFields() {
         var handle = RASolutionHandle()
