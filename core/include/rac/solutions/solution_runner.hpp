@@ -65,7 +65,9 @@ class SolutionRunner {
     /// Attach a live RAG session to every `retrieve` operator in the
     /// expanded pipeline. The session is borrowed: the caller must keep it
     /// alive while this solution can execute retrieval. Must be called before
-    /// `start()` materializes the PipelineExecutor.
+    /// `start()` materializes the PipelineExecutor. A session attached through
+    /// this API is cleared after `wait()`, so restarting requires re-attaching
+    /// a live session.
     rac_result_t attach_rag_session(rac_handle_t session);
 
     /// Compile + launch the pipeline. Idempotent — subsequent calls
@@ -82,7 +84,9 @@ class SolutionRunner {
 
     /// Block until every worker thread has exited. Safe to call after
     /// stop/cancel or immediately if the scheduler has already
-    /// drained.
+    /// drained. Any RAG session handle attached through
+    /// `attach_rag_session()` is removed from the stored spec so a later
+    /// restart cannot reuse a stale borrowed handle.
     void wait();
 
     /// Current state predicate. Best-effort; racy against
@@ -116,6 +120,7 @@ class SolutionRunner {
     std::string root_output_payload_type_;
     bool started_{false};
     bool joined_{false};
+    bool rag_session_attached_{false};
 };
 
 }  // namespace rac::solutions
