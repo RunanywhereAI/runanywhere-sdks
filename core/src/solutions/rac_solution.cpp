@@ -62,19 +62,17 @@ rac_result_t validate_live_rag_session(rac_handle_t rag_session) {
     const rac_result_t rc = rac_rag_stats_proto(rag_session, &stats);
     std::string detail;
     if (rc != RAC_SUCCESS) {
-        detail = stats.error_message ? stats.error_message : "RAG session handle is not live";
+        detail = stats.error_message ? stats.error_message : "RAG session validation failed";
     }
     rac_proto_buffer_free(&stats);
 
     if (rc == RAC_SUCCESS)
         return RAC_SUCCESS;
-    if (rc == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
-        rac_error_set_details(detail.c_str());
-        return rc;
-    }
 
     rac_error_set_details(detail.c_str());
-    return RAC_ERROR_INVALID_HANDLE;
+    if (rc == RAC_ERROR_COMPONENT_NOT_READY)
+        return RAC_ERROR_INVALID_HANDLE;
+    return rc;
 #endif
 }
 
