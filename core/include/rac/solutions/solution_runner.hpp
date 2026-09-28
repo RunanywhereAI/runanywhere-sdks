@@ -36,6 +36,7 @@
 #include <string>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
 #include "rac/graph/graph_scheduler.hpp"
 #include "rac/solutions/operator_registry.hpp"
 
@@ -60,6 +61,12 @@ class SolutionRunner {
 
     SolutionRunner(const SolutionRunner&) = delete;
     SolutionRunner& operator=(const SolutionRunner&) = delete;
+
+    /// Attach a live RAG session to every `retrieve` operator in the
+    /// expanded pipeline. The session is borrowed: the caller must keep it
+    /// alive while this solution can execute retrieval. Must be called before
+    /// `start()` materializes the PipelineExecutor.
+    rac_result_t attach_rag_session(rac_handle_t session);
 
     /// Compile + launch the pipeline. Idempotent — subsequent calls
     /// while running return RAC_ERROR_ALREADY_INITIALIZED.
