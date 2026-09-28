@@ -85,9 +85,9 @@ RAC_API rac_result_t rac_solution_create_from_yaml(const char* yaml_text,
  *
  * @return RAC_SUCCESS; RAC_ERROR_FEATURE_NOT_AVAILABLE when the Solutions
  *         runtime or RAG backend is unavailable; RAC_ERROR_INVALID_HANDLE for
- *         a null, destroyed, or otherwise non-live handle; RAC_ERROR_INVALID_STATE
- *         if already started; or RAC_ERROR_INVALID_CONFIGURATION if no retrieve
- *         operator exists.
+ *         a null solution handle or a null/non-live RAG session handle;
+ *         RAC_ERROR_INVALID_STATE if already started; or
+ *         RAC_ERROR_INVALID_CONFIGURATION if no retrieve operator exists.
  */
 RAC_API rac_result_t rac_solution_attach_rag_session(rac_solution_handle_t handle,
                                                      rac_handle_t rag_session);
