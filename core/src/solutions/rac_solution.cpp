@@ -14,6 +14,8 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
+#include "rac/features/rag/rac_rag.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/solutions/config_loader.hpp"
 #include "rac/solutions/operator_registry.hpp"
 #include "rac/solutions/solution_runner.hpp"
@@ -47,6 +49,33 @@ void ensure_engine_backed_operators_registered() {
             RAC_LOG_DEBUG("Solutions", "Registered %zu engine-backed operators", registered);
         }
     });
+}
+
+rac_result_t validate_live_rag_session(rac_handle_t rag_session) {
+#if !defined(RAC_HAVE_RAG)
+    (void)rag_session;
+    rac_error_set_details("RAG backend is not available in this build");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    rac_proto_buffer_t stats;
+    rac_proto_buffer_init(&stats);
+    const rac_result_t rc = rac_rag_stats_proto(rag_session, &stats);
+    std::string detail;
+    if (rc != RAC_SUCCESS) {
+        detail = stats.error_message ? stats.error_message : "RAG session handle is not live";
+    }
+    rac_proto_buffer_free(&stats);
+
+    if (rc == RAC_SUCCESS)
+        return RAC_SUCCESS;
+    if (rc == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        rac_error_set_details(detail.c_str());
+        return rc;
+    }
+
+    rac_error_set_details(detail.c_str());
+    return RAC_ERROR_INVALID_HANDLE;
+#endif
 }
 
 /// Heuristic: a YAML document whose top level declares `operators:` is
@@ -152,6 +181,11 @@ RAC_API rac_result_t rac_solution_attach_rag_session(rac_solution_handle_t handl
         return RAC_ERROR_INVALID_HANDLE;
     if (!rag_session)
         return RAC_ERROR_INVALID_HANDLE;
+
+    const rac_result_t session_status = validate_live_rag_session(rag_session);
+    if (session_status != RAC_SUCCESS)
+        return session_status;
+
     return runner->attach_rag_session(rag_session);
 }
 
