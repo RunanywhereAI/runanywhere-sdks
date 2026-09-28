@@ -145,6 +145,16 @@ RAC_API rac_result_t rac_solution_create_from_yaml(const char* yaml_text,
     return RAC_SUCCESS;
 }
 
+RAC_API rac_result_t rac_solution_attach_rag_session(rac_solution_handle_t handle,
+                                                     rac_handle_t rag_session) {
+    auto* runner = as_runner(handle);
+    if (!runner)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!rag_session)
+        return RAC_ERROR_INVALID_HANDLE;
+    return runner->attach_rag_session(rag_session);
+}
+
 RAC_API rac_result_t rac_solution_start(rac_solution_handle_t handle) {
     auto* runner = as_runner(handle);
     if (!runner)
