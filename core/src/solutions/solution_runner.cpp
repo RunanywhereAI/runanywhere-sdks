@@ -56,6 +56,7 @@ rac_result_t SolutionRunner::attach_rag_session(rac_handle_t session) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
 
+    rag_session_attached_ = true;
     return RAC_SUCCESS;
 }
 
@@ -129,6 +130,16 @@ void SolutionRunner::wait() {
         root_output_payload_type_.clear();
         joined_ = true;
         started_ = false;
+
+        if (rag_session_attached_) {
+            for (int i = 0; i < spec_.operators_size(); ++i) {
+                auto* op = spec_.mutable_operators(i);
+                if (op->type() == "retrieve") {
+                    op->mutable_params()->erase("session_handle_id");
+                }
+            }
+            rag_session_attached_ = false;
+        }
     }
     if (in_edge)
         in_edge->close();
