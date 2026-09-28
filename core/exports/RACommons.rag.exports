@@ -28,12 +28,6 @@ _rac_rag_session_create_proto
 _rac_rag_session_destroy_proto
 _rac_rag_stats_proto
 
-# Solutions -> RAG runtime dependency bridge. rac_solution_stub.cpp keeps the
-# symbol defined even when the full Solutions runtime is disabled; exporting it
-# with the RAG capability keeps dynamic Apple builds linkable for Swift's
-# SolutionHandle.attachRagSession(_:) surface.
-_rac_solution_attach_rag_session
-
 # rac_backend_rag_* — RAG backend plugin registration (publishes the engine
 # vtable to the plugin registry; reached by SDK bridges at module-load time).
 _rac_backend_rag_register
