@@ -12,6 +12,7 @@
 //  in the generated types or the capability surface fails at unit-test time.
 //
 
+import CRACommons
 import Foundation
 import SwiftProtobuf
 import XCTest
@@ -63,12 +64,43 @@ final class SolutionsSurfaceTests: XCTestCase {
         _ = (runConfig, runBytes, runYaml)
     }
 
-    /// Pin the RAG runtime-dependency attachment surface added for #914.
-    func testSolutionHandleExposesRagSessionAttachment() {
-        let attach: (SolutionHandle, RagSession) async throws -> Void = { handle, session in
-            try await handle.attachRagSession(session)
+    /// Exercise the new native attachment boundary without requiring model
+    /// fixtures: a non-null token that is not registered as a live RAG session
+    /// must be rejected before it is stamped into the retrieve operator.
+    func testSolutionAttachRejectsUnknownRagSessionHandle() throws {
+        let yaml = """
+        name: "rag-attach-validation"
+        operators:
+          - name: "query"
+            type: "source"
+          - name: "retrieve"
+            type: "retrieve"
+          - name: "sink"
+            type: "sink"
+        edges:
+          - from: "query.out"
+            to: "retrieve.in"
+          - from: "retrieve.results"
+            to: "sink.in"
+        """
+
+        var solution: rac_solution_handle_t?
+        let createResult = yaml.withCString {
+            rac_solution_create_from_yaml($0, &solution)
         }
-        _ = attach
+        XCTAssertEqual(createResult, RAC_SUCCESS)
+        guard let solution else {
+            return XCTFail("solution creation should return a native handle")
+        }
+        defer { rac_solution_destroy(solution) }
+
+        guard let unknownSession = UnsafeMutableRawPointer(bitPattern: 0xBAD) else {
+            return XCTFail("failed to construct non-null test handle")
+        }
+        XCTAssertEqual(
+            rac_solution_attach_rag_session(solution, unknownSession),
+            RAC_ERROR_INVALID_HANDLE
+        )
     }
 
     /// The generated handle descriptor carries its canonical fields.
