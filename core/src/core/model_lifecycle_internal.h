@@ -104,6 +104,11 @@ struct LoadedModel {
     int64_t loaded_at_ms{0};
     int64_t updated_at_ms{0};
     std::string error_message;
+    // Effective context actually reported by the initialized LLM/VLM backend.
+    // Zero means the backend cannot currently report it. This is resident-state
+    // truth (not the original request) and is used to decide whether a later
+    // same-model context_length request can be satisfied without reloading.
+    int32_t effective_context_length{0};
     // Human-readable name; populated by the per-handle lifecycle facade
     // (path-loaded entries). Registry-loaded entries leave this empty.
     std::string model_name;
