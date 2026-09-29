@@ -11,6 +11,10 @@ on:
         description: 'GitHub release tag to attach kits to (e.g. v0.20.25). Empty = artifacts only.'
         required: false
         default: ''
+      only:
+        description: 'Restrict this run to one platform job (e.g. linux-arm64). Empty = every job.'
+        required: false
+        default: ''
   push:
     paths:
       - 'cmake/CppDesktopKit.cmake'
@@ -48,6 +52,7 @@ concurrency:
 
 jobs:
   macos-arm64:
+    if: ${{ inputs.only == '' || inputs.only == 'macos-arm64' }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -79,6 +84,7 @@ jobs:
           if-no-files-found: error
 
   windows-x64:
+    if: ${{ inputs.only == '' || inputs.only == 'windows-x64' }}
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
@@ -119,7 +125,10 @@ jobs:
           if-no-files-found: error
 
   linux-x64:
-    runs-on: ubuntu-24.04
+    if: ${{ inputs.only == '' || inputs.only == 'linux-x64' }}
+    # Release compatibility floor: Ubuntu 24.04 emits GLIBC_2.38 and
+    # GLIBCXX_3.4.31/32 requirements that do not run on Ubuntu 22.04.
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -157,7 +166,47 @@ jobs:
             dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz.sha256
           if-no-files-found: error
 
+  linux-arm64:
+    if: ${{ inputs.only == '' || inputs.only == 'linux-arm64' }}
+    # Same release compatibility floor as linux-x64 above: build on 22.04 so the
+    # kit does not require a glibc/libstdc++ newer than the x64 baseline.
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          # No libprotobuf-dev, same as linux-x64: force the vendored
+          # FetchContent protobuf path rather than Ubuntu's too-old system one.
+          sudo apt-get install -y ninja-build libcurl4-openssl-dev
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/linux/download-sherpa-onnx.sh
+      - name: Configure + package
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-linux-arm64
+          cmake --build --preset cpp-desktop-linux-arm64 --target package-cpp-desktop-tarball \
+            -j "$(nproc)"
+          ls -la dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz
+          tar=$(echo dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --linux --forbid-private-engines
+          (
+            cd dist
+            name="RunAnywhere-cpp-desktop-linux-arm64-v$(tr -d '[:space:]' < ../core/VERSION).tar.gz"
+            sha256sum "$name" | tee "$name.sha256"
+          )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-linux-arm64
+          path: |
+            dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz.sha256
+          if-no-files-found: error
+
   windows-arm64:
+    if: ${{ inputs.only == '' || inputs.only == 'windows-arm64' }}
     runs-on: windows-11-arm
     timeout-minutes: 90
     steps:
@@ -204,7 +253,7 @@ jobs:
           if-no-files-found: error
 
   macos-arm64-neurt-private:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: ${{ (inputs.only == '' || inputs.only == 'macos-arm64-neurt-private') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -243,7 +292,7 @@ jobs:
           if-no-files-found: error
 
   windows-arm64-qhexrt-private:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: ${{ (inputs.only == '' || inputs.only == 'windows-arm64-qhexrt-private') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: windows-11-arm
     timeout-minutes: 120
     steps:
@@ -293,8 +342,11 @@ jobs:
           if-no-files-found: error
 
   attach-release:
-    if: github.event_name == 'workflow_dispatch' && inputs.attach_tag != ''
-    needs: [macos-arm64, windows-x64, windows-arm64, linux-x64]
+    # always(): a filtered run (inputs.only) skips some build jobs, and a
+    # skipped need must not skip the attach. The upload below only ever sees
+    # the artifacts that were actually built this run.
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.attach_tag != '' }}
+    needs: [macos-arm64, windows-x64, windows-arm64, linux-x64, linux-arm64]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -312,10 +364,21 @@ jobs:
           ls -la artifacts
           # Attach-only: never create a release. Fail if the tag has no GitHub Release yet.
           gh release view "$ATTACH_TAG" --repo "${{ github.repository }}" >/dev/null
-          # Public kits only. Never attach *neurt-private* / *qhexrt-private*.
-          gh release upload "$ATTACH_TAG" \
-            artifacts/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz* \
-            artifacts/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz* \
-            artifacts/RunAnywhere-cpp-desktop-windows-arm64-v*.tar.gz* \
-            artifacts/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz* \
+          # Public kits only. Never attach *neurt-private* / *qhexrt-private*. Upload
+          # exactly the kits this run produced, so a filtered run (inputs.only)
+          # adds its one asset without touching the others already on the release.
+          shopt -s nullglob
+          kits=()
+          for f in artifacts/RunAnywhere-cpp-desktop-*-v*.tar.gz artifacts/RunAnywhere-cpp-desktop-*-v*.tar.gz.sha256; do
+            case "$f" in
+              *neurt-private*|*qhexrt-private*) continue ;;
+            esac
+            kits+=("$f")
+          done
+          if [ ${#kits[@]} -eq 0 ]; then
+            echo "::error::no public kit artifacts to attach" >&2
+            exit 1
+          fi
+          printf 'attaching:\n'; printf '  %s\n' "${kits[@]}"
+          gh release upload "$ATTACH_TAG" "${kits[@]}" \
             --repo "${{ github.repository }}" --clobber
