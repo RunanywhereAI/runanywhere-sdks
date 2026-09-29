@@ -358,6 +358,21 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
         entry->owner_lifecycle = mgr;
         entry->service_handle = service;
         decompose_service(mgr->component, service, entry.get());
+        if (entry->impl != nullptr) {
+            if (entry->primitive == RAC_PRIMITIVE_GENERATE_TEXT && entry->llm_ops &&
+                entry->llm_ops->get_info) {
+                rac_llm_info_t info{};
+                if (entry->llm_ops->get_info(entry->impl, &info) == RAC_SUCCESS) {
+                    entry->effective_context_length = info.context_length;
+                }
+            } else if (entry->primitive == RAC_PRIMITIVE_VLM && entry->vlm_ops &&
+                       entry->vlm_ops->get_info) {
+                rac_vlm_info_t info{};
+                if (entry->vlm_ops->get_info(entry->impl, &info) == RAC_SUCCESS) {
+                    entry->effective_context_length = info.context_length;
+                }
+            }
+        }
         entry->loaded_at_ms = detail::now_ms();
         entry->updated_at_ms = entry->loaded_at_ms;
         auto destroy_fn = mgr->destroy_fn;
