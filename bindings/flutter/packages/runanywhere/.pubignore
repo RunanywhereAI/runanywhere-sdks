@@ -1,0 +1,4 @@
+# The repo-root .gitignore excludes these codegen outputs, and pub applies it
+# when packaging. They are not committed but must ship in the archive.
+!lib/generated/
+!android/src/main/kotlin/com/runanywhere/sdk/generated/
