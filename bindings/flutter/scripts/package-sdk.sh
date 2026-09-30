@@ -514,6 +514,16 @@ validate_public_remote_binary_contract() {
                 echo "ERROR: runanywhere_mlx .pubignore drifted from the reviewed generated-payload contract" >&2
                 exit 1
             fi
+        elif [ "$pkg" = "runanywhere" ]; then
+            [ -f "$pkg_dir/.pubignore" ] || { echo "ERROR: runanywhere requires .pubignore to ship the gitignored generated trees" >&2; exit 1; }
+            expected_pubignore="$(printf '%s\n' \
+                '!lib/generated/' \
+                '!android/src/main/kotlin/com/runanywhere/sdk/generated/')"
+            actual_pubignore="$(sed -E '/^[[:space:]]*(#|$)/d' "$pkg_dir/.pubignore")"
+            if [ "$actual_pubignore" != "$expected_pubignore" ]; then
+                echo "ERROR: runanywhere .pubignore drifted from the generated-tree contract" >&2
+                exit 1
+            fi
         elif [ -e "$pkg_dir/.pubignore" ]; then
             echo "ERROR: $pkg .pubignore would override the remote-binary publish contract" >&2
             exit 1
