@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { isSDKException, ErrorCodes } from '../../dist/errors';
 import { registerCatalog, clearCatalog } from '../../dist/catalog';
+import { SdkInitResult } from '@runanywhere/proto-ts/sdk_init';
 
 let electronPath: string | null = null;
 try {
@@ -159,12 +160,19 @@ function connect(state: FakeState): FakePort {
 // v3 initialize() is a handshake rather than one call: v3.initialize, then
 // v3.version, then the secure-store round trip that mints a device id. Answer
 // every request as it is posted so the promise can settle.
-async function pump(port: FakePort, replies: Record<string, unknown> = {}): Promise<void> {
+// Methods named in `hold` are left unanswered, so a test can check what settles while
+// they are still in flight.
+async function pump(
+  port: FakePort,
+  replies: Record<string, unknown> = {},
+  hold: ReadonlySet<string> = new Set()
+): Promise<void> {
   let answered = 0;
   for (let i = 0; i < 16; i++) {
     await tick();
     while (answered < port.posts.length) {
       const msg = port.posts[answered++];
+      if (hold.has(msg.method)) continue;
       port.onmessage!({
         data: { id: msg.id, ok: true, result: replies[msg.method] },
       });
@@ -387,3 +395,77 @@ test('an unknown reply id is ignored (no throw, no cross-talk)', { skip: SKIP },
   port.onmessage!({ data: { id: msg.id, ok: true, result: 'real' } });
   assert.equal(await p, 'real');
 });
+
+// A re-forked host starts uninitialised, so the preload replays initialize() and,
+// once the gate is open again, re-runs the auth setup when the app configured a
+// control plane. Calls made after the restart must still settle.
+// The first host could not finish the HTTP setup (offline), and the replacement
+// host's retry succeeds. Commons reports no token, so auth.state() takes its status
+// from the retry's outcome: it only reads 'authenticated' once the retry has applied.
+const initResult = (hasCompletedHttpSetup: boolean) =>
+  SdkInitResult.encode(SdkInitResult.fromPartial({ httpApplicable: true, hasCompletedHttpSetup })).finish();
+const noToken = {
+  authenticated: false,
+  needsRefresh: false,
+  expiresAtUnixSec: 0,
+  userId: '',
+  organizationId: '',
+  deviceRegistered: false,
+};
+const controlPlaneReplies = {
+  'v3.hasControlPlane': true,
+  'v3.devicePersistentId': 'device-1',
+  'v3.configureControlPlane': initResult(false),
+  'v3.retryControlPlane': initResult(true),
+};
+for (const controlPlane of [undefined, { apiKey: 'sk-test', baseUrl: 'https://cp.example.test' }]) {
+  test(`calls after a host restart settle (control plane ${controlPlane ? 'on' : 'off'})`, { skip: SKIP }, async () => {
+    const { exposed, state } = freshPreload();
+    const initialize = exposed.runanywhere.initialize as (
+      secureDir?: string,
+      baseDir?: string,
+      cp?: { apiKey?: string }
+    ) => Promise<void>;
+    const first = connect(state);
+    const replies = { 'v3.version': '1.0.0', 'v3.authState': noToken, ...(controlPlane ? controlPlaneReplies : {}) };
+    await Promise.all([initialize('/sec', '/base', controlPlane), pump(first, replies)]);
+    assert.equal(
+      first.posts.some((m) => m.method === 'v3.configureControlPlane'),
+      Boolean(controlPlane),
+      'the control plane is configured only when the app supplied one'
+    );
+
+    // The utility host dies and main delivers a replacement port.
+    state.ipcOn['runanywhere-host-exited']!({ ports: [] });
+    const replacement = connect(state);
+    const version = exposed.runanywhere.version();
+    let settled = false;
+    version.then(() => (settled = true), () => (settled = true));
+    // Leave the auth retry unanswered: calls made after the restart must not wait for it.
+    const retry = 'v3.retryControlPlane';
+    await pump(replacement, { ...replies, version: '1.0.0' }, new Set([retry]));
+
+    assert.ok(settled, `version() is still pending; posted: ${replacement.posts.map((m) => m.method).join(', ')}`);
+    assert.equal(await version, '1.0.0');
+    const auth = exposed.runanywhere.auth as { state(): Promise<{ status: string }> };
+    if (controlPlane) {
+      const before = auth.state();
+      await pump(replacement, replies, new Set([retry]));
+      assert.equal((await before).status, 'offline', 'the held retry has not applied yet');
+    }
+
+    // Release the retry (and answer the authState read that follows it), then the
+    // page must see the control-plane state the retry restored.
+    await pump(replacement, replies);
+    const after = auth.state();
+    await pump(replacement, replies);
+    assert.equal((await after).status, controlPlane ? 'authenticated' : 'disabled');
+    const init = replacement.posts.find((m) => m.method === 'v3.initialize');
+    assert.deepEqual(init?.args, [{ secureDir: '/sec', baseDir: '/base' }]);
+    assert.equal(
+      replacement.posts.some((m) => m.method === 'v3.retryControlPlane'),
+      Boolean(controlPlane),
+      'the fresh host re-runs control-plane auth only when one was configured'
+    );
+  });
+}
