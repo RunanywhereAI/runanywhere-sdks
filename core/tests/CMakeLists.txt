@@ -226,6 +226,17 @@ rac_link_archive_deps(test_vlm_options_defaults)
 target_compile_features(test_vlm_options_defaults PRIVATE cxx_std_17)
 add_test(NAME vlm_options_defaults_tests COMMAND test_vlm_options_defaults)
 
+# --- Direct C-struct VLM raw-image validation -----------------------
+add_executable(test_vlm_image_validation test_vlm_image_validation.cpp)
+target_include_directories(test_vlm_image_validation PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_vlm_image_validation PRIVATE rac_commons)
+rac_link_archive_deps(test_vlm_image_validation)
+target_compile_features(test_vlm_image_validation PRIVATE cxx_std_17)
+add_test(NAME vlm_image_validation_tests COMMAND test_vlm_image_validation)
+
 # --- MemoryPool<T> tests ------------------------------
 # Header-only template; verifies acquire/release, blocking, cancel, and a
 # concurrent stress test.
