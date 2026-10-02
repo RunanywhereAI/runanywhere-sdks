@@ -1285,6 +1285,71 @@ TEST(c_abi_yaml_solution_lifecycle) {
 }
 
 // ---------------------------------------------------------------------------
+// 12b. An apostrophe in an unquoted scalar must not swallow the comment.
+//      The comment stripper tracks quote state so a '#' inside a quoted
+//      string survives. An apostrophe in ordinary prose ("Don't") opens that
+//      state and nothing closes it, so the rest of the line counts as quoted
+//      and the trailing comment is kept as part of the value.
+// ---------------------------------------------------------------------------
+TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
+    const char* yaml =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  stt_model_id: whisper\n"
+        "  tts_model_id: kokoro\n"
+        "  vad_model_id: silero\n"
+        "  system_prompt: Don't use markdown  # keep replies short\n";
+
+    runanywhere::v1::SolutionConfig cfg;
+    const rac_result_t rc = rac::solutions::load_solution_from_yaml(yaml, &cfg);
+    CHECK(rc == RAC_SUCCESS);
+
+    const std::string prompt = cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] system_prompt = %s\n", prompt.c_str());
+    CHECK(prompt == "Don't use markdown");
+
+    // The other direction, so the fix cannot be "just stop tracking quotes":
+    // a '#' inside a properly quoted scalar is data and must survive, and a
+    // '#' with no leading whitespace is not a comment either.
+    const char* quoted =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: \"has # inside\"  # real comment\n";
+    runanywhere::v1::SolutionConfig quoted_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(quoted, &quoted_cfg) == RAC_SUCCESS);
+    const std::string kept = quoted_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] quoted system_prompt = %s\n", kept.c_str());
+    CHECK(kept == "has # inside");
+
+    // Two apostrophes, one in the value and one in the comment. They balance,
+    // so quote tracking ends the line looking correct and the
+    // unterminated-quote fallback never runs. Only opening a quote at a token
+    // boundary keeps `Don't` from opening one at all.
+    const char* two =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: Don't use markdown  # don't forget\n";
+    runanywhere::v1::SolutionConfig two_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(two, &two_cfg) == RAC_SUCCESS);
+    const std::string two_prompt = two_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] two-apostrophe system_prompt = %s\n", two_prompt.c_str());
+    CHECK(two_prompt == "Don't use markdown");
+
+    // A genuinely unterminated quote must still reach the fallback, and a
+    // quoted scalar whose comment also contains an apostrophe must keep its
+    // own '#'.
+    const char* apos_comment =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: \"has # inside\"  # don't forget\n";
+    runanywhere::v1::SolutionConfig apos_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(apos_comment, &apos_cfg) == RAC_SUCCESS);
+    const std::string apos_kept = apos_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] quoted + apostrophe comment = %s\n", apos_kept.c_str());
+    CHECK(apos_kept == "has # inside");
+}
+
+// ---------------------------------------------------------------------------
 // 13. C ABI YAML path — raw PipelineSpec shape (top-level `operators`).
 // ---------------------------------------------------------------------------
 TEST(c_abi_yaml_pipeline_lifecycle) {
@@ -1420,6 +1485,7 @@ int main() {
     run_test_c_abi_proto_bytes_lifecycle();
     run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_c_abi_yaml_solution_lifecycle();
+    run_test_yaml_apostrophe_does_not_swallow_a_trailing_comment();
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();
     run_test_null_handle_paths();
