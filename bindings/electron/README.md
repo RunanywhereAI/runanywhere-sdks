@@ -201,6 +201,47 @@ npm run start:gpu  # CUDA (when the GPU prebuild is present)
 On Windows you can also double-click `RunAnywhere AI.cmd` / `RunAnywhere AI (GPU).cmd`.
 The example covers chat/streaming, vision, embeddings, and a mic → STT → LLM → TTS → speaker voice loop.
 
+## Handle Leak Detection (RAC_HANDLE_AUDIT)
+
+When `RAC_HANDLE_AUDIT` is set to `warn` or `debug`, the native addon tracks every loaded handle in an internal audit table keyed by handle ID. On shutdown, handles that remain in the audit table (that is, were never properly unloaded) are reported as leaks. Any other value (including an empty string) disables tracking and its bookkeeping.
+
+### Usage
+
+```bash
+# Enable warning-level leak reporting at shutdown
+RAC_HANDLE_AUDIT=warn node dist/main.js
+
+# Enable periodic delta logging to stdout/stderr
+RAC_HANDLE_AUDIT=debug node dist/main.js
+```
+
+### Environment values
+
+| Value | Behavior |
+|---|---|
+| `off` (default) | No audit table updates, reporting, or audit mutex contention. |
+| `warn` | Records every handle ID and tracked category at load time; erases at unload. Logs leaked handles during `Shutdown()`. |
+| `debug` | Same as `warn`, plus the TS `HandleAuditor` prints periodic delta reports (`+N / -M`) to stderr every 5 seconds. |
+
+### Audit data shape
+
+The native addon exposes `handleAudit()` returning:
+
+```typescript
+interface HandleAuditEntry {
+  id: number;           // globally unique integer handle ID
+  category: string;     // 'llm' | 'vlm' | 'embedding' | 'stt' | 'tts' | 'vad' | 'rag' | 'rerank' | 'diarization' | 'segmentation'
+  model?: string;       // model id or path; 'rag_session' for RAG sessions
+}
+```
+
+### Implementation details
+
+- Tracked categories are `llm`, `vlm`, `embedding`, `stt`, `tts`, `vad`, `rag`, `rerank`, `diarization`, and `segmentation`.
+- Overhead when enabled: one `std::map<int32_t, HandleAuditEntry>` insert/erase per load/destroy and the mutex used to protect the shared handle tables.
+- The audit table is guarded by `g_handles_mutex` — the same mutex that protects all handle maps — so no additional locking is needed.
+- When `RAC_HANDLE_AUDIT` is not `warn` or `debug`, a static flag evaluated once at module init avoids audit bookkeeping and per-call `getenv()` overhead.
+
 ## Errors
 
 Failures throw `SDKException` with `.code`, `.category`, and `.recoverySuggestion`, consistent with other RunAnywhere SDKs.
