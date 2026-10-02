@@ -28,6 +28,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -426,7 +427,7 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = activeCall != null && synchronized(slot) { slot.cancelRequested },
+                cancelled = isStreamCancellation(e, activeCall, slot),
             )
         } finally {
             inFlightStreams.remove(streamId)
@@ -451,7 +452,11 @@ object OkHttpHttpTransport {
                 val n = try {
                     input.read(buffer)
                 } catch (io: IOException) {
-                    if (synchronized(slot) { slot.cancelRequested }) {
+                    // A cancelled call surfaces as an IOException — treat that
+                    // as a clean cancellation rather than a transport failure.
+                    // Timeouts stay transport errors (see
+                    // [isStreamCancellation]).
+                    if (isStreamCancellation(io, call, slot)) {
                         cancelled = true
                         break
                     }
@@ -486,6 +491,26 @@ object OkHttpHttpTransport {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Classifies a streaming failure as cancellation.
+     *
+     * True when the SDK-owned [StreamSlot.cancelRequested] marker is set (the
+     * native chunk callback returned `false`, or [cancelAllStreams] ran), or
+     * the OkHttp [Call] was cancelled by some other owner — e.g. a host
+     * client's shared `Dispatcher.cancelAll()` reached through [setHttpClient].
+     *
+     * OkHttp's own call/read timeouts cancel too, but surface as
+     * [InterruptedIOException] (which `SocketTimeoutException` extends), so
+     * they stay transport errors for JNI to map to `RAC_ERROR_TIMEOUT`.
+     */
+    private fun isStreamCancellation(failure: Throwable, call: Call?, slot: StreamSlot): Boolean {
+        if (synchronized(slot) { slot.cancelRequested }) return true
+        return call != null &&
+            call.isCanceled() &&
+            failure is IOException &&
+            failure !is InterruptedIOException
+    }
 
     private fun buildRequest(
         method: String,
