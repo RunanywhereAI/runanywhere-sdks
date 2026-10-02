@@ -164,6 +164,25 @@ namespace {
 constexpr int32_t kAcceleratorPolicyUnspecified = 0;
 constexpr int32_t kAcceleratorPolicyNpu = 4;
 
+int32_t query_effective_context_length(const rac_engine_vtable_t* vt,
+                                       rac_primitive_t primitive, void* impl) {
+    if (!vt || !impl) {
+        return 0;
+    }
+    if (primitive == RAC_PRIMITIVE_GENERATE_TEXT && vt->llm_ops && vt->llm_ops->get_info) {
+        rac_llm_info_t info{};
+        if (vt->llm_ops->get_info(impl, &info) == RAC_SUCCESS) {
+            return info.context_length;
+        }
+    } else if (primitive == RAC_PRIMITIVE_VLM && vt->vlm_ops && vt->vlm_ops->get_info) {
+        rac_vlm_info_t info{};
+        if (vt->vlm_ops->get_info(impl, &info) == RAC_SUCCESS) {
+            return info.context_length;
+        }
+    }
+    return 0;
+}
+
 rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t primitive,
                                  const std::string& resolved_path, const std::string& mmproj_path,
                                  const std::string& options_json, void** out_impl,
@@ -751,6 +770,11 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     // Same-component slot handling. The READY fast path is re-checked only
     // after admission, so a concurrent non-force follower observes the model
     // installed by the leader and returns without creating another backend.
+    // A concrete context_length is part of resident compatibility: if the
+    // initialized backend reports a different context (or cannot report one),
+    // reusing it would silently ignore the caller's request. context_length=0
+    // remains the documented auto/model-derived request and imposes no concrete
+    // resident size requirement.
     // The previous occupant is captured but left installed so a failed new
     // load does not strand the caller with an empty slot (create-then-swap: the
     // old backend is destroyed only after the new one is created successfully,
@@ -768,6 +792,24 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         if (existing != detail::g_loaded.end()) {
             if (!request.force_reload() && existing->second->model_id == request.model_id() &&
                 existing->second->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
+                const int32_t requested_context =
+                    request.has_context_length() ? request.context_length() : 0;
+                const int32_t resident_context = existing->second->effective_context_length;
+                if (requested_context > 0 && resident_context != requested_context) {
+                    const std::string resident_label =
+                        resident_context > 0 ? std::to_string(resident_context) : "unknown";
+                    const std::string message =
+                        "ModelLoadRequest.context_length=" + std::to_string(requested_context) +
+                        " cannot be applied because model '" + request.model_id() +
+                        "' is already resident with effective context_length=" + resident_label +
+                        "; retry with force_reload=true to recreate the resident model";
+                    ModelLoadResult result = detail::make_load_result(
+                        false, existing->second->model_id, existing->second->category,
+                        existing->second->framework, existing->second->resolved_path,
+                        existing->second->resolved_artifacts, existing->second->loaded_at_ms,
+                        message, detail::placement_from_loaded(*existing->second));
+                    return detail::copy_proto(result, out_result);
+                }
                 ModelLoadResult result = detail::make_load_result(
                     true, existing->second->model_id, existing->second->category,
                     existing->second->framework, existing->second->resolved_path,
@@ -1092,6 +1134,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->ocr_ops = vt->ocr_ops;
     }
     loaded->impl = impl;
+    loaded->effective_context_length = detail::query_effective_context_length(vt, primitive, impl);
     // QHexRT reasoning templates may prefill `<think>` into the prompt
     // (`chat.assistant.gen_prefill`). Stamp that onto ModelInfo so the stream
     // splitter can call start_inside_reasoning() instead of the ambiguous hold.
