@@ -11,7 +11,9 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include "rac/features/cua/rac_cua.h"
 
@@ -59,21 +61,77 @@ struct CuaProfile {
     uint32_t model_space_h;
 };
 
-// Built-in profile registry. Extend here to add a CUA model family.
+// Built-in profiles. This list is a convenience, not the extension point:
+// `rac_cua_register_profile` lets an application add a model family at runtime,
+// so a new model needs no edit here, no rebuild, and no republish of the
+// language bindings.
+//
+// Built-ins are kept deliberately few. A profile is only useful if its prompt
+// and coordinate space match what the model was actually trained to emit;
+// shipping a plausible-looking guess would produce confidently wrong clicks,
+// which is worse than having no profile at all.
 constexpr CuaProfile kProfiles[] = {
     {RAC_CUA_PROFILE_FARA, kFaraSystemPrompt, 1000, 1000},
 };
 
-const CuaProfile* find_profile(const char* id) {
-    if (id == nullptr) {
-        return nullptr;
+// A profile registered at runtime. Owns its strings: callers are told they may
+// free theirs on return, and a dangling prompt pointer would be a use-after-free
+// on every subsequent prompt build.
+struct OwnedProfile {
+    std::string id;
+    std::string system_prompt;
+    uint32_t model_space_w;
+    uint32_t model_space_h;
+};
+
+// Function-local statics: initialised on first use, in a defined order, with no
+// static-initialisation-order hazard against other translation units.
+std::mutex& registry_mutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::vector<OwnedProfile>& runtime_profiles() {
+    static std::vector<OwnedProfile> v;
+    return v;
+}
+
+// Resolved by VALUE rather than by pointer. A pointer into `runtime_profiles()`
+// would dangle the moment another thread registered a profile and the vector
+// reallocated; copying two small strings per call is not worth that risk.
+struct ResolvedProfile {
+    std::string system_prompt;
+    uint32_t model_space_w;
+    uint32_t model_space_h;
+};
+
+// Runtime registrations are searched first, so registering an existing id
+// overrides it — including a built-in, which lets an application correct a
+// shipped prompt without waiting for a release.
+bool resolve_profile(const char* id, ResolvedProfile* out) {
+    if (id == nullptr || out == nullptr) {
+        return false;
+    }
+    {
+        std::lock_guard<std::mutex> lock(registry_mutex());
+        for (const auto& p : runtime_profiles()) {
+            if (p.id == id) {
+                out->system_prompt = p.system_prompt;
+                out->model_space_w = p.model_space_w;
+                out->model_space_h = p.model_space_h;
+                return true;
+            }
+        }
     }
     for (const auto& p : kProfiles) {
         if (std::strcmp(p.id, id) == 0) {
-            return &p;
+            out->system_prompt = p.system_prompt;
+            out->model_space_w = p.model_space_w;
+            out->model_space_h = p.model_space_h;
+            return true;
         }
     }
-    return nullptr;
+    return false;
 }
 
 // --- minimal, dependency-free JSON-ish extractors (Fara's tool_call is fixed) ---
@@ -435,8 +493,8 @@ int32_t scale_coordinate(long value, uint32_t viewport, uint32_t model_space) {
 
 extern "C" int rac_cua_system_prompt(const char* profile_id, uint32_t display_w, uint32_t display_h,
                                      char* out, size_t out_size) {
-    const CuaProfile* p = find_profile(profile_id);
-    if (p == nullptr) {
+    ResolvedProfile profile;
+    if (!resolve_profile(profile_id, &profile)) {
         return -1;
     }
     // (0, 0) means "use the profile's native space". Anything else must be a
@@ -453,10 +511,10 @@ extern "C" int rac_cua_system_prompt(const char* profile_id, uint32_t display_w,
     // declared space that disagreed produced a prompt and a rescale that
     // contradicted each other — every click confidently wrong, silently. Refuse
     // it. The parameter stays for a future profile whose space is negotiable.
-    if (display_w != 0 && (display_w != p->model_space_w || display_h != p->model_space_h)) {
+    if (display_w != 0 && (display_w != profile.model_space_w || display_h != profile.model_space_h)) {
         return -1;
     }
-    const std::string& prompt = p->system_prompt;
+    const std::string& prompt = profile.system_prompt;
     if (out != nullptr && out_size > 0) {
         copy_bounded(out, out_size, prompt);
     }
@@ -466,8 +524,8 @@ extern "C" int rac_cua_system_prompt(const char* profile_id, uint32_t display_w,
 extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_output,
                                     uint32_t viewport_w, uint32_t viewport_h,
                                     rac_cua_action_t* out) {
-    const CuaProfile* p = find_profile(profile_id);
-    if (p == nullptr || model_output == nullptr || out == nullptr) {
+    ResolvedProfile profile;
+    if (!resolve_profile(profile_id, &profile) || model_output == nullptr || out == nullptr) {
         return -1;
     }
     // Unlike the prompt's display space, a viewport has no "use the default"
@@ -516,8 +574,8 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
     long my = 0;
     if (json_int_pair(body, "coordinate", &mx, &my)) {
         out->has_coordinate = 1;
-        out->x = scale_coordinate(mx, viewport_w, p->model_space_w);
-        out->y = scale_coordinate(my, viewport_h, p->model_space_h);
+        out->x = scale_coordinate(mx, viewport_w, profile.model_space_w);
+        out->y = scale_coordinate(my, viewport_h, profile.model_space_h);
     }
 
     double num = 0.0;
@@ -620,4 +678,101 @@ extern "C" rac_result_t rac_cua_parse_action_proto(const char* profile_id, const
     }
     return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), out);
 #endif
+}
+
+extern "C" rac_result_t rac_cua_register_profile(const char* profile_id, const char* system_prompt,
+                                                 uint32_t model_space_w, uint32_t model_space_h) {
+    if (profile_id == nullptr || *profile_id == '\0' || system_prompt == nullptr) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    // Same bound the built-in path enforces: a zero or absurd coordinate space
+    // would make every rescale meaningless rather than merely wrong.
+    if (!dimension_in_range(model_space_w) || !dimension_in_range(model_space_h)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(registry_mutex());
+    auto& profiles = runtime_profiles();
+    for (auto& existing : profiles) {
+        if (existing.id == profile_id) {
+            existing.system_prompt = system_prompt;
+            existing.model_space_w = model_space_w;
+            existing.model_space_h = model_space_h;
+            return RAC_SUCCESS;
+        }
+    }
+    profiles.push_back(OwnedProfile{profile_id, system_prompt, model_space_w, model_space_h});
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_cua_unregister_profile(const char* profile_id) {
+    if (profile_id == nullptr || *profile_id == '\0') {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    std::lock_guard<std::mutex> lock(registry_mutex());
+    auto& profiles = runtime_profiles();
+    for (auto it = profiles.begin(); it != profiles.end(); ++it) {
+        if (it->id == profile_id) {
+            profiles.erase(it);
+            return RAC_SUCCESS;
+        }
+    }
+    // Built-ins are not removable; reporting success here would imply the
+    // profile is gone when the next lookup would still resolve it.
+    return RAC_ERROR_INVALID_ARGUMENT;
+}
+
+extern "C" size_t rac_cua_profile_count(void) {
+    std::lock_guard<std::mutex> lock(registry_mutex());
+    size_t count = runtime_profiles().size();
+    // A runtime profile that overrides a built-in must be counted once, not
+    // twice, or an index walk would report the same id from both lists.
+    for (const auto& builtin : kProfiles) {
+        bool overridden = false;
+        for (const auto& runtime : runtime_profiles()) {
+            if (runtime.id == builtin.id) {
+                overridden = true;
+                break;
+            }
+        }
+        if (!overridden) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+extern "C" int rac_cua_profile_id_at(size_t index, char* out, size_t out_size) {
+    std::lock_guard<std::mutex> lock(registry_mutex());
+    const auto& profiles = runtime_profiles();
+    if (index < profiles.size()) {
+        const std::string& id = profiles[index].id;
+        if (out != nullptr && out_size > 0) {
+            copy_bounded(out, out_size, id);
+        }
+        return static_cast<int>(id.size());
+    }
+
+    size_t remaining = index - profiles.size();
+    for (const auto& builtin : kProfiles) {
+        bool overridden = false;
+        for (const auto& runtime : profiles) {
+            if (runtime.id == builtin.id) {
+                overridden = true;
+                break;
+            }
+        }
+        if (overridden) {
+            continue;
+        }
+        if (remaining == 0) {
+            const std::string id = builtin.id;
+            if (out != nullptr && out_size > 0) {
+                copy_bounded(out, out_size, id);
+            }
+            return static_cast<int>(id.size());
+        }
+        --remaining;
+    }
+    return -1;
 }

@@ -78,6 +78,19 @@ export type {
   CuaDisplaySize,
 } from './Public/Extensions/RunAnywhere+CUA.js';
 
+// Browser hardware capabilities (WebGPU/shader-f16/memory/cores/…), also
+// surfaced on `RunAnywhere.Hardware`. Used to choose model sizes/acceleration.
+export { Hardware } from './Public/Extensions/RunAnywhere+Hardware.js';
+export type { WebCapabilities } from './Public/Extensions/RunAnywhere+Hardware.js';
+
+// Full canonical SDK event catalog (subscribe/poll/publish) over the proto
+// event stream, carrying per-token telemetry (tokens_per_second,
+// time_to_first_token_ms, …) richer than the 4-variant breadcrumb stream on
+// `RunAnywhere.events`.
+export { SDKEvents } from './Public/Extensions/RunAnywhere+SDKEvents.js';
+export type { SDKEventHandler, SDKEventUnsubscribe } from './Adapters/SDKEventStreamAdapter.js';
+export type { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
+
 // Results
 export type {
   AppliedAdapter,
