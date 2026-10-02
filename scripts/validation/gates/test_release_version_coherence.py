@@ -1,9 +1,10 @@
-"""Tests for the podspec source-tag half of check_release_version_coherence.sh.
+"""Tests for the podspec source-tag and root README pin halves of
+check_release_version_coherence.sh.
 
 The gate is the only thing standing between a podspec and a `:tag` that was
 never pushed, which fails `pod install` outright rather than degrading. It reads
 ~40 files under REPO_ROOT, so the tests run it against a sandbox that mirrors
-the real tree with symlinks and materializes only the podspecs a case mutates.
+the real tree with symlinks and materializes only the files a case mutates.
 That keeps every other assertion in the gate satisfied by the real repo, so a
 failure means the mutation caused it.
 """
@@ -77,6 +78,18 @@ def _spm_version():
     raise AssertionError("Package.swift has no sdkVersion pin")
 
 
+def _core_version():
+    return (REPO_ROOT / "core/VERSION").read_text(encoding="utf-8").strip()
+
+
+def _mutate_readme(tmp_path, old, new):
+    sandbox = _mirror(tmp_path, writable={"README.md"})
+    text = (sandbox / "README.md").read_text(encoding="utf-8")
+    assert text.count(old) == 1, old
+    (sandbox / "README.md").write_text(text.replace(old, new), encoding="utf-8")
+    return _run(sandbox)
+
+
 def test_unmodified_tree_passes(tmp_path):
     # Establishes the baseline the other cases lean on: whatever they trip, it
     # is not one of the gate's other forty assertions.
@@ -130,6 +143,36 @@ def test_every_rn_podspec_is_covered(tmp_path):
     assert on_disk == sorted(RN_PODSPECS)
     for podspec in on_disk:
         assert podspec in gate, f"{podspec} is not covered by {GATE}"
+
+
+def test_one_stale_readme_pin_is_rejected(tmp_path):
+    # The case expect_literal misses: every other pin still names the current
+    # version, so the version string is present and only a per-pin check fails.
+    version = _core_version()
+    pin = f"io.github.sanchitmonga22:runanywhere-sdk:{version}"
+    result = _mutate_readme(tmp_path, pin, "io.github.sanchitmonga22:runanywhere-sdk:0.0.1")
+    assert result.returncode == 1
+    assert (
+        f"expected {version}, found 'io.github.sanchitmonga22:runanywhere-sdk:0.0.1'"
+        in result.stderr
+    )
+
+
+def test_readme_pin_with_a_prerelease_suffix_is_rejected(tmp_path):
+    # The version must end the pin: a suffix names a different artifact.
+    version = _core_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}-rc.1")
+    assert result.returncode == 1
+    assert f"found 'runanywhere=={version}-rc.1'" in result.stderr
+
+
+def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
+    # A shape with no match means the README was reworded under the gate, which
+    # would otherwise stop checking that install command without saying so.
+    version = _core_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", "runanywhere")
+    assert result.returncode == 1
+    assert "no version pin matches 'runanywhere=='" in result.stderr
 
 
 if __name__ == "__main__":
