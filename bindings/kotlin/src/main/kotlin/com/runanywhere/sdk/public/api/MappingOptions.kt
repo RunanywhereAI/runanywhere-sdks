@@ -20,6 +20,7 @@ import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGRetrievalOptions
 import ai.runanywhere.proto.v1.RerankOptions
 import ai.runanywhere.proto.v1.STTOptions
+import ai.runanywhere.proto.v1.StructuredOutputMode as ProtoStructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.ThinkingTagPattern
@@ -118,11 +119,15 @@ internal fun ReasoningOptions.toProto(): ProtoReasoningOptions =
  * regex }`. [StructuredOutput.strict] has no wire home any more — retry
  * behaviour for an invalid first pass is owned entirely by the Kotlin-side
  * `llm.generateStructured(mode = REPAIR)` loop, not by a commons flag.
- */
 internal fun StructuredOutput.toProto(): StructuredOutputOptions =
     StructuredOutputOptions(
         schema = schema.rawJson,
         include_schema_in_prompt = true,
+        mode = when (mode) {
+            StructuredOutputMode.CONSTRAINED -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED
+            StructuredOutputMode.VALIDATION_ONLY -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY
+            StructuredOutputMode.REPAIR -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR
+        },
     )
 
 internal fun SttOptions?.orDefault(): SttOptions = this ?: SttOptions()

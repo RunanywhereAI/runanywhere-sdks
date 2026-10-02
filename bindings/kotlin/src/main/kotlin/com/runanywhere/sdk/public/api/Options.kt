@@ -58,12 +58,13 @@ public sealed class ToolChoice {
 /** Schema the generated text must conform to. */
 public data class StructuredOutput(
     val schema: JsonSchema,
+    val mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
     val strict: Boolean = true,
 )
 
 /** Enforcement level `llm.generateStructured` applies to its schema. */
 public enum class StructuredOutputMode {
-    /** Engine-constrained decoding; fails preflight until a constrained-decoding engine is wired in. */
+    /** Engine-constrained decoding (GBNF grammar sampling). */
     CONSTRAINED,
 
     /** Generate freely, then validate against the schema. */

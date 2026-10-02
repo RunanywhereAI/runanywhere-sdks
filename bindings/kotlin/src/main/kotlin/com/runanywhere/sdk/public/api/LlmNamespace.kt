@@ -126,10 +126,9 @@ public class LlmNamespace internal constructor() {
      * Generate a completion constrained to [schema] and parse it.
      *
      * [mode] picks how the schema is enforced:
-     * - [StructuredOutputMode.VALIDATION_ONLY] (default): generate freely, then validate.
+     * - [StructuredOutputMode.CONSTRAINED] (default): engine-constrained decoding (GBNF grammar sampling).
+     * - [StructuredOutputMode.VALIDATION_ONLY]: generate freely, then validate against the schema.
      * - [StructuredOutputMode.REPAIR]: validate, then retry once with a repair instruction if invalid.
-     * - [StructuredOutputMode.CONSTRAINED]: engine-constrained decoding — fails preflight
-     *   until a constrained-decoding engine is wired in.
      *
      * @throws SDKException when no language model can be loaded, [mode] cannot
      *   be honored, or generation fails.
@@ -137,17 +136,11 @@ public class LlmNamespace internal constructor() {
     public suspend fun generateStructured(
         prompt: String,
         schema: JsonSchema,
-        mode: StructuredOutputMode = StructuredOutputMode.VALIDATION_ONLY,
+        mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
         options: LlmOptions? = null,
     ): StructuredResult {
-        if (mode == StructuredOutputMode.CONSTRAINED) {
-            throw SDKException.unsupportedCapability(
-                "llm.generateStructured(mode = CONSTRAINED)",
-                "needs engine-level constrained decoding, which is not wired in yet; use VALIDATION_ONLY or REPAIR",
-            )
-        }
         val opts = options.orDefault()
-        val structuredOutput = StructuredOutput(schema = schema)
+        val structuredOutput = StructuredOutput(schema = schema, mode = mode)
         var generation = generateStructuredUnary(prompt, opts, structuredOutput)
         var parsed = parseStructuredOutput(generation, structuredOutput)
 

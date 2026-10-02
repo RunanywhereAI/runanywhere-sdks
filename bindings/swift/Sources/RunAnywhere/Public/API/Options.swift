@@ -81,6 +81,9 @@ public struct StructuredOutput: Sendable {
     /// Schema the output must validate against, as raw JSON Schema text.
     public var schema: JsonSchema
 
+    /// How the schema constraint is enforced during generation.
+    public var mode: StructuredEnforcementMode = .constrained
+
     /// Reject output that does not validate instead of returning it raw.
     ///
     /// `RAStructuredOutputOptions.strictMode` was deleted outright
@@ -92,13 +95,27 @@ public struct StructuredOutput: Sendable {
     public var strict: Bool = true
 
     /// Build a structured-output constraint.
-    public init(schema: JsonSchema, strict: Bool = true) {
+    public init(
+        schema: JsonSchema,
+        mode: StructuredEnforcementMode = .constrained,
+        strict: Bool = true
+    ) {
         self.schema = schema
+        self.mode = mode
         self.strict = strict
     }
 
     func toProto() -> RAStructuredOutputOptions {
-        RAStructuredOutputOptions.defaults(schema: schema, includeSchemaInPrompt: true)
+        var proto = RAStructuredOutputOptions.defaults(schema: schema, includeSchemaInPrompt: true)
+        switch mode {
+        case .constrained:
+            proto.mode = .constrained
+        case .validationOnly:
+            proto.mode = .validationOnly
+        case .repair:
+            proto.mode = .repair
+        }
+        return proto
     }
 }
 

@@ -77,30 +77,20 @@ public extension RunAnywhere {
         /// Generate output that satisfies `schema`.
         ///
         /// `mode` picks how the schema is enforced:
-        /// - `.validationOnly` (default): generate freely, then validate.
+        /// - `.constrained` (default): engine-constrained decoding (GBNF grammar sampling).
+        /// - `.validationOnly`: generate freely, then validate against the schema.
         /// - `.repair`: validate, then retry once with a repair instruction if invalid.
-        /// - `.constrained`: engine-constrained decoding — fails preflight
-        ///   until a constrained-decoding engine is wired in.
         ///
         /// - Throws: `SDKException` when no model can be loaded, `mode` cannot
         ///   be honored, generation fails, or the output cannot be parsed.
         public func generateStructured(
             prompt: String,
             schema: JsonSchema,
-            mode: StructuredEnforcementMode = .validationOnly,
+            mode: StructuredEnforcementMode = .constrained,
             options: LlmOptions? = nil
         ) async throws -> StructuredResult {
-            guard mode != .constrained else {
-                throw SDKException(
-                    code: .notSupported,
-                    message: "generateStructured(mode: .constrained) needs engine-level constrained decoding, " +
-                        "which is not wired in yet; use .validationOnly or .repair",
-                    category: .validation
-                )
-            }
-
             var effective = options ?? LlmOptions()
-            effective.structuredOutput = StructuredOutput(schema: schema)
+            effective.structuredOutput = StructuredOutput(schema: schema, mode: mode)
 
             var generation = try await generate(prompt: prompt, history: [], options: effective)
             var parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)

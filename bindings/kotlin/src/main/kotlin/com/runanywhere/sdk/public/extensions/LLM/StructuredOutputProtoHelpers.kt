@@ -15,6 +15,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import com.runanywhere.sdk.public.api.JsonSchema
 import com.runanywhere.sdk.public.types.RAStructuredOutputResult
@@ -23,20 +24,17 @@ import com.runanywhere.sdk.public.types.RAStructuredOutputResult
 
 /**
  * Default structured-output options mirroring Swift
- * `RAStructuredOutputOptions.defaults(schema:includeSchemaInPrompt:strict:)`.
- *
- * `strict`/`repair` have no wire home any more (`strict_mode`/`mode`/
- * `repair_json` were all deleted from `StructuredOutputOptions`): retry
- * behaviour for an invalid first pass is owned entirely by the Kotlin-side
- * `llm.generateStructured(mode = REPAIR)` loop, not a commons flag.
+ * `RAStructuredOutputOptions.defaults(schema:includeSchemaInPrompt:mode:)`.
  */
 fun StructuredOutputOptions.Companion.defaults(
     schema: JsonSchema,
     includeSchemaInPrompt: Boolean = true,
+    mode: StructuredOutputMode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED,
 ): StructuredOutputOptions =
     StructuredOutputOptions(
         include_schema_in_prompt = includeSchemaInPrompt,
         schema = schema.rawJson,
+        mode = mode,
     )
 
 // MARK: - StructuredOutputResult
