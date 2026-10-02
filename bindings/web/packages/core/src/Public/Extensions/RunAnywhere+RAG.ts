@@ -1282,6 +1282,7 @@ function normalizeCrossWasmDocument(document: RAGDocument): NormalizedCrossWasmD
   };
 }
 
+/** Represents a bounded chunk produced by splitRAGText. */
 interface SplitRAGChunk {
   text: string;
   startOffset: number;
@@ -1289,29 +1290,101 @@ interface SplitRAGChunk {
   tokenCount: number;
 }
 
+/** Represents the start and end byte/char offset of a token in the original text. */
+interface RAGTokenSpan {
+  startOffset: number;
+  endOffset: number;
+}
+
+/**
+ * Counts the number of Unicode code points in a string, correctly counting surrogate pairs as one code point.
+ *
+ * @param str - Input string to measure.
+ * @returns Total count of Unicode code points.
+ */
+function countCodePoints(str: string): number {
+  let count = 0;
+  for (const char of str) {
+    if (char) count++;
+  }
+  return count;
+}
+
+/**
+ * Splits input text into sliding-window chunks bounded by token count and chunk overlap.
+ * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK text
+ * or long non-whitespace strings) by Unicode code points without breaking surrogate pairs.
+ *
+ * @param text - The raw input text to chunk.
+ * @param requestedSize - The desired maximum chunk size in tokens.
+ * @param requestedOverlap - The number of tokens that should overlap between consecutive chunks.
+ * @returns An array of chunks containing text slices, offsets, and token counts.
+ */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
   if (matches.length === 0) return [];
   const size = Math.max(1, Math.floor(requestedSize));
   const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
   const stride = Math.max(1, size - overlap);
+
+  // Build the list of token spans. In whitespace-delimited scripts (English, etc.),
+  // each non-whitespace sequence is roughly one token. In scripts without spaces
+  // (CJK, etc.) or for oversized runs (long URLs, base64 blobs), a single regex
+  // match can exceed the chunk size budget. We enforce a character/code-point
+  // limit by splitting any token whose code-point count exceeds `size` on Unicode
+  // code-point boundaries (preventing surrogate pair corruption). Tokens within
+  // the budget remain atomic.
+  const tokens: RAGTokenSpan[] = [];
+  for (const match of matches) {
+    const matchText = match[0];
+    const matchStart = match.index ?? 0;
+    const cpCount = countCodePoints(matchText);
+    const isOversized = cpCount > size;
+
+    if (!isOversized) {
+      tokens.push({
+        startOffset: matchStart,
+        endOffset: matchStart + matchText.length,
+      });
+    } else {
+      let currentOffset = matchStart;
+      for (const char of matchText) {
+        tokens.push({
+          startOffset: currentOffset,
+          endOffset: currentOffset + char.length,
+        });
+        currentOffset += char.length;
+      }
+    }
+  }
+
+  if (tokens.length === 0) return [];
+
   const chunks: SplitRAGChunk[] = [];
-  for (let start = 0; start < matches.length; start += stride) {
-    const end = Math.min(matches.length, start + size);
-    const startOffset = matches[start]!.index ?? 0;
-    const last = matches[end - 1]!;
-    const endOffset = (last.index ?? 0) + last[0].length;
+  for (let start = 0; start < tokens.length; start += stride) {
+    const end = Math.min(tokens.length, start + size);
+    const startOffset = tokens[start]!.startOffset;
+    const last = tokens[end - 1]!;
+    const endOffset = last.endOffset;
     chunks.push({
       text: text.slice(startOffset, endOffset),
       startOffset,
       endOffset,
       tokenCount: end - start,
     });
-    if (end === matches.length) break;
+    if (end === tokens.length) break;
   }
   return chunks;
 }
 
+/**
+ * Truncates and formats retrieved RAG search result chunks into a single context string,
+ * adhering to a maximum token budget using code-point-aware tokenization.
+ *
+ * @param chunks - Retrieved RAG search result chunks to format.
+ * @param requestedMaxTokens - Maximum allowable token budget for the formatted context.
+ * @returns Formatted context string with source attributions.
+ */
 function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number): string {
   const maxTokens = Math.max(1, Math.floor(requestedMaxTokens));
   const parts: string[] = [];
@@ -1322,11 +1395,11 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
   chunks.forEach((chunk, index) => {
     const available = maxTokens - used;
     if (available <= 0) return;
-    const words = chunk.text.split(/\s+/).filter(Boolean);
-    const text = words.slice(0, available).join(' ');
+    const [fragment] = splitRAGText(chunk.text, available, 0);
+    const text = fragment?.text ?? '';
     if (!text) return;
     parts.push(`[Source ${index + 1}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
-    used += Math.min(words.length, available);
+    used += fragment?.tokenCount ?? 0;
   });
   return parts.join('\n\n');
 }
@@ -1961,6 +2034,8 @@ export const __testing__ = {
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
+  splitRAGText,
+  boundedRAGContext,
 };
 
 /**
