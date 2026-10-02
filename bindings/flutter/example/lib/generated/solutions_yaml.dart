@@ -30,9 +30,6 @@ voice_agent:
   chunk_ms: 20
   audio_source: "microphone"
 
-  enable_barge_in: true
-  barge_in_threshold_ms: 200
-
   system_prompt: "You are a helpful voice assistant. Keep answers concise."
   max_context_tokens: 4096
   temperature: 0.7
