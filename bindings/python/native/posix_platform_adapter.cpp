@@ -117,11 +117,23 @@ rac_result_t posix_file_delete(const char* path, void*) {
 // protection, which matches how a headless service account typically runs.
 // ---------------------------------------------------------------------------
 
+/**
+ * @brief Resolve the absolute filesystem path for a secure store key.
+ *
+ * @param key Key identifier for the secret.
+ * @return std::filesystem::path Filesystem path to the secret file.
+ */
 fs::path secure_path(const char* key) { return fs::path(g_secure_dir) / fs::path(key); }
 
-// The secure store is a flat key -> file namespace. Reject a key that could escape the store
-// directory (a path separator, '..', or an absolute path) so secure_set/get/delete cannot
-// reach an arbitrary file. Defense in depth: the Python facade validates too.
+/**
+ * @brief Validate that a secure store key does not escape the storage directory.
+ *
+ * Reject keys with path separators, dot-dot references, or absolute paths.
+ *
+ * @param key Key string to validate.
+ * @return true If the key is valid and safe to use as a filename.
+ * @return false If the key is empty, null, or contains forbidden path sequences.
+ */
 bool secure_key_ok(const char* key) {
     if (!key || !*key) return false;
     std::string k(key);
@@ -131,6 +143,16 @@ bool secure_key_ok(const char* key) {
     return true;
 }
 
+/**
+ * @brief Retrieve a secret from the POSIX filesystem secure store.
+ *
+ * @param key Identifier of the secret to retrieve.
+ * @param out_value Destination pointer for allocated null-terminated secret string.
+ * @param user_data User data context pointer (unused).
+ * @return rac_result_t RAC_SUCCESS on success, RAC_ERROR_FILE_NOT_FOUND on clean miss,
+ *         RAC_ERROR_INVALID_ARGUMENT on invalid key or null out_value,
+ *         or RAC_ERROR_SECURE_STORAGE_FAILED on read failure.
+ */
 rac_result_t posix_secure_get(const char* key, char** out_value, void*) {
     if (!key || !out_value) return RAC_ERROR_INVALID_ARGUMENT;
     if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
@@ -163,6 +185,18 @@ rac_result_t posix_secure_get(const char* key, char** out_value, void*) {
     return RAC_SUCCESS;
 }
 
+/**
+ * @brief Persist a secret into the POSIX filesystem secure store with 0600 permissions.
+ *
+ * Ensures data is flushed and the file descriptor closed successfully.
+ *
+ * @param key Identifier of the secret.
+ * @param value Null-terminated secret string to write.
+ * @param user_data User data context pointer (unused).
+ * @return rac_result_t RAC_SUCCESS on complete write and clean close,
+ *         RAC_ERROR_SECURE_STORAGE_FAILED on open, write, or close failure,
+ *         or RAC_ERROR_INVALID_ARGUMENT on null/unsafe key or null value.
+ */
 rac_result_t posix_secure_set(const char* key, const char* value, void*) {
     if (!key || !value) return RAC_ERROR_INVALID_ARGUMENT;
     if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
@@ -192,10 +226,18 @@ rac_result_t posix_secure_set(const char* key, const char* value, void*) {
         }
         off += static_cast<size_t>(w);
     }
-    ::close(fd);
-    return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+    int close_rc = ::close(fd);
+    return (ok && close_rc == 0) ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
+/**
+ * @brief Delete a secret from the POSIX filesystem secure store.
+ *
+ * @param key Identifier of the secret to remove.
+ * @param user_data User data context pointer (unused).
+ * @return rac_result_t RAC_SUCCESS on success (including missing files),
+ *         or RAC_ERROR_INVALID_ARGUMENT on null or unsafe key.
+ */
 rac_result_t posix_secure_delete(const char* key, void*) {
     if (!key) return RAC_ERROR_INVALID_ARGUMENT;
     if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
@@ -285,12 +327,21 @@ rac_result_t posix_get_memory_info(rac_memory_info_t* out, void*) {
 // Directory enumeration + probe (portable — same as win32's std::filesystem)
 // ---------------------------------------------------------------------------
 
+rac_result_t filesystem_error_to_rac(const std::error_code& ec, rac_result_t fallback) {
+    if (ec == std::errc::no_such_file_or_directory) return RAC_ERROR_FILE_NOT_FOUND;
+    if (ec == std::errc::permission_denied) return RAC_ERROR_PERMISSION_DENIED;
+    if (ec == std::errc::no_space_on_device) return RAC_ERROR_STORAGE_FULL;
+    return fallback;
+}
+
 rac_result_t posix_list_dir(const char* dir_path, rac_directory_entry_t* out_entries,
                             size_t* in_out_count, void*) {
     if (!dir_path || !in_out_count) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::path dir(dir_path);
-    if (!fs::is_directory(dir, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;
+    const bool is_directory = fs::is_directory(dir, ec);
+    if (ec) return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+    if (!is_directory) return RAC_ERROR_FILE_NOT_FOUND;
     const size_t cap = out_entries ? *in_out_count : 0;
     size_t written = 0, total = 0;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
@@ -310,6 +361,7 @@ rac_result_t posix_list_dir(const char* dir_path, rac_directory_entry_t* out_ent
         }
         ++written;
     }
+    if (ec) return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
     *in_out_count = out_entries ? written : total;
     return RAC_SUCCESS;
 }

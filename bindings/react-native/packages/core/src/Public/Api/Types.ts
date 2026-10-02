@@ -17,10 +17,15 @@ import type {
   VoiceEvent as CanonicalVoiceEvent,
 } from '@runanywhere/proto-ts/events/public_events';
 import type { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-import type { ModelCategory, InferenceFramework, ModelInfo } from '@runanywhere/proto-ts/model_types';
+import type {
+  ModelCategory,
+  InferenceFramework,
+  ModelInfo,
+  ModelSource,
+} from '@runanywhere/proto-ts/model_types';
 import type { ToolCall, ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 
-export type { ModelCategory, InferenceFramework, ModelInfo };
+export type { ModelCategory, InferenceFramework, ModelInfo, ModelSource };
 export type { ToolCall, ToolDefinition };
 
 /**
@@ -329,6 +334,10 @@ export interface ModelRegistration {
   category?: ModelCategory;
   framework?: InferenceFramework;
   memoryRequirementBytes?: number;
+  downloadSizeBytes?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   supportsThinking?: boolean;
   supportsLora?: boolean;
   /** Single-file download url. */
