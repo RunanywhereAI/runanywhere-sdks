@@ -143,7 +143,7 @@ export class HandleAuditor {
     if (!Array.isArray(raw)) return [];
     return raw.filter((entry): entry is HandleAuditEntry => {
       if (typeof entry !== 'object' || entry === null) return false;
-      const candidate = entry as Record<string, unknown>;
+      const candidate = entry as unknown as Record<string, unknown>;
       return (
         typeof candidate.id === 'number' &&
         Number.isSafeInteger(candidate.id) &&
