@@ -37,13 +37,18 @@ test('categoryForCode maps ranges like the canonical table', () => {
   assert.equal(categoryForCode(0), ErrorCategories.UNSPECIFIED);
   assert.equal(categoryForCode(100), ErrorCategories.CONFIGURATION);
   assert.equal(categoryForCode(110), ErrorCategories.MODEL);
-  // Generation (-130..-149) is in none of the table's ranges, so it takes the
-  // INTERNAL fallback — exactly as commons' rac_result_to_proto_category does.
+  // Generation (-130..-149) is explicitly INTERNAL in the shared table.
   assert.equal(categoryForCode(130), ErrorCategories.INTERNAL);
   assert.equal(categoryForCode(182), ErrorCategories.IO);
   assert.equal(categoryForCode(259), ErrorCategories.VALIDATION);
   assert.equal(categoryForCode(380), ErrorCategories.INTERNAL);
+  assert.equal(categoryForCode(351), ErrorCategories.IO);
+  assert.equal(categoryForCode(371), ErrorCategories.VALIDATION);
+  assert.equal(categoryForCode(401), ErrorCategories.COMPONENT);
+  assert.equal(categoryForCode(501), ErrorCategories.CONFIGURATION);
+  assert.equal(categoryForCode(601), ErrorCategories.COMPONENT);
   assert.equal(categoryForCode(804), ErrorCategories.INTERNAL);
+  assert.equal(categoryForCode(1000), ErrorCategories.UNSPECIFIED);
 });
 
 test('SDKException is an Error subclass with the right name', () => {

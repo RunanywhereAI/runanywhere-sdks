@@ -58,6 +58,7 @@
 #include "voice_bridge.h"
 
 #include "rac/core/rac_types.h"
+#include "rac/core/rac_error_proto.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diarization/rac_diarization_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -273,6 +274,13 @@ Napi::Error make_rac_error(Napi::Env env, rac_result_t code, const std::string& 
     Napi::Object value = error.Value();
     value.Set("code", Napi::Number::New(env, rac_code_abs(code)));  // canonical positive ErrorCode
     value.Set("cAbiCode", Napi::Number::New(env, static_cast<int>(code)));  // raw rac_result_t
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    if (rac_result_to_proto_error(code, &buffer) == RAC_SUCCESS && buffer.data != nullptr &&
+        buffer.size > 0) {
+        value.Set("sdkError", Napi::Buffer<uint8_t>::Copy(env, buffer.data, buffer.size));
+    }
+    rac_proto_buffer_free(&buffer);
     return error;
 }
 

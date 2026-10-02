@@ -137,8 +137,8 @@ through the process-wide singleton `bus`, exposed as `runanywhere.events`. Subsc
 
 `errors.py` defines `SDKException` (the single throwable) carrying a canonical `code`
 (`ErrorCode`, exhaustive vs `idl/errors.proto`) + `category` (`ErrorCategory`) for
-cross-SDK-uniform handling. `category_for_code` is a faithful port of commons
-`rac_result_to_proto_category` (keep in sync). Category-specific static factories
+cross-SDK-uniform handling. `category_for_code` mirrors the canonical 18-range
+commons mapping; unmapped negative values remain `UNSPECIFIED`. Category-specific static factories
 (`not_initialized`, `validation_failed`, `model_not_found`, `generation_failed`,
 `storage_error`, `invalid_state`, …) build the right code/category; `raise_for_rac(rac_code)`
 maps a negative `rac_result_t` back to an `ErrorCode` (preserving the raw ABI value as
