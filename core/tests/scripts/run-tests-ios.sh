@@ -58,6 +58,12 @@ print_header() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# The repo root, not core/: engines/ is added by the top-level CMakeLists,
+# so configuring core/ standalone with -DRAC_BUILD_BACKENDS=ON builds no
+# engines at all. core/CMakeLists.txt now refuses that combination rather
+# than handing back a backend-less build, so these runners have to point
+# -S at the root. Build dirs stay under core/.
+REPO_ROOT="$(cd "${RAC_ROOT}/.." && pwd)"
 
 # Load centralized versions
 source "${RAC_ROOT}/scripts/load-versions.sh"
@@ -182,7 +188,7 @@ if [ ! -f "${TOOLCHAIN_FILE}" ]; then
 fi
 
 print_step "Configuring CMake for iOS Simulator arm64..."
-cmake -B "${IOS_BUILD_DIR}" -S "${RAC_ROOT}" \
+cmake -B "${IOS_BUILD_DIR}" -S "${REPO_ROOT}" \
     -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
     -DIOS_PLATFORM=SIMULATORARM64 \
     -DCMAKE_BUILD_TYPE=Debug \
@@ -230,7 +236,7 @@ if [ "${DOWNLOAD_FIRST}" = true ]; then
 fi
 
 print_step "Configuring CMake for macOS native..."
-cmake -B "${MACOS_BUILD_DIR}" -S "${RAC_ROOT}" \
+cmake -B "${MACOS_BUILD_DIR}" -S "${REPO_ROOT}" \
     -DRAC_BUILD_TESTS=ON \
     -DRAC_BUILD_BACKENDS=ON \
     -DCMAKE_BUILD_TYPE=Debug

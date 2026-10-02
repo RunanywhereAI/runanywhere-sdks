@@ -56,6 +56,12 @@ print_header() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# The repo root, not core/: engines/ is added by the top-level CMakeLists,
+# so configuring core/ standalone with -DRAC_BUILD_BACKENDS=ON builds no
+# engines at all. core/CMakeLists.txt now refuses that combination rather
+# than handing back a backend-less build, so these runners have to point
+# -S at the root. Build dirs stay under core/.
+REPO_ROOT="$(cd "${RAC_ROOT}/.." && pwd)"
 
 # Load centralized versions
 source "${RAC_ROOT}/scripts/load-versions.sh"
@@ -213,7 +219,7 @@ echo -e "${YELLOW}      For reliable test execution, use --run with a real devic
 echo ""
 
 print_step "Configuring CMake..."
-cmake -B "${BUILD_DIR}" -S "${RAC_ROOT}" \
+cmake -B "${BUILD_DIR}" -S "${REPO_ROOT}" \
     -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
     -DANDROID_ABI="${ABI}" \
     -DANDROID_PLATFORM="android-${ANDROID_API_LEVEL}" \
