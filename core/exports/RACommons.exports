@@ -698,6 +698,7 @@ _rac_voice_agent_is_ready
 
 # Solutions API — L5 solution lifecycle called from Swift
 # Public/Extensions/Solutions/RunAnywhere+Solutions.swift.
+_rac_solution_attach_rag_session
 _rac_solution_cancel
 _rac_solution_close_input
 _rac_solution_create_from_proto

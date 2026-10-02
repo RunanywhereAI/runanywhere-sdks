@@ -71,6 +71,28 @@ RAC_API rac_result_t rac_solution_create_from_yaml(const char* yaml_text,
                                                    rac_solution_handle_t* out_handle);
 
 /**
+ * Attach an existing live RAG session to every `retrieve` operator in this solution.
+ *
+ * The session is borrowed: the caller remains responsible for keeping it alive
+ * while the solution can execute retrieval. This must be called before
+ * `rac_solution_start()` because the runner materializes operator nodes from the
+ * pipeline spec at start time. Attachment validates that the supplied session is
+ * currently registered and open. After a started solution is joined/destroyed,
+ * a later restart must attach a live RAG session again.
+ *
+ * @param handle       Solution handle returned by rac_solution_create_*.
+ * @param rag_session  Live RAG session returned by rac_rag_session_create_proto().
+ *
+ * @return RAC_SUCCESS; RAC_ERROR_FEATURE_NOT_AVAILABLE when the Solutions
+ *         runtime or RAG backend is unavailable; RAC_ERROR_INVALID_HANDLE for
+ *         a null solution handle or a null/non-live RAG session handle;
+ *         RAC_ERROR_INVALID_STATE if already started; or
+ *         RAC_ERROR_INVALID_CONFIGURATION if no retrieve operator exists.
+ */
+RAC_API rac_result_t rac_solution_attach_rag_session(rac_solution_handle_t handle,
+                                                     rac_handle_t rag_session);
+
+/**
  * Start the underlying scheduler. Non-blocking; worker threads run in
  * the background until `rac_solution_stop` / `rac_solution_cancel` is
  * called.

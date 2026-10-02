@@ -18,6 +18,12 @@ import Foundation
 import os
 import SwiftProtobuf
 
+/// Carries a borrowed RAG session handle across the `@Sendable` closure used
+/// by `SolutionHandle.withHandle`. Ownership remains with `RagSession`.
+private struct SolutionRAGSessionHandleRef: @unchecked Sendable {
+    let handle: rac_handle_t
+}
+
 // MARK: - SolutionHandle
 
 /// Opaque, ARC-safe wrapper around a `rac_solution_handle_t`.
@@ -44,6 +50,20 @@ public final class SolutionHandle: @unchecked Sendable {
                 rac_solution_destroy(current)
                 state.handle = nil
             }
+        }
+    }
+
+    /// Attach an open RAG session to every retrieve operator in this solution.
+    ///
+    /// The solution borrows the session; callers must keep `session` open for
+    /// as long as this solution can execute retrieval. Call this before
+    /// `start()`, because native operator nodes are materialized at start time.
+    public func attachRagSession(_ session: RagSession) async throws {
+        let sessionRef = SolutionRAGSessionHandleRef(
+            handle: try await session.nativeHandleForSolution()
+        )
+        try withHandle { solutionHandle in
+            rac_solution_attach_rag_session(solutionHandle, sessionRef.handle)
         }
     }
 
