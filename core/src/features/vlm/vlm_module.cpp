@@ -25,6 +25,7 @@
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/common/special_token_filter.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -154,10 +155,15 @@ extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char*
             }
         }
 
+        const size_t dir_len = strlen(model_dir);
+        const bool has_trailing_sep =
+            dir_len > 0 && (model_dir[dir_len - 1] == '/' || model_dir[dir_len - 1] == '\\');
+        const char* const fmt = has_trailing_sep ? "%s%s" : "%s/%s";
+
         if (is_mmproj && out_mmproj_path[0] == '\0') {
-            snprintf(out_mmproj_path, mmproj_path_size, "%s/%s", model_dir, name);
+            snprintf(out_mmproj_path, mmproj_path_size, fmt, model_dir, name);
         } else if (!is_mmproj && out_model_path[0] == '\0') {
-            snprintf(out_model_path, model_path_size, "%s/%s", model_dir, name);
+            snprintf(out_model_path, model_path_size, fmt, model_dir, name);
         }
 
         // Stop once both are found
@@ -349,6 +355,17 @@ extern "C" rac_result_t rac_vlm_component_cleanup(rac_handle_t handle) {
     return rac_lifecycle_reset(component->lifecycle);
 }
 
+/**
+ * @brief Loads a vision-language model into the component by registry model identifier.
+ *
+ * Resolves the model from the global registry, derives its folder location, and initializes
+ * the underlying inference engine. Preserves the root path separator when local_path resides
+ * directly in the filesystem root.
+ *
+ * @param handle VLM component handle.
+ * @param model_id Unique identifier of the model to load.
+ * @return RAC_SUCCESS on successful loading, or an error code.
+ */
 extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
                                                            const char* model_id) {
     if (!handle)
@@ -375,9 +392,17 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
         } else {
             // It's a file path — use parent directory
             strncpy(model_folder, model_info->local_path, sizeof(model_folder) - 1);
-            char* last_sep = strrchr(model_folder, '/');
+            char* last_sep = rac::path::find_last_path_separator(model_folder);
             if (last_sep) {
-                *last_sep = '\0';
+                if (last_sep == model_folder) {
+                    // Root-level path like "/model.gguf" or "\model.gguf": preserve the root separator
+                    *(last_sep + 1) = '\0';
+                } else if (last_sep == model_folder + 2 && model_folder[1] == ':') {
+                    // Windows drive root like "C:\model.gguf": preserve the drive root "C:\"
+                    *(last_sep + 1) = '\0';
+                } else {
+                    *last_sep = '\0';
+                }
             }
         }
     } else {

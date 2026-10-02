@@ -14,6 +14,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_error_model.h"
 #include "rac/core/rac_platform_adapter.h"
 
@@ -59,21 +60,9 @@ const char* level_to_string(rac_log_level_t level) {
     }
 }
 
-// Extract filename from path
+// Extract filename from path (delegates to shared cross-platform helper)
 const char* filename_from_path(const char* path) {
-    if (!path)
-        return nullptr;
-    const char* last_slash = strrchr(path, '/');
-    const char* last_backslash = strrchr(path, '\\');
-    // Pick the later separator. Avoid comparing two pointers from unrelated
-    // arrays (UB when one is nullptr): explicitly handle the null cases.
-    const char* last_sep;
-    if (last_slash && last_backslash) {
-        last_sep = last_slash > last_backslash ? last_slash : last_backslash;
-    } else {
-        last_sep = last_slash ? last_slash : last_backslash;
-    }
-    return last_sep ? last_sep + 1 : path;
+    return rac::path::filename_from_path(path);
 }
 
 // Format message with metadata for platform adapter
@@ -142,7 +131,14 @@ void format_message_with_metadata(char* buffer, size_t buffer_size, const char* 
     }
 }
 
-// Fallback to stderr
+/**
+ * @brief Fallback logging function that writes formatted log records to stderr.
+ *
+ * @param level Severity level of the log entry.
+ * @param category Log category name.
+ * @param message Main log message text.
+ * @param metadata Optional structured metadata including source file, line, error code.
+ */
 void log_to_stderr(rac_log_level_t level, const char* category, const char* message,
                    const rac_log_metadata_t* metadata) {
     const char* const level_str = level_to_string(level);

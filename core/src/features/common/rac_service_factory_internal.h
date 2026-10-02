@@ -17,6 +17,7 @@
 #include <string>
 
 #include "rac/core/rac_core.h"
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -91,11 +92,7 @@ inline rac_result_t resolve_model_reference(const char* model_id,
     }
 
     if (result != RAC_SUCCESS && options.lookup_last_path_component) {
-        const char* last_fwd = strrchr(model_id, '/');
-        const char* last_bck = strrchr(model_id, '\\');
-        const char* last_slash = (last_fwd && last_bck) ? std::max(last_fwd, last_bck)
-                                 : last_fwd             ? last_fwd
-                                                        : last_bck;
+        const char* last_slash = rac::path::find_last_path_separator(model_id);
         if (last_slash && last_slash[1] != '\0') {
             const char* extracted_id = last_slash + 1;
             RAC_LOG_DEBUG(options.log_cat, "Trying extracted model ID from path: %s", extracted_id);
