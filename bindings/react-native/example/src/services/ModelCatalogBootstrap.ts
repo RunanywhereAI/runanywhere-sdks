@@ -15,8 +15,10 @@
  */
 
 import { Platform } from 'react-native';
-import { RunAnywhere } from '@runanywhere/core';
+import { RunAnywhere, SDKException } from '@runanywhere/core';
 import { QHexRT } from '@runanywhere/qhexrt';
+import type { NpuCapability } from '@runanywhere/proto-ts/hardware_profile';
+import { ErrorCode } from '@runanywhere/proto-ts/errors';
 import {
   ModelCategory,
   InferenceFramework,
@@ -26,8 +28,9 @@ import { logDiagnostic } from '../utils/diagnostics';
 import { registerLoraArtifact } from '../utils/loraArtifacts';
 import {
   NPU_BUNDLES,
+  isNpuBundleEligible,
   publishNpuCatalogAcceptance,
-  toNpuRegistrationRequest,
+  toNpuModelRegistration,
 } from './NpuModelCatalog';
 import { PORTABLE_NVIDIA_EMBEDDING_MODELS } from './EmbeddingCatalogPolicy';
 
@@ -42,6 +45,7 @@ export type BackendRegistrationState = {
 };
 
 let qhexrtBackendRegistered = false;
+const RAC_ERROR_NOT_FOUND = -ErrorCode.ERROR_CODE_NOT_FOUND;
 
 /**
  * Register the curated model catalog for every successfully-registered
@@ -629,11 +633,12 @@ export async function registerAll(
   }
 
   // =========================================================================
-  // QHexRT (Hexagon NPU) bundles — logical URLs resolved natively
+  // QHexRT (Hexagon NPU) examples — app-owned logical or pinned references
   // =========================================================================
   qhexrtBackendRegistered = qhexrtRegistered;
-  if (await isNpuCatalogReady()) {
-    const result = await registerNpuBundles();
+  const npuCapability = await npuCatalogCapability();
+  if (npuCapability) {
+    const result = await registerNpuBundles(npuCapability);
     publishNpuCatalogAcceptance(result.registeredIds);
   } else {
     publishNpuCatalogAcceptance([]);
@@ -677,69 +682,73 @@ type NpuSeedResult = Readonly<{
   registeredIds: ReadonlySet<string>;
   registered: number;
   failed: number;
-  skippedNative: number;
 }>;
 
-async function isNpuCatalogReady(): Promise<boolean> {
-  if (!qhexrtBackendRegistered) return false;
+async function npuCatalogCapability(): Promise<NpuCapability | null> {
+  if (!qhexrtBackendRegistered) return null;
 
   try {
     const [registered, capability] = await Promise.all([
       QHexRT.isRegistered(),
       QHexRT.probeNpu(),
     ]);
-    return registered && capability.supported;
+    return registered && capability.supported ? capability : null;
   } catch (error) {
     logDiagnostic(`[App] QHexRT readiness check failed: ${String(error)}`);
-    return false;
+    return null;
   }
 }
 
-/** Register only the logical HNPU rows accepted by native QHexRT. */
-async function registerNpuBundles(): Promise<NpuSeedResult> {
+/** Register app-selected dedicated HNPU artifact URLs through the core SDK. */
+async function registerNpuBundles(
+  capability: NpuCapability
+): Promise<NpuSeedResult> {
   const registeredIds = new Set<string>();
   let registered = 0;
   let failed = 0;
-  let skippedNative = 0;
+  let skipped = 0;
 
   for (const bundle of NPU_BUNDLES) {
+    if (!isNpuBundleEligible(bundle, capability)) {
+      skipped += 1;
+      continue;
+    }
     try {
-      const saved = await QHexRT.registerModelForDevice(
-        toNpuRegistrationRequest(bundle)
+      const saved = await RunAnywhere.models.register(
+        toNpuModelRegistration(bundle)
       );
-      if (saved) {
-        registered += 1;
-        registeredIds.add(saved.id);
-      } else {
-        skippedNative += 1;
-      }
+      registered += 1;
+      registeredIds.add(saved.id);
     } catch (error) {
-      failed += 1;
-      logDiagnostic(
-        `[App] Failed to register NPU bundle ${bundle.id}: ${String(error)}`
-      );
+      if (isMissingNpuManifest(error)) {
+        skipped += 1;
+      } else {
+        failed += 1;
+        logDiagnostic(
+          `[App] Failed to register NPU bundle ${bundle.id}: ${String(error)}`
+        );
+      }
     }
   }
 
   logDiagnostic(
-    `[App] QHexRT catalog seeded: ok=${registered} failed=${failed} ` +
-      `skippedNative=${skippedNative}`
+    `[App] QHexRT examples registered: ok=${registered} failed=${failed} skipped=${skipped}`
   );
   return {
     registeredIds,
     registered,
     failed,
-    skippedNative,
   };
 }
 
 /**
- * Re-seed QHexRT rows after token/config changes. Re-seeding is only meaningful
- * when native QHexRT is still registered on a supported device; the rows land in
- * the native registry directly, so `models.list()` sees them without a refresh.
+ * Re-register the app's explicit QHexRT URLs after token/config changes. A
+ * generic registry refresh is only meaningful when QHexRT is registered on a
+ * supported device.
  */
 export async function refreshNpuCatalog(): Promise<boolean> {
-  if (!(await isNpuCatalogReady())) {
+  const capability = await npuCatalogCapability();
+  if (!capability) {
     publishNpuCatalogAcceptance([]);
     logDiagnostic(
       '[App] Skipping QHexRT catalog refresh - native backend/device unsupported'
@@ -747,7 +756,7 @@ export async function refreshNpuCatalog(): Promise<boolean> {
     return false;
   }
 
-  const result = await registerNpuBundles();
+  const result = await registerNpuBundles(capability);
   // Publish after re-seeding so retained pickers reload a completed catalog
   // snapshot rather than observing an intermediate registration pass.
   publishNpuCatalogAcceptance(result.registeredIds);
@@ -755,4 +764,8 @@ export async function refreshNpuCatalog(): Promise<boolean> {
     `[App] QHexRT catalog refresh completed: rows=${result.registered}`
   );
   return result.registered > 0;
+}
+
+function isMissingNpuManifest(error: unknown): boolean {
+  return error instanceof SDKException && error.cAbiCode === RAC_ERROR_NOT_FOUND;
 }
