@@ -117,6 +117,33 @@ abstract final class ModelCatalogBootstrap {
       supportsThinking: true,
     );
 
+    // MiniCPM5 (OpenBMB) — thinking-capable, phone-scale.
+    // Standard LlamaForCausalLM arch (GGUF `general.architecture` = "llama"),
+    // so the pinned llama.cpp fork loads both sizes with no engine change. The
+    // chat template travels inside the GGUF's `tokenizer.chat_template` and
+    // uses the default <think>/</think> markers, so neither row needs a custom
+    // ThinkingTagPattern.
+    await _registerLLM(
+      id: 'minicpm5-1b-q4_k_m',
+      name: 'MiniCPM5 1B Q4_K_M',
+      url:
+          'https://huggingface.co/openbmb/MiniCPM5-1B-GGUF/resolve/main/MiniCPM5-1B-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      // 688,065,920 B of weights plus KV cache and runtime overhead.
+      memoryRequirement: 800000000,
+      supportsThinking: true,
+    );
+    await _registerLLM(
+      id: 'minicpm5-2b-q4_k_m',
+      name: 'MiniCPM5 2B Q4_K_M',
+      url:
+          'https://huggingface.co/openbmb/MiniCPM5-2B-GGUF/resolve/main/MiniCPM5-2B-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      // 1,561,318,368 B of weights plus KV cache and runtime overhead.
+      memoryRequirement: 1700000000,
+      supportsThinking: true,
+    );
+
     // LFM2 / LFM2.5 (Liquid AI)
     // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
     // (149 MB vs 153 MB): 4 MB buys K-quant mixed precision on the
