@@ -219,11 +219,13 @@ typedef struct rac_diffusion_model_strategy {
     /** Check if this strategy can handle a model ID */
     rac_bool_t (*can_handle)(const char* model_id, void* user_data);
 
-    /** Get model definition for a model ID */
+    /** Get model definition for a model ID. Return RAC_ERROR_NOT_FOUND to defer to other
+     * strategies; any other error aborts the registry call and is returned to the caller. */
     rac_result_t (*get_model_def)(const char* model_id, rac_diffusion_model_def_t* out_def,
                                   void* user_data);
 
-    /** Get all models supported by this strategy */
+    /** Get all models supported by this strategy. Return RAC_ERROR_NOT_FOUND to defer to other
+     * strategies; any other error aborts the registry call and is returned to the caller. */
     rac_result_t (*list_models)(rac_diffusion_model_def_t** out_models, size_t* out_count,
                                 void* user_data);
 
