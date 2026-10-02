@@ -148,6 +148,8 @@ export interface DiarizationOptions {
 /** Segmentation controls. */
 export interface SegmentationOptions {
   includeDiagnosticImage?: boolean;
+  /** Return the winning-class probability for each source pixel, scaled from 0 through 255. */
+  includeConfidence?: boolean;
 }
 
 /** When the agent decides the user has finished speaking. */
@@ -260,7 +262,10 @@ export const REASONING_DEFAULTS = {
  * zero value is the default and this states it explicitly for the one field the
  * public option exposes.
  */
-export const SEGMENTATION_DEFAULTS = { includeDiagnosticImage: false } as const;
+export const SEGMENTATION_DEFAULTS = {
+  includeDiagnosticImage: false,
+  includeConfidence: false,
+} as const;
 
 /**
  * Spec defaults for {@link ImageOptions}. `mode` has no IDL counterpart at all —

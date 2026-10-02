@@ -1910,11 +1910,13 @@ int32_t load_segmentation_model(const std::string& model_path, std::optional<std
 }
 
 // segment(handle, data, width, height, pixel_format=1, stride_bytes=0,
-//         include_diagnostic_rgba=False) ->
-//   {width, height, class_mask: uint16 ndarray, classes: [...], diagnostic_rgba?: bytes}.
+//         include_diagnostic_rgba=False, include_confidence=False) ->
+//   {width, height, class_mask: uint16 ndarray, classes: [...], diagnostic_rgba?: bytes,
+//    confidence_mask?: bytes}.
 py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t height,
                  std::optional<int32_t> pixel_format, std::optional<int64_t> stride_bytes,
-                 std::optional<bool> include_diagnostic_rgba) {
+                 std::optional<bool> include_diagnostic_rgba,
+                 std::optional<bool> include_confidence) {
     rac_handle_t h = begin_op(g_seg_handles, handle);
     if (!h) throw std::runtime_error("invalid segmentation handle");
     OpScope op(handle);
@@ -1937,6 +1939,9 @@ py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t 
     rac_segmentation_options_t opts = RAC_SEGMENTATION_OPTIONS_DEFAULT;
     if (include_diagnostic_rgba.has_value() && *include_diagnostic_rgba) {
         opts.include_diagnostic_rgba = RAC_TRUE;
+    }
+    if (include_confidence.has_value() && *include_confidence) {
+        opts.include_confidence = RAC_TRUE;
     }
 
     rac_segmentation_result_t result;
@@ -1971,6 +1976,11 @@ py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t 
         out["diagnostic_rgba"] =
             py::bytes(reinterpret_cast<const char*>(result.diagnostic_rgba),
                       result.diagnostic_rgba_size);
+    }
+    if (result.confidence_mask && result.confidence_mask_size) {
+        out["confidence_mask"] =
+            py::bytes(reinterpret_cast<const char*>(result.confidence_mask),
+                      result.confidence_mask_size);
     }
     rac_segmentation_result_free(&result);
     return out;
@@ -2615,6 +2625,7 @@ PYBIND11_MODULE(_core, m) {
     m.def("segment", &segment, py::arg("handle"), py::arg("data"), py::arg("width"),
           py::arg("height"), py::arg("pixel_format") = py::none(),
           py::arg("stride_bytes") = py::none(), py::arg("include_diagnostic_rgba") = py::none(),
+          py::arg("include_confidence") = py::none(),
           "Segment raw image pixels; returns {width, height, class_mask, classes}.");
     m.def("unload_segmentation_model", &unload_segmentation_model, py::arg("handle"),
           "Unload a segmentation handle.");

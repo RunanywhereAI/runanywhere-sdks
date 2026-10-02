@@ -30,10 +30,12 @@ typedef struct rac_segmentation_image {
 
 typedef struct rac_segmentation_options {
     rac_bool_t include_diagnostic_rgba;
+    rac_bool_t include_confidence;
 } rac_segmentation_options_t;
 
 static const rac_segmentation_options_t RAC_SEGMENTATION_OPTIONS_DEFAULT = {
     .include_diagnostic_rgba = RAC_FALSE,
+    .include_confidence = RAC_FALSE,
 };
 
 typedef struct rac_segmentation_class_summary {
@@ -50,6 +52,8 @@ typedef struct rac_segmentation_result {
     size_t class_mask_count;
     uint8_t* diagnostic_rgba;
     size_t diagnostic_rgba_size;
+    uint8_t* confidence_mask;
+    size_t confidence_mask_size;
     rac_segmentation_class_summary_t* class_summaries;
     size_t class_summary_count;
     int64_t processing_time_ms;

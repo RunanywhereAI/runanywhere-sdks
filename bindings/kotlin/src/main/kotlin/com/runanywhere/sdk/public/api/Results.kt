@@ -162,6 +162,8 @@ public class SegmentationResult internal constructor(
     public val classes: List<ClassInfo>,
     /** RGBA overlay, present only when `includeDiagnosticImage` was requested. */
     public val diagnosticImage: ByteArray?,
+    /** Chosen-class probabilities as 0..255 bytes, present when requested. */
+    public val confidenceMask: ByteArray? = null,
 )
 
 /** One retrieved chunk with its similarity score. */

@@ -193,7 +193,10 @@ internal fun DiarizationOptions.toProto(): ProtoDiarizationOptions =
 internal fun SegmentationOptions?.orDefault(): SegmentationOptions = this ?: SegmentationOptions()
 
 internal fun SegmentationOptions.toProto(): ProtoSegmentationOptions =
-    ProtoSegmentationOptions(include_diagnostic_rgba = includeDiagnosticImage)
+    ProtoSegmentationOptions(
+        include_diagnostic_rgba = includeDiagnosticImage,
+        include_confidence = includeConfidence,
+    )
 
 internal fun ImageOptions?.orDefault(): ImageOptions = this ?: ImageOptions()
 

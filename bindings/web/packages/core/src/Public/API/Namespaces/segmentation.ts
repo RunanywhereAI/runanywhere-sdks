@@ -84,7 +84,7 @@ export const segmentation = {
       image: await toSegmentationImage(image),
       options: {
         includeDiagnosticRgba: options?.includeDiagnosticImage ?? false,
-        includeConfidence: false,
+        includeConfidence: options?.includeConfidence ?? false,
       },
     });
     return toSegmentationResult(result);

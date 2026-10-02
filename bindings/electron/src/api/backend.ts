@@ -140,6 +140,7 @@ export interface NativeSegmentation {
   classMask: Uint16Array;
   classes: Array<{ classId: number; label?: string; pixelCount: number; fraction: number }>;
   diagnosticRgba?: Uint8Array;
+  confidenceMask?: Uint8Array;
 }
 
 /**
