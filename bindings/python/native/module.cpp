@@ -951,17 +951,30 @@ int32_t load_embedding_model(const std::string& path) {
     return register_handle(g_embed_handles, h);
 }
 
-py::array_t<float> embed(int32_t handle, const std::string& text) {
+py::array_t<float> embed(int32_t handle, const std::string& text,
+                        std::optional<bool> normalize = std::nullopt,
+                        std::optional<int32_t> pooling = std::nullopt) {
     rac_handle_t h = begin_op(g_embed_handles, handle);
     if (!h) throw std::runtime_error("invalid embedding handle");
     OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
+
+    rac_embeddings_options_t opts = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    bool has_opts = false;
+    if (normalize.has_value()) {
+        opts.normalize = *normalize ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
+        has_opts = true;
+    }
+    if (pooling.has_value()) {
+        opts.pooling = *pooling;
+        has_opts = true;
+    }
 
     rac_embeddings_result_t result;
     std::memset(&result, 0, sizeof(result));
     rac_result_t rc;
     {
         py::gil_scoped_release release;
-        rc = rac_embeddings_embed(h, text.c_str(), nullptr, &result);
+        rc = rac_embeddings_embed(h, text.c_str(), has_opts ? &opts : nullptr, &result);
     }
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "embed");
     if (result.num_embeddings == 0 || result.embeddings == nullptr ||
@@ -977,7 +990,9 @@ py::array_t<float> embed(int32_t handle, const std::string& text) {
 }
 
 
-py::list embed_batch(int32_t handle, const std::vector<std::string>& texts) {
+py::list embed_batch(int32_t handle, const std::vector<std::string>& texts,
+                     std::optional<bool> normalize = std::nullopt,
+                     std::optional<int32_t> pooling = std::nullopt) {
     rac_handle_t h = begin_op(g_embed_handles, handle);
     if (!h) throw std::runtime_error("invalid embedding handle");
     OpScope op(handle);
@@ -986,12 +1001,23 @@ py::list embed_batch(int32_t handle, const std::vector<std::string>& texts) {
     ptrs.reserve(texts.size());
     for (const auto& t : texts) ptrs.push_back(t.c_str());
 
+    rac_embeddings_options_t opts = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    bool has_opts = false;
+    if (normalize.has_value()) {
+        opts.normalize = *normalize ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
+        has_opts = true;
+    }
+    if (pooling.has_value()) {
+        opts.pooling = *pooling;
+        has_opts = true;
+    }
+
     rac_embeddings_result_t result;
     std::memset(&result, 0, sizeof(result));
     rac_result_t rc;
     {
         py::gil_scoped_release release;
-        rc = rac_embeddings_embed_batch(h, ptrs.data(), ptrs.size(), nullptr, &result);
+        rc = rac_embeddings_embed_batch(h, ptrs.data(), ptrs.size(), has_opts ? &opts : nullptr, &result);
     }
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "embed_batch");
 
@@ -2501,8 +2527,10 @@ PYBIND11_MODULE(_core, m) {
     m.def("load_embedding_model", &load_embedding_model, py::arg("path"),
           "Load an embedding model (ONNX); returns an integer handle.");
     m.def("embed", &embed, py::arg("handle"), py::arg("text"),
+          py::arg("normalize") = py::none(), py::arg("pooling") = py::none(),
           "Embed text; returns a float32 numpy array.");
     m.def("embed_batch", &embed_batch, py::arg("handle"), py::arg("texts"),
+          py::arg("normalize") = py::none(), py::arg("pooling") = py::none(),
           "Embed a batch of texts; returns a list of float32 numpy arrays.");
     m.def("unload_embedding_model", &unload_embedding_model, py::arg("handle"),
           "Unload an embedding handle.");
