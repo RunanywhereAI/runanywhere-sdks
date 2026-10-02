@@ -750,15 +750,17 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
 
     // Same-component slot handling. The READY fast path is re-checked only
     // after admission, so a concurrent non-force follower observes the model
-    // installed by the leader and returns without creating another backend.
+    // installed by the leader and returns without creating another backend,
+    // unless the follower explicitly requests a different context length.
     // The previous occupant is captured but left installed so a failed new
     // load does not strand the caller with an empty slot (create-then-swap: the
     // old backend is destroyed only after the new one is created successfully,
-    // or explicitly for a same-model force_reload). The destroy stays outside
+    // or explicitly for a same-model reload). The destroy stays outside
     // g_lifecycle_mutex because destroy_loaded_model() re-acquires it to wait
     // for active_refs to drain.
-    // `previous_loaded` is torn down up front (force-reload only). `swap_previous`
-    // is the create-then-swap occupant left installed and displaced on success.
+    // `previous_loaded` is torn down up front for force reloads and explicit
+    // context changes. `swap_previous` is the create-then-swap occupant left
+    // installed and displaced on success.
     std::shared_ptr<detail::LoadedModel> previous_loaded;
     std::shared_ptr<detail::LoadedModel> swap_previous;
     ComponentLifecycleState previous_state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
@@ -766,8 +768,15 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
         auto existing = detail::g_loaded.find(component);
         if (existing != detail::g_loaded.end()) {
-            if (!request.force_reload() && existing->second->model_id == request.model_id() &&
-                existing->second->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
+            const bool same_ready_model =
+                existing->second->model_id == request.model_id() &&
+                existing->second->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
+            const int32_t requested_context_length =
+                request.has_context_length() ? request.context_length() : 0;
+            const bool context_length_changed =
+                same_ready_model && request.has_context_length() &&
+                existing->second->requested_context_length != requested_context_length;
+            if (!request.force_reload() && same_ready_model && !context_length_changed) {
                 ModelLoadResult result = detail::make_load_result(
                     true, existing->second->model_id, existing->second->category,
                     existing->second->framework, existing->second->resolved_path,
@@ -776,11 +785,13 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                 return detail::copy_proto(result, out_result);
             }
             previous_state = existing->second->state;
-            // A same-model force_reload cannot hold two backends for one context
-            // at once (the reload targets the very DSP/context the old one owns),
+            // A same-model reload cannot hold two backends for one context at
+            // once (the reload targets the very DSP/context the old one owns),
             // so tear the old one down up front. A DIFFERENT model keeps the old
             // backend resident until the new one is proven, then swaps.
-            if (request.force_reload() && existing->second->model_id == request.model_id()) {
+            const bool force_same_model =
+                request.force_reload() && existing->second->model_id == request.model_id();
+            if (force_same_model || context_length_changed) {
                 previous_loaded = existing->second;
                 detail::g_loaded.erase(existing);
             } else {
@@ -793,7 +804,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     // Cross-modality guard (A5): a new QHexRT/NPU backend cannot co-reside with
     // another component's QHexRT context on the DSP. Evict them before create so
     // the new load has DSP memory; done after the same-component teardown above
-    // so a same-model force_reload frees its own context first.
+    // so a same-model reload frees its own context first.
     std::vector<std::shared_ptr<detail::LoadedModel>> evicted_qhexrt_models;
     if (framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT) {
         evicted_qhexrt_models = detail::evict_other_qhexrt_models(component);
@@ -1069,6 +1080,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     loaded->abi_version = placement.abi_version;
     loaded->fallback_reason = placement.fallback_reason;
     loaded->category = category;
+    loaded->requested_context_length =
+        request.has_context_length() ? request.context_length() : 0;
     loaded->primitive = primitive;
     if (primitive == RAC_PRIMITIVE_GENERATE_TEXT) {
         loaded->llm_ops = vt->llm_ops;
