@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import numpy as np
 
-from .inputs import AudioFormat, InferenceFramework, ModelCategory
+from .inputs import AudioFormat, InferenceFramework, ModelCategory, ModelSource
 from .options import BackendPreference, StructuredOutputMode
 
 __all__ = [
@@ -339,6 +339,10 @@ class ModelInfo:
     size_bytes: int = 0
     local_path: Optional[str] = None
     framework: Optional[InferenceFramework] = None
+    download_size_bytes: int = 0
+    context_length: int = 0
+    source: Optional[ModelSource] = None
+    description: Optional[str] = None
 
 
 @dataclass

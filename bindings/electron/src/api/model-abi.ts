@@ -11,6 +11,7 @@ import {
   CurrentModelRequest,
   CurrentModelResult,
   InferenceFramework as ProtoFramework,
+  ModelSource,
   ModelCategory as ProtoCategory,
   ModelCompatibilityRequest,
   ModelCompatibilityResult,
@@ -99,12 +100,42 @@ export function frameworkFromProto(framework: ProtoFramework): InferenceFramewor
   return FRAMEWORK_FROM_PROTO.get(framework);
 }
 
+/** Normalize a public model source before placing it on a proto request. */
+export function sourceToProto(source: ModelSource): ModelSource {
+  switch (source) {
+    case ModelSource.MODEL_SOURCE_REMOTE:
+    case ModelSource.MODEL_SOURCE_LOCAL:
+    case ModelSource.MODEL_SOURCE_BUILT_IN:
+      return source;
+    case ModelSource.MODEL_SOURCE_UNSPECIFIED:
+    case ModelSource.UNRECOGNIZED:
+    default:
+      return ModelSource.MODEL_SOURCE_UNSPECIFIED;
+  }
+}
+
+/** The canonical source for a proto ordinal, or undefined when it has no public value. */
+export function sourceFromProto(source: ModelSource): ModelSource | undefined {
+  switch (source) {
+    case ModelSource.MODEL_SOURCE_REMOTE:
+    case ModelSource.MODEL_SOURCE_LOCAL:
+    case ModelSource.MODEL_SOURCE_BUILT_IN:
+      return source;
+    case ModelSource.MODEL_SOURCE_UNSPECIFIED:
+    case ModelSource.UNRECOGNIZED:
+    default:
+      return undefined;
+  }
+}
+
 /**
  * A registry row as the public surface sees it. `downloaded` reads
  * `registry_status`, which the proto comment names as the only durable
  * downloaded-ness signal — a non-empty `local_path` survives file deletion.
  */
 export function toPublicModelInfo(model: ProtoModelInfo): ModelInfo {
+  const source = sourceFromProto(model.source);
+  const description = model.metadata?.description;
   return {
     id: model.id,
     name: model.name || model.id,
@@ -113,6 +144,10 @@ export function toPublicModelInfo(model: ProtoModelInfo): ModelInfo {
     localPath: model.localPath || undefined,
     downloaded: model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
     sizeBytes: model.downloadSizeBytes ?? 0,
+    ...(model.downloadSizeBytes !== undefined ? { downloadSizeBytes: model.downloadSizeBytes } : {}),
+    ...(model.contextLength !== undefined ? { contextLength: model.contextLength } : {}),
+    ...(source !== undefined ? { source } : {}),
+    ...(description ? { description } : {}),
   };
 }
 

@@ -217,19 +217,55 @@ def test_adownload_reports_completion(sdk, gguf) -> None:
 
 
 def test_register_local_path_writes_the_native_registry(sdk, gguf) -> None:
-    from runanywhere import ModelRegistration
+    from runanywhere import ModelRegistration, ModelSource
 
     info = ra.models.register(
         ModelRegistration(id="my-llm", category=ModelCategory.LANGUAGE, path=gguf)
     )
     assert info.id == "my-llm" and info.downloaded is True
-    model_id, path, framework, category = sdk.args_of("register_model")
+    model_id, path, framework, category, *_ = sdk.args_of("register_model")
     assert (model_id, path) == ("my-llm", gguf)
     assert category == int(ModelCategory.LANGUAGE)
 
 
+def test_registration_metadata_round_trips_for_local_model(sdk, gguf) -> None:
+    from runanywhere import ModelRegistration, ModelSource
+
+    registered = ra.models.register(
+        ModelRegistration(
+            id="metadata-llm",
+            category=ModelCategory.LANGUAGE,
+            path=gguf,
+            download_size_bytes=1234,
+            context_length=4096,
+            source=ModelSource.LOCAL,
+            description="Local metadata fixture",
+        )
+    )
+
+    assert registered.download_size_bytes == 1234
+    assert registered.context_length == 4096
+    assert registered.source == ModelSource.LOCAL
+    assert registered.description == "Local metadata fixture"
+    read_back = ra.models.get("metadata-llm")
+    assert read_back is not None
+    assert (
+        read_back.download_size_bytes,
+        read_back.context_length,
+        read_back.source,
+        read_back.description,
+    ) == (1234, 4096, ModelSource.LOCAL, "Local metadata fixture")
+    assert sdk.args_of("register_model")[4:] == (
+        1234,
+        4096,
+        int(ModelSource.LOCAL),
+        "Local metadata fixture",
+        None,
+    )
+
+
 def test_register_url_adds_a_downloadable_catalog_entry(fake_core) -> None:
-    from runanywhere import ModelRegistration
+    from runanywhere import ModelRegistration, ModelSource
     from runanywhere.catalog import CATALOG
 
     try:
@@ -238,10 +274,27 @@ def test_register_url_adds_a_downloadable_catalog_entry(fake_core) -> None:
                 id="tmp-url-model",
                 category=ModelCategory.LANGUAGE,
                 url="https://example.invalid/weights.gguf",
+                download_size_bytes=1234,
+                context_length=4096,
+                source=ModelSource.REMOTE,
+                description="Remote metadata fixture",
             )
         )
         assert info.id == "tmp-url-model"
         assert CATALOG["tmp-url-model"].primary == "weights.gguf"
+        read_back = ra.models.get("tmp-url-model")
+        assert read_back is not None
+        assert (
+            read_back.download_size_bytes,
+            read_back.context_length,
+            read_back.source,
+            read_back.description,
+        ) == (
+            1234,
+            4096,
+            ModelSource.REMOTE,
+            "Remote metadata fixture",
+        )
     finally:
         CATALOG.pop("tmp-url-model", None)
 

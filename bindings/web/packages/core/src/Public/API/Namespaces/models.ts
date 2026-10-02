@@ -9,6 +9,7 @@ import {
   ModelCompatibilityResult,
   ModelFileRole,
   ModelRegistryStatus,
+  ModelSource,
   type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
@@ -38,6 +39,12 @@ import {
 
 const BYTES_PER_GIB = 1024 * 1024 * 1024;
 const modelsLogger = new SDKLogger('models');
+const REGISTRATION_MODEL_SOURCES: ReadonlySet<ModelSource> = new Set([
+  ModelSource.MODEL_SOURCE_UNSPECIFIED,
+  ModelSource.MODEL_SOURCE_REMOTE,
+  ModelSource.MODEL_SOURCE_LOCAL,
+  ModelSource.MODEL_SOURCE_BUILT_IN,
+]);
 
 interface CompatibilityModule extends EmscriptenRunanywhereModule {
   _rac_model_compatibility_check_proto?(
@@ -211,6 +218,12 @@ export const models = {
    * @throws SDKException when neither `url` nor `files` is supplied.
    */
   register(model: ModelRegistration): ModelInfo {
+    if (model.source !== undefined && !REGISTRATION_MODEL_SOURCES.has(model.source)) {
+      throw SDKException.validationFailed({
+        fieldPath: 'model.source',
+        message: 'model.source must be a valid generated ModelSource value',
+      });
+    }
     const shared = {
       id: model.id,
       description: model.description,
@@ -219,6 +232,7 @@ export const models = {
       memoryRequirement: model.memoryRequiredBytes,
       downloadSizeBytes: model.sizeBytes,
       contextLength: model.contextLength,
+      source: model.source,
       supportsThinking: model.supportsThinking,
       supportsLora: model.supportsLora,
       cuaProfile: model.cuaProfile,

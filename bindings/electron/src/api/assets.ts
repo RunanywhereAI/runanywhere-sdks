@@ -21,6 +21,7 @@ import {
   categoryToProto,
   frameworkFromProto,
   frameworkToProto,
+  sourceToProto,
   toPublicModelInfo,
 } from './model-abi';
 import { IMAGE_DEFAULTS, SEGMENTATION_DEFAULTS } from './options';
@@ -531,6 +532,12 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
           framework: framework ?? frameworkToProto(InferenceFramework.ONNX),
           category,
           format: FORMAT_OF_CATEGORY[model.category],
+          ...(model.downloadSizeBytes !== undefined
+            ? { downloadSizeBytes: model.downloadSizeBytes }
+            : {}),
+          ...(model.contextLength !== undefined ? { contextLength: model.contextLength } : {}),
+          ...(model.source !== undefined ? { source: sourceToProto(model.source) } : {}),
+          ...(model.description !== undefined ? { description: model.description } : {}),
           files: model.files.map((f, index) => ({
             url: f.url,
             filename: f.as,
@@ -551,7 +558,16 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
         id,
         framework,
         category,
-        source: model.path ? ModelSource.MODEL_SOURCE_LOCAL : ModelSource.MODEL_SOURCE_REMOTE,
+        source: model.source !== undefined
+          ? sourceToProto(model.source)
+          : model.path
+            ? ModelSource.MODEL_SOURCE_LOCAL
+            : ModelSource.MODEL_SOURCE_REMOTE,
+        ...(model.downloadSizeBytes !== undefined
+          ? { downloadSizeBytes: model.downloadSizeBytes }
+          : {}),
+        ...(model.contextLength !== undefined ? { contextLength: model.contextLength } : {}),
+        ...(model.description !== undefined ? { description: model.description } : {}),
       });
       return toPublicModelInfo(saved);
     },
