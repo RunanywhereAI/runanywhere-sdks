@@ -207,6 +207,25 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORC
 
 FetchContent_MakeAvailable(llamacpp)
 
+# =============================================================================
+# Decision-model support probe
+# =============================================================================
+# The decision engine op needs both the joint decision head model and the
+# per-token span API from llama.cpp. Older pinned revisions of the fork have
+# neither, so the op is only built when both are present. The probe reads the
+# fetched source tree; a miss keeps the engine's decision_ops slot NULL, which
+# the registry already treats as "this engine does not serve the primitive".
+file(READ "${llamacpp_SOURCE_DIR}/include/llama.h" _rac_llama_public_header)
+if(_rac_llama_public_header MATCHES "llama_batch_set_decision_order")
+    set(RAC_LLAMACPP_HAS_DECISION ON)
+else()
+    set(RAC_LLAMACPP_HAS_DECISION OFF)
+    message(STATUS
+        "llama.cpp @ ${RAC_LLAMACPP_VERSION} has no decision span API — "
+        "the llamacpp decision_ops slot stays NULL (pin a fork revision with "
+        "the decision support to enable it).")
+endif()
+
 # Android: map POSIX_MADV_* to MADV_* to avoid missing constants
 if(RAC_PLATFORM_ANDROID)
     if(TARGET llama)
@@ -254,6 +273,13 @@ set(LLAMACPP_BACKEND_SOURCES
     # the two plugin entries were unified.
     rac_llamacpp_vlm_ops.cpp
 )
+
+# Joint decision scoring (state + typed questions -> calibrated answers). Only
+# builds against a fork revision that carries the decision head + span API; the
+# probe above decides. See decision_prompt.h for the span construction.
+if(RAC_LLAMACPP_HAS_DECISION)
+    list(APPEND LLAMACPP_BACKEND_SOURCES rac_decision_llamacpp.cpp)
+endif()
 
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
@@ -346,6 +372,7 @@ rac_add_engine_plugin(llamacpp
                         ${llamacpp_SOURCE_DIR}/ggml/include
                         ${llamacpp_SOURCE_DIR}/vendor # nlohmann/json.hpp
     COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
+                        $<$<BOOL:${RAC_LLAMACPP_HAS_DECISION}>:RAC_LLAMACPP_HAS_DECISION=1>
     AVAILABILITY        PUBLIC
     PACKAGE_OWNER       runanywhere
     PACKAGE_NAME        runanywhere_llamacpp
