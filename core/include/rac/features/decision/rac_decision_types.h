@@ -48,10 +48,17 @@ typedef struct rac_decision_question {
 typedef struct rac_decision_options {
     /** Per-request temperature override; 0 = the model's own per-type value. */
     float temperature;
+    /**
+     * Prompt-wording version the caller requires; 0 = the model's own served
+     * version. A model that serves a different version refuses the request
+     * (RAC_ERROR_NOT_SUPPORTED) rather than scoring with unknown wording.
+     */
+    uint32_t prompt_format_version;
 } rac_decision_options_t;
 
 static const rac_decision_options_t RAC_DECISION_OPTIONS_DEFAULT = {
     .temperature = 0.0f,
+    .prompt_format_version = 0u,
 };
 
 typedef struct rac_decision_answer {
@@ -84,6 +91,8 @@ typedef struct rac_decision_result {
     char* model_id;
     /** Tokens of the jointly-evaluated prompt. */
     int32_t input_tokens;
+    /** Prompt-wording version the model served; 0 when it reports none. */
+    uint32_t prompt_format_version;
 } rac_decision_result_t;
 
 /** Free every malloc-owned result field and zero the struct. */

@@ -376,6 +376,7 @@ _rac_ocr_result_free
 _rac_ocr_cleanup
 _rac_ocr_destroy
 _rac_decision_create
+_rac_decision_default_prompt_format_version
 _rac_decision_initialize
 _rac_decision_decide
 _rac_decision_cleanup

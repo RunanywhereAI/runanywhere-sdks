@@ -53,6 +53,10 @@ struct FakeDecisionImpl {
     std::string load_path;
 };
 
+// The pin the fake engine last received, so the request->options plumbing can
+// be asserted (the engine itself does not enforce it; real engines do).
+uint32_t g_last_prompt_format_pin = 0;
+
 rac_result_t fake_create(const char* model_id, const char* /*config*/, void** out_impl) {
     if (!model_id || !out_impl) {
         return RAC_ERROR_NULL_POINTER;
@@ -70,16 +74,20 @@ rac_result_t fake_initialize(void* impl, const char* model_path) {
 }
 
 rac_result_t fake_decide(void* impl, const char* state, const rac_decision_question_t* questions,
-                         size_t question_count, const rac_decision_options_t* /*options*/,
+                         size_t question_count, const rac_decision_options_t* options,
                          rac_decision_result_t* out_result) {
     if (!impl || !state || !out_result || (question_count > 0 && !questions)) {
         return RAC_ERROR_NULL_POINTER;
     }
+    g_last_prompt_format_pin = options != nullptr ? options->prompt_format_version : 0;
     *out_result = {};
     out_result->processing_time_ms = 1;
     const auto* fake = static_cast<const FakeDecisionImpl*>(impl);
     out_result->model_id = strdup(fake->load_path.empty() ? "fake-decider" : fake->load_path.c_str());
     out_result->input_tokens = 42;
+    // The fake engine serves the shared default version, so the pin-mismatch
+    // path can be exercised against a known value.
+    out_result->prompt_format_version = rac_decision_default_prompt_format_version();
 
     out_result->answers = static_cast<rac_decision_answer_t*>(
         std::calloc(question_count, sizeof(rac_decision_answer_t)));
@@ -154,9 +162,12 @@ rac_engine_vtable_t make_fake_vtable() {
     return vt;
 }
 
-std::string build_request(const std::string& state) {
+std::string build_request(const std::string& state, uint32_t prompt_format_pin = 0) {
     runanywhere::v1::DecisionRequest request;
     request.set_state(state);
+    if (prompt_format_pin != 0) {
+        request.mutable_options()->set_prompt_format_version(prompt_format_pin);
+    }
 
     auto* team = request.add_questions();
     team->set_id("team");
@@ -292,7 +303,24 @@ int main() {
               "result carries the logical model id, not the backend-reported load path");
         check(result.usage().input_tokens() == 42 && result.usage().output_tokens() == 0,
               "usage reports input tokens only");
+        check(result.prompt_format_version() == rac_decision_default_prompt_format_version(),
+              "result carries the prompt-wording version the model served");
         std::free(data);
+        rac_proto_buffer_free(&out);
+    }
+
+    // The request pin reaches the engine's options unchanged.
+    {
+        const uint32_t pin = rac_decision_default_prompt_format_version();
+        const std::string request_bytes = build_request("pinned request", pin);
+        rac_proto_buffer_t out = {};
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_decision_component_decide_proto(
+            component, reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+            &out);
+        check(rc == RAC_SUCCESS, "decide_proto with a prompt-format pin succeeds");
+        check(g_last_prompt_format_pin == pin,
+              "request prompt_format_version reaches the engine options");
         rac_proto_buffer_free(&out);
     }
 

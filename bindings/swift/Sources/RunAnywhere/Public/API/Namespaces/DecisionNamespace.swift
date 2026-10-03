@@ -69,6 +69,17 @@ public extension RunAnywhere {
         public let legend: [String: String]
     }
 
+    /// One decision pass: the answers plus the wording version that produced them.
+    struct DecisionRun: Sendable {
+        /// One answer per request question, in request order.
+        public let answers: [DecisionAnswer]
+        /// The prompt-wording version the model served; 0 when it reports none.
+        /// Pinning this on a later request makes a wording change explicit.
+        public let promptFormatVersion: UInt32
+        /// Tokens of the jointly-evaluated prompt.
+        public let inputTokens: Int64
+    }
+
     /// Score `state` with the loaded decision model.
     struct Decision: Sendable {
 
@@ -85,14 +96,41 @@ public extension RunAnywhere {
         /// print(answers[0].choice ?? "")
         /// ```
         ///
-        /// - Throws: `SDKException` when no decision model is loaded or scoring
-        ///   fails.
+        /// - Parameters:
+        ///   - state: The text every question is asked about.
+        ///   - questions: The questions to answer, evaluated jointly.
+        ///   - temperature: Per-request calibration override; nil = the model's
+        ///     own per-type value.
+        ///   - promptFormatVersion: Requires a specific prompt-wording version.
+        ///     nil = whatever this model serves. A model serving a different
+        ///     version throws `SDKException` rather than scoring with wording
+        ///     the caller did not expect.
+        ///
+        /// - Throws: `SDKException` when no decision model is loaded, the
+        ///   prompt-format pin does not match, or scoring fails.
         public func decide(
             state: String,
             questions: [DecisionQuestion],
-            temperature: Float? = nil
+            temperature: Float? = nil,
+            promptFormatVersion: UInt32? = nil
         ) async throws -> [DecisionAnswer] {
-            guard !questions.isEmpty else { return [] }
+            try await decideResult(
+                state: state, questions: questions, temperature: temperature,
+                promptFormatVersion: promptFormatVersion
+            ).answers
+        }
+
+        /// Like `decide`, but also returns the wording version the model served
+        /// and the prompt token count.
+        public func decideResult(
+            state: String,
+            questions: [DecisionQuestion],
+            temperature: Float? = nil,
+            promptFormatVersion: UInt32? = nil
+        ) async throws -> DecisionRun {
+            guard !questions.isEmpty else {
+                return DecisionRun(answers: [], promptFormatVersion: 0, inputTokens: 0)
+            }
 
             var request = RADecisionRequest()
             request.state = state
@@ -109,14 +147,23 @@ public extension RunAnywhere {
                 }
                 return proto
             }
-            if let temperature {
+            if temperature != nil || promptFormatVersion != nil {
                 var options = RADecisionOptions()
-                options.temperature = max(0, temperature)
+                if let temperature {
+                    options.temperature = max(0, temperature)
+                }
+                if let promptFormatVersion {
+                    options.promptFormatVersion = promptFormatVersion
+                }
                 request.options = options
             }
 
             let result = try await RunAnywhere.decideProto(request)
-            return result.answers.map(DecisionAnswer.init(proto:))
+            return DecisionRun(
+                answers: result.answers.map(DecisionAnswer.init(proto:)),
+                promptFormatVersion: result.promptFormatVersion,
+                inputTokens: Int64(result.usage.inputTokens)
+            )
         }
 
         private static func protoType(_ type: DecisionQuestionKind) -> RADecisionQuestionType {

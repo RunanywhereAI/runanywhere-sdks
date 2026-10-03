@@ -78,6 +78,12 @@ message DecisionOptions {
         (runanywhere.v1.rac_default) = "0",
         (runanywhere.v1.rac_min_float) = 0.0
     ];
+
+    // The prompt-wording version the caller requires. Unset or 0 = the model's
+    // own served version. A model refuses a request pinning a version it does
+    // not serve, so a caller pinning it is told when the wording -- and so the
+    // probabilities -- change.
+    uint32 prompt_format_version = 2 [(runanywhere.v1.rac_default) = "0"];
 }
 
 message DecisionRequest {
@@ -137,4 +143,8 @@ message DecisionResult {
     // The decision pass has no output tokens; input_tokens counts the tokens of
     // the jointly-evaluated prompt.
     TokenUsage usage = 4;
+
+    // The prompt-wording version this model actually served. 0 when the model
+    // reports none. A request pinning a different version is refused.
+    uint32 prompt_format_version = 5;
 }

@@ -71,6 +71,9 @@ private struct RunRecord: Codable {
     let framework: String
     let model: String
     let answers: [AnswerRecord]
+    /// Prompt-wording version the model served; optional so JSON written before
+    /// the field existed still decodes.
+    var promptFormatVersion: UInt32?
 }
 
 enum CLIError: Error, LocalizedError {
@@ -157,17 +160,20 @@ private struct DecisionCLI {
             modelPath: modelPath, framework: frameworkKind, modelID: modelID,
             category: .decision)
 
+        let pin = value(of: "--prompt-format-version", in: args).flatMap(UInt32.init)
         let started = Date()
-        let answers = try await withTimeout(seconds: timeoutSeconds) {
-            try await RunAnywhere.decision.decide(
-                state: canonicalState, questions: canonicalQuestions)
+        let run = try await withTimeout(seconds: timeoutSeconds) {
+            try await RunAnywhere.decision.decideResult(
+                state: canonicalState, questions: canonicalQuestions,
+                promptFormatVersion: pin)
         }
         let elapsed = Date().timeIntervalSince(started)
 
         let record = RunRecord(
             framework: framework.lowercased(),
             model: modelPath,
-            answers: answers.map(answerRecord))
+            answers: run.answers.map(answerRecord),
+            promptFormatVersion: run.promptFormatVersion)
         try emit(record, to: outputPath)
         printReport(record, elapsed: elapsed)
     }
@@ -390,6 +396,9 @@ private struct DecisionCLI {
 
     private static func printReport(_ record: RunRecord, elapsed: TimeInterval) {
         print("framework: \(record.framework)")
+        if let version = record.promptFormatVersion {
+            print("prompt_format_version: \(version)")
+        }
         for answer in record.answers {
             let probabilities = answer.probabilities
                 .sorted { $0.key < $1.key }
@@ -451,7 +460,7 @@ private struct DecisionCLI {
             decision-cli — local model smoke + parity tool
 
             USAGE:
-              decision-cli run    --framework <mlx|llamacpp> --model <id|path> [--out result.json] [--timeout 300]
+              decision-cli run    --framework <mlx|llamacpp> --model <id|path> [--out result.json] [--timeout 300] [--prompt-format-version N]
               decision-cli chat   --framework <mlx|llamacpp> --model <id|path> [--prompt "..."] [--max-tokens 64]
               decision-cli compare --a <result.json> --b <result.json> [--tolerance 0.01]
               decision-cli models

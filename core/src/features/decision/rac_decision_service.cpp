@@ -59,6 +59,10 @@ rac_result_t rac::decision::create_service(const char* model_id, const char* con
 
 extern "C" {
 
+uint32_t rac_decision_default_prompt_format_version(void) {
+    return 3u;
+}
+
 rac_result_t rac_decision_create(const char* model_id, rac_handle_t* out_handle) {
     return rac::decision::create_service(model_id, nullptr, out_handle);
 }

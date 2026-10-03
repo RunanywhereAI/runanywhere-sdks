@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -62,6 +63,16 @@ struct LlamaCppDecisionHandle {
     llama_context* context = nullptr;
     int32_t max_tokens = kDefaultContext;
     int32_t default_threads = 1;
+    // Per-question calibration read from clef.decision.temperature.* at load:
+    // key "<type>" or "<type>.<bucket>", value the divisor for that question's
+    // softmax. Empty when the GGUF carries no such keys (the model's scores
+    // are then used as-is, which is the trained 1.0 case).
+    std::map<std::string, float> temperatures;
+    // Prompt-wording version the checkpoint declares
+    // (clef.decision.prompt_format_version); 0 when the GGUF states none. A
+    // request pinning a different version is refused rather than scored with
+    // wording the caller did not expect.
+    uint32_t prompt_format_version = 0;
 };
 
 struct LlamaBatchGuard {
@@ -111,12 +122,93 @@ void release_model(LlamaCppDecisionHandle* handle) {
         llama_model_free(handle->model);
         handle->model = nullptr;
     }
+    handle->temperatures.clear();
+    handle->prompt_format_version = 0;
     handle->model_path.clear();
 }
 
-float temperature_for(rac_decision_question_type_t type, const rac_decision_options_t* options) {
+// Reads the per-question calibration from the GGUF, as the reference does:
+// "<arch>.decision.temperature.<type>" or
+// "<arch>.decision.temperature.<type>.<bucket>", a positive divisor used for
+// that question kind's softmax. A GGUF without these keys takes the trained
+// 1.0. A key that is present but not a positive number is a broken model file
+// and fails the load rather than silently changing every probability.
+rac_result_t load_temperatures(LlamaCppDecisionHandle* handle) {
+    handle->temperatures.clear();
+    char arch[64] = {0};
+    if (llama_model_meta_val_str(handle->model, "general.architecture", arch, sizeof(arch)) < 0) {
+        return RAC_SUCCESS;
+    }
+    const std::string prefix = std::string(arch) + ".decision.temperature.";
+    const int32_t meta_count = llama_model_meta_count(handle->model);
+    for (int32_t i = 0; i < meta_count; ++i) {
+        char key[256];
+        char value[64];
+        if (llama_model_meta_key_by_index(handle->model, i, key, sizeof(key)) < 0 ||
+            !std::string(key).starts_with(prefix)) {
+            continue;
+        }
+        if (llama_model_meta_val_str_by_index(handle->model, i, value, sizeof(value)) < 0) {
+            continue;
+        }
+        const float temperature = std::strtof(value, nullptr);
+        if (temperature <= 0.0f) {
+            RAC_LOG_ERROR(kLogCategory, "invalid decision temperature: %s = %s", key, value);
+            return RAC_ERROR_MODEL_LOAD_FAILED;
+        }
+        handle->temperatures[std::string(key).substr(prefix.size())] = temperature;
+    }
+    return RAC_SUCCESS;
+}
+
+// Reads the prompt-wording version the checkpoint declares
+// (<arch>.decision.prompt_format_version). A GGUF that states none is the clef
+// lineage, whose served wording the contract fixes at version 3; a conversion
+// that changes the template states its own version here. A stated 0 or a
+// non-numeric value is a broken model file and fails the load.
+rac_result_t load_prompt_format_version(LlamaCppDecisionHandle* handle) {
+    handle->prompt_format_version = rac_decision_default_prompt_format_version();
+    char arch[64] = {0};
+    if (llama_model_meta_val_str(handle->model, "general.architecture", arch, sizeof(arch)) < 0) {
+        return RAC_SUCCESS;
+    }
+    const std::string key = std::string(arch) + ".decision.prompt_format_version";
+    char value[32] = {0};
+    if (llama_model_meta_val_str(handle->model, key.c_str(), value, sizeof(value)) < 0) {
+        return RAC_SUCCESS;
+    }
+    const unsigned long parsed = std::strtoul(value, nullptr, 10);
+    if (parsed == 0 || parsed > UINT32_MAX) {
+        RAC_LOG_ERROR(kLogCategory, "invalid decision prompt format version: %s = %s",
+                      key.c_str(), value);
+        return RAC_ERROR_MODEL_LOAD_FAILED;
+    }
+    handle->prompt_format_version = static_cast<uint32_t>(parsed);
+    return RAC_SUCCESS;
+}
+
+// The per-request override wins; otherwise the model's own calibration for
+// this question kind, first with the option-count bucket then without; 1.0
+// when the GGUF carries no entry. The buckets are the ones the calibration
+// was fitted over.
+float temperature_for(const LlamaCppDecisionHandle* handle, rac_decision_question_type_t type,
+                      size_t option_count, const rac_decision_options_t* options) {
     if (options != nullptr && options->temperature > 0.0f) {
         return options->temperature;
+    }
+    const std::string type_name = runanywhere::decision_prompt::question_type_name(type);
+    const char* bucket = option_count <= 2 ? "2"
+                         : option_count <= 5 ? "3_5"
+                         : option_count <= 10 ? "6_10"
+                                              : "11";
+    const auto& temperatures = handle->temperatures;
+    const auto bucketed = temperatures.find(type_name + "." + bucket);
+    if (bucketed != temperatures.end()) {
+        return bucketed->second;
+    }
+    const auto plain = temperatures.find(type_name);
+    if (plain != temperatures.end()) {
+        return plain->second;
     }
     return 1.0f;
 }
@@ -263,6 +355,18 @@ rac_result_t llamacpp_decision_initialize(void* implementation, const char* mode
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
+    const rac_result_t temperature_rc = load_temperatures(handle);
+    if (temperature_rc != RAC_SUCCESS) {
+        release_model(handle);
+        return temperature_rc;
+    }
+
+    const rac_result_t version_rc = load_prompt_format_version(handle);
+    if (version_rc != RAC_SUCCESS) {
+        release_model(handle);
+        return version_rc;
+    }
+
     const int32_t training_context = llama_model_n_ctx_train(handle->model);
     handle->max_tokens =
         training_context > 0 ? std::min(training_context, kDefaultContext) : kDefaultContext;
@@ -306,6 +410,17 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
     *output = {};
     if (question_count == 0) {
         return RAC_SUCCESS;
+    }
+
+    // A pinned request must match the wording this checkpoint serves. Both the
+    // wording and the probabilities derived from it are model-versioned, so a
+    // silent mismatch would hand back scores the caller cannot interpret.
+    if (options != nullptr && options->prompt_format_version != 0 &&
+        handle->prompt_format_version != options->prompt_format_version) {
+        RAC_LOG_ERROR(kLogCategory,
+                      "request pins prompt format %u, model serves %u",
+                      options->prompt_format_version, handle->prompt_format_version);
+        return RAC_ERROR_NOT_SUPPORTED;
     }
 
     const auto started = std::chrono::steady_clock::now();
@@ -392,7 +507,8 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
             return RAC_ERROR_INFERENCE_FAILED;
         }
 
-        const float temperature = temperature_for(question.type, options);
+        const float temperature =
+            temperature_for(handle, question.type, question.option_count, options);
         const std::vector<float> probs = scores_to_probabilities(raw.data(), raw.size(), temperature);
         std::memcpy(answer.probabilities, probs.data(), probs.size() * sizeof(float));
 
@@ -446,6 +562,7 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
             .count();
     output->model_id = strdup(handle->model_id.c_str());
     output->input_tokens = n_tokens;
+    output->prompt_format_version = handle->prompt_format_version;
     if (output->model_id == nullptr) {
         rac_decision_result_free(output);
         return RAC_ERROR_OUT_OF_MEMORY;

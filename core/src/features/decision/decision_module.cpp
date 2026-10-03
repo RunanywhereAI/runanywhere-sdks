@@ -233,6 +233,7 @@ rac_result_t validate_request(const runanywhere::v1::DecisionRequest& request,
     }
     if (request.has_options()) {
         out_options->temperature = request.options().temperature();
+        out_options->prompt_format_version = request.options().prompt_format_version();
     }
     return RAC_SUCCESS;
 }
@@ -312,6 +313,7 @@ rac_result_t result_to_proto(const rac_decision_result_t& source,
     out->mutable_usage()->set_input_tokens(source.input_tokens);
     out->mutable_usage()->set_output_tokens(0);
     out->mutable_usage()->set_total_tokens(source.input_tokens);
+    out->set_prompt_format_version(source.prompt_format_version);
     return RAC_SUCCESS;
 }
 

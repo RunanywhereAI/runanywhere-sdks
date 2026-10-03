@@ -4,6 +4,7 @@
 #define RAC_FEATURES_DECISION_RAC_DECISION_SERVICE_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
@@ -34,6 +35,14 @@ typedef struct rac_decision_service {
     void* impl;
     const char* model_id;
 } rac_decision_service_t;
+
+/**
+ * The prompt-wording version the clef decision lineage serves. Engines that
+ * have no per-checkpoint override report this; it is kept in step with the
+ * cloud contract, so a caller pinning the version it saw in the cloud gets the
+ * same wording locally.
+ */
+RAC_API uint32_t rac_decision_default_prompt_format_version(void);
 
 RAC_API rac_result_t rac_decision_create(const char* model_id, rac_handle_t* out_handle);
 RAC_API rac_result_t rac_decision_initialize(rac_handle_t handle, const char* model_path);

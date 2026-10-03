@@ -730,6 +730,17 @@ rac_result_t decision_decide(void* impl, const char* state,
     if (!state || !questions || !out_result || question_count == 0) {
         return RAC_ERROR_NULL_POINTER;
     }
+    // The MLX clef port renders the same prompt wording as the llamacpp engine,
+    // so it serves the same contract version. Sourced from the shared constant
+    // until the checkpoint config carries its own.
+    const uint32_t served_prompt_format_version =
+        rac_decision_default_prompt_format_version();
+    if (options != nullptr && options->prompt_format_version != 0 &&
+        served_prompt_format_version != options->prompt_format_version) {
+        RAC_LOG_ERROR(LOG_CAT, "request pins prompt format %u, model serves %u",
+                      options->prompt_format_version, served_prompt_format_version);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
     rac_mlx_callbacks_t callbacks = {};
     if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
         callbacks.decision == nullptr) {
@@ -794,6 +805,7 @@ rac_result_t decision_decide(void* impl, const char* state,
     out_result->processing_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                          std::chrono::steady_clock::now() - started)
                                          .count();
+    out_result->prompt_format_version = served_prompt_format_version;
     return RAC_SUCCESS;
 }
 
