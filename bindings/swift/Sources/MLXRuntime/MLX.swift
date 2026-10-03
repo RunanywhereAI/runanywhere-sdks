@@ -2608,8 +2608,7 @@ private func fillEmbeddingResult(
 /// parallel to the request's option order. Canonical-ordering rules (choice
 /// sorted by key, noul true-then-false, score by level index) are applied by
 /// the model; probabilities are re-keyed back onto the request order here.
-private let mlxDecision: rac_mlx_decision_fn = {
-    handle, statePtr, questionsPtr, questionCount, optionsPtr, outResult, _ in
+private let mlxDecision: rac_mlx_decision_fn = { handle, statePtr, questionsPtr, questionCount, optionsPtr, outResult, _ in
     guard let session = session(from: handle), let statePtr, let questionsPtr, let outResult else {
         return RAC_ERROR_INVALID_PARAMETER
     }
@@ -2640,8 +2639,11 @@ private let mlxDecision: rac_mlx_decision_fn = {
         let instructions = question.instructions.map { String(cString: $0) }
         requestQuestions.append(
             ClefDecisionQuestion(
-                id: id, kind: decisionKind(from: question.type),
-                instructions: instructions, options: options))
+                id: id,
+                kind: decisionKind(from: question.type),
+                instructions: instructions,
+                options: options
+            ))
         requestKeys.append(keys)
     }
     let temperature: Float? = optionsPtr.flatMap {
