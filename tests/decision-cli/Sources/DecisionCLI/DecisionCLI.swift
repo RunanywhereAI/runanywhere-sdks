@@ -161,10 +161,30 @@ private struct DecisionCLI {
             category: .decision)
 
         let pin = value(of: "--prompt-format-version", in: args).flatMap(UInt32.init)
+
+        // Custom request: --state (inline, @file or -) plus repeatable
+        // --ask/--choice/--score flags build a request at runtime; without any
+        // of them the canonical ticket (team/refund/urgency) is used so the
+        // cross-engine compare stays stable.
+        var state = canonicalState
+        var requestQuestions = canonicalQuestions
+        if let stateRaw = value(of: "--state", in: args) {
+            state = try readState(stateRaw)
+            requestQuestions = try parseQuestions(from: args)
+            if requestQuestions.isEmpty {
+                throw CLIError.usage(
+                    "--state needs at least one --ask/--choice/--score question")
+            }
+        } else if let requestPath = value(of: "--request", in: args) {
+            (state, requestQuestions) = try request(from: requestPath)
+        }
+        let finalState = state
+        let finalQuestions = requestQuestions
+
         let started = Date()
         let run = try await withTimeout(seconds: timeoutSeconds) {
             try await RunAnywhere.decision.decideResult(
-                state: canonicalState, questions: canonicalQuestions,
+                state: finalState, questions: finalQuestions,
                 promptFormatVersion: pin)
         }
         let elapsed = Date().timeIntervalSince(started)
@@ -438,6 +458,198 @@ private struct DecisionCLI {
         return args[index + 1]
     }
 
+    /// Every occurrence of a repeatable flag, in order.
+    private static func values(of flag: String, in args: [String]) -> [String] {
+        var found: [String] = []
+        for (index, arg) in args.enumerated() where arg == flag && index + 1 < args.count {
+            found.append(args[index + 1])
+        }
+        return found
+    }
+
+    /// Resolves `--state`: inline text, `@path` to read a file, `-` for stdin.
+    private static func readState(_ raw: String) throws -> String {
+        if raw == "-" {
+            let data = FileHandle.standardInput.readDataToEndOfFile()
+            guard let text = String(data: data, encoding: .utf8) else {
+                throw CLIError.usage("stdin is not valid UTF-8")
+            }
+            return text
+        }
+        if raw.hasPrefix("@") {
+            let path = String(raw.dropFirst())
+            guard let text = try? String(contentsOfFile: path, encoding: .utf8) else {
+                throw CLIError.usage("could not read state file '\(path)'")
+            }
+            return text
+        }
+        return raw
+    }
+
+    /// One question from the flags: `--ask "Is it urgent?"` (yes/no, question
+    /// type is either the value of a `--ask-type` or `.noul`).
+    /// `--choice "Which team?=account,frontend,payments"` (the part before `=`
+    /// is the question, the comma list is the options).
+    /// `--score "How urgent?=Routine,Soon,Urgent"` (ordered levels).
+    /// Custom request overrides the built-in canonical ticket.
+    private static func parseQuestions(from args: [String]) throws -> [RunAnywhere.DecisionQuestion] {
+        var questions: [RunAnywhere.DecisionQuestion] = []
+
+        for raw in values(of: "--ask", in: args) {
+            let (question, optionsRaw) = splitQuestion(raw)
+            var options = try options(from: optionsRaw, minimum: 2, flag: "--ask")
+            if options.isEmpty {
+                // A yes/no question always has the conventional pair, with the
+                // given text as the affirm/deny phrasing when supplied.
+                options = [
+                    .init(key: "true", description: "The proposition is true or the answer is yes."),
+                    .init(key: "false", description: "The proposition is false or the answer is no."),
+                ]
+            }
+            questions.append(
+                .init(id: "q\(questions.count + 1)", type: .noul, instructions: question, options: options))
+        }
+
+        for raw in values(of: "--choice", in: args) {
+            let (question, optionsRaw) = splitQuestion(raw)
+            let options = try options(from: optionsRaw, minimum: 2, flag: "--choice")
+            questions.append(
+                .init(id: "q\(questions.count + 1)", type: .choice, instructions: question, options: options))
+        }
+
+        for raw in values(of: "--score", in: args) {
+            let (question, optionsRaw) = splitQuestion(raw)
+            let levels = try options(from: optionsRaw, minimum: 2, flag: "--score")
+            // Levels are ordered; the key is the level index the engine expects.
+            let numbered = levels.enumerated().map { index, option in
+                RunAnywhere.DecisionOption(key: "\(index)", description: option.description)
+            }
+            questions.append(
+                .init(id: "q\(questions.count + 1)", type: .score, instructions: question, options: numbered))
+        }
+
+        return questions
+    }
+
+    private static func splitQuestion(_ raw: String) -> (question: String, options: String) {
+        guard let separator = raw.firstIndex(of: "=") else {
+            return (raw, "")
+        }
+        return (String(raw[..<separator]), String(raw[raw.index(after: separator)...]))
+    }
+
+    private static func options(from raw: String, minimum: Int, flag: String) throws
+        -> [RunAnywhere.DecisionOption] {
+        guard !raw.isEmpty else { return [] }
+        let parts = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard parts.count >= minimum else {
+            throw CLIError.usage("\(flag) needs at least \(minimum) comma-separated options")
+        }
+        return parts.map { part in
+            // "key:description" sets a custom key; a bare label keys on itself.
+            if let separator = part.firstIndex(of: ":") {
+                let key = String(part[..<separator]).trimmingCharacters(in: .whitespaces)
+                let description = String(part[part.index(after: separator)...])
+                    .trimmingCharacters(in: .whitespaces)
+                return .init(key: key, description: description)
+            }
+            return .init(key: part, description: part)
+        }
+    }
+
+    /// Reads a full request JSON: `{"state"|"input": ..., "questions": [...]}`.
+    /// Each question is `{"id", "type": "choice"|"noul"|"score",
+    /// "instructions", "options": [{"key","description"}]}`. `questions` may
+    /// also be an object keyed by id, as the cloud `/v1/systemone` shape is.
+    private static func request(from path: String) throws
+        -> (state: String, questions: [RunAnywhere.DecisionQuestion]) {
+        let raw = try readState(path == "-" ? "-" : "@\(path)")
+        guard let data = raw.data(using: .utf8),
+              let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CLIError.usage("--request file is not a JSON object")
+        }
+        let stateValue = root["state"] ?? root["input"]
+        let state: String
+        if let text = stateValue as? String {
+            state = text
+        } else if let object = stateValue {
+            // A structured state is re-serialized compactly with sorted keys,
+            // the same shape the canonical ticket uses.
+            guard let encoded = try? JSONSerialization.data(
+                withJSONObject: object, options: [.sortedKeys]),
+                let text = String(data: encoded, encoding: .utf8) else {
+                throw CLIError.usage("--request 'state' object could not be serialized")
+            }
+            state = text
+        } else {
+            throw CLIError.usage("--request needs a 'state' or 'input'")
+        }
+        guard !state.isEmpty else {
+            throw CLIError.usage("--request needs a non-empty 'state' or 'input'")
+        }
+
+        var entries: [(String, [String: Any])] = []
+        if let list = root["questions"] as? [[String: Any]] {
+            for (index, question) in list.enumerated() {
+                entries.append((question["id"] as? String ?? "q\(index + 1)", question))
+            }
+        } else if let map = root["questions"] as? [String: [String: Any]] {
+            entries = map.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
+        } else {
+            throw CLIError.usage("--request needs a 'questions' array or object")
+        }
+
+        let questions: [RunAnywhere.DecisionQuestion] = try entries.map { id, question in
+            guard let typeName = question["type"] as? String,
+                  let kind = decisionKind(typeName) else {
+                throw CLIError.usage("question '\(id)' needs type choice|noul|score")
+            }
+            let instructions = question["instructions"] as? String
+                ?? question["question"] as? String
+                ?? id
+            var options: [RunAnywhere.DecisionOption] = []
+            if let list = question["options"] as? [[String: Any]] {
+                options = list.map { option in
+                    let key = option["key"] as? String ?? option["name"] as? String ?? ""
+                    let description = option["description"] as? String
+                    return .init(key: key, description: description ?? key)
+                }
+            } else if let criteria = question["criteria"] as? [String: String] {
+                options = criteria.sorted { $0.key < $1.key }.map {
+                    .init(key: $0.key, description: $0.value)
+                }
+            } else if let levels = question["levels"] as? [String] {
+                options = levels.enumerated().map { .init(key: "\($0.offset)", description: $0.element) }
+            }
+            switch kind {
+            case .noul:
+                if options.isEmpty {
+                    options = [
+                        .init(key: "true", description: "The proposition is true or the answer is yes."),
+                        .init(key: "false", description: "The proposition is false or the answer is no."),
+                    ]
+                }
+            case .choice where options.count < 2:
+                throw CLIError.usage("choice question '\(id)' needs at least 2 options")
+            case .score where options.count < 2:
+                throw CLIError.usage("score question '\(id)' needs at least 2 levels")
+            default:
+                break
+            }
+            return .init(id: id, type: kind, instructions: instructions, options: options)
+        }
+        return (state, questions)
+    }
+
+    private static func decisionKind(_ raw: String) -> DecisionQuestionKind? {
+        switch raw.lowercased() {
+        case "choice": return .choice
+        case "noul", "yes_no", "yesno", "boolean": return .noul
+        case "score": return .score
+        default: return nil
+        }
+    }
+
     private static func withTimeout<T: Sendable>(
         seconds: Double,
         _ body: @escaping @Sendable () async throws -> T
@@ -461,10 +673,19 @@ private struct DecisionCLI {
 
             USAGE:
               decision-cli run    --framework <mlx|llamacpp> --model <id|path> [--out result.json] [--timeout 300] [--prompt-format-version N]
+              decision-cli run    ... --state <text|@file|-> [--ask "Q" | --choice "Q=opt1,opt2" | --score "Q=lvl1,lvl2"]...
+              decision-cli run    ... --request <file|->        # full request JSON
               decision-cli chat   --framework <mlx|llamacpp> --model <id|path> [--prompt "..."] [--max-tokens 64]
               decision-cli compare --a <result.json> --b <result.json> [--tolerance 0.01]
               decision-cli models
               decision-cli help
+
+            CUSTOM REQUEST:
+              Without --state/--request the canonical ticket (team/refund/urgency)
+              is scored, so cross-engine `compare` stays stable. --state takes
+              inline text, @path, or - for stdin. Options may carry a custom key
+              as "key:description"; a bare label keys on itself. A yes/no --ask
+              with no options uses the conventional true/false pair.
 
             MODEL:
               --model takes a filesystem path, or a catalog id resolved (and

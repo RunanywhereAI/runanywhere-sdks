@@ -4,6 +4,7 @@
 
 #include "decision_service_internal.h"
 
+#include <cctype>
 #include <cstdlib>
 
 #include "../common/rac_service_factory_internal.h"
@@ -16,6 +17,15 @@ constexpr const char* kLogCategory = "Decision.Service";
 
 const rac_decision_service_ops_t* decision_ops(const rac_engine_vtable_t* vt) {
     return vt ? vt->decision_ops : nullptr;
+}
+
+bool state_is_blank(const char* state) {
+    for (const char* c = state; *c != '\0'; ++c) {
+        if (!std::isspace(static_cast<unsigned char>(*c))) {
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace
@@ -84,6 +94,9 @@ rac_result_t rac_decision_decide(rac_handle_t handle, const char* state,
                                  rac_decision_result_t* out_result) {
     if (!handle || !state || !out_result || (question_count > 0 && !questions)) {
         return RAC_ERROR_NULL_POINTER;
+    }
+    if (state_is_blank(state)) {
+        return RAC_ERROR_INVALID_PARAMETER;
     }
     auto* service = static_cast<rac_decision_service_t*>(handle);
     if (!service->ops || !service->ops->decide) {

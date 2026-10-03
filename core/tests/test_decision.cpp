@@ -349,6 +349,95 @@ int main() {
         rac_proto_buffer_free(&out);
     }
 
+    // Rejected requests: blank state, duplicate option keys, invalid keys, and
+    // fewer than two options on CHOICE/SCORE. Each used to score silently.
+    {
+        auto expect_rejected = [&](runanywhere::v1::DecisionRequest request,
+                                   const char* what) {
+            const std::string bytes = request.SerializeAsString();
+            rac_proto_buffer_t out = {};
+            rac_proto_buffer_init(&out);
+            const rac_result_t rc = rac_decision_component_decide_proto(
+                component, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &out);
+            check(rc != RAC_SUCCESS, what);
+            rac_proto_buffer_free(&out);
+        };
+
+        runanywhere::v1::DecisionRequest blank;
+        blank.set_state("   ");
+        blank.add_questions()->set_id("q");
+        expect_rejected(std::move(blank), "blank state is rejected");
+
+        runanywhere::v1::DecisionRequest duplicate;
+        duplicate.set_state("state");
+        auto* dup = duplicate.add_questions();
+        dup->set_id("q");
+        dup->set_type(runanywhere::v1::DECISION_QUESTION_TYPE_CHOICE);
+        dup->set_instructions("Pick");
+        dup->add_options()->set_key("a");
+        dup->add_options()->set_key("A");  // duplicates a, ignoring case
+        expect_rejected(std::move(duplicate), "duplicate option keys are rejected");
+
+        runanywhere::v1::DecisionRequest empty_key;
+        empty_key.set_state("state");
+        auto* ek = empty_key.add_questions();
+        ek->set_id("q");
+        ek->set_type(runanywhere::v1::DECISION_QUESTION_TYPE_CHOICE);
+        ek->set_instructions("Pick");
+        ek->add_options()->set_key("");
+        ek->add_options()->set_key("b");
+        expect_rejected(std::move(empty_key), "empty option key is rejected");
+
+        runanywhere::v1::DecisionRequest single;
+        single.set_state("state");
+        auto* one = single.add_questions();
+        one->set_id("q");
+        one->set_type(runanywhere::v1::DECISION_QUESTION_TYPE_CHOICE);
+        one->set_instructions("Pick");
+        one->add_options()->set_key("only");
+        expect_rejected(std::move(single), "single-option choice is rejected");
+
+        runanywhere::v1::DecisionRequest unknown_type;
+        unknown_type.set_state("state");
+        auto* ut = unknown_type.add_questions();
+        ut->set_id("q");
+        ut->set_instructions("Pick");
+        ut->add_options()->set_key("a");
+        ut->add_options()->set_key("b");
+        expect_rejected(std::move(unknown_type), "unspecified question type is rejected");
+    }
+
+    // NOUL is normalized to the reserved true/false pair regardless of the
+    // caller's wording, so every engine reads the same shape and p(true) is
+    // unambiguous.
+    {
+        runanywhere::v1::DecisionRequest request;
+        request.set_state("state");
+        auto* noul = request.add_questions();
+        noul->set_id("refund");
+        noul->set_type(runanywhere::v1::DECISION_QUESTION_TYPE_NOUL);
+        noul->set_instructions("Refund?");
+        noul->add_options()->set_key("no: No refund");
+        noul->add_options()->set_key("yes: Refund");
+        const std::string bytes = request.SerializeAsString();
+        rac_proto_buffer_t out = {};
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_decision_component_decide_proto(
+            component, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &out);
+        check(rc == RAC_SUCCESS, "no/yes NOUL question is accepted");
+        uint8_t* data = nullptr;
+        size_t size = 0;
+        rac_proto_buffer_take_data(&out, &data, &size);
+        runanywhere::v1::DecisionResult result;
+        result.ParseFromArray(data, static_cast<int>(size));
+        check(result.answers_size() == 1 &&
+                  result.answers(0).probabilities().count("true") == 1 &&
+                  result.answers(0).probabilities().count("false") == 1,
+              "NOUL options are normalized to true/false keys");
+        std::free(data);
+        rac_proto_buffer_free(&out);
+    }
+
     rac_decision_component_destroy(component);
 
     // (5) Standalone request/result proto round-trip (no backend involved).

@@ -2,6 +2,8 @@
 
 #include "decision_internal.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -31,9 +33,10 @@ namespace {
 
 constexpr const char* kLogCategory = "Decision.Component";
 // Guards against pathological requests; the proto boundary should never hand us
-// more questions or options than this in a single decide call.
-constexpr size_t kMaxQuestions = 1024;
-constexpr size_t kMaxOptionsPerQuestion = 4096;
+// more questions or options than this in a single decide call. The option cap
+// matches the cloud contract (labels A to Z).
+constexpr size_t kMaxQuestions = 128;
+constexpr size_t kMaxOptionsPerQuestion = 26;
 
 struct rac_decision_component {
     rac_handle_t lifecycle = nullptr;
@@ -179,6 +182,21 @@ DecisionQuestionType question_type_to_proto(rac_decision_question_type_t type) {
     }
 }
 
+// Releases the per-question option arrays a successful (or partial)
+// validate_request allocated. Declared before validate_request so its failure
+// paths can clean up after themselves.
+void free_question_views(std::vector<rac_decision_question_t>* questions);
+
+bool is_blank(const std::string& text);
+
+// Trims ASCII whitespace and lowercases, for the "distinct ignoring case and
+// surrounding space" option-key rule the cloud contract states.
+std::string normalize_option_key(const std::string& key);
+
+// Option keys must be non-blank, unique within their question, and free of the
+// control/line-break characters the contract forbids.
+bool key_is_valid(const std::string& key);
+
 // Flatten the parsed request into C structs. The option views borrow from the
 // still-alive parsed request's strings; the question views borrow from
 // `out_questions`, which the caller owns for the duration of the decide call.
@@ -194,6 +212,18 @@ rac_result_t validate_request(const runanywhere::v1::DecisionRequest& request,
         static_cast<size_t>(request.questions_size()) > kMaxQuestions) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
+    if (request.state().empty() || is_blank(request.state())) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // Option storage is freed by free_question_views; on any failure past a
+    // calloc, release what was already built so the caller's cleanup is a no-op.
+    auto fail = [&](rac_result_t rc) {
+        free_question_views(out_questions);
+        out_questions->clear();
+        return rc;
+    };
+
     try {
         out_questions->reserve(static_cast<size_t>(request.questions_size()));
     } catch (...) {
@@ -202,33 +232,93 @@ rac_result_t validate_request(const runanywhere::v1::DecisionRequest& request,
     for (int i = 0; i < request.questions_size(); ++i) {
         const auto& question = request.questions(i);
         if (static_cast<size_t>(question.options_size()) > kMaxOptionsPerQuestion) {
-            return RAC_ERROR_INVALID_PARAMETER;
+            return fail(RAC_ERROR_INVALID_PARAMETER);
         }
+        const rac_decision_question_type_t type = question_type_from_proto(question.type());
+        if (type == RAC_DECISION_QUESTION_UNSPECIFIED) {
+            return fail(RAC_ERROR_INVALID_PARAMETER);
+        }
+
+        // Late-bound key storage: NOUL options are re-keyed to the reserved
+        // true/false pair, so the buffers must outlive the input strings. Kept
+        // in a side vector for the duration of the call (freed by the views'
+        // owners), and referenced by `options[j].key` below.
+        size_t option_count = static_cast<size_t>(question.options_size());
+
         rac_decision_question_t view = {};
         view.id = question.id().c_str();
-        view.type = question_type_from_proto(question.type());
+        view.type = type;
         view.instructions = question.instructions().empty() ? nullptr : question.instructions().c_str();
-        view.option_count = static_cast<size_t>(question.options_size());
+        view.option_count = option_count;
         view.options = nullptr;
-        if (view.option_count > 0) {
-            // The option array must outlive this loop; store it in the question
-            // vector's element after reserving. Because `view.options` points
-            // into memory owned by a parallel vector, keep it alive by storing
-            // the buffer in a side allocation the caller frees via the returned
-            // questions' backing store.
-            auto* options = static_cast<rac_decision_option_t*>(
-                std::calloc(view.option_count, sizeof(rac_decision_option_t)));
-            if (!options) {
-                return RAC_ERROR_OUT_OF_MEMORY;
+
+        if (type == RAC_DECISION_QUESTION_NOUL) {
+            // The wire reserves "true"/"false" for yes/no; callers may phrase
+            // the options any way (yes/no, no/yes, true/false). Normalize to
+            // the reserved pair here so every engine reads the same shape and
+            // the answer's p(true) is unambiguous.
+            if (option_count != 2) {
+                return fail(RAC_ERROR_INVALID_PARAMETER);
             }
-            for (int j = 0; j < question.options_size(); ++j) {
-                options[j].key = question.options(j).key().c_str();
+            auto* options = static_cast<rac_decision_option_t*>(
+                std::calloc(2, sizeof(rac_decision_option_t)));
+            if (!options) {
+                return fail(RAC_ERROR_OUT_OF_MEMORY);
+            }
+            // "true" is the affirmative option: the one whose key is literally
+            // true/yes, else the first option (the fallback the docs describe).
+            size_t true_index = 0;
+            for (size_t j = 0; j < option_count; ++j) {
+                const std::string key = normalize_option_key(question.options(j).key());
+                if (key == "true" || key == "yes") {
+                    true_index = j;
+                    break;
+                }
+            }
+            static const char* kKeys[2] = {"true", "false"};
+            for (size_t slot = 0; slot < 2; ++slot) {
+                const size_t source = slot == 0 ? true_index : (1 - true_index);
+                options[slot].key = kKeys[slot];
+                options[slot].description = question.options(source).description().empty()
+                                                ? nullptr
+                                                : question.options(source).description().c_str();
+            }
+            view.options = options;
+        } else if (option_count > 0) {
+            auto* options = static_cast<rac_decision_option_t*>(
+                std::calloc(option_count, sizeof(rac_decision_option_t)));
+            if (!options) {
+                return fail(RAC_ERROR_OUT_OF_MEMORY);
+            }
+            // Duplicate or invalid keys are rejected: the proto probability map
+            // is keyed by them, so duplicates would silently drop an option.
+            std::unordered_map<std::string, bool> seen;
+            for (size_t j = 0; j < option_count; ++j) {
+                const std::string& key = question.options(j).key();
+                if (!key_is_valid(key)) {
+                    std::free(options);
+                    return fail(RAC_ERROR_INVALID_PARAMETER);
+                }
+                if (!seen.emplace(normalize_option_key(key), true).second) {
+                    std::free(options);
+                    return fail(RAC_ERROR_INVALID_PARAMETER);
+                }
+                options[j].key = key.c_str();
                 options[j].description = question.options(j).description().empty()
                                              ? nullptr
                                              : question.options(j).description().c_str();
             }
             view.options = options;
         }
+
+        // CHOICE/SCORE need at least two options for a meaningful distribution
+        // (confidence is pinned to 1.0 below two, and the map min is 2).
+        if ((type == RAC_DECISION_QUESTION_CHOICE || type == RAC_DECISION_QUESTION_SCORE) &&
+            option_count < 2) {
+            std::free(const_cast<rac_decision_option_t*>(view.options));
+            return fail(RAC_ERROR_INVALID_PARAMETER);
+        }
+
         out_questions->push_back(view);
     }
     if (request.has_options()) {
@@ -245,6 +335,39 @@ void free_question_views(std::vector<rac_decision_question_t>* questions) {
     for (auto& question : *questions) {
         std::free(const_cast<rac_decision_option_t*>(question.options));
     }
+}
+
+bool is_blank(const std::string& text) {
+    return std::all_of(text.begin(), text.end(), [](unsigned char c) { return std::isspace(c); });
+}
+
+std::string normalize_option_key(const std::string& key) {
+    size_t begin = 0;
+    size_t end = key.size();
+    while (begin < end && std::isspace(static_cast<unsigned char>(key[begin]))) {
+        ++begin;
+    }
+    while (end > begin && std::isspace(static_cast<unsigned char>(key[end - 1]))) {
+        --end;
+    }
+    std::string normalized = key.substr(begin, end - begin);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return normalized;
+}
+
+bool key_is_valid(const std::string& key) {
+    if (is_blank(key)) {
+        return false;
+    }
+    for (const unsigned char c : key) {
+        if (c <= 0x1F || c == 0x7F) {
+            return false;
+        }
+    }
+    // U+2028 / U+2029 in UTF-8.
+    return key.find("\xe2\x80\xa8") == std::string::npos &&
+           key.find("\xe2\x80\xa9") == std::string::npos;
 }
 
 rac_result_t result_to_proto(const rac_decision_result_t& source,
