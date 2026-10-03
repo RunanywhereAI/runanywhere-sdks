@@ -115,7 +115,9 @@ public extension RunAnywhere {
             promptFormatVersion: UInt32? = nil
         ) async throws -> [DecisionAnswer] {
             try await decideResult(
-                state: state, questions: questions, temperature: temperature,
+                state: state,
+                questions: questions,
+                temperature: temperature,
                 promptFormatVersion: promptFormatVersion
             ).answers
         }
