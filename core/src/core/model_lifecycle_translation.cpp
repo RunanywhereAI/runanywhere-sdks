@@ -239,6 +239,8 @@ rac_model_category_t c_category_from_proto(runanywhere::v1::ModelCategory catego
             return RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
         case runanywhere::v1::MODEL_CATEGORY_OCR:
             return RAC_MODEL_CATEGORY_OCR;
+        case runanywhere::v1::MODEL_CATEGORY_DECISION:
+            return RAC_MODEL_CATEGORY_DECISION;
         case runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED:
         default:
             return RAC_MODEL_CATEGORY_UNKNOWN;

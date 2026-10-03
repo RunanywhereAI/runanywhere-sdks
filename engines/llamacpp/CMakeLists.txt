@@ -423,6 +423,12 @@ else()
         CXX_VISIBILITY_PRESET hidden
     )
     target_compile_definitions(runanywhere_llamacpp PRIVATE RAC_BUILDING_PLUGIN=1)
+    # The carrier compiles rac_plugin_entry_llamacpp.cpp itself, so it needs the
+    # same decision probe result the backend target gets — without it the entry
+    # omits RAC_PRIMITIVE_DECIDE and ships a NULL decision_ops slot.
+    if(RAC_LLAMACPP_HAS_DECISION)
+        target_compile_definitions(runanywhere_llamacpp PRIVATE RAC_LLAMACPP_HAS_DECISION=1)
+    endif()
     target_link_libraries(runanywhere_llamacpp PUBLIC
         rac_backend_llamacpp
         rac_commons

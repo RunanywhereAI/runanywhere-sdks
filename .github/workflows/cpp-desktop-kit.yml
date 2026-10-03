@@ -51,6 +51,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-dispatch:
+    # GitHub reports skipped jobs as successful, so a typo in `only` (e.g.
+    # linux-arm6) would skip every platform job and still show a green run with
+    # no kit built. Fail the run instead of silently building nothing.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.only != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate `only`
+        env:
+          ONLY: ${{ inputs.only }}
+        run: |
+          case "${ONLY}" in
+            macos-arm64|windows-x64|linux-x64|linux-arm64|windows-arm64|macos-arm64-neurt-private|windows-arm64-qhexrt-private) ;;
+            *)
+              echo "error: unknown 'only' value '${ONLY}'" >&2
+              echo "valid: macos-arm64 windows-x64 linux-x64 linux-arm64 windows-arm64 macos-arm64-neurt-private windows-arm64-qhexrt-private" >&2
+              exit 1
+              ;;
+          esac
+
   macos-arm64:
     if: ${{ inputs.only == '' || inputs.only == 'macos-arm64' }}
     runs-on: macos-14
@@ -342,10 +362,12 @@ jobs:
           if-no-files-found: error
 
   attach-release:
-    # always(): a filtered run (inputs.only) skips some build jobs, and a
-    # skipped need must not skip the attach. The upload below only ever sees
-    # the artifacts that were actually built this run.
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.attach_tag != '' }}
+    # !cancelled() (not always()): a filtered run (inputs.only) skips some
+    # build jobs, and a skipped need must not skip the attach — but a canceled
+    # run must not attach either. always() keeps the job alive through
+    # cancellation, and the --clobber upload below would then overwrite release
+    # assets from a canceled run.
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.attach_tag != '' }}
     needs: [macos-arm64, windows-x64, windows-arm64, linux-x64, linux-arm64]
     runs-on: ubuntu-24.04
     permissions:

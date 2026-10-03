@@ -2739,12 +2739,13 @@ private func fillDecisionResult(
 
     if failed {
         // Hand back nothing usable and release whatever was allocated; the
-        // commons caller frees the (now empty) result.
+        // commons caller frees the (now empty) result. free(), not
+        // deinitialize/deallocate: this buffer came from calloc and commons
+        // owns it through free().
         for index in 0..<requestKeys.count {
             free(answersRaw[index].probabilities)
         }
-        answersRaw.deinitialize(count: requestKeys.count)
-        answersRaw.deallocate()
+        free(answersRaw)
         outResult.pointee = rac_decision_result_t()
         return RAC_ERROR_INFERENCE_FAILED
     }

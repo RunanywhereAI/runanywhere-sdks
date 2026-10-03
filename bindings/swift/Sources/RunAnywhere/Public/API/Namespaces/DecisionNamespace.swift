@@ -201,7 +201,15 @@ private extension RunAnywhere.DecisionAnswer {
             noul = nil
             score = value
         case nil:
-            type = .choice
+            // No oneof value: fall back to the answer's own `type` field
+            // rather than assuming CHOICE, which would mislabel a noul/score
+            // answer whose value happens to be zero/empty. The value fields
+            // stay nil for that kind.
+            switch proto.type {
+            case .noul: type = .noul
+            case .score: type = .score
+            default: type = .choice
+            }
             choice = nil
             noul = nil
             score = nil

@@ -58,6 +58,11 @@ extension CppBridge {
 
         private var handle: rac_handle_t?
         private var loadedModelID: String?
+        /// The path the currently-loaded model came from. Tracked with the id
+        /// because the lifecycle can load a different checkpoint under the same
+        /// id (the dev CLIs do exactly that), and the component would otherwise
+        /// keep scoring with the stale weights.
+        private var loadedModelPath: String?
         private let logger = SDKLogger(category: "CppBridge.Decision")
 
         private init() {}
@@ -90,6 +95,7 @@ extension CppBridge {
             guard let handle = handle, let unloadFn = DecisionComponentABI.unload else { return }
             _ = unloadFn(handle)
             loadedModelID = nil
+            loadedModelPath = nil
             logger.info("Decision model unloaded")
         }
 
@@ -101,6 +107,7 @@ extension CppBridge {
             }
             handle = nil
             loadedModelID = nil
+            loadedModelPath = nil
         }
 
         // MARK: - Handle preparation (mirrors Rerank.prepareHandle)
@@ -121,7 +128,7 @@ extension CppBridge {
                 )
             }
             let componentHandle = try getHandle()
-            if loadedModelID == modelID {
+            if loadedModelID == modelID && loadedModelPath == modelPath {
                 return componentHandle
             }
             let loadModel = try NativeProtoABI.require(
@@ -143,6 +150,7 @@ extension CppBridge {
                 )
             }
             loadedModelID = modelID
+            loadedModelPath = modelPath
             logger.info("Decision model loaded: \(modelID)")
             return componentHandle
         }

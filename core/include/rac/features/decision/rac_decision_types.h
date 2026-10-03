@@ -77,8 +77,11 @@ typedef struct rac_decision_answer {
     /** Calibrated confidence in [0, 1]. */
     float confidence;
     /**
-     * SCORE only: malloc-owned descriptions parallel to `probabilities`
-     * (entries may be NULL). NULL when the request carried no descriptions.
+     * SCORE only: descriptions parallel to `probabilities` (entries may be
+     * NULL). NULL when the request carried no descriptions. The array is
+     * malloc-owned and released by rac_decision_result_free; the entries
+     * point into the caller's request (which must outlive the result), so a
+     * backend must NOT allocate them and MUST NOT free them.
      */
     char** legend;
 } rac_decision_answer_t;
