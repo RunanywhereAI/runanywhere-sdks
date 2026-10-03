@@ -35,11 +35,16 @@ let package = Package(
                 .unsafeFlags(
                     [
                         // dlsym-only C ABI symbols are dead-stripped by the static
-                        // linker; pin every entry point the decision path calls.
+                        // linker; pin every entry point the decision and chat
+                        // paths call, or release builds fail "model not loaded".
                         "-Xlinker", "-u",
                         "-Xlinker", "_rac_model_registry_import_proto",
                         "-Xlinker", "-u",
                         "-Xlinker", "_rac_model_lifecycle_load_proto",
+                        "-Xlinker", "-u",
+                        "-Xlinker", "_rac_model_lifecycle_current_model_proto",
+                        "-Xlinker", "-u",
+                        "-Xlinker", "_rac_component_lifecycle_snapshot_proto",
                         "-Xlinker", "-u",
                         "-Xlinker", "_rac_decision_component_create",
                         "-Xlinker", "-u",
