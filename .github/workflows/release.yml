@@ -556,6 +556,91 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  # Linux kit jobs. Linux has no other kit producer in this workflow (the
+  # `native_linux` job above builds the RACommons .so tar, not the kit), so
+  # without these the published release has no Linux kit at all — the dev
+  # cpp-desktop-kit.yml workflow was the only source. Ubuntu 22.04 for both:
+  # 24.04 emits GLIBC_2.38 / GLIBCXX_3.4.31 that does not run on 22.04, and
+  # the kit is supposed to run on the oldest supported distro.
+  native_cpp_desktop_linux_x64:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install build deps
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          # No libprotobuf-dev: Ubuntu's protobuf is below the pinned minimum and
+          # would register a system IMPORTED target before FetchContent can add
+          # its own. Same reasoning as the cpp-desktop-kit workflow.
+          sudo apt-get install -y ninja-build libcurl4-openssl-dev
+      # WITHOUT this, sherpa still BUILDS but as a non-routable stub — same
+      # failure the native_linux job above documents at length.
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/linux/download-sherpa-onnx.sh
+      - name: Configure + package C++ desktop kit
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-linux-x64
+          cmake --build --preset cpp-desktop-linux-x64 --target package-cpp-desktop-tarball \
+            -j "$(nproc)"
+          ls -la dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz
+          tar=$(echo dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --linux --forbid-private-engines
+          (
+            cd dist
+            name="RunAnywhere-cpp-desktop-linux-x64-v$(tr -d '[:space:]' < ../core/VERSION).tar.gz"
+            sha256sum "$name" | tee "$name.sha256"
+          )
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-linux-x64
+          path: |
+            dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_cpp_desktop_linux_arm64:
+    needs: validate
+    if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install build deps
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libcurl4-openssl-dev
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/linux/download-sherpa-onnx.sh
+      - name: Configure + package C++ desktop kit
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-linux-arm64
+          cmake --build --preset cpp-desktop-linux-arm64 --target package-cpp-desktop-tarball \
+            -j "$(nproc)"
+          ls -la dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz
+          tar=$(echo dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --linux --forbid-private-engines
+          (
+            cd dist
+            name="RunAnywhere-cpp-desktop-linux-arm64-v$(tr -d '[:space:]' < ../core/VERSION).tar.gz"
+            sha256sum "$name" | tee "$name.sha256"
+          )
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpp-desktop-linux-arm64
+          path: |
+            dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-linux-arm64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
   native_cpp_desktop_macos_neurt_private:
     needs: validate
     if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
@@ -1964,6 +2049,8 @@ jobs:
       - native_cpp_desktop_macos
       - native_cpp_desktop_windows
       - native_cpp_desktop_windows_arm64
+      - native_cpp_desktop_linux_x64
+      - native_cpp_desktop_linux_arm64
       - native_cpp_desktop_macos_neurt_private
       - native_cpp_desktop_windows_qhexrt_private
       - native_windows
@@ -2014,6 +2101,8 @@ jobs:
         needs.native_cpp_desktop_macos.result == 'success' &&
         needs.native_cpp_desktop_windows.result == 'success' &&
         needs.native_cpp_desktop_windows_arm64.result == 'success' &&
+        needs.native_cpp_desktop_linux_x64.result == 'success' &&
+        needs.native_cpp_desktop_linux_arm64.result == 'success' &&
         needs.native_cpp_desktop_macos_neurt_private.result == 'success' &&
         needs.native_cpp_desktop_windows_qhexrt_private.result == 'success' &&
         (needs.native_web.result == 'success' ||
@@ -2029,6 +2118,8 @@ jobs:
         needs.native_cpp_desktop_macos.result == 'success' &&
         needs.native_cpp_desktop_windows.result == 'success' &&
         needs.native_cpp_desktop_windows_arm64.result == 'success' &&
+        needs.native_cpp_desktop_linux_x64.result == 'success' &&
+        needs.native_cpp_desktop_linux_arm64.result == 'success' &&
         needs.native_cpp_desktop_macos_neurt_private.result == 'success' &&
         needs.native_cpp_desktop_windows_qhexrt_private.result == 'success'
       ))
@@ -2187,6 +2278,8 @@ jobs:
           assert_pair "C++ desktop kit macOS arm64"    "RunAnywhere-cpp-desktop-macos-arm64-v${VERSION}.tar.gz"
           assert_pair "C++ desktop kit Windows x64"    "RunAnywhere-cpp-desktop-windows-x64-v${VERSION}.tar.gz"
           assert_pair "C++ desktop kit Windows arm64"  "RunAnywhere-cpp-desktop-windows-arm64-v${VERSION}.tar.gz"
+          assert_pair "C++ desktop kit Linux x64"      "RunAnywhere-cpp-desktop-linux-x64-v${VERSION}.tar.gz"
+          assert_pair "C++ desktop kit Linux arm64"    "RunAnywhere-cpp-desktop-linux-arm64-v${VERSION}.tar.gz"
           # Official CLI bottles ship from RunanywhereAI/RCLI, not this repo.
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"
           assert_pair "Web proto package"              "runanywhere-proto-ts-${VERSION}.tgz"

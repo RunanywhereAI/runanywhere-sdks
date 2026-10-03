@@ -127,7 +127,16 @@ let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_P
 // fork-local tags ensure every direct and transitive SwiftPM edge resolves the
 // same MLX core instead of silently substituting the public package identity.
 let mlxAudioPackageDependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.5"),
+    // Pinned to the PR head by revision until RunanywhereAI/mlx-audio-swift#1
+    // merges and the repo cuts tag 0.1.6. The fix it carries is mlx-swift-lm
+    // 3.31.8, which the MLX decision work requires and the released 0.1.5
+    // conflicts with. The revision (not a tag) is deliberate: the PR is not
+    // merged, so no tag exists on this repo yet — but a PR head commit is
+    // fetchable from the org repo, so no personal fork enters the manifest.
+    // Migration once merged: swap back to
+    //   .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.6")
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git",
+             revision: "ecc772d3c433d8b7967d423f2ea35995085c4d1c"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -136,7 +145,7 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
 ]
 
 let runAnywhereMLXSwiftVersion: Version = "0.31.8"
-let runAnywhereMLXSwiftLMVersion: Version = "3.31.5"
+let runAnywhereMLXSwiftLMVersion: Version = "3.31.8"
 
 let package = Package(
     name: "runanywhere-sdks",

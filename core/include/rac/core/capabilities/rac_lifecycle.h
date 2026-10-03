@@ -51,7 +51,8 @@ typedef enum rac_resource_type {
     RAC_RESOURCE_TYPE_EMBEDDINGS_MODEL = 7,   /**< Text embedding model */
     RAC_RESOURCE_TYPE_SEGMENTATION_MODEL = 8, /**< Semantic segmentation model */
     RAC_RESOURCE_TYPE_RERANK_MODEL = 9,       /**< Cross-encoder reranking model */
-    RAC_RESOURCE_TYPE_OCR_MODEL = 10          /**< Full-page OCR model */
+    RAC_RESOURCE_TYPE_OCR_MODEL = 10,         /**< Full-page OCR model */
+    RAC_RESOURCE_TYPE_DECISION_MODEL = 11     /**< Joint decision scoring model */
 } rac_resource_type_t;
 
 /**
