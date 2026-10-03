@@ -136,7 +136,7 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
 ]
 
 let runAnywhereMLXSwiftVersion: Version = "0.31.8"
-let runAnywhereMLXSwiftLMVersion: Version = "3.31.5"
+let runAnywhereMLXSwiftLMVersion: Version = "3.31.8"
 
 let package = Package(
     name: "runanywhere-sdks",
