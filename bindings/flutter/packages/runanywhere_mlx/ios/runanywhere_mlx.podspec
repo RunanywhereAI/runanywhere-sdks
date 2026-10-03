@@ -8,10 +8,10 @@
 #
 
 mlx_checksums = {
-  'RABackendMLX' => 'b75b7fa4625ac40f9545469cb136e2d06f6b7948802d18e58554711da0688690',
-  'RunAnywhereMLXRuntime' => 'a9a5bbd9c26b7cc1a3e9eca829896570710dd55292ea7fe8ec19ca650d069b3e',
+  'RABackendMLX' => '701d649be5f3fd50c780a3cd8d0332165f2e8187bbdc82449af4f414d8b0f03f',
+  'RunAnywhereMLXRuntime' => '1698d712ae6597596499763fa77b416403a624bcce237a7067e38fa61b5bdcc4',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
-  'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
+  'RunAnywhereMLXResources' => '034ff535b50f34bf2a24d95a24b9b5ffe7535f30d009ffc876b296abc354e1f7'
 }.freeze
 
 checksum_for = lambda do |name|

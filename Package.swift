@@ -573,22 +573,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "30dd54a32112208d33ae810119b3c851183ba97db5351935cc5fa042c9274a4e"
+                checksum: "c7c2f23f74145b7dd7343b1c6b4962e2c759149167cd4e002e3d18b8b0ef4e02"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "f2bd8fc13a2e2dd077d0185ae75e61fc3a76e81ec321b72f39170d9c60693026"
+                checksum: "50bdbaf629e47be3f89df8deace6d08dde29bfc463a680d230680d449d5b100e"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "7aa05c5ee68f39fef65a776a8b47ec173b029534934c167b1b76ee5a6a28f88f"
+                checksum: "2029d60b907a25943e6155bf458666cbf90d1459fe77e5442813b5fba564545b"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "a3a51aca86d3ef5cff15cb8f4cf0d561611be77e483de74f762fb41d724e0ea5"
+                checksum: "bdf58c660ed88cad47b395fca9109720bdc78df9516613f7191d554066172e48"
             ),
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
             // unconditional dependency on this, so the remote list must carry it.
@@ -598,12 +598,12 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
-                checksum: "f2a850c9b29b0b5cb1d75fb0f737fd2ae76a2cbab2eda6e916a8f71417d97262"
+                checksum: "17d5fa222e0183e420547447f8cc4799d5158988f5bbf4487e2db47f76acdd90"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
-                checksum: "b75b7fa4625ac40f9545469cb136e2d06f6b7948802d18e58554711da0688690"
+                checksum: "701d649be5f3fd50c780a3cd8d0332165f2e8187bbdc82449af4f414d8b0f03f"
             ),
         ]
     }
