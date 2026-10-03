@@ -941,6 +941,9 @@ set(RAC_FEATURES_SOURCES
     # Cross-encoder reranking (query × candidate relevance scoring)
     src/features/rerank/rerank_module.cpp
     src/features/rerank/rac_rerank_service.cpp
+    # Joint decision scoring (state + typed questions -> calibrated answers)
+    src/features/decision/decision_module.cpp
+    src/features/decision/rac_decision_service.cpp
     # TTS
     # W4: unified module — merges tts_component.cpp + TTS slice of
     # rac_nonllm_lifecycle_proto_abi.cpp.
@@ -1462,6 +1465,7 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/segmentation.pb.cc
     ${_RAC_PROTO_GEN_DIR}/ocr.pb.cc
     ${_RAC_PROTO_GEN_DIR}/rerank.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/decision.pb.cc
     ${_RAC_PROTO_GEN_DIR}/tts_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vad_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vlm_options.pb.cc

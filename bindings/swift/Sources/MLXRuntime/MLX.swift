@@ -114,6 +114,7 @@ public enum MLX {
         callbacks.user_data = nil
         callbacks.llm_generate_chat_stream = nil
         callbacks.context_length = mlxContextLength
+        callbacks.decision = mlxDecision
 
         let clearCancelResult = ra_mlx_set_clear_cancel_callback(mlxClearCancellation, nil)
         guard clearCancelResult == RAC_SUCCESS else {
@@ -225,11 +226,15 @@ private enum MLXSessionKind {
     case embeddings
     case stt
     case tts
+    case decision
 }
 
 private struct TransformersTokenizerLoader: TokenizerLoader {
     func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
-        let upstream = try await Tokenizers.AutoTokenizer.from(modelFolder: directory)
+        // Non-strict: unknown tokenizer_class names (e.g. Qwen3_5Tokenizer,
+        // which is plain byte-level BPE described fully by tokenizer.json)
+        // fall back to BPETokenizer instead of throwing unsupportedTokenizer.
+        let upstream = try await Tokenizers.AutoTokenizer.from(modelFolder: directory, strict: false)
         return TransformersTokenizerBridge(upstream)
     }
 }
@@ -753,6 +758,9 @@ private final class MLXSession: @unchecked Sendable {
         var generationContainer: ModelContainer?
         var llmChatCache: LLMChatCache?
         var embedderContainer: EmbedderModelContainer?
+        /// Decision checkpoints are not generation containers: the joint head
+        /// scores every option in one non-autoregressive pass.
+        var decisionModel: ClefDecisionModel?
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         var sttModel: STTGenerationModel?
         var ttsModel: SpeechGenerationModel?
@@ -827,6 +835,12 @@ private final class MLXSession: @unchecked Sendable {
             #else
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
+        case .decision:
+            let decisionModel = try await ClefDecisionModel.load(
+                from: directory,
+                using: tokenizerLoader
+            )
+            modelLock.withLock { $0.decisionModel = decisionModel }
         }
         let modelContextLength = MLXModelConfig.contextLength(inDirectory: directory)
         lock.withLock {
@@ -1021,6 +1035,7 @@ private final class MLXSession: @unchecked Sendable {
             models.generationContainer = nil
             models.llmChatCache = nil
             models.embedderContainer = nil
+            models.decisionModel = nil
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             models.sttModel = nil
             models.ttsModel = nil
@@ -1420,6 +1435,24 @@ private final class MLXSession: @unchecked Sendable {
         return metrics
     }
 
+    /// One joint decision pass over the state and questions. Returns the
+    /// model result plus the encoded prompt size. Answer option ids may be in
+    /// canonical order (choice sorts by key, noul is true-then-false); the
+    /// caller maps them back onto the request's option order.
+    func decide(
+        state: String,
+        questions: [ClefDecisionQuestion],
+        temperature: Float?
+    ) async throws -> (ClefDecisionResult, Int) {
+        guard let decisionModel = modelLock.withLock({ $0.decisionModel }) else {
+            throw MLXRuntimeError.notLoaded(modelID)
+        }
+        if isCancelled { throw CancellationError() }
+        let request = ClefDecisionRequest(state: state, questions: questions)
+        let result = try decisionModel.decide(request, temperature: temperature)
+        return (result, result.inputTokens)
+    }
+
     func embedBatch(
         texts: [String],
         options: MLXEmbeddingOptionsSnapshot
@@ -1703,6 +1736,8 @@ private final class MLXSession: @unchecked Sendable {
             return "STT"
         case .tts:
             return "TTS"
+        case .decision:
+            return "decision"
         }
     }
 
@@ -2350,6 +2385,8 @@ private let mlxCreate: rac_mlx_create_fn = { kind, modelIDPtr, outHandle, _ in
         sessionKind = .stt
     case RAC_MLX_SESSION_KIND_TTS:
         sessionKind = .tts
+    case RAC_MLX_SESSION_KIND_DECISION:
+        sessionKind = .decision
     default:
         sessionKind = .llm
     }
@@ -2581,6 +2618,155 @@ private func fillEmbeddingResult(
         data.initialize(from: vector, count: dimension)
         embeddings[index].data = data
         embeddings[index].dimension = dimension
+    }
+    return RAC_SUCCESS
+}
+
+/// Joint decision scoring callback. Translates the C request into the fork's
+/// decision types, runs one pass, and returns the per-option probabilities
+/// parallel to the request's option order. Canonical-ordering rules (choice
+/// sorted by key, noul true-then-false, score by level index) are applied by
+/// the model; probabilities are re-keyed back onto the request order here.
+private let mlxDecision: rac_mlx_decision_fn = {
+    handle, statePtr, questionsPtr, questionCount, optionsPtr, outResult, _ in
+    guard let session = session(from: handle), let statePtr, let questionsPtr, let outResult else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let state = String(cString: statePtr)
+    let count = Int(questionCount)
+
+    // Snapshot the request C views into owned Swift values up front; the
+    // pointers only stay valid for the duration of this callback.
+    var requestQuestions: [ClefDecisionQuestion] = []
+    requestQuestions.reserveCapacity(count)
+    var requestKeys: [[String]] = []
+    requestKeys.reserveCapacity(count)
+    for index in 0..<count {
+        let question = questionsPtr[index]
+        let optionCount = Int(question.option_count)
+        var options: [ClefDecisionOption] = []
+        options.reserveCapacity(optionCount)
+        var keys: [String] = []
+        keys.reserveCapacity(optionCount)
+        for optionIndex in 0..<optionCount {
+            let option = question.options[optionIndex]
+            let key = option.key.map { String(cString: $0) } ?? ""
+            let description = option.description.map { String(cString: $0) }
+            options.append(ClefDecisionOption(key: key, description: description))
+            keys.append(key)
+        }
+        let id = question.id.map { String(cString: $0) } ?? ""
+        let instructions = question.instructions.map { String(cString: $0) }
+        requestQuestions.append(
+            ClefDecisionQuestion(
+                id: id, kind: decisionKind(from: question.type),
+                instructions: instructions, options: options))
+        requestKeys.append(keys)
+    }
+    let temperature: Float? = optionsPtr.flatMap {
+        $0.pointee.temperature > 0 ? $0.pointee.temperature : nil
+    }
+    // Immutable snapshots for the Sendable closure below.
+    let questions = requestQuestions
+    let keysByQuestion = requestKeys
+    let capturedState = state
+
+    switch syncWait({
+        try await session.decide(
+            state: capturedState, questions: questions, temperature: temperature)
+    }) {
+    case .success(let output):
+        return fillDecisionResult(
+            output.0, requestKeys: keysByQuestion, inputTokens: output.1, outResult: outResult)
+    case .failure(let error):
+        if error is CancellationError {
+            return RAC_ERROR_CANCELLED
+        }
+        recordMLXFailure("MLX decision scoring", error: error)
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+}
+
+/// Maps the C question kind onto the fork's decision kind.
+private func decisionKind(from type: rac_decision_question_type_t) -> ClefQuestionKind {
+    switch type {
+    case RAC_DECISION_QUESTION_NOUL: return .noul
+    case RAC_DECISION_QUESTION_SCORE: return .score
+    default: return .choice
+    }
+}
+
+/// Maps the model's per-question answers onto the C result, reordering
+/// probabilities to the request's option order and validating arity.
+private func fillDecisionResult(
+    _ result: ClefDecisionResult,
+    requestKeys: [[String]],
+    inputTokens: Int,
+    outResult: UnsafeMutablePointer<rac_decision_result_t>
+) -> rac_result_t {
+    guard result.answers.count == requestKeys.count else {
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+
+    // calloc, not UnsafeMutablePointer.allocate: commons releases this array
+    // (and each probabilities array) with free() in rac_decision_result_free.
+    let answersBytes = requestKeys.count * MemoryLayout<rac_decision_answer_t>.stride
+    guard let answersRaw = calloc(1, answersBytes)?
+        .bindMemory(to: rac_decision_answer_t.self, capacity: requestKeys.count) else {
+        return RAC_ERROR_OUT_OF_MEMORY
+    }
+    outResult.pointee.answers = answersRaw
+    outResult.pointee.answer_count = requestKeys.count
+    outResult.pointee.input_tokens = Int32(inputTokens)
+
+    var failed = false
+    for (index, answer) in result.answers.enumerated() {
+        let keys = requestKeys[index]
+        // A shape mismatch or a genuinely missing key is an error rather than a
+        // silent zero, so a backend mapping bug cannot masquerade as a
+        // confident answer.
+        guard keys.count == answer.optionIds.count else {
+            failed = true
+            break
+        }
+        // malloc, not UnsafeMutablePointer.allocate: commons releases this
+        // array with free() in rac_decision_result_free.
+        guard let probabilitiesRaw = malloc(keys.count * MemoryLayout<Float>.stride) else {
+            failed = true
+            break
+        }
+        let probabilities = probabilitiesRaw.bindMemory(to: Float.self, capacity: keys.count)
+        probabilities.initialize(repeating: 0, count: keys.count)
+        var complete = true
+        for (optionIndex, key) in keys.enumerated() {
+            guard let value = answer.probabilities[key] else {
+                complete = false
+                break
+            }
+            probabilities[optionIndex] = value
+        }
+        guard complete else {
+            free(probabilitiesRaw)
+            failed = true
+            break
+        }
+        var cAnswer = answersRaw[index]
+        cAnswer.probabilities = probabilities
+        cAnswer.probability_count = keys.count
+        answersRaw[index] = cAnswer
+    }
+
+    if failed {
+        // Hand back nothing usable and release whatever was allocated; the
+        // commons caller frees the (now empty) result. free(), not
+        // deinitialize/deallocate: this buffer came from calloc and commons
+        // owns it through free().
+        for index in 0..<requestKeys.count {
+            free(answersRaw[index].probabilities)
+        }
+        free(answersRaw)
+        outResult.pointee = rac_decision_result_t()
+        return RAC_ERROR_INFERENCE_FAILED
     }
     return RAC_SUCCESS
 }

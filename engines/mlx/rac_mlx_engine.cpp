@@ -5,9 +5,10 @@
 
 #include "llm_service.pb.h"
 #include "rac_mlx_callbacks_internal.h"
-#include "rac/backends/rac_mlx_chat_bridge.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstdlib>
 #include <cstring>
@@ -20,8 +21,10 @@
 #include <vector>
 
 #include "common/rac_engine_unavailable.h"
+#include "rac/backends/rac_mlx_chat_bridge.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/decision/rac_decision_service.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -646,6 +649,186 @@ rac_result_t llm_create(const char* model_id, const char* /*config_json*/, void*
     return create_session(RAC_MLX_SESSION_KIND_LLM, model_id, out_impl);
 }
 
+// =============================================================================
+// Joint decision scoring
+// =============================================================================
+
+rac_result_t decision_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
+    return create_session(RAC_MLX_SESSION_KIND_DECISION, model_id, out_impl);
+}
+
+rac_result_t decision_initialize(void* impl, const char* model_path) {
+    return mlx_initialize(impl, model_path);
+}
+
+// Spread of the distribution over a uniform one; 0 when flat, 1 when certain.
+float decision_choice_confidence(const std::vector<float>& probabilities) {
+    if (probabilities.size() < 2) {
+        return 1.0f;
+    }
+    const float uniform = 1.0f / static_cast<float>(probabilities.size());
+    const float p_max = *std::max_element(probabilities.begin(), probabilities.end());
+    return std::max(0.0f, (p_max - uniform) / (1.0f - uniform));
+}
+
+// Mean distance to the mode relative to a uniform distribution around its center.
+float decision_score_confidence(const std::vector<float>& probabilities) {
+    if (probabilities.size() < 2) {
+        return 1.0f;
+    }
+    const size_t n = probabilities.size();
+    const size_t mode = static_cast<size_t>(
+        std::max_element(probabilities.begin(), probabilities.end()) - probabilities.begin());
+    double dist = 0.0;
+    double dist_uniform = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+        dist += probabilities[i] * std::fabs(static_cast<double>(i) - static_cast<double>(mode));
+        dist_uniform += std::fabs(static_cast<double>(i) - (n - 1) / 2.0) / n;
+    }
+    if (dist_uniform <= 0.0) {
+        return 1.0f;
+    }
+    return std::max(0.0f, static_cast<float>(1.0 - dist / dist_uniform));
+}
+
+// Fills one answer's kind-specific fields from its per-option probabilities.
+// Mirrors the llamacpp decision op so both engines agree on the wire values.
+void decision_fill_answer(const rac_decision_question_t& question,
+                          const std::vector<float>& probabilities, rac_decision_answer_t& answer) {
+    switch (question.type) {
+        case RAC_DECISION_QUESTION_CHOICE: {
+            const size_t best =
+                static_cast<size_t>(std::max_element(probabilities.begin(), probabilities.end()) -
+                                    probabilities.begin());
+            const char* key =
+                question.options[best].key != nullptr ? question.options[best].key : "";
+            answer.choice = strdup(key);
+            answer.confidence = decision_choice_confidence(probabilities);
+            break;
+        }
+        case RAC_DECISION_QUESTION_NOUL: {
+            // The probability mass on the "true" option; when the request did
+            // not name it, the first option is the affirmative one.
+            size_t true_index = 0;
+            for (size_t j = 0; j < probabilities.size(); ++j) {
+                if (question.options[j].key != nullptr &&
+                    std::strcmp(question.options[j].key, "true") == 0) {
+                    true_index = j;
+                    break;
+                }
+            }
+            answer.noul = probabilities[true_index];
+            answer.confidence = decision_choice_confidence(probabilities);
+            break;
+        }
+        case RAC_DECISION_QUESTION_SCORE: {
+            double expected = 0.0;
+            for (size_t j = 0; j < probabilities.size(); ++j) {
+                expected += static_cast<double>(j) * probabilities[j];
+            }
+            answer.score = static_cast<float>(expected);
+            answer.confidence = decision_score_confidence(probabilities);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+rac_result_t decision_decide(void* impl, const char* state,
+                             const rac_decision_question_t* questions, size_t question_count,
+                             const rac_decision_options_t* options,
+                             rac_decision_result_t* out_result) {
+    if (!state || !questions || !out_result || question_count == 0) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    // The MLX clef port renders the same prompt wording as the llamacpp engine,
+    // so it serves the same contract version. Sourced from the shared constant
+    // until the checkpoint config carries its own.
+    const uint32_t served_prompt_format_version =
+        rac_decision_default_prompt_format_version();
+    if (options != nullptr && options->prompt_format_version != 0 &&
+        served_prompt_format_version != options->prompt_format_version) {
+        RAC_LOG_ERROR(LOG_CAT, "request pins prompt format %u, model serves %u",
+                      options->prompt_format_version, served_prompt_format_version);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    rac_mlx_callbacks_t callbacks = {};
+    if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
+        callbacks.decision == nullptr) {
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    const auto started = std::chrono::steady_clock::now();
+    MlxCancellableOperation operation;
+    const rac_result_t rc = operation.begin(impl);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    const rac_result_t decide_rc =
+        callbacks.decision(operation.swift_handle(), state, questions, question_count, options,
+                           out_result, callbacks.user_data);
+    if (decide_rc != RAC_SUCCESS) {
+        rac_decision_result_free(out_result);
+        return decide_rc;
+    }
+    if (out_result->answers == nullptr || out_result->answer_count != question_count) {
+        rac_decision_result_free(out_result);
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+
+    // The Swift frontend fills the plain per-option probabilities; the shared
+    // answer fields (id / type / choice / noul / score / confidence / legend)
+    // are derived here so MLX and llamacpp cannot drift on the wire contract.
+    for (size_t i = 0; i < question_count; ++i) {
+        const rac_decision_question_t& question = questions[i];
+        rac_decision_answer_t& answer = out_result->answers[i];
+        if (answer.id == nullptr) {
+            answer.id = strdup(question.id != nullptr ? question.id : "");
+        }
+        answer.type = question.type;
+        answer.probability_count = question.option_count;
+        if (question.option_count == 0 || answer.probabilities == nullptr) {
+            continue;
+        }
+        const std::vector<float> probabilities(answer.probabilities,
+                                               answer.probabilities + question.option_count);
+        decision_fill_answer(question, probabilities, answer);
+        if (question.type == RAC_DECISION_QUESTION_SCORE && answer.legend == nullptr) {
+            answer.legend = static_cast<char**>(std::calloc(question.option_count, sizeof(char*)));
+            if (answer.legend != nullptr) {
+                // Entries are borrowed from the request questions, which stay
+                // alive for the whole call; only the array is owned (see
+                // rac_decision_result_free).
+                for (size_t j = 0; j < question.option_count; ++j) {
+                    answer.legend[j] = const_cast<char*>(question.options[j].description);
+                }
+            }
+        }
+        if (question.type == RAC_DECISION_QUESTION_CHOICE && answer.choice == nullptr) {
+            // Out of memory while duplicating the winning key; report the
+            // failure so the caller frees the partial result cleanly.
+            rac_decision_result_free(out_result);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    MlxSession* session = as_session(impl);
+    out_result->model_id = strdup(session != nullptr ? session->model_id.c_str() : "");
+    out_result->processing_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                         std::chrono::steady_clock::now() - started)
+                                         .count();
+    out_result->prompt_format_version = served_prompt_format_version;
+    return RAC_SUCCESS;
+}
+
+const rac_decision_service_ops_t g_mlx_decision_ops = {
+    .initialize = decision_initialize,
+    .decide = decision_decide,
+    .cleanup = mlx_cleanup,
+    .destroy = mlx_destroy,
+    .create = decision_create,
+};
+
 rac_result_t vlm_initialize(void* impl, const char* model_path, const char* mmproj_path) {
     (void)mmproj_path;
     return mlx_initialize(impl, model_path);
@@ -1138,7 +1321,7 @@ static const uint32_t k_mlx_formats[] = {
 
 static const rac_primitive_t k_mlx_primitives[] = {
     RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_TRANSCRIBE, RAC_PRIMITIVE_SYNTHESIZE,
-    RAC_PRIMITIVE_EMBED,         RAC_PRIMITIVE_VLM,
+    RAC_PRIMITIVE_EMBED,         RAC_PRIMITIVE_VLM,        RAC_PRIMITIVE_DECIDE,
 };
 
 static const rac_engine_manifest_t k_mlx_manifest = {
@@ -1175,11 +1358,12 @@ static const rac_engine_vtable_t g_mlx_engine_vtable = {
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
 
-    /* reserved_slot_2..9 */
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+    /* rerank_ops       */ nullptr,
+    /* image_embedding_ops */ nullptr,
+    /* ocr_ops          */ nullptr,
+    /* decision_ops     */ &g_mlx_decision_ops,
+
+    /* reserved_slot_6..9 */
     nullptr,
     nullptr,
     nullptr,

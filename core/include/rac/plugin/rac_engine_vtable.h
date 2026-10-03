@@ -200,7 +200,10 @@ typedef struct rac_engine_vtable {
     /** OCR (`RAC_PRIMITIVE_OCR`). Promoted from reserved_slot_4 in ABI v11 — same binary
      *  offset, so the 17-pointer tail is unchanged and only the ABI version gates it. */
     const struct rac_ocr_service_ops* ocr_ops;
-    const void* reserved_slot_5;
+
+    /** Joint decision scoring (`RAC_PRIMITIVE_DECIDE`). Promoted from reserved_slot_5 in
+     *  ABI v13 — same binary offset, so the 17-pointer tail is unchanged. */
+    const struct rac_decision_service_ops* decision_ops;
     const void* reserved_slot_6;
     const void* reserved_slot_7;
     const void* reserved_slot_8;
@@ -246,7 +249,8 @@ typedef struct rac_engine_vtable {
     X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")    \
     X(RAC_PRIMITIVE_RERANK, rerank_ops, "rerank")           \
     X(RAC_PRIMITIVE_EMBED_IMAGE, image_embedding_ops, "embed_image") \
-    X(RAC_PRIMITIVE_OCR, ocr_ops, "ocr")
+    X(RAC_PRIMITIVE_OCR, ocr_ops, "ocr") \
+    X(RAC_PRIMITIVE_DECIDE, decision_ops, "decide")
 
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by
