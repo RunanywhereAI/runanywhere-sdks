@@ -1,0 +1,140 @@
+// RunAnywhere IDL - decision-model types (choice / noul / score, single pass).
+//
+// A decision model consumes a free-form state (text or JSON) plus a set of typed
+// questions, and returns a probability distribution over each question's fixed
+// answers. It does not generate text: the joint head scores every option in one
+// forward pass, so a response carries calibrated probabilities, not tokens.
+//
+// Wire types only: a request (state + repeated questions + options) and a result
+// (repeated answers). There is no service block - model lifecycle is the C ABI
+// (rac_decision_component_create / load_model / unload / destroy), and scoring
+// crosses the boundary as proto bytes via
+// rac_decision_component_decide_proto.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "rac_options.proto";
+import "token_usage.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "DecisionProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// The kind of answer a question expects. The kind selects both the shape of the
+// answer and the calibration formula used for its confidence.
+enum DecisionQuestionType {
+    DECISION_QUESTION_TYPE_UNSPECIFIED = 0;
+
+    // Pick one of the listed options. The answer carries the winning key plus
+    // per-option probabilities.
+    DECISION_QUESTION_TYPE_CHOICE      = 1;
+
+    // Yes / no / unknown over the listed options. The answer carries the
+    // probability of the "true" option.
+    DECISION_QUESTION_TYPE_NOUL        = 2;
+
+    // A level on an ordered scale. The answer carries the expected level index
+    // (0..n-1) plus per-level probabilities and their descriptions.
+    DECISION_QUESTION_TYPE_SCORE       = 3;
+}
+
+// One candidate answer for a question.
+message DecisionOption {
+    // Stable identifier echoed back in the answer. For CHOICE this is the
+    // option's semantic key ("billing", "technical"); for NOUL the conventional
+    // keys are "true" / "false" / "unknown"; for SCORE the key is the level.
+    string key = 1;
+
+    // Human-readable text for this option, read by the model as the option's
+    // description.
+    string description = 2;
+}
+
+message DecisionQuestion {
+    // Identifier echoed back on the matching answer.
+    string id = 1;
+
+    DecisionQuestionType type = 2 [(runanywhere.v1.rac_required) = true];
+
+    // Instructions for this question, read by the model alongside the options.
+    string instructions = 3;
+
+    // The candidate answers. At least two are required for CHOICE and NOUL;
+    // SCORE levels are ordered from lowest to highest.
+    repeated DecisionOption options = 4;
+}
+
+message DecisionOptions {
+    // Per-request override of the model's calibration temperature. 0 = use the
+    // model's own per-type temperature.
+    float temperature = 1 [
+        (runanywhere.v1.rac_default) = "0",
+        (runanywhere.v1.rac_min_float) = 0.0
+    ];
+}
+
+message DecisionRequest {
+    // Free-form state to decide over: a text document or a stringified JSON
+    // object. Kept a string so a structured payload needs no schema change.
+    string state = 1 [(runanywhere.v1.rac_required) = true];
+
+    // The questions to answer about `state`, evaluated jointly.
+    repeated DecisionQuestion questions = 2;
+
+    optional DecisionOptions options = 3;
+
+    // Registry id of the decision model to score with. Unset = whatever model is
+    // already resident under the decision component.
+    optional string model_id = 4;
+}
+
+message DecisionAnswer {
+    // Id of the question this answers.
+    string id = 1;
+
+    DecisionQuestionType type = 2;
+
+    oneof answer {
+        // CHOICE: the key of the highest-probability option.
+        string choice = 3;
+
+        // NOUL: probability of the "true" option, in [0, 1].
+        float noul = 4;
+
+        // SCORE: expected level index over the ordered options.
+        float score = 5;
+    }
+
+    // Probability of each option, keyed by DecisionOption.key. For CHOICE this
+    // sums to 1 across the options; for SCORE the keys are the level indices.
+    map<string, float> probabilities = 6;
+
+    // Calibrated confidence of this answer, in [0, 1]. 1.0 when the model
+    // reports no calibration for the question type.
+    float confidence = 7;
+
+    // SCORE only: option key -> description, so the caller can label the
+    // expected level without re-sending the request.
+    map<string, string> legend = 8;
+}
+
+message DecisionResult {
+    // One answer per request question, in request order.
+    repeated DecisionAnswer answers = 1;
+
+    // Wall time of the decision, measured by commons across the engine call.
+    int64 processing_time_ms = 2;
+
+    string model_id = 3;
+
+    // The decision pass has no output tokens; input_tokens counts the tokens of
+    // the jointly-evaluated prompt.
+    TokenUsage usage = 4;
+}

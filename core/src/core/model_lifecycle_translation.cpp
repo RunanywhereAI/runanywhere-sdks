@@ -89,6 +89,8 @@ runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCateg
             return runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION;
         case runanywhere::v1::MODEL_CATEGORY_OCR:
             return runanywhere::v1::SDK_COMPONENT_OCR;
+        case runanywhere::v1::MODEL_CATEGORY_DECISION:
+            return runanywhere::v1::SDK_COMPONENT_DECISION;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -204,6 +206,8 @@ rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component)
             return RAC_PRIMITIVE_OCR;
         case runanywhere::v1::SDK_COMPONENT_RERANK:
             return RAC_PRIMITIVE_RERANK;
+        case runanywhere::v1::SDK_COMPONENT_DECISION:
+            return RAC_PRIMITIVE_DECIDE;
         default:
             return RAC_PRIMITIVE_UNSPECIFIED;
     }

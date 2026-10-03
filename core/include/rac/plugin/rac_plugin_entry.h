@@ -108,8 +108,12 @@ extern "C" {
  *   12u — added structured LLM chat streaming through
  *                 `rac_llm_service_ops_t::generate_chat_stream`; added cached
  *                 prompt accounting to `rac_llm_token_counts_t`.
+ *   13u — promoted reserved primitive wire/slot 14 to joint decision scoring
+ *                 (`RAC_PRIMITIVE_DECIDE` / `decision_ops`, renamed from
+ *                 reserved_slot_5 at the same binary offset). Engines compiled
+ *                 against v12 are rejected until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 12u
+#define RAC_PLUGIN_API_VERSION 13u
 
 /* ===========================================================================
  * Plugin entry-point signature
