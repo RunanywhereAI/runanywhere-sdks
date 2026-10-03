@@ -325,6 +325,7 @@ public enum CppBridge {
         await TTS.shared.destroy()
         await VAD.shared.destroy()
         await Diarization.shared.destroy()
+        await Decision.shared.destroy()
         await VoiceAgent.shared.destroy()
 
         await MainActor.run {
