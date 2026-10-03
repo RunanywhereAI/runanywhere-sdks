@@ -23,6 +23,7 @@
 #include <mutex>
 
 #include "rac/core/rac_error.h"
+#include "rac/features/decision/rac_decision_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/rerank/rac_rerank_service.h"

@@ -37,7 +37,7 @@ enum Catalog {
             framework: "llamacpp",
             category: "decision",
             url: "https://huggingface.co/ggml-org/Clef-Flash-GGUF/resolve/main/Clef-Flash-Q4_K_M.gguf",
-            repo: nil, revision: nil, file: nil,
+            repo: "ggml-org/Clef-Flash-GGUF", revision: nil, file: "Clef-Flash-Q4_K_M.gguf",
             sizeBytes: 6_486_448_192
         ),
         // ---- decision models (MLX) ----

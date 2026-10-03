@@ -249,7 +249,7 @@ SHERPA_ONNX_COMMIT_WEB=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 # Maple is CPU-only until its ternary expert mul_mm_id kernels exist on GPU;
 # the engine enforces that after reading general.architecture from the GGUF.
 # See the fork's RUNANYWHERE.md before rebasing.
-LLAMACPP_VERSION=runanywhere-b10453.4
+LLAMACPP_VERSION=runanywhere-b10453.6
 # Repository the llama.cpp FetchContent clones. Consumed by
 # engines/llamacpp/CMakeLists.txt via LoadVersions (RAC_LLAMACPP_GIT_REPOSITORY).
 LLAMACPP_GIT_REPOSITORY=https://github.com/RunanywhereAI/llama.cpp.git

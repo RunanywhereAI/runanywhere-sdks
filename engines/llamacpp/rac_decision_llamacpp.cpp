@@ -379,7 +379,10 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
                 ok = false;
                 break;
             }
-            raw[j] = embedding[0];
+            // The joint head returns one score per rendered option, in the
+            // model's canonical order; place it on the request option index.
+            raw[static_cast<size_t>(prompt.option_request_index[option_cursor + j])] =
+                embedding[0];
         }
         option_cursor += question.option_count;
         if (!ok) {
