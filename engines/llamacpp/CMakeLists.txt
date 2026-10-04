@@ -186,10 +186,9 @@ elseif(RAC_PLATFORM_WINDOWS)
     set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
     set(GGML_RPC OFF CACHE BOOL "" FORCE)
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
-    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
-    # No SVE on Windows ARM: Snapdragon has none, and an SVE probe in
+    # SVE stays OFF on Windows ARM too: Snapdragon has none, and an SVE probe in
     # ggml_cpu_init would SIGILL there (seen on Linux ARM64). NEON is the
-    # portable baseline; GGML_NATIVE below only gates the NEON probe.
+    # portable baseline; GGML_NATIVE below only gates the NEON probe, not SVE.
     set(GGML_SVE OFF CACHE BOOL "" FORCE)
     # MSVC targeting ARM has no -mcpu/-march: ggml (upstream #28362) selects
     # NEON features by probing the host at configure time, and that probe only
@@ -220,23 +219,21 @@ elseif(RAC_PLATFORM_WINDOWS)
         message(STATUS "Configuring llama.cpp for Windows (no CUDA; Vulkan=${GGML_VULKAN})")
     endif()
 
-    # ggml's MSVC ARM backend is an explicit FATAL_ERROR ("use clang").
-    # Windows-on-ARM hosts still report CMAKE_SYSTEM_PROCESSOR=ARM64 even
-    # when vcvarsall amd64 has selected Hostx64/x64/cl.exe, which is how
-    # the cpp-desktop-windows-x64 kit is built on Snapdragon boxes under
-    # Prism. Force AMD64 so ggml takes the AVX path, not ARM.
-    if(MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64")
-        if(CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
-           OR CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$"
-           OR CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
-            set(CMAKE_SYSTEM_PROCESSOR AMD64)
-            message(STATUS "llama.cpp: x64 MSVC on ARM host — CMAKE_SYSTEM_PROCESSOR=AMD64")
-        else()
-            message(FATAL_ERROR
-                "llama.cpp cannot be built with MSVC targeting ARM. "
-                "Use vcvarsall amd64 (x64 kit under Prism) or clang, "
-                "or set RAC_BACKEND_LLAMACPP=OFF.")
-        endif()
+    # An ARM64 host can build two different targets:
+    #   * the x64 kit under Prism — vcvarsall amd64 selects Hostx64/x64/cl.exe
+    #     while CMAKE_SYSTEM_PROCESSOR still reports ARM64. Force AMD64 so ggml
+    #     takes the AVX path, not ARM.
+    #   * the native ARM64 kit — an ARM64 compiler on an ARM64 host. ggml used
+    #     to FATAL_ERROR on this ("MSVC is not supported for ARM, use clang");
+    #     the fork now carries upstream #28362 (0c6a6a7c), which probes the
+    #     host for NEON features instead of requiring -mcpu. Nothing to force;
+    #     GGML_NATIVE=ON (set above) drives the probe.
+    if(MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64"
+       AND (CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
+            OR CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$"
+            OR CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64"))
+        set(CMAKE_SYSTEM_PROCESSOR AMD64)
+        message(STATUS "llama.cpp: x64 MSVC on ARM host — CMAKE_SYSTEM_PROCESSOR=AMD64")
     endif()
 endif()
 
