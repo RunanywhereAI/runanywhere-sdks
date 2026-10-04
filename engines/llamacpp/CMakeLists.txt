@@ -157,6 +157,10 @@ elseif(RAC_PLATFORM_LINUX)
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for Linux aarch64")
     endif()
+    # SVE stays OFF: ggml's SVE probe (cntb in ggml_cpu_init) faults with
+    # SIGILL on non-SVE cores (Apple Silicon VMs, Pi, older Graviton), and
+    # the kit must run on all of them. NEON above is the portable baseline.
+    set(GGML_SVE OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_WINDOWS)
     # Windows: Vulkan is the default GPU backend (AMD / Intel / NVIDIA) and
     # degrades to CPU when the SDK is absent. CUDA remains a separate opt-in
@@ -171,6 +175,10 @@ elseif(RAC_PLATFORM_WINDOWS)
     set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
     set(GGML_RPC OFF CACHE BOOL "" FORCE)
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    # No SVE on Windows ARM: Snapdragon has none, and an SVE probe in
+    # ggml_cpu_init would SIGILL there (seen on Linux ARM64). NEON is the
+    # portable baseline; GGML_NATIVE below only gates the NEON probe.
+    set(GGML_SVE OFF CACHE BOOL "" FORCE)
     # MSVC targeting ARM has no -mcpu/-march: ggml (upstream #28362) selects
     # NEON features by probing the host at configure time, and that probe only
     # runs when GGML_NATIVE is ON — with it OFF ggml FATAL_ERRORs ("MSVC on ARM
