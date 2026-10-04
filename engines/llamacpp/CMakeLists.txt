@@ -157,6 +157,10 @@ elseif(RAC_PLATFORM_LINUX)
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for Linux aarch64")
     endif()
+    # SVE stays OFF: ggml's SVE probe (cntb in ggml_cpu_init) faults with
+    # SIGILL on non-SVE cores (Apple Silicon VMs, Pi, older Graviton), and
+    # the kit must run on all of them. NEON above is the portable baseline.
+    set(GGML_SVE OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_WINDOWS)
     # Windows: Vulkan is the default GPU backend (AMD / Intel / NVIDIA) and
     # degrades to CPU when the SDK is absent. CUDA remains a separate opt-in
@@ -172,6 +176,28 @@ elseif(RAC_PLATFORM_WINDOWS)
     set(GGML_RPC OFF CACHE BOOL "" FORCE)
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    # No SVE on Windows ARM: Snapdragon has none, and an SVE probe in
+    # ggml_cpu_init would SIGILL there (seen on Linux ARM64). NEON is the
+    # portable baseline; GGML_NATIVE below only gates the NEON probe.
+    set(GGML_SVE OFF CACHE BOOL "" FORCE)
+    # MSVC targeting ARM has no -mcpu/-march: ggml (upstream #28362) selects
+    # NEON features by probing the host at configure time, and that probe only
+    # runs when GGML_NATIVE is ON — with it OFF ggml FATAL_ERRORs ("MSVC on ARM
+    # requires GGML_NATIVE=ON"). The probe executes ARM binaries, which is only
+    # valid for a native target; x64-on-ARM (Prism) and x64-on-x64 stay OFF.
+    # Detected from the compiler's target, not the host: CMAKE_SYSTEM_PROCESSOR
+    # is ARM64 even for the x64 kit built on a Snapdragon box.
+    if(MSVC
+       AND (CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64"
+            OR (NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID
+                AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64|aarch64"
+                AND NOT CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
+                AND NOT CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$")))
+        set(GGML_NATIVE ON CACHE BOOL "" FORCE)
+        message(STATUS "llama.cpp: native ARM64 MSVC — GGML_NATIVE=ON for the NEON probe")
+    else()
+        set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    endif()
     if(RAC_GPU_CUDA)
         set(GGML_CUDA ON CACHE BOOL "" FORCE)
         if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
