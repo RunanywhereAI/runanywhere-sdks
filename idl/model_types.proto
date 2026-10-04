@@ -114,6 +114,7 @@ enum ModelCategory {
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION    = 11 [(runanywhere.v1.rac_wire_string) = "semantic-segmentation"];
     MODEL_CATEGORY_RERANK                   = 12 [(runanywhere.v1.rac_wire_string) = "rerank"];
     MODEL_CATEGORY_OCR                      = 13 [(runanywhere.v1.rac_wire_string) = "ocr"];
+    MODEL_CATEGORY_DECISION                 = 14 [(runanywhere.v1.rac_wire_string) = "decision"];
 }
 
 // ---------------------------------------------------------------------------
