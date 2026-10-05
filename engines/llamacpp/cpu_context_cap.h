@@ -12,6 +12,20 @@
 #include <string>
 
 #if defined(_WIN32)
+// windows.h (MSVC's shim, not a raw SDK header) bootstraps the architecture
+// macros (_AMD64_ etc.) before it reaches winnt.h, so it is safe to include
+// even as the first Windows header in a TU.  sysinfoapi.h is a raw SDK UM
+// header that relies on those macros already being set — it hits the
+// winnt.h "No Target Architecture" guard on MSVC x64 when nothing upstream
+// has loaded vcruntime.h yet.  NOMINMAX prevents windows.h from defining
+// min/max macros that would break std::min/std::max in the including TU.
+// WIN32_LEAN_AND_MEAN drops winsock/rpc/mmsystem extras we do not need.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #elif defined(__APPLE__)
 #include <sys/sysctl.h>
