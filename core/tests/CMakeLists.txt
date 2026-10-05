@@ -134,6 +134,19 @@ rac_link_archive_deps(test_log_redact)
 target_compile_features(test_log_redact PRIVATE cxx_std_17)
 add_test(NAME log_redact_tests COMMAND test_log_redact --run-all)
 
+# CPU-only llamacpp context ceiling: pure tier mapping in
+# engines/llamacpp/cpu_context_cap.h, no backend linkage needed.
+add_executable(test_cpu_context_cap test_cpu_context_cap.cpp)
+target_include_directories(test_cpu_context_cap PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/engines/llamacpp
+)
+target_link_libraries(test_cpu_context_cap PRIVATE rac_commons)
+rac_link_archive_deps(test_cpu_context_cap)
+target_compile_features(test_cpu_context_cap PRIVATE cxx_std_17)
+add_test(NAME cpu_context_cap_tests COMMAND test_cpu_context_cap --run-all)
+
 # CUA (computer-use-agent) scaffold: profile prompt + tool_call parse + coord
 # scale. Pure-C++ helper, no backend dependency.
 add_executable(test_cua test_cua.cpp)
