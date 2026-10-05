@@ -1,5 +1,6 @@
 #include "llamacpp_backend.h"
 
+#include "cpu_context_cap.h"
 #include "common.h"
 #include "llamacpp_logging.h"
 // llama.cpp b9180 puts the model-memory fitting helper + status enum in a
@@ -557,8 +558,13 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
                      *user_gpu_layers);
     }
     model_params.n_gpu_layers = 0;
-    if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > 4096) {
-        ctx_params.n_ctx = 4096;
+    // CPU-only has no VRAM to fit against, so common_fit_params' n_ctx is a
+    // GPU-memory answer to a host-memory question. Re-cap it here against
+    // host RAM instead of dropping to a hardcoded 4096 that starves the
+    // harness (which needs >=16384).
+    const uint32_t ram_cap = runanywhere::cpu_ram_context_cap();
+    if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > ram_cap) {
+        ctx_params.n_ctx = ram_cap;
         RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only: capping context to %u", ctx_params.n_ctx);
     }
 #else
