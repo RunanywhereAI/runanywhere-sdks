@@ -12,7 +12,9 @@
 #include <string>
 
 #if defined(_WIN32)
-#include <windows.h>
+// sysinfoapi.h, not windows.h: it declares GlobalMemoryStatusEx without the
+// min/max macros that break std::min/std::max throughout the including TU.
+#include <sysinfoapi.h>
 #elif defined(__APPLE__)
 #include <sys/sysctl.h>
 #endif
