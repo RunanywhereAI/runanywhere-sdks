@@ -143,8 +143,11 @@ const protoAvailabilityByModule = new WeakMap<ModelRegistryModule, ModelRegistry
 const knownModules = new Set<ModelRegistryModule>();
 
 export interface RefreshOptions {
+  /** Merge a remote catalog; off by default. */
   includeRemoteCatalog?: boolean;
+  /** Rescan managed model files; on by default. */
   rescanLocal?: boolean;
+  /** Clear downloaded state for missing files; off by default. */
   pruneOrphans?: boolean;
 }
 
@@ -272,11 +275,11 @@ export class ModelRegistryAdapter {
 
     const reqBytes = ProtoModelRegistryRefreshRequestCodec.encode({
       includeRemoteCatalog: options.includeRemoteCatalog ?? false,
-      rescanLocal: options.rescanLocal ?? false,
+      rescanLocal: options.rescanLocal ?? true,
       pruneOrphans: options.pruneOrphans ?? false,
       catalogUri: '',
       forceRefresh: false,
-      includeDownloadedState: options.rescanLocal ?? false,
+      includeDownloadedState: true,
     }).finish();
 
     try {

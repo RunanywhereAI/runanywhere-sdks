@@ -134,10 +134,14 @@ for event in ra.models.download("smollm2-360m"):
     if event.kind == DownloadEventKind.PROGRESS:
         print(f"{event.percent}%")
 
+ra.models.refresh()                   # reconcile the native registry with local model files
 ra.models.list(ModelFilter(downloaded=True))
 ra.models.load("smollm2-360m")      # pay the load cost now instead of on first generate
 ra.models.state()                   # what is resident + disk used/free
 ```
+
+`models.refresh()` is best-effort and returns `None`; it is a no-op before initialization.
+Install `runanywhere[rag]` to enable its protobuf-backed native registry bridge.
 
 ## Local OpenAI-compatible server
 

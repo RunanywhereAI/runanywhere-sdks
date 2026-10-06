@@ -146,7 +146,7 @@ export interface RefreshOptions {
   includeRemoteCatalog?: boolean;
   /** Rescan the model store for artifacts on disk. On by default. */
   rescanLocal?: boolean;
-  /** Clear downloaded state for rows whose files are gone. On by default. */
+  /** Clear downloaded state for rows whose files are gone. Off by default. */
   pruneOrphans?: boolean;
 }
 
@@ -190,7 +190,7 @@ export interface ModelsNamespace {
    * vanished outside the SDK, and clear the downloaded flag on rows whose files
    * are gone.
    */
-  refresh(options?: RefreshOptions): Promise<ModelInfo[]>;
+  refresh(options?: RefreshOptions): Promise<void>;
   /**
    * Fetch a model, reporting progress and completion in one stream.
    *
@@ -561,16 +561,24 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     },
 
     async refresh(options = {}) {
-      const result = await abi.refresh({
-        includeRemoteCatalog: options.includeRemoteCatalog ?? false,
-        rescanLocal: options.rescanLocal ?? true,
-        pruneOrphans: options.pruneOrphans ?? true,
-        catalogUri: '',
-        forceRefresh: false,
-        includeDownloadedState: true,
-      });
-      if (result.error) throw SDKException.fromProto(result.error);
-      return (result.models?.models ?? []).map(toPublicModelInfo);
+      try {
+        const result = await abi.refresh({
+          includeRemoteCatalog: options.includeRemoteCatalog ?? false,
+          rescanLocal: options.rescanLocal ?? true,
+          pruneOrphans: options.pruneOrphans ?? false,
+          catalogUri: '',
+          forceRefresh: false,
+          includeDownloadedState: true,
+        });
+        if (result.error) {
+          console.warn(`[runanywhere] models.refresh failed: ${result.error.message}`);
+        }
+      } catch (error: unknown) {
+        console.warn(
+          '[runanywhere] models.refresh failed:',
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     },
 
     download(id) {
