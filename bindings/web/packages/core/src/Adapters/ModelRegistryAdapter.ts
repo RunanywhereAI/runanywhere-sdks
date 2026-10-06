@@ -539,26 +539,33 @@ export class ModelRegistryAdapter {
    */
   private registerDirect(model: ProtoModelInfo): boolean {
     if (!this.ensureProtoExports('registerDirect')) return false;
-    const handle = this.getRegistryHandle('registerDirect');
-    if (!handle) return false;
-    const existing = this.get(model.id);
-    const preservedStatus = existing?.registryStatus;
-    const mergedModel = existing
-      ? {
-          ...model,
-          localPath: existing.localPath || model.localPath,
-          checksumSha256: existing.checksumSha256 ?? model.checksumSha256,
-          registryStatus: preservedStatus !== undefined
-            && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED
-            && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED
-            ? preservedStatus
-            : model.registryStatus ?? preservedStatus,
-          isAvailable: existing.isAvailable ?? model.isAvailable,
-          lastUsedAtUnixMs: existing.lastUsedAtUnixMs ?? model.lastUsedAtUnixMs,
-        }
-      : model;
-    const bytes = ProtoModelInfoCodec.encode(mergedModel).finish();
     try {
+      const handle = this.getRegistryHandle('registerDirect');
+      if (!handle) return false;
+
+      const existing = this.get(model.id);
+      const preservedStatus = existing?.registryStatus;
+      const hasLocalDownloadState = preservedStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+        || preservedStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
+      const mergedModel = existing
+        ? {
+            ...model,
+            localPath: existing.localPath || model.localPath,
+            checksumSha256: hasLocalDownloadState
+              ? existing.checksumSha256 ?? model.checksumSha256
+              : model.checksumSha256 ?? existing.checksumSha256,
+            registryStatus: preservedStatus !== undefined
+              && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED
+              && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED
+              ? preservedStatus
+              : model.registryStatus ?? preservedStatus,
+            isAvailable: hasLocalDownloadState
+              ? existing.isAvailable ?? model.isAvailable
+              : model.isAvailable ?? existing.isAvailable,
+            lastUsedAtUnixMs: existing.lastUsedAtUnixMs ?? model.lastUsedAtUnixMs,
+          }
+        : model;
+      const bytes = ProtoModelInfoCodec.encode(mergedModel).finish();
       const result = this.withHeapBytesOnModule(this.module, bytes, (bytesPtr, bytesLen) => (
         this.module._rac_model_registry_register_proto!(handle, bytesPtr, bytesLen)
       ));

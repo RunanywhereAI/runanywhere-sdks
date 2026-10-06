@@ -236,4 +236,48 @@ describe('ModelRegistryAdapter refresh', () => {
     expect(synced.registryStatus).toBe(ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED);
     expect(synced.isAvailable).toBe(true);
   });
+
+  it('prefers refreshed catalog metadata when a sibling row is only registered', () => {
+    const commons = createRegistryModule(101);
+    const llama = createRegistryModule(202);
+    ModelRegistryAdapter.setDefaultModule(commons.module);
+    ModelRegistryAdapter.setDefaultModule(llama.module);
+
+    llama.setListModels([ModelInfoCodec.fromPartial({
+      id: 'catalog-model',
+      name: 'Current catalog row',
+      checksumSha256: 'current-digest',
+      isAvailable: true,
+    })]);
+    commons.setExistingModel(ModelInfoCodec.fromPartial({
+      id: 'catalog-model',
+      name: 'Stale sibling row',
+      checksumSha256: 'old-digest',
+      registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED,
+      isAvailable: false,
+    }));
+
+    const registry = ModelRegistryAdapter.tryDefault();
+    expect(registry).not.toBeNull();
+    expect(registry!.refresh({ includeRemoteCatalog: true, rescanLocal: false })).toBe(true);
+
+    const synced = ModelInfoCodec.decode(commons.registerRequests[0]);
+    expect(synced.checksumSha256).toBe('current-digest');
+    expect(synced.isAvailable).toBe(true);
+  });
+
+  it('contains sibling lookup failures during remote catalog replay', () => {
+    const commons = createRegistryModule(101);
+    const llama = createRegistryModule(202);
+    ModelRegistryAdapter.setDefaultModule(commons.module);
+    ModelRegistryAdapter.setDefaultModule(llama.module);
+    llama.setListModels([ModelInfoCodec.fromPartial({ id: 'catalog-model' })]);
+    commons.module._rac_model_registry_get_proto = () => {
+      throw new Error('sibling registry lookup failed');
+    };
+
+    const registry = ModelRegistryAdapter.tryDefault();
+    expect(registry).not.toBeNull();
+    expect(registry!.refresh({ includeRemoteCatalog: true, rescanLocal: false })).toBe(false);
+  });
 });
