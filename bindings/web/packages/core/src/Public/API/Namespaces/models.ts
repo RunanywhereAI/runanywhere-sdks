@@ -17,6 +17,7 @@ import { SDKException } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { Runtime } from '../../../Foundation/RuntimeConfig.js';
 import { ModelRegistry } from '../../Extensions/RunAnywhere+ModelRegistry.js';
+import type { RefreshOptions } from '../../../Adapters/ModelRegistryAdapter.js';
 import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
 import {
   registerModelArchive,
@@ -38,6 +39,8 @@ import {
 
 const BYTES_PER_GIB = 1024 * 1024 * 1024;
 const modelsLogger = new SDKLogger('models');
+
+export type { RefreshOptions } from '../../../Adapters/ModelRegistryAdapter.js';
 
 interface CompatibilityModule extends EmscriptenRunanywhereModule {
   _rac_model_compatibility_check_proto?(
@@ -188,6 +191,23 @@ function toLoadedModel(
 
 /** The model catalog and everything that governs residency. */
 export const models = {
+  /**
+   * Reconcile the native registry with model files on disk. Failures are logged and
+   * contained, matching the other SDKs. Before initialization this is a no-op.
+   */
+  async refresh(options: RefreshOptions = {}): Promise<void> {
+    if (!SDKCore.isInitialized) return;
+    try {
+      if (!ModelRegistry.refresh(options)) {
+        modelsLogger.warning('Model registry refresh failed');
+      }
+    } catch (error: unknown) {
+      modelsLogger.warning(
+        `Model registry refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+
   /**
    * List catalog entries, optionally narrowed by a filter.
    *

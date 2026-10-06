@@ -26,6 +26,7 @@ __all__ = [
     "Interruption",
     "LlmOptions",
     "LoadOptions",
+    "ModelRefreshOptions",
     "PoolingMode",
     "RagConfig",
     "RagQueryOptions",
@@ -174,6 +175,19 @@ class VadOptions:
     min_silence_ms: int = 300
     prefix_padding_ms: int = 0
     model: Optional[str] = None
+
+
+@dataclass
+class ModelRefreshOptions:
+    """Controls reconciliation of the native model registry.
+
+    The current native refresh API reports orphan pruning as unsupported; setting
+    ``prune_orphans`` to ``True`` does not clear missing-file rows.
+    """
+
+    rescan_local: bool = True
+    include_remote_catalog: bool = False
+    prune_orphans: bool = False
 
 
 class PoolingMode(IntEnum):

@@ -72,6 +72,17 @@ await RunAnywhere.speak('This audio was synthesized locally.');
 
 The same facade provides batch and streaming STT, TTS synthesis/playback, VAD, Voice Agent orchestration, VLM inference, RAG, storage, model switching, structured output, tool calling, and cancellation.
 
+Refresh the native model registry after external changes to managed model files:
+
+```ts
+await RunAnywhere.models.refresh();
+```
+
+Refresh rescans local files by default, does not fetch a remote catalog or prune missing files
+by default, and logs failures instead of rejecting. It is a no-op before initialization. The
+current native refresh API does not implement orphan pruning; setting `pruneOrphans: true`
+reports a warning and leaves missing-file rows unchanged.
+
 ## Public entrypoints
 
 | Import | Use for |

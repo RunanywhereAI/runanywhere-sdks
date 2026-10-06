@@ -1128,18 +1128,6 @@ void remove_model(const std::string& model_id) {
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "remove_model");
 }
 
-#ifdef RAC_HAVE_BACKEND_RAG
-// =============================================================================
-// RAG: proto-bytes session ABI (rac_rag_*_proto).
-//
-// Every call is bytes-in / bytes-out over serialized runanywhere.v1.* messages;
-// the Python `runanywhere.rag` facade owns the (de)serialization via the
-// generated _pb2 classes. Session handles reuse the integer-id handle machinery
-// under a dedicated g_rag_handles map. Guarded by RAC_HAVE_BACKEND_RAG so a
-// build without the RAG backend simply omits these bindings (the facade then
-// raises a friendly "rebuild with [rag]" hint).
-// =============================================================================
-
 // Turn a returned rac_proto_buffer_t into py::bytes, or raise. Prefers the
 // buffer's own negative status/message, else the function return code. Frees
 // the buffer either way. Must run with the GIL held.
@@ -1154,6 +1142,33 @@ py::bytes finish_proto_out(rac_result_t rc, rac_proto_buffer_t* buf, const char*
     rac_proto_buffer_free(buf);
     return out;
 }
+
+py::bytes refresh_model_registry(const std::string& request_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_model_registry_handle_t reg = rac_get_model_registry();
+    if (!reg) throw std::runtime_error("global model registry unavailable");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_model_registry_refresh_proto(
+            reg, reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "refresh_model_registry");
+}
+
+#ifdef RAC_HAVE_BACKEND_RAG
+// =============================================================================
+// RAG: proto-bytes session ABI (rac_rag_*_proto).
+//
+// Every call is bytes-in / bytes-out over serialized runanywhere.v1.* messages;
+// the Python `runanywhere.rag` facade owns the (de)serialization via the
+// generated _pb2 classes. Session handles reuse the integer-id handle machinery
+// under a dedicated g_rag_handles map. Guarded by RAC_HAVE_BACKEND_RAG so a
+// build without the RAG backend simply omits these bindings (the facade then
+// raises a friendly "rebuild with [rag]" hint).
+// =============================================================================
 
 int32_t rag_session_create(const std::string& config_bytes) {
     if (!g_initialized.load()) throw std::runtime_error("not initialized");
@@ -2517,6 +2532,8 @@ PYBIND11_MODULE(_core, m) {
     m.def("list_models", &list_models, "List all registered models as dicts.");
     m.def("remove_model", &remove_model, py::arg("model_id"),
           "Remove a model from the global registry.");
+    m.def("refresh_model_registry", &refresh_model_registry, py::arg("request_bytes"),
+          "Refresh the global model registry from a serialized ModelRegistryRefreshRequest.");
 
 #ifdef RAC_HAVE_BACKEND_RAG
     // RAG — proto-bytes in / proto-bytes out (serialized runanywhere.v1.* msgs).

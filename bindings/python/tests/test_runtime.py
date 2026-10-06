@@ -50,6 +50,12 @@ def test_reset_before_initialize_is_noop(fake_core) -> None:
     assert fake_core.count("shutdown") == 0
 
 
+def test_model_refresh_is_noop_before_initialize(fake_core) -> None:
+    """Refresh does not call the native bridge before runtime initialization."""
+    ra.models.refresh()
+    assert fake_core.count("refresh_model_registry") == 0
+
+
 def test_version_requires_initialize(fake_core) -> None:
     with pytest.raises(SDKException) as error:
         ra.version()
@@ -195,6 +201,84 @@ def test_list_and_get_describe_catalog_models(fake_core) -> None:
     assert language and all(i.category == ModelCategory.LANGUAGE for i in language)
     assert ra.models.get("no-such-model") is None
     assert ra.models.get(infos[0].id).id == infos[0].id
+
+
+def test_model_refresh_serializes_options(sdk) -> None:
+    """Refresh options are serialized into the native protobuf request."""
+    from runanywhere import ModelRefreshOptions
+    from runanywhere._proto import model_types_pb2
+
+    ra.models.refresh(
+        ModelRefreshOptions(
+            rescan_local=False,
+            include_remote_catalog=True,
+            prune_orphans=True,
+        )
+    )
+
+    (request_bytes,) = sdk.args_of("refresh_model_registry")
+    request = model_types_pb2.ModelRegistryRefreshRequest()
+    request.ParseFromString(request_bytes)
+    assert request.rescan_local is False
+    assert request.include_remote_catalog is True
+    assert request.prune_orphans is True
+    assert request.include_downloaded_state is True
+
+
+def test_model_refresh_logs_native_failures_without_raising(sdk, monkeypatch, caplog) -> None:
+    """Operational native refresh failures are logged and contained."""
+
+    def fail_refresh(_request_bytes: bytes) -> bytes:
+        raise RuntimeError("native refresh failed")
+
+    monkeypatch.setattr(sdk, "refresh_model_registry", fail_refresh)
+    ra.models.refresh()
+
+    assert "models.refresh failed" in caplog.text
+
+
+def test_model_refresh_requires_native_refresh_abi(sdk, monkeypatch) -> None:
+    """An extension without the refresh symbol reports NOT_IMPLEMENTED."""
+    monkeypatch.delattr(type(sdk), "refresh_model_registry")
+
+    with pytest.raises(SDKException) as error:
+        ra.models.refresh()
+
+    assert error.value.code == ErrorCode.NOT_IMPLEMENTED
+    assert "rac_model_registry_refresh_proto" in str(error.value)
+
+
+def test_model_refresh_contains_core_acquisition_race(sdk, monkeypatch, caplog) -> None:
+    """A concurrent reset between readiness and core lookup is best-effort."""
+    from runanywhere._runtime import runtime
+
+    monkeypatch.setattr(type(runtime), "is_ready", property(lambda _self: True))
+
+    def reset_before_core_lookup():
+        """Simulate reset clearing the native core after the readiness check."""
+        raise SDKException.not_initialized("runtime reset during refresh")
+
+    monkeypatch.setattr(runtime, "core", reset_before_core_lookup)
+    ra.models.refresh()
+
+    assert "models.refresh failed" in caplog.text
+
+
+def test_async_model_refresh_serializes_default_options(sdk) -> None:
+    """The async API sends the same default request as the sync API."""
+    import asyncio
+
+    from runanywhere._proto import model_types_pb2
+
+    asyncio.run(ra.models.arefresh())
+
+    (request_bytes,) = sdk.args_of("refresh_model_registry")
+    request = model_types_pb2.ModelRegistryRefreshRequest()
+    request.ParseFromString(request_bytes)
+    assert request.rescan_local is True
+    assert request.include_remote_catalog is False
+    assert request.prune_orphans is False
+    assert request.include_downloaded_state is True
 
 
 def test_aload_puts_the_model_in_its_category(sdk, gguf) -> None:

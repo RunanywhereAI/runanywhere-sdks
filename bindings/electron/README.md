@@ -185,6 +185,17 @@ When packaging with electron-builder, unpack native artifacts from the asar:
 
 `models.load(id)` and the `model:` option on a generation accept a catalog id (downloaded on first use) or a registered local path. Built-in ids include `smollm2-135m`, `qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-tiny`, and `piper-lessac`.
 
+Reconcile the native registry after model files change outside the SDK:
+
+```ts
+await RunAnywhere.models.refresh();
+```
+
+Refresh rescans local files by default, does not fetch a remote catalog or prune missing files
+by default, and logs failures instead of rejecting. It resolves to `void`. The current native
+refresh API does not implement orphan pruning; setting `pruneOrphans: true` reports a warning
+and leaves missing-file rows unchanged.
+
 ## Example application
 
 The TypeScript demo app lives in its own repository:
