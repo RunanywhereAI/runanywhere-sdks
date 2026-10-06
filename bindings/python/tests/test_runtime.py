@@ -248,6 +248,22 @@ def test_model_refresh_requires_native_refresh_abi(sdk, monkeypatch) -> None:
     assert "rac_model_registry_refresh_proto" in str(error.value)
 
 
+def test_model_refresh_contains_core_acquisition_race(sdk, monkeypatch, caplog) -> None:
+    """A concurrent reset between readiness and core lookup is best-effort."""
+    from runanywhere._runtime import runtime
+
+    monkeypatch.setattr(type(runtime), "is_ready", property(lambda _self: True))
+
+    def reset_before_core_lookup():
+        """Simulate reset clearing the native core after the readiness check."""
+        raise SDKException.not_initialized("runtime reset during refresh")
+
+    monkeypatch.setattr(runtime, "core", reset_before_core_lookup)
+    ra.models.refresh()
+
+    assert "models.refresh failed" in caplog.text
+
+
 def test_async_model_refresh_serializes_default_options(sdk) -> None:
     """The async API sends the same default request as the sync API."""
     import asyncio

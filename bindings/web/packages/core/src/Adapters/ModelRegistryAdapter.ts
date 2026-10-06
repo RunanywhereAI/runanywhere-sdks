@@ -269,6 +269,39 @@ export class ModelRegistryAdapter {
    * encode → withHeapBytes → readOwnedProtoResult pattern used by `query`.
    */
   refresh(options: RefreshOptions = {}): boolean {
+    const primary = this.module;
+    const siblings = [...knownModules].filter((mod) => mod !== primary);
+    const primarySucceeded = this.refreshCurrent(options);
+    let allSucceeded = primarySucceeded;
+
+    // Remote assignment refresh mutates this module's registry. Replay its
+    // snapshots into sibling registries before their local rescan so every
+    // backend can resolve newly assigned models.
+    if (primarySucceeded && options.includeRemoteCatalog) {
+      const models = this.list()?.models ?? [];
+      for (const mod of siblings) {
+        const adapter = new ModelRegistryAdapter(mod);
+        for (const model of models) {
+          if (!adapter.registerDirect(model)) allSucceeded = false;
+        }
+      }
+    }
+
+    for (const mod of siblings) {
+      const adapter = new ModelRegistryAdapter(mod);
+      if (!adapter.refreshCurrent({
+        ...options,
+        includeRemoteCatalog: false,
+        pruneOrphans: false,
+      })) {
+        allSucceeded = false;
+      }
+    }
+    return allSucceeded;
+  }
+
+  /** Refresh only this module's registry; {@link refresh} handles fan-out. */
+  private refreshCurrent(options: RefreshOptions): boolean {
     const mod = this.module;
     const handle = mod._rac_get_model_registry();
     if (!handle) {
@@ -498,19 +531,21 @@ export class ModelRegistryAdapter {
    * Register a model directly on this adapter's module WITHOUT broadcasting
    * to other known modules. Used during catalog replay when a new WASM joins.
    */
-  private registerDirect(model: ProtoModelInfo): void {
-    if (!this.ensureProtoExports('registerDirect')) return;
+  private registerDirect(model: ProtoModelInfo): boolean {
+    if (!this.ensureProtoExports('registerDirect')) return false;
     const handle = this.getRegistryHandle('registerDirect');
-    if (!handle) return;
+    if (!handle) return false;
     const bytes = ProtoModelInfoCodec.encode(model).finish();
     try {
-      this.withHeapBytesOnModule(this.module, bytes, (bytesPtr, bytesLen) => (
+      const result = this.withHeapBytesOnModule(this.module, bytes, (bytesPtr, bytesLen) => (
         this.module._rac_model_registry_register_proto!(handle, bytesPtr, bytesLen)
       ));
+      return this.handleResult('rac_model_registry_register_proto', result);
     } catch (error) {
       logger.debug(
         `registerDirect(${model.id}) failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return false;
     }
   }
 

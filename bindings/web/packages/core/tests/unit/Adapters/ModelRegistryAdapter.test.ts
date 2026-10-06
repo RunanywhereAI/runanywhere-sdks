@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ModelRegistryRefreshRequest as RefreshRequestCodec } from '@runanywhere/proto-ts/model_types';
 import {
   ModelRegistryAdapter,
   type ModelRegistryModule,
@@ -12,6 +13,7 @@ interface DownloadStatusCall {
 interface FakeRegistryModule {
   readonly module: ModelRegistryModule;
   readonly calls: DownloadStatusCall[];
+  readonly refreshRequests: Uint8Array[];
   readonly liveAllocations: ReadonlySet<number>;
 }
 
@@ -22,6 +24,7 @@ function createRegistryModule(handle: number): FakeRegistryModule {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const calls: DownloadStatusCall[] = [];
+  const refreshRequests: Uint8Array[] = [];
   const liveAllocations = new Set<number>();
   let nextPtr = 256;
 
@@ -53,7 +56,10 @@ function createRegistryModule(handle: number): FakeRegistryModule {
       heapU8[ptr + bytes.length] = 0;
     },
     _rac_get_model_registry: () => handle,
-    _rac_model_registry_refresh_proto: () => 0,
+    _rac_model_registry_refresh_proto: (_registry, requestPtr, requestSize) => {
+      refreshRequests.push(heapU8.slice(requestPtr, requestPtr + requestSize));
+      return 0;
+    },
     _rac_model_registry_register_proto: () => 0,
     _rac_model_registry_update_proto: () => 0,
     _rac_model_registry_update_download_status: (_registry, modelIdPtr, localPathPtr) => {
@@ -72,7 +78,7 @@ function createRegistryModule(handle: number): FakeRegistryModule {
     _rac_model_registry_proto_free: () => undefined,
   };
 
-  return { module, calls, liveAllocations };
+  return { module, calls, refreshRequests, liveAllocations };
 }
 
 describe('ModelRegistryAdapter download status', () => {
@@ -109,5 +115,31 @@ describe('ModelRegistryAdapter download status', () => {
     expect(() => ModelRegistryAdapter.setDefaultModule(incomplete.module))
       .toThrow(/missing required model-registry exports.*update_download_status/);
     expect(ModelRegistryAdapter.tryDefault()).toBeNull();
+  });
+});
+
+describe('ModelRegistryAdapter refresh', () => {
+  beforeEach(() => ModelRegistryAdapter.clearDefaultModule());
+  afterEach(() => ModelRegistryAdapter.clearDefaultModule());
+
+  it('rescans every live registry and fetches the remote catalog only once', () => {
+    const commons = createRegistryModule(101);
+    const llama = createRegistryModule(202);
+    const onnx = createRegistryModule(303);
+    ModelRegistryAdapter.setDefaultModule(commons.module);
+    ModelRegistryAdapter.setDefaultModule(llama.module);
+    ModelRegistryAdapter.setDefaultModule(onnx.module);
+
+    const registry = ModelRegistryAdapter.tryDefault();
+    expect(registry).not.toBeNull();
+    expect(registry!.refresh({ includeRemoteCatalog: true })).toBe(true);
+
+    for (const target of [commons, llama, onnx]) {
+      expect(target.refreshRequests).toHaveLength(1);
+      const request = RefreshRequestCodec.decode(target.refreshRequests[0]);
+      expect(request.rescanLocal).toBe(true);
+      expect(request.includeDownloadedState).toBe(true);
+      expect(request.includeRemoteCatalog).toBe(target === onnx);
+    }
   });
 });

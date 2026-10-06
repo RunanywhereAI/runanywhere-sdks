@@ -20,7 +20,13 @@ def refresh(options: ModelRefreshOptions) -> None:
     if not runtime.is_ready:
         return
 
-    core = runtime.core()
+    try:
+        core = runtime.core()
+    except SDKException:
+        # reset() may clear the core after the readiness check above.
+        _LOG.warning("models.refresh failed", exc_info=True)
+        return
+
     refresh_native = getattr(core, "refresh_model_registry", None)
     if refresh_native is None:
         raise SDKException.not_implemented("rac_model_registry_refresh_proto")
