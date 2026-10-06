@@ -179,7 +179,11 @@ class VadOptions:
 
 @dataclass
 class ModelRefreshOptions:
-    """Controls reconciliation of the native model registry."""
+    """Controls reconciliation of the native model registry.
+
+    The current native refresh API reports orphan pruning as unsupported; setting
+    ``prune_orphans`` to ``True`` does not clear missing-file rows.
+    """
 
     rescan_local: bool = True
     include_remote_catalog: bool = False

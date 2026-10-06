@@ -198,7 +198,9 @@ export const models = {
   async refresh(options: RefreshOptions = {}): Promise<void> {
     if (!SDKCore.isInitialized) return;
     try {
-      ModelRegistry.refresh(options);
+      if (!ModelRegistry.refresh(options)) {
+        modelsLogger.warning('Model registry refresh failed');
+      }
     } catch (error: unknown) {
       modelsLogger.warning(
         `Model registry refresh failed: ${error instanceof Error ? error.message : String(error)}`,

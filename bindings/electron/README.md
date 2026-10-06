@@ -188,11 +188,13 @@ When packaging with electron-builder, unpack native artifacts from the asar:
 Reconcile the native registry after model files change outside the SDK:
 
 ```ts
-await RunAnywhere.assets.refresh();
+await RunAnywhere.models.refresh();
 ```
 
 Refresh rescans local files by default, does not fetch a remote catalog or prune missing files
-by default, and logs failures instead of rejecting. It resolves to `void`.
+by default, and logs failures instead of rejecting. It resolves to `void`. The current native
+refresh API does not implement orphan pruning; setting `pruneOrphans: true` reports a warning
+and leaves missing-file rows unchanged.
 
 ## Example application
 

@@ -146,7 +146,9 @@ export interface RefreshOptions {
   includeRemoteCatalog?: boolean;
   /** Rescan the model store for artifacts on disk. On by default. */
   rescanLocal?: boolean;
-  /** Clear downloaded state for rows whose files are gone. Off by default. */
+  /**
+   * Request orphan pruning. The current native refresh API warns and leaves rows unchanged.
+   */
   pruneOrphans?: boolean;
 }
 
@@ -186,9 +188,9 @@ export interface ModelsNamespace {
    */
   unregister(id: string): Promise<void>;
   /**
-   * Re-read the registry: rescan the model store for artifacts that arrived or
-   * vanished outside the SDK, and clear the downloaded flag on rows whose files
-   * are gone.
+   * Re-read the registry and rescan the model store for artifacts that arrived
+   * outside the SDK. The current native refresh API does not prune rows for
+   * missing files; requesting `pruneOrphans` reports a warning instead.
    */
   refresh(options?: RefreshOptions): Promise<void>;
   /**
@@ -572,6 +574,9 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
         });
         if (result.error) {
           console.warn(`[runanywhere] models.refresh failed: ${result.error.message}`);
+        }
+        for (const warning of result.warnings) {
+          console.warn(`[runanywhere] models.refresh: ${warning}`);
         }
       } catch (error: unknown) {
         console.warn(

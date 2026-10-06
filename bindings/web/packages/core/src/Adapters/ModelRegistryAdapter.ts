@@ -7,9 +7,9 @@
  * browser surface is symmetric with Swift / Kotlin / RN / Flutter.
  * The remote-catalog step flows through whatever transport the caller
  * configured on the native side (typically a fetch-backed assignment
- * callback installed at SDK init); `rescan_local` and `prune_orphans` are
- * no-ops in the browser today because there is no persistent filesystem
- * for discovery.
+ * callback installed at SDK init); `rescan_local` uses the platform's browser
+ * filesystem callback. The current native refresh implementation reports
+ * `prune_orphans` as unsupported and leaves missing-file rows unchanged.
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
@@ -147,7 +147,10 @@ export interface RefreshOptions {
   includeRemoteCatalog?: boolean;
   /** Rescan managed model files; on by default. */
   rescanLocal?: boolean;
-  /** Clear downloaded state for missing files; off by default. */
+  /**
+   * Request orphan pruning. The current native refresh API reports this as
+   * unsupported and leaves missing-file rows unchanged.
+   */
   pruneOrphans?: boolean;
 }
 
@@ -298,6 +301,9 @@ export class ModelRegistryAdapter {
         return false;
       }
       const result = ProtoModelRegistryRefreshResultCodec.decode(resultBytes);
+      for (const warning of result.warnings) {
+        logger.warning(`rac_model_registry_refresh_proto: ${warning}`);
+      }
       return !result.error;
     } catch (error) {
       logger.warning(

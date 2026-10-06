@@ -68,8 +68,10 @@ class Models:
         """Reconcile the shared native registry with managed model files.
 
         This best-effort operation is a no-op before initialization and logs refresh
-        failures instead of raising, matching the other SDKs. Protobuf-backed refresh
-        requires the optional ``runanywhere[rag]`` extra.
+        failures instead of raising, except that a native extension missing the refresh
+        ABI raises ``SDKException`` with ``NOT_IMPLEMENTED``. The current native API
+        reports ``prune_orphans`` as unsupported and leaves missing-file rows unchanged.
+        Protobuf-backed refresh requires the optional ``runanywhere[rag]`` extra.
         """
         refresh_model_registry(options or ModelRefreshOptions())
 

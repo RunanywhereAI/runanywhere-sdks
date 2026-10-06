@@ -5,26 +5,28 @@ from __future__ import annotations
 import logging
 
 from ._runtime import runtime
+from .errors import SDKException
 from .options import ModelRefreshOptions
 
 _LOG = logging.getLogger("runanywhere")
 
 
 def refresh(options: ModelRefreshOptions) -> None:
-    """Refresh the commons registry, keeping failures non-throwing like Swift."""
+    """Refresh the commons registry, logging operational failures best-effort.
+
+    Raises:
+        SDKException: If the loaded native extension does not expose the refresh ABI.
+    """
     if not runtime.is_ready:
         return
 
+    core = runtime.core()
+    refresh_native = getattr(core, "refresh_model_registry", None)
+    if refresh_native is None:
+        raise SDKException.not_implemented("rac_model_registry_refresh_proto")
+
     try:
         from ._proto import model_types_pb2 as model_types
-
-        core = runtime.core()
-        refresh_native = getattr(core, "refresh_model_registry", None)
-        if refresh_native is None:
-            _LOG.warning(
-                "models.refresh: this native build does not export refresh_model_registry"
-            )
-            return
 
         request = model_types.ModelRegistryRefreshRequest(
             include_remote_catalog=options.include_remote_catalog,
