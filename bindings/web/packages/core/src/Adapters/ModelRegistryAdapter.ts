@@ -25,6 +25,7 @@ import {
   ModelInfo as ProtoModelInfoCodec,
   ModelInfoList as ProtoModelInfoListCodec,
   ModelQuery as ProtoModelQueryCodec,
+  ModelRegistryStatus,
   ModelRegistryRefreshRequest as ProtoModelRegistryRefreshRequestCodec,
   ModelRegistryRefreshResult as ProtoModelRegistryRefreshResultCodec,
   type ModelImportRequest as ProtoModelImportRequest,
@@ -278,11 +279,15 @@ export class ModelRegistryAdapter {
     // snapshots into sibling registries before their local rescan so every
     // backend can resolve newly assigned models.
     if (primarySucceeded && options.includeRemoteCatalog) {
-      const models = this.list()?.models ?? [];
-      for (const mod of siblings) {
-        const adapter = new ModelRegistryAdapter(mod);
-        for (const model of models) {
-          if (!adapter.registerDirect(model)) allSucceeded = false;
+      const catalog = this.list();
+      if (!catalog) {
+        allSucceeded = false;
+      } else {
+        for (const mod of siblings) {
+          const adapter = new ModelRegistryAdapter(mod);
+          for (const model of catalog.models) {
+            if (!adapter.registerDirect(model)) allSucceeded = false;
+          }
         }
       }
     }
@@ -529,13 +534,30 @@ export class ModelRegistryAdapter {
 
   /**
    * Register a model directly on this adapter's module WITHOUT broadcasting
-   * to other known modules. Used during catalog replay when a new WASM joins.
+   * to other known modules. Used when a new WASM joins and when remote refresh
+   * replays primary-registry catalog rows into sibling modules.
    */
   private registerDirect(model: ProtoModelInfo): boolean {
     if (!this.ensureProtoExports('registerDirect')) return false;
     const handle = this.getRegistryHandle('registerDirect');
     if (!handle) return false;
-    const bytes = ProtoModelInfoCodec.encode(model).finish();
+    const existing = this.get(model.id);
+    const preservedStatus = existing?.registryStatus;
+    const mergedModel = existing
+      ? {
+          ...model,
+          localPath: existing.localPath || model.localPath,
+          checksumSha256: existing.checksumSha256 ?? model.checksumSha256,
+          registryStatus: preservedStatus !== undefined
+            && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED
+            && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED
+            ? preservedStatus
+            : model.registryStatus ?? preservedStatus,
+          isAvailable: existing.isAvailable ?? model.isAvailable,
+          lastUsedAtUnixMs: existing.lastUsedAtUnixMs ?? model.lastUsedAtUnixMs,
+        }
+      : model;
+    const bytes = ProtoModelInfoCodec.encode(mergedModel).finish();
     try {
       const result = this.withHeapBytesOnModule(this.module, bytes, (bytesPtr, bytesLen) => (
         this.module._rac_model_registry_register_proto!(handle, bytesPtr, bytesLen)
