@@ -760,6 +760,9 @@ private final class MLXSession: @unchecked Sendable {
         /// Decision checkpoints are not generation containers: the joint head
         /// scores every option in one non-autoregressive pass.
         var decisionModel: ClefDecisionModel?
+        /// PPLX-style decider checkpoints: Qwen3.5 backbone with a 255-way
+        /// readout instead of a joint head. Routed by `decision_config.json`.
+        var deciderModel: Qwen35DeciderModel?
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         var sttModel: STTGenerationModel?
         var ttsModel: SpeechGenerationModel?
@@ -830,11 +833,19 @@ private final class MLXSession: @unchecked Sendable {
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
         case .decision:
-            let decisionModel = try await ClefDecisionModel.load(
-                from: directory,
-                using: tokenizerLoader
-            )
-            modelLock.withLock { $0.decisionModel = decisionModel }
+            if Qwen35DeciderModel.isDeciderCheckpoint(at: directory) {
+                let decider = try await Qwen35DeciderModel.load(
+                    from: directory,
+                    using: tokenizerLoader
+                )
+                modelLock.withLock { $0.deciderModel = decider }
+            } else {
+                let decisionModel = try await ClefDecisionModel.load(
+                    from: directory,
+                    using: tokenizerLoader
+                )
+                modelLock.withLock { $0.decisionModel = decisionModel }
+            }
         }
         let modelContextLength = MLXModelConfig.contextLength(inDirectory: directory)
         lock.withLock {
@@ -1030,6 +1041,7 @@ private final class MLXSession: @unchecked Sendable {
             models.llmChatCache = nil
             models.embedderContainer = nil
             models.decisionModel = nil
+            models.deciderModel = nil
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             models.sttModel = nil
             models.ttsModel = nil
@@ -1438,11 +1450,17 @@ private final class MLXSession: @unchecked Sendable {
         questions: [ClefDecisionQuestion],
         temperature: Float?
     ) async throws -> (ClefDecisionResult, Int) {
+        if isCancelled { throw CancellationError() }
+        let request = ClefDecisionRequest(state: state, questions: questions)
+        // The decider carries its calibrated temperature in the checkpoint;
+        // an explicit override would break calibration, so it is not applied.
+        if let decider = modelLock.withLock({ $0.deciderModel }) {
+            let result = try decider.decide(request)
+            return (result, result.inputTokens)
+        }
         guard let decisionModel = modelLock.withLock({ $0.decisionModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
-        if isCancelled { throw CancellationError() }
-        let request = ClefDecisionRequest(state: state, questions: questions)
         let result = try decisionModel.decide(request, temperature: temperature)
         return (result, result.inputTokens)
     }
