@@ -133,7 +133,7 @@ let mlxAudioPackageDependencies: [Package.Dependency] = [
     // revision pins), and it is the same tree the decision work was verified
     // against. 0.1.6 carries mlx-swift-lm 3.31.8, which the decision work
     // requires and the released 0.1.5 conflicts with.
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.6"),
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.7"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),

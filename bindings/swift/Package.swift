@@ -26,7 +26,7 @@ let mlxAudioPackageDependencies: [Package.Dependency] = [
     // Tagged 0.1.6 when mlx-audio-swift#1 merged on runanywhere-0.1.5, so the
     // fork-local revision pin this used to carry is gone. Same tree the
     // decision work was verified against; carries mlx-swift-lm 3.31.8.
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.6"),
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.7"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
