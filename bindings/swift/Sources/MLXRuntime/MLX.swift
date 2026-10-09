@@ -786,7 +786,9 @@ private final class MLXSession: @unchecked Sendable {
         var d1OmniModel: D1Omni?
         var d1OmniTokenizer: (any MLXLMCommon.Tokenizer)?
         var glinerModel: GLiNERClassifier?
-        var glinerMaxTokens = 512
+        /// GLiNER's DeBERTa window, from config.json. 512 is that architecture's
+        /// position limit when the file omits it, not a sampling cap.
+        var glinerPositionWindow = 512
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         var sttModel: STTGenerationModel?
         var ttsModel: SpeechGenerationModel?
@@ -892,7 +894,7 @@ private final class MLXSession: @unchecked Sendable {
                 let limit = MLXTextDecisionCheckpoint.glinerMaxTokens(at: directory)
                 modelLock.withLockUnchecked {
                     $0.glinerModel = model
-                    $0.glinerMaxTokens = limit
+                    $0.glinerPositionWindow = limit
                 }
             case nil:
                 let decisionModel = try await ClefDecisionModel.load(
@@ -1532,7 +1534,7 @@ private final class MLXSession: @unchecked Sendable {
             return (pass, pass.inputTokens)
         }
         if let model = modelLock.withLockUnchecked({ $0.glinerModel }) {
-            let limit = modelLock.withLock { $0.glinerMaxTokens }
+            let limit = modelLock.withLock { $0.glinerPositionWindow }
             let pass = try MLXTextDecisions.scoreGLiNER(model, request: request, maxTokens: limit)
             return (pass, pass.inputTokens)
         }

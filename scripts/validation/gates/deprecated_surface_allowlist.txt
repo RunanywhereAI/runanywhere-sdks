@@ -19,6 +19,8 @@ bindings/swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.
 bindings/swift/Sources/MLXRuntime/MLX.swift|swift:json-bridge
 # Typed reader for the external Hugging Face model config.json boundary.
 bindings/swift/Sources/MLXRuntime/MLXVLMResolutionPolicy.swift|swift:json-bridge
+# Reads Hugging Face config.json to route D1, D1 Omni, and GLiNER checkpoints.
+bindings/swift/Sources/MLXRuntime/MLXTextDecisions.swift|swift:json-bridge
 bindings/swift/Sources/MLXRuntime/Nemotron.swift|swift:json-bridge
 bindings/swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+WebSearchTool.swift|swift:json-bridge
 bindings/swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:json-bridge

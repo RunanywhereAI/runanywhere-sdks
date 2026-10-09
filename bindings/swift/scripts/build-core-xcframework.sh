@@ -1799,8 +1799,10 @@ LLAMACPP_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_llamacpp.a"
 merge_llamacpp_backend_slice "${DEV_BIN}" "Release-iphoneos" "${LLAMACPP_DEV_LIB}" "arm64"
 merge_llamacpp_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${LLAMACPP_SIM_LIB}" "arm64"
 merge_llamacpp_backend_macos_slice "${MAC_BIN}" "${LLAMACPP_MAC_LIB}" "arm64"
+# runanywhere-b10453.8 unity-builds models/*.cpp, so src/models/llama.cpp no
+# longer collides with src/llama.cpp. The remaining stems are still doubled.
 LLAMACPP_HASHED_MEMBER_INVENTORY=(
-    llama=2 ggml=2 ggml-cpu=2 ggml-metal-device=2 quants=2 repack=2
+    ggml=2 ggml-cpu=2 ggml-metal-device=2 quants=2 repack=2
 )
 run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${LLAMACPP_DEV_LIB}" "${LLAMACPP_HASHED_MEMBER_INVENTORY[@]}"
 run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${LLAMACPP_SIM_LIB}" "${LLAMACPP_HASHED_MEMBER_INVENTORY[@]}"
