@@ -35,6 +35,16 @@
 
 #include "rac/features/decision/rac_decision_types.h"
 
+#if !defined(RAC_LLAMACPP_HAS_CLEF_SPAN)
+enum {
+    LLAMA_DECISION_ORDER_NONE = 0,
+    LLAMA_DECISION_ORDER_QUESTION_NOUL = 1,
+    LLAMA_DECISION_ORDER_QUESTION_CHOICE = 2,
+    LLAMA_DECISION_ORDER_QUESTION_SCORE = 3,
+    LLAMA_DECISION_ORDER_OPTION = 4,
+};
+#endif
+
 namespace runanywhere::decision_prompt {
 
 // Tokens and their span roles for one decision prompt.

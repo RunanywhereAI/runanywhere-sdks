@@ -216,7 +216,16 @@ FetchContent_MakeAvailable(llamacpp)
 # fetched source tree; a miss keeps the engine's decision_ops slot NULL, which
 # the registry already treats as "this engine does not serve the primitive".
 file(READ "${llamacpp_SOURCE_DIR}/include/llama.h" _rac_llama_public_header)
+file(READ "${llamacpp_SOURCE_DIR}/common/common.h" _rac_llama_common_header)
+set(RAC_LLAMACPP_HAS_CLEF_SPAN OFF)
+set(RAC_LLAMACPP_HAS_D1 OFF)
 if(_rac_llama_public_header MATCHES "llama_batch_set_decision_order")
+    set(RAC_LLAMACPP_HAS_CLEF_SPAN ON)
+endif()
+if(_rac_llama_common_header MATCHES "common_get_decision_type")
+    set(RAC_LLAMACPP_HAS_D1 ON)
+endif()
+if(RAC_LLAMACPP_HAS_CLEF_SPAN OR RAC_LLAMACPP_HAS_D1)
     set(RAC_LLAMACPP_HAS_DECISION ON)
 else()
     set(RAC_LLAMACPP_HAS_DECISION OFF)
@@ -279,6 +288,9 @@ set(LLAMACPP_BACKEND_SOURCES
 # probe above decides. See decision_prompt.h for the span construction.
 if(RAC_LLAMACPP_HAS_DECISION)
     list(APPEND LLAMACPP_BACKEND_SOURCES rac_decision_llamacpp.cpp)
+endif()
+if(RAC_LLAMACPP_HAS_D1)
+    list(APPEND LLAMACPP_BACKEND_SOURCES d1_decision.cpp)
 endif()
 
 set(LLAMACPP_BACKEND_HEADERS
@@ -373,6 +385,8 @@ rac_add_engine_plugin(llamacpp
                         ${llamacpp_SOURCE_DIR}/vendor # nlohmann/json.hpp
     COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
                         $<$<BOOL:${RAC_LLAMACPP_HAS_DECISION}>:RAC_LLAMACPP_HAS_DECISION=1>
+                        $<$<BOOL:${RAC_LLAMACPP_HAS_CLEF_SPAN}>:RAC_LLAMACPP_HAS_CLEF_SPAN=1>
+                        $<$<BOOL:${RAC_LLAMACPP_HAS_D1}>:RAC_LLAMACPP_HAS_D1=1>
     AVAILABILITY        PUBLIC
     PACKAGE_OWNER       runanywhere
     PACKAGE_NAME        runanywhere_llamacpp
