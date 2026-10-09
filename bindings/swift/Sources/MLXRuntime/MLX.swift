@@ -786,9 +786,8 @@ private final class MLXSession: @unchecked Sendable {
         var d1OmniModel: D1Omni?
         var d1OmniTokenizer: (any MLXLMCommon.Tokenizer)?
         var glinerModel: GLiNERClassifier?
-        /// GLiNER's DeBERTa window, from config.json. 512 is that architecture's
-        /// position limit when the file omits it, not a sampling cap.
-        var glinerPositionWindow = 512
+        /// GLiNER's DeBERTa window, read from config.json at load.
+        var glinerPositionWindow: Int?
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         var sttModel: STTGenerationModel?
         var ttsModel: SpeechGenerationModel?
@@ -870,6 +869,7 @@ private final class MLXSession: @unchecked Sendable {
                 models.d1OmniModel = nil
                 models.d1OmniTokenizer = nil
                 models.glinerModel = nil
+                models.glinerPositionWindow = nil
             }
             switch MLXTextDecisionCheckpoint.kind(at: directory) {
             case .decider:
@@ -1103,6 +1103,7 @@ private final class MLXSession: @unchecked Sendable {
             models.d1OmniModel = nil
             models.d1OmniTokenizer = nil
             models.glinerModel = nil
+            models.glinerPositionWindow = nil
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             models.sttModel = nil
             models.ttsModel = nil
@@ -1533,9 +1534,14 @@ private final class MLXSession: @unchecked Sendable {
                 loaded.0, tokenizer: loaded.1, request: request)
             return (pass, pass.inputTokens)
         }
-        if let model = modelLock.withLockUnchecked({ $0.glinerModel }) {
-            let limit = modelLock.withLock { $0.glinerPositionWindow }
-            let pass = try MLXTextDecisions.scoreGLiNER(model, request: request, maxTokens: limit)
+        if let loaded = modelLock.withLockUnchecked({ state -> (GLiNERClassifier, Int)? in
+            guard let model = state.glinerModel, let limit = state.glinerPositionWindow else {
+                return nil
+            }
+            return (model, limit)
+        }) {
+            let pass = try MLXTextDecisions.scoreGLiNER(
+                loaded.0, request: request, maxTokens: loaded.1)
             return (pass, pass.inputTokens)
         }
         guard let decisionModel = modelLock.withLock({ $0.decisionModel }) else {

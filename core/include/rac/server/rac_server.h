@@ -189,9 +189,9 @@ RAC_API rac_result_t rac_server_get_status(rac_server_status_t* status);
 /**
  * @brief Get the context length of the loaded model
  *
- * Returns the context length the backend actually allocated after device
- * fitting and model limits. This can be smaller than
- * rac_server_config_t.context_size.
+ * Returns the context length reported by the loaded backend. This value may
+ * differ from rac_server_config_t.context_size and may not reflect device
+ * fitting.
  *
  * @param context_length Output context length in tokens (must not be NULL)
  * @return RAC_SUCCESS on success, RAC_ERROR_SERVER_NOT_RUNNING when stopped,

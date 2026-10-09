@@ -437,9 +437,13 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
     const auto started = std::chrono::steady_clock::now();
 #if defined(RAC_LLAMACPP_HAS_D1)
     if (handle->d1_kind != rac_llamacpp_d1_kind::none) {
-        return rac_llamacpp_d1_decide(handle->model, handle->context, handle->d1_kind, state,
-                                      questions, question_count, options, output,
-                                      handle->model_id.c_str());
+        const rac_result_t rc = rac_llamacpp_d1_decide(
+            handle->model, handle->context, handle->d1_kind, state, questions, question_count,
+            options, output, handle->model_id.c_str());
+        if (rc == RAC_SUCCESS) {
+            output->prompt_format_version = handle->prompt_format_version;
+        }
+        return rc;
     }
 #endif
 #if !defined(RAC_LLAMACPP_HAS_CLEF_SPAN)

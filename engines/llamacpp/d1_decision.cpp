@@ -107,6 +107,27 @@ std::vector<llama_token> one_token_forms(const llama_vocab* vocab, const std::ve
     return out;
 }
 
+std::string ascii_lower(std::string text) {
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+}
+
+// 1 is the yes side, 0 the no side, -1 is not a yes/no key.
+int noul_polarity(const char* key) {
+    if (key == nullptr) {
+        return -1;
+    }
+    const std::string lower = ascii_lower(key);
+    if (lower == "true" || lower == "yes") {
+        return 1;
+    }
+    if (lower == "false" || lower == "no") {
+        return 0;
+    }
+    return -1;
+}
+
 std::string choice_label(const std::string& key, size_t index, size_t count) {
     if (key.size() == 1 && std::isalpha(static_cast<unsigned char>(key[0]))) {
         return key;
@@ -135,10 +156,14 @@ std::vector<llama_token> label_group(const llama_vocab* vocab, rac_decision_ques
         }
         return group;
     }
-    if (key == "true") {
+    const int polarity = noul_polarity(key.c_str());
+    if (polarity == 1) {
         return one_token_forms(vocab, {"yes", "Yes", "YES"});
     }
-    return one_token_forms(vocab, {"no", "No", "NO"});
+    if (polarity == 0) {
+        return one_token_forms(vocab, {"no", "No", "NO"});
+    }
+    throw std::runtime_error("yes/no options must be true/false or yes/no");
 }
 
 std::string render_template(const llama_model* model, const common_json& input) {
@@ -172,7 +197,7 @@ std::vector<float> score_lfm2(llama_model* model, llama_context* ctx, const llam
     if (true_first) {
         std::stable_partition(order.begin(), order.end(), [&](size_t index) {
             const char* key = question.options[index].key;
-            return key != nullptr && std::strcmp(key, "true") == 0;
+            return noul_polarity(key) == 1;
         });
     }
 
@@ -344,6 +369,9 @@ std::vector<float> score_gliner(llama_model* model, llama_context* ctx, const ll
     if (marks.size() != question.option_count) {
         throw std::runtime_error("option markers do not match the question");
     }
+    if (llama_memory_t mem = llama_get_memory(ctx)) {
+        llama_memory_clear(mem, true);
+    }
     decode_all(ctx, tokens);
     std::vector<float> scores;
     for (const int32_t at : marks) {
@@ -402,6 +430,26 @@ rac_result_t rac_llamacpp_d1_decide(llama_model* model, llama_context* ctx, rac_
             if (question.option_count == 0) {
                 continue;
             }
+            if (question.type == RAC_DECISION_QUESTION_NOUL) {
+                if (question.option_count != 2) {
+                    throw std::runtime_error("a yes/no decision needs two options");
+                }
+                int yes = 0;
+                int no = 0;
+                for (size_t j = 0; j < question.option_count; ++j) {
+                    const int polarity = noul_polarity(question.options[j].key);
+                    if (polarity == 1) {
+                        ++yes;
+                    } else if (polarity == 0) {
+                        ++no;
+                    } else {
+                        throw std::runtime_error("yes/no options must be true/false or yes/no");
+                    }
+                }
+                if (yes != 1 || no != 1) {
+                    throw std::runtime_error("yes/no options must name both sides once");
+                }
+            }
             const float temperature = temperature_for(model, question.type, question.option_count, options);
             std::vector<float> probs;
             if (kind == rac_llamacpp_d1_kind::omni) {
@@ -425,13 +473,15 @@ rac_result_t rac_llamacpp_d1_decide(llama_model* model, llama_context* ctx, rac_
                     break;
                 }
                 case RAC_DECISION_QUESTION_NOUL: {
-                    size_t true_index = 0;
+                    size_t true_index = probs.size();
                     for (size_t j = 0; j < probs.size(); ++j) {
-                        if (question.options[j].key != nullptr &&
-                            std::strcmp(question.options[j].key, "true") == 0) {
+                        if (noul_polarity(question.options[j].key) == 1) {
                             true_index = j;
                             break;
                         }
+                    }
+                    if (true_index >= probs.size()) {
+                        throw std::runtime_error("yes/no options must be true/false or yes/no");
                     }
                     answer.noul = probs[true_index];
                     answer.confidence = choice_confidence(probs);
