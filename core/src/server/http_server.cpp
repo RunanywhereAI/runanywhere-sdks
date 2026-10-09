@@ -212,6 +212,25 @@ void HttpServer::getStatus(rac_server_status_t& status) const {
     }
 }
 
+rac_result_t HttpServer::getContextLength(int32_t& contextLength) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    contextLength = 0;
+    if (!running_ || llmHandle_ == nullptr) {
+        return RAC_ERROR_SERVER_NOT_RUNNING;
+    }
+
+    rac_llm_info_t info{};
+    const rac_result_t result = rac_llm_get_info(llmHandle_, &info);
+    if (RAC_FAILED(result)) {
+        return result;
+    }
+    if (info.context_length <= 0) {
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    contextLength = info.context_length;
+    return RAC_SUCCESS;
+}
+
 int HttpServer::wait() {
     if (serverThread_.joinable()) {
         serverThread_.join();
@@ -449,6 +468,20 @@ RAC_API rac_result_t rac_server_get_status(rac_server_status_t* status) {
         return RAC_SUCCESS;
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("Server", "Failed to get status: %s", e.what());
+        return RAC_ERROR_INTERNAL;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
+}
+
+RAC_API rac_result_t rac_server_get_context_length(int32_t* context_length) {
+    if (!context_length) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    try {
+        return rac::server::HttpServer::instance().getContextLength(*context_length);
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR("Server", "Failed to get context length: %s", e.what());
         return RAC_ERROR_INTERNAL;
     } catch (...) {
         return RAC_ERROR_INTERNAL;

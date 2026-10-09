@@ -7,6 +7,20 @@
 // rely on incidental re-export from common.h.
 #include "fit.h"
 
+// common_batch_add left the public headers when batches moved to llama_batch_ext.
+// The text path still fills a llama_batch directly.
+static void rac_batch_add(llama_batch& batch, llama_token id, llama_pos pos,
+                          const std::vector<llama_seq_id>& seq_ids, bool logits) {
+    batch.token[batch.n_tokens] = id;
+    batch.pos[batch.n_tokens] = pos;
+    batch.n_seq_id[batch.n_tokens] = static_cast<int32_t>(seq_ids.size());
+    for (size_t i = 0; i < seq_ids.size(); ++i) {
+        batch.seq_id[batch.n_tokens][i] = seq_ids[i];
+    }
+    batch.logits[batch.n_tokens] = logits ? 1 : 0;
+    batch.n_tokens++;
+}
+
 // Internal llama.cpp header for LoRA adapter introspection (ab_map tensor
 // count)
 #include "llama-adapter.h"
@@ -14,6 +28,7 @@
 // POSIX dirent/stat over a Win32 shim on MSVC (passthrough to <dirent.h>
 // elsewhere) — provides DIR/opendir/readdir/closedir + S_ISDIR. Mirrors sherpa.
 #include <algorithm>
+#include <vector>
 #include <chrono>
 #include <climits>
 #include <cmath>
@@ -499,7 +514,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     // FetchContent pulls).
     fit_status = common_fit_params(resolved_path.c_str(), &model_params, &ctx_params,
                                    tensor_split.data(), tensor_buft_overrides.data(),
-                                   margins.data(), n_ctx_min, GGML_LOG_LEVEL_INFO);
+                                   margins.data(), n_ctx_min, nullptr, GGML_LOG_LEVEL_INFO);
 
     switch (fit_status) {
         case COMMON_PARAMS_FIT_STATUS_SUCCESS:
@@ -1076,7 +1091,7 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
         }
 
         batch.n_tokens = 0;
-        common_batch_add(batch, new_token_id, n_cur, {0}, true);
+        rac_batch_add(batch, new_token_id, n_cur, {0}, true);
 
         n_cur++;
         tokens_generated++;
@@ -1272,7 +1287,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 
         for (int i = chunk_start; i < chunk_end; i++) {
             bool need_logits = is_last_chunk && (i == chunk_end - 1);
-            common_batch_add(batch, tokens_list[i], i, {0}, need_logits);
+            rac_batch_add(batch, tokens_list[i], i, {0}, need_logits);
         }
 
         if (llama_decode(context_, batch) != 0) {
@@ -1372,7 +1387,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
                 llama_memory_seq_rm(post_mem, 0, static_cast<llama_pos>(prompt_tokens - 1), -1);
             if (prompt_cache_valid) {
                 batch.n_tokens = 0;
-                common_batch_add(batch, tokens_list.back(), prompt_tokens - 1, {0}, true);
+                rac_batch_add(batch, tokens_list.back(), prompt_tokens - 1, {0}, true);
                 prompt_cache_valid = llama_decode(context_, batch) == 0;
             }
         } else {
@@ -1429,7 +1444,7 @@ bool LlamaCppTextGeneration::inject_system_prompt(const std::string& prompt) {
         int chunk_end = std::min(chunk_start + n_batch_lim, n_tokens);
 
         for (int i = chunk_start; i < chunk_end; ++i) {
-            common_batch_add(batch, tokens[i], i, {0}, false);
+            rac_batch_add(batch, tokens[i], i, {0}, false);
         }
 
         if (llama_decode(context_, batch) != 0) {
@@ -1482,7 +1497,7 @@ bool LlamaCppTextGeneration::append_context(const std::string& text) {
         int chunk_end = std::min(chunk_start + n_batch_lim, n_tokens);
 
         for (int i = chunk_start; i < chunk_end; ++i) {
-            common_batch_add(batch, tokens[i], start_pos + i, {0}, false);
+            rac_batch_add(batch, tokens[i], start_pos + i, {0}, false);
         }
 
         if (llama_decode(context_, batch) != 0) {
@@ -1561,7 +1576,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
 
         for (int i = chunk_start; i < chunk_end; ++i) {
             bool need_logits = is_last_chunk && (i == chunk_end - 1);
-            common_batch_add(batch, tokens[i], current_pos + i, {0}, need_logits);
+            rac_batch_add(batch, tokens[i], current_pos + i, {0}, need_logits);
         }
 
         if (llama_decode(context_, batch) != 0) {
