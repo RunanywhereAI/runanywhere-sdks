@@ -73,6 +73,10 @@ typedef rac_result_t (*rac_mlx_llm_generate_chat_stream_fn)(
     rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_llm_stream_callback_fn callback, void* callback_user_data, void* user_data);
 
+typedef rac_result_t (*rac_mlx_context_length_fn)(rac_handle_t handle,
+                                                  int32_t* out_context_length,
+                                                  void* user_data);
+
 typedef rac_result_t (*rac_mlx_decision_fn)(rac_handle_t handle, const char* state,
                                             const rac_decision_question_t* questions,
                                             size_t question_count,
@@ -178,6 +182,9 @@ typedef struct rac_mlx_callbacks {
      * rac_mlx_set_callbacks probes struct_size before reading this slot.
      */
     rac_mlx_llm_generate_chat_stream_fn llm_generate_chat_stream;
+
+    /** Loaded model context from Swift's parsed config.json (optional). */
+    rac_mlx_context_length_fn context_length;
 
     /**
      * Joint decision scoring (optional). Runs one forward pass over the encoded

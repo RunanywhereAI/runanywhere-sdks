@@ -187,6 +187,19 @@ RAC_API rac_bool_t rac_server_is_running(void);
 RAC_API rac_result_t rac_server_get_status(rac_server_status_t* status);
 
 /**
+ * @brief Get the context length of the loaded model
+ *
+ * Returns the context length the backend actually allocated after device
+ * fitting and model limits. This can be smaller than
+ * rac_server_config_t.context_size.
+ *
+ * @param context_length Output context length in tokens (must not be NULL)
+ * @return RAC_SUCCESS on success, RAC_ERROR_SERVER_NOT_RUNNING when stopped,
+ *         or RAC_ERROR_BACKEND_UNAVAILABLE when the backend cannot report it
+ */
+RAC_API rac_result_t rac_server_get_context_length(int32_t* context_length);
+
+/**
  * @brief Block until the server stops
  *
  * Useful for main() to keep the process alive while serving requests.

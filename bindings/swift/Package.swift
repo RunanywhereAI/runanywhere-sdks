@@ -23,10 +23,9 @@ import Foundation
 // The exact versions match the published root manifest and prevent transitive
 // audio dependencies from replacing the Bonsai/Maple-capable MLX runtime.
 let mlxAudioPackageDependencies: [Package.Dependency] = [
-    // Tagged 0.1.6 when mlx-audio-swift#1 merged on runanywhere-0.1.5, so the
-    // fork-local revision pin this used to carry is gone. Same tree the
-    // decision work was verified against; carries mlx-swift-lm 3.31.8.
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.7"),
+    // 0.1.8 carries mlx-swift-lm 3.31.10. The tag is what the distribution
+    // repo can consume (it refuses revision pins).
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.8"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -35,7 +34,7 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
 ]
 
 let runAnywhereMLXSwiftVersion: Version = "0.31.8"
-let runAnywhereMLXSwiftLMVersion: Version = "3.31.9"
+let runAnywhereMLXSwiftLMVersion: Version = "3.31.10"
 
 let package = Package(
     name: "RunAnywhere",
