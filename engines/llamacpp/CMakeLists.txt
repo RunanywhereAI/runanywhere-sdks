@@ -309,6 +309,8 @@ set(LLAMACPP_BACKEND_HEADERS
 #   ld.lld: error: undefined symbol: vtable for
 #     mtmd_image_preprocessor_{llava_uhd,step3vl,idefics3,internvl}
 list(APPEND LLAMACPP_BACKEND_SOURCES
+    ${llamacpp_SOURCE_DIR}/vendor/hash/hash.cpp
+    ${llamacpp_SOURCE_DIR}/vendor/hash/sha256/sha256.c
     ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
     ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
     ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
@@ -397,6 +399,7 @@ rac_add_engine_plugin(llamacpp
 target_include_directories(rac_backend_llamacpp PRIVATE
     ${llamacpp_SOURCE_DIR}/tools/mtmd
     ${llamacpp_SOURCE_DIR}/tools/mtmd/models
+    ${llamacpp_SOURCE_DIR}/vendor/hash
 )
 
 # Self-registration carrier: thin shim that wraps RAC_STATIC_PLUGIN_REGISTER.
