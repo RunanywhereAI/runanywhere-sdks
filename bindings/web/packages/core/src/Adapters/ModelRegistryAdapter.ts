@@ -7,9 +7,9 @@
  * browser surface is symmetric with Swift / Kotlin / RN / Flutter.
  * The remote-catalog step flows through whatever transport the caller
  * configured on the native side (typically a fetch-backed assignment
- * callback installed at SDK init); `rescan_local` and `prune_orphans` are
- * no-ops in the browser today because there is no persistent filesystem
- * for discovery.
+ * callback installed at SDK init); `rescan_local` uses the platform's browser
+ * filesystem callback. The current native refresh implementation reports
+ * `prune_orphans` as unsupported and leaves missing-file rows unchanged.
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
@@ -25,6 +25,7 @@ import {
   ModelInfo as ProtoModelInfoCodec,
   ModelInfoList as ProtoModelInfoListCodec,
   ModelQuery as ProtoModelQueryCodec,
+  ModelRegistryStatus,
   ModelRegistryRefreshRequest as ProtoModelRegistryRefreshRequestCodec,
   ModelRegistryRefreshResult as ProtoModelRegistryRefreshResultCodec,
   type ModelImportRequest as ProtoModelImportRequest,
@@ -143,8 +144,14 @@ const protoAvailabilityByModule = new WeakMap<ModelRegistryModule, ModelRegistry
 const knownModules = new Set<ModelRegistryModule>();
 
 export interface RefreshOptions {
+  /** Merge a remote catalog; off by default. */
   includeRemoteCatalog?: boolean;
+  /** Rescan managed model files; on by default. */
   rescanLocal?: boolean;
+  /**
+   * Request orphan pruning. The current native refresh API reports this as
+   * unsupported and leaves missing-file rows unchanged.
+   */
   pruneOrphans?: boolean;
 }
 
@@ -263,6 +270,43 @@ export class ModelRegistryAdapter {
    * encode → withHeapBytes → readOwnedProtoResult pattern used by `query`.
    */
   refresh(options: RefreshOptions = {}): boolean {
+    const primary = this.module;
+    const siblings = [...knownModules].filter((mod) => mod !== primary);
+    const primarySucceeded = this.refreshCurrent(options);
+    let allSucceeded = primarySucceeded;
+
+    // Remote assignment refresh mutates this module's registry. Replay its
+    // snapshots into sibling registries before their local rescan so every
+    // backend can resolve newly assigned models.
+    if (primarySucceeded && options.includeRemoteCatalog) {
+      const catalog = this.list();
+      if (!catalog) {
+        allSucceeded = false;
+      } else {
+        for (const mod of siblings) {
+          const adapter = new ModelRegistryAdapter(mod);
+          for (const model of catalog.models) {
+            if (!adapter.registerDirect(model)) allSucceeded = false;
+          }
+        }
+      }
+    }
+
+    for (const mod of siblings) {
+      const adapter = new ModelRegistryAdapter(mod);
+      if (!adapter.refreshCurrent({
+        ...options,
+        includeRemoteCatalog: false,
+        pruneOrphans: false,
+      })) {
+        allSucceeded = false;
+      }
+    }
+    return allSucceeded;
+  }
+
+  /** Refresh only this module's registry; {@link refresh} handles fan-out. */
+  private refreshCurrent(options: RefreshOptions): boolean {
     const mod = this.module;
     const handle = mod._rac_get_model_registry();
     if (!handle) {
@@ -272,11 +316,11 @@ export class ModelRegistryAdapter {
 
     const reqBytes = ProtoModelRegistryRefreshRequestCodec.encode({
       includeRemoteCatalog: options.includeRemoteCatalog ?? false,
-      rescanLocal: options.rescanLocal ?? false,
+      rescanLocal: options.rescanLocal ?? true,
       pruneOrphans: options.pruneOrphans ?? false,
       catalogUri: '',
       forceRefresh: false,
-      includeDownloadedState: options.rescanLocal ?? false,
+      includeDownloadedState: true,
     }).finish();
 
     try {
@@ -295,6 +339,9 @@ export class ModelRegistryAdapter {
         return false;
       }
       const result = ProtoModelRegistryRefreshResultCodec.decode(resultBytes);
+      for (const warning of result.warnings) {
+        logger.warning(`rac_model_registry_refresh_proto: ${warning}`);
+      }
       return !result.error;
     } catch (error) {
       logger.warning(
@@ -487,21 +534,47 @@ export class ModelRegistryAdapter {
 
   /**
    * Register a model directly on this adapter's module WITHOUT broadcasting
-   * to other known modules. Used during catalog replay when a new WASM joins.
+   * to other known modules. Used when a new WASM joins and when remote refresh
+   * replays primary-registry catalog rows into sibling modules.
    */
-  private registerDirect(model: ProtoModelInfo): void {
-    if (!this.ensureProtoExports('registerDirect')) return;
-    const handle = this.getRegistryHandle('registerDirect');
-    if (!handle) return;
-    const bytes = ProtoModelInfoCodec.encode(model).finish();
+  private registerDirect(model: ProtoModelInfo): boolean {
+    if (!this.ensureProtoExports('registerDirect')) return false;
     try {
-      this.withHeapBytesOnModule(this.module, bytes, (bytesPtr, bytesLen) => (
+      const handle = this.getRegistryHandle('registerDirect');
+      if (!handle) return false;
+
+      const existing = this.get(model.id);
+      const preservedStatus = existing?.registryStatus;
+      const hasLocalDownloadState = preservedStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+        || preservedStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
+      const mergedModel = existing
+        ? {
+            ...model,
+            localPath: existing.localPath || model.localPath,
+            checksumSha256: hasLocalDownloadState
+              ? existing.checksumSha256 ?? model.checksumSha256
+              : model.checksumSha256 ?? existing.checksumSha256,
+            registryStatus: preservedStatus !== undefined
+              && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED
+              && preservedStatus !== ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED
+              ? preservedStatus
+              : model.registryStatus ?? preservedStatus,
+            isAvailable: hasLocalDownloadState
+              ? existing.isAvailable ?? model.isAvailable
+              : model.isAvailable ?? existing.isAvailable,
+            lastUsedAtUnixMs: existing.lastUsedAtUnixMs ?? model.lastUsedAtUnixMs,
+          }
+        : model;
+      const bytes = ProtoModelInfoCodec.encode(mergedModel).finish();
+      const result = this.withHeapBytesOnModule(this.module, bytes, (bytesPtr, bytesLen) => (
         this.module._rac_model_registry_register_proto!(handle, bytesPtr, bytesLen)
       ));
+      return this.handleResult('rac_model_registry_register_proto', result);
     } catch (error) {
       logger.debug(
         `registerDirect(${model.id}) failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return false;
     }
   }
 
