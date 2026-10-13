@@ -55,7 +55,8 @@ struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
 struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
 struct rac_diarization_service_ops; /* rac/features/diarization/rac_diarization_service.h */
 struct rac_segmentation_service_ops; /* reserved for semantic segmentation service */
-struct rac_rerank_service_ops;       /* rac/features/rerank/rac_rerank_service.h */
+struct rac_rerank_service_ops;
+struct rac_image_embedding_service_ops; /* rac/features/embeddings/rac_image_embedding_service.h */
 
 /**
  * @brief Plugin metadata carried in every vtable.
@@ -180,7 +181,12 @@ typedef struct rac_engine_vtable {
      *  struct layout stayed stable across the promotion. */
     const struct rac_rerank_service_ops* rerank_ops;
 
-    /* ─────────── Reserved slot pool (7 slots) ─────────── */
+    /** Image embedding (`RAC_PRIMITIVE_EMBED_IMAGE`). Promoted from reserved_slot_3 in ABI v10 —
+     *  occupies the same binary offset, so the struct layout stayed stable across the promotion,
+     *  exactly as rerank_ops did in v8. */
+    const struct rac_image_embedding_service_ops* image_embedding_ops;
+
+    /* ─────────── Reserved slot pool (5 slots) ─────────── */
     /*
      * Keeps the struct layout binary-stable as new primitives land. Each
      * reserved slot is a `const void*` so the compiler can fill with NULL
@@ -191,8 +197,9 @@ typedef struct rac_engine_vtable {
      *   3. Bumping RAC_PLUGIN_API_VERSION.
      * Old binaries will fail ABI version check and be rejected safely.
      */
-    const void* reserved_slot_3;
-    const void* reserved_slot_4;
+    /** OCR (`RAC_PRIMITIVE_OCR`). Promoted from reserved_slot_4 in ABI v11 — same binary
+     *  offset, so the 17-pointer tail is unchanged and only the ABI version gates it. */
+    const struct rac_ocr_service_ops* ocr_ops;
     const void* reserved_slot_5;
     const void* reserved_slot_6;
     const void* reserved_slot_7;
@@ -237,7 +244,9 @@ typedef struct rac_engine_vtable {
     X(RAC_PRIMITIVE_DIFFUSION, diffusion_ops, "diffusion")   \
     X(RAC_PRIMITIVE_DIARIZE, diarization_ops, "diarize")     \
     X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")    \
-    X(RAC_PRIMITIVE_RERANK, rerank_ops, "rerank")
+    X(RAC_PRIMITIVE_RERANK, rerank_ops, "rerank")           \
+    X(RAC_PRIMITIVE_EMBED_IMAGE, image_embedding_ops, "embed_image") \
+    X(RAC_PRIMITIVE_OCR, ocr_ops, "ocr")
 
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by

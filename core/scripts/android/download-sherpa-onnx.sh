@@ -36,7 +36,7 @@ CACHE_IDENTITY_FILE="${SHERPA_DIR}/.sherpa-android-provenance"
 HEADER_IDENTITY_FILE="${SHERPA_DIR}/include/.header-provenance"
 SHERPA_EMBEDDED_BUILD_ROOT="/home/home/Projects/sherpa-onnx"
 SHERPA_SANITIZED_BUILD_ROOT="/runanywhere/third-party/sherpa"
-SHERPA_TRANSFORM_MANIFEST="${SCRIPT_DIR}/sherpa-onnx-android-path-sanitization-v1.13.2.txt"
+SHERPA_TRANSFORM_MANIFEST="${SCRIPT_DIR}/sherpa-onnx-android-path-sanitization-v${SHERPA_VERSION}.txt"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -124,6 +124,7 @@ headers_are_current() {
     [ -f "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h" ] &&
         [ -f "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h" ] &&
         [ -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] &&
+        [ -f "${SHERPA_DIR}/include/onnxruntime_error_code.h" ] &&
         [ -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ] &&
         [ -f "${SHERPA_DIR}/include/onnxruntime_ep_c_api.h" ] &&
         [ -f "${HEADER_IDENTITY_FILE}" ] &&
@@ -420,6 +421,7 @@ download_headers() {
     rm -rf "${include_dir}/sherpa-onnx"
     rm -f \
         "${include_dir}/onnxruntime_c_api.h" \
+        "${include_dir}/onnxruntime_error_code.h" \
         "${include_dir}/onnxruntime_cxx_api.h" \
         "${include_dir}/onnxruntime_cxx_inline.h" \
         "${include_dir}/onnxruntime_float16.h" \
@@ -438,6 +440,8 @@ download_headers() {
     printf 'Downloading ONNX Runtime %s headers from commit %s...\n' \
         "${ONNX_VERSION_ANDROID}" "${ONNX_COMMIT_ANDROID}"
     download_file "${onnx_base}/onnxruntime_c_api.h" "${include_dir}/onnxruntime_c_api.h"
+    download_file "${onnx_base}/onnxruntime_error_code.h" \
+        "${include_dir}/onnxruntime_error_code.h"
     download_file "${onnx_base}/onnxruntime_cxx_api.h" "${include_dir}/onnxruntime_cxx_api.h"
     download_file "${onnx_base}/onnxruntime_cxx_inline.h" "${include_dir}/onnxruntime_cxx_inline.h"
     download_file "${onnx_base}/onnxruntime_float16.h" "${include_dir}/onnxruntime_float16.h"

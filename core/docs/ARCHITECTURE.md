@@ -1099,3 +1099,6 @@ Integration tests run through platform SDKs:
 
 - [README.md](./README.md) - Getting started guide
 - [../AGENTS.md](../AGENTS.md) - AI context and coding guidelines
+- [reference/subsystems.md](./reference/subsystems.md) - Lifecycle Manager, model registry,
+  download manager, error categories, logging, and RAG (including its "do not relitigate"
+  design rules)

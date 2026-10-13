@@ -23,8 +23,12 @@
  *  1. **One flat folder.** `QnnHtp.dll`, `QnnSystem.dll`, `QnnHtpPrepare.dll`
  *     and `QnnHtpV<arch>Stub.dll` (from `lib/aarch64-windows-msvc/`) sit beside
  *     `libQnnHtpV<arch>Skel.so` **and `libqnnhtpv<arch>.cat`** (from
- *     `lib/hexagon-v<arch>/unsigned/`). There is no `ADSP_LIBRARY_PATH` on
- *     Windows — the loader resolves through the DLL's own directory.
+ *     `lib/hexagon-v<arch>/unsigned/`), plus the Bonsai/Maple ternary decoder's
+ *     own `librun_main_on_hexagon_skel.so` + `.cat`. The standard HTP graph path
+ *     resolves through the DLL's own directory (see point 3); the Bonsai/Maple
+ *     skel is loaded by a separate FastRPC mechanism that DOES read
+ *     `ADSP_LIBRARY_PATH` on Windows — `bridge.ts`'s
+ *     `addSidecarDirToDspSearchPath` sets it to this same flat folder.
  *  2. **The `.cat` is mandatory.** Without it the skel fails signature
  *     verification, and the failure surfaces with no message naming the catalog
  *     — it reads exactly like a corrupt bundle.

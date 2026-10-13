@@ -1,0 +1,103 @@
+// RunAnywhere IDL - optical character recognition types.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "rac_options.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "OcrProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// Packed 8-bit pixel layouts accepted at the SDK boundary. Rows are tightly
+// packed; callers must not include per-row padding. Mirrors
+// SegmentationPixelFormat — decoding stays a platform concern, so commons and
+// the engines below it never link an image codec.
+enum OCRPixelFormat {
+    OCR_PIXEL_FORMAT_UNSPECIFIED = 0;
+    OCR_PIXEL_FORMAT_RGB8        = 1;
+    OCR_PIXEL_FORMAT_RGBA8       = 2;
+    OCR_PIXEL_FORMAT_BGRA8       = 3;
+}
+
+message OCRImage {
+    bytes data = 1 [(runanywhere.v1.rac_required) = true];
+    uint32 width = 2 [
+        (runanywhere.v1.rac_required) = true,
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 8192
+    ];
+    uint32 height = 3 [
+        (runanywhere.v1.rac_required) = true,
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 8192
+    ];
+    OCRPixelFormat pixel_format = 4 [(runanywhere.v1.rac_required) = true];
+}
+
+// A detected text region's outline, as FOUR CORNER POINTS rather than an
+// axis-aligned rectangle. Detectors in this family (FOTS/RegNet) emit rotated
+// boxes; flattening to a bounding rect at the boundary throws the angle away
+// before any caller can use it — a caller wanting an AABB can always compute
+// one from the quad, but not the reverse.
+//
+// Points are in SOURCE-image pixels (not the model's internal input size),
+// clockwise from top-left.
+message OCRQuad {
+    float x0 = 1;
+    float y0 = 2;
+    float x1 = 3;
+    float y1 = 4;
+    float x2 = 5;
+    float y2 = 6;
+    float x3 = 7;
+    float y3 = 8;
+}
+
+message OCRRegion {
+    string text = 1;
+    // Mean per-character confidence in [0.0, 1.0]. Absent — not zero — when
+    // the engine reports none; the C ABI signals that with a negative float,
+    // which would be indistinguishable from "certainly wrong" if flattened
+    // into a plain float here.
+    optional float confidence = 2;
+    OCRQuad quad = 3;
+}
+
+message OCRRequest {
+    OCRImage image = 1;
+
+    // Registry id, catalog id, or absolute path. Unset = use the resident OCR
+    // model. Mirrors SegmentationRequest.model_id.
+    optional string model_id = 2;
+
+    // Read one already-cropped LINE instead of detecting regions across a page.
+    //
+    // Only meaningful for engines whose recognizer consumes pixels. The
+    // detector-coupled families (nemotron-ocr) take a grid-sampled crop of the
+    // detector's own feature map, so their recognizer cannot run standalone and
+    // this returns NOT_SUPPORTED rather than a confident string of nonsense.
+    // Check OCRResult.supports_line_recognition before setting it.
+    bool recognize_single_line = 3;
+}
+
+message OCRResult {
+    repeated OCRRegion regions = 1;
+
+    // Wall time of the whole read, measured by commons across the engine call —
+    // not the engine's own self-report. The C ABI has a field for the latter and
+    // no engine fills it, so forwarding it meant every result claimed 0 ms.
+    int64 processing_time_ms = 2;
+    string model_id = 3;
+
+    // Whether this engine can serve recognize_single_line. Reported on every
+    // result so a caller learns the capability from a call it was going to make
+    // anyway, rather than needing a separate probe.
+    bool supports_line_recognition = 4;
+}

@@ -81,17 +81,17 @@ def write_transform_manifest(
 class DownloaderPinsTest(unittest.TestCase):
     def test_inspected_artifact_and_source_pins_are_exact(self) -> None:
         values = read_versions()
-        self.assertEqual(values["ONNX_VERSION_ANDROID"], "1.24.3")
+        self.assertEqual(values["ONNX_VERSION_ANDROID"], "1.28.0")
         self.assertEqual(
-            values["ONNX_COMMIT_ANDROID"], "3a728b75062256951b6e19ce718907cf1a1d4cf0",
+            values["ONNX_COMMIT_ANDROID"], "da9b5e364c465de65c49d91e696cd6485270757f",
         )
         self.assertEqual(
             values["SHERPA_ONNX_COMMIT_ANDROID"],
-            "707ffc40b0fd59c04f50998e72989dd816b1dd37",
+            "12f7112dc8f8161bdb611b31837bd47d70e4603f",
         )
         self.assertEqual(
             values["SHERPA_ONNX_ANDROID_SHA256"],
-            "6ce931ffb49605cf1448e5fa98f9804fb7fdc5bb72efded3048a84080eea477b",
+            "f7e774d99f03bf51f11ee0b9c155f2737b98c5f299b0575c18821285a338edd5",
         )
         self.assertEqual(
             values["SHERPA_ONNX_HEADER_COMMIT_ANDROID"],

@@ -462,7 +462,11 @@ export interface NativeAddon {
  * runtime beats a differently-versioned QAIRT already on the machine's PATH; the
  * whole flat set (QnnHtp/QnnSystem/QnnHtpPrepare/QnnHtpV<arch>Stub plus the skel
  * and its .cat) then resolves out of that one directory, which is the invariant
- * the Hexagon stack requires on Windows (there is no ADSP_LIBRARY_PATH here).
+ * the standard Hexagon HTP graph path requires on Windows. The Bonsai/Maple
+ * ternary decoder's FastRPC skel is a SEPARATE mechanism that does read an
+ * `ADSP_LIBRARY_PATH` env var on Windows (contrary to what an earlier version of
+ * this comment claimed) — see `addSidecarDirToDspSearchPath` below, which this
+ * function also calls.
  *
  * Thin-addon dual path: also prepend every registered plugin directory and the
  * directory that holds `librac_commons` / `rac_commons.dll` when present.
@@ -476,6 +480,41 @@ function addSidecarDirToDllSearch(dir: string): void {
     .some((entry) => entry && path.resolve(entry).toLowerCase() === resolved.toLowerCase());
   if (already) return;
   process.env.PATH = current ? `${dir}${path.delimiter}${current}` : dir;
+  addSidecarDirToDspSearchPath(dir);
+}
+
+/**
+ * Also make a directory reachable by the Bonsai/Maple decoder's FastRPC skel loader
+ * (QHexRT/src/bonsai/fastrpc_win.cpp), which is a SEPARATE search mechanism from the
+ * Win32 DLL loader above and does not benefit from the PATH prepend at all.
+ *
+ * That native code seeds `ADSP_LIBRARY_PATH` itself, but its only fallback is
+ * `exe_dir()` — the directory of the running EXECUTABLE. For a CLI tool the exe
+ * sits beside the flat QAIRT/skel folder, so that fallback is correct. In a
+ * packaged Electron app the executable is `RunAnywhere AI.exe`, nowhere near
+ * `node_modules/@runanywhere/electron-qhexrt/prebuilds/…` — exactly the gap
+ * `addSidecarDirToDllSearch` above exists to close for PATH. Left unset, the
+ * custom ternary/bonsai skel (`librun_main_on_hexagon_skel.so`) fails to load
+ * with a bare `HostOpFailed` at generate time — the model loads fine and only
+ * this one decode path breaks, which is what makes it easy to miss: every other
+ * QHexRT model resolves its runtime through the ordinary `LoadLibraryW`
+ * search order and never touches this second mechanism.
+ *
+ * Must run before the utility-host fork so the child inherits it — `_putenv_s`
+ * seeds a DLL's CRT at its OWN LoadLibrary time, but a forked child's env is a
+ * snapshot taken at fork(), so setting this in the parent process (here, before
+ * `require()` loads the addon that eventually forks) is what makes the timing
+ * work at all.
+ */
+function addSidecarDirToDspSearchPath(dir: string): void {
+  if (process.platform !== 'win32') return;
+  const current = process.env.ADSP_LIBRARY_PATH ?? '';
+  const resolved = path.resolve(dir);
+  const already = current
+    .split(path.delimiter)
+    .some((entry) => entry && path.resolve(entry).toLowerCase() === resolved.toLowerCase());
+  if (already) return;
+  process.env.ADSP_LIBRARY_PATH = current ? `${dir}${path.delimiter}${current}` : dir;
 }
 
 function commonsLibraryFileName(platform: NodeJS.Platform = process.platform): string {

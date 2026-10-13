@@ -9,7 +9,7 @@ The Web SDK is a Swift-aligned TypeScript facade over the RACommons C/C++ core. 
 - `@runanywhere/web/internal`: broader core-internal implementation exports; neither applications nor backend packages may depend on this entrypoint.
 - `@runanywhere/web/browser`: browser-only helpers such as audio capture/playback, video capture, and capability detection.
 - `@runanywhere/web-llamacpp`: LLM + GGUF text embeddings + VLM + LoRA + tool-calling + structured-output backend. Ships **two execution-mode variants**: `racommons-llamacpp.{js,wasm}` (CPU) and `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU + Asyncify). Both carry the unified llama.cpp vtable; model-framework routing lets its embedding primitive coexist with ONNX.
-- `@runanywhere/web-onnx`: ONNX embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` (CPU/pthread) and `racommons-onnx-sherpa-webgpu.{js,wasm}` (ORT WebGPU EP) — registers two vtables (`onnx`, `sherpa`) because they share ONNX Runtime. Speech acceleration is **separate** from LLM WebGPU (`ONNX.register({ acceleration, threads })`, `RunAnywhere.runtime.speech`). Fail-closed BackendWorker by default in browsers. See `docs/ONNX_WEBGPU.md`.
+- `@runanywhere/web-onnx`: ONNX embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` (CPU/pthread) and `racommons-onnx-sherpa-webgpu.{js,wasm}` (ORT WebGPU EP) — registers two vtables (`onnx`, `sherpa`) because they share ONNX Runtime. Speech acceleration is **separate** from LLM WebGPU (`ONNX.register({ acceleration, threads })`, `RunAnywhere.runtime.speech`). Fail-closed BackendWorker by default in browsers. See [`docs/ONNX_WEBGPU.md`](docs/ONNX_WEBGPU.md) and [`docs/WASM_AND_WEBGPU.md`](docs/WASM_AND_WEBGPU.md) for why both WASM and WebGPU exist.
 
 Keep app code on the root `RunAnywhere` facade. Backend packages integrate only through `@runanywhere/web/backend`; browser apps may import UI/device helpers from `@runanywhere/web/browser`.
 
@@ -77,11 +77,11 @@ browser app
 
 ## Security and Honest Runtime State
 
-- Never log API keys, bearer tokens, authorization headers, request bodies
-  containing credentials, or secret-bearing URLs. Do not store API keys in
-  localStorage, OPFS, IndexedDB, screenshots, traces, or committed `.env`
-  files. `VITE_*` values are browser-visible client configuration, never
-  server secrets.
+- Never log or persist API keys, bearer tokens, authorization headers, request
+  bodies containing credentials, or secret-bearing URLs (localStorage, OPFS,
+  IndexedDB, screenshots, traces, `.env` files included). `VITE_*` values are
+  public browser-bundle configuration, never server secrets — see
+  [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full deployment contract.
 - Browser control-plane access must be same-origin when an upstream does not
   publish CORS. Keep relay destinations fixed and allowlisted; never turn a
   URL from Settings, query parameters, or request bodies into a proxy target.
@@ -133,36 +133,8 @@ npm run build
 npm run dev
 ```
 
-## Public Surface
-
-The root package intentionally exports a small Swift-shaped surface:
-
-```ts
-import { RunAnywhere, SDKEnvironment } from '@runanywhere/web';
-import { LlamaCPP } from '@runanywhere/web-llamacpp';
-
-await RunAnywhere.initialize({
-  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-});
-await LlamaCPP.register({ acceleration: 'auto' });
-
-const stream = await RunAnywhere.generateStream({
-  prompt: 'Write a haiku about local AI.',
-  maxTokens: 128,
-});
-
-for await (const token of stream.stream) {
-  console.log(token);
-}
-```
-
-Prefer Swift-shaped flat APIs at the root when Swift exposes a flat method:
-
-- Model lifecycle/registry: `RunAnywhere.loadModel`, `unloadModel`, `currentModel`, `componentLifecycleSnapshot`, `listModels`, `queryModels`, `getModel`, `downloadedModels`, `downloadModel`, `importModel`.
-- LLM/structured/tool calling: `RunAnywhere.generate`, `generateStream`, `cancelGeneration`, `generateStructured`, `generateStructuredStream`, `extractStructuredOutput`, `generateWithTools`.
-- Speech/VLM/VoiceAgent/RAG: `RunAnywhere.transcribe`, `transcribeStream`, `synthesize`, `synthesizeStream`, `speak`, `stopSynthesis`, `stopSpeaking`, `detectVoiceActivity`, `streamVAD`, `resetVAD`, `processImage`, `processImageStream`, `cancelVLMGeneration`, `initializeVoiceAgent`, `processVoiceTurn`, `streamVoiceAgent`, `ragCreatePipeline`, `ragIngest`, `ragQuery`, etc.
-
-Keep namespaces when Swift has namespace properties (`RunAnywhere.solutions`, `RunAnywhere.pluginLoader`) or when backend/package internals need lower-level handles. Example app code should prefer root Swift-shaped methods and avoid `@runanywhere/web/internal`.
+Full release-gate sequencing, package-verification, and browser-validation
+runbooks live in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 ## Package Structure
 
@@ -185,7 +157,6 @@ bindings/web/
     ├── llamacpp/
     │   ├── src/LlamaCPP.ts
     │   ├── src/Foundation/LlamaCppBridge.ts
-    │   ├── src/Infrastructure/LifecycleVLMProvider.ts
     │   └── wasm/              # racommons-llamacpp.{js,wasm} + racommons-llamacpp-webgpu.{js,wasm}
     └── onnx/
         ├── src/ONNX.ts
@@ -193,9 +164,7 @@ bindings/web/
         └── wasm/              # racommons-onnx-sherpa.{js,wasm} (+ optional -webgpu twin)
 ```
 
-There is no longer a `packages/onnx/wasm/sherpa/` standalone artifact, and no `StandaloneSherpa*` provider in `packages/onnx/src/Foundation/`. The proto-byte STT/TTS/VAD path through `racommons-onnx-sherpa.wasm` is the only Sherpa surface.
-
-## Initialization Flow
+## Initialization & Public Surface
 
 ```ts
 import { RunAnywhere, SDKEnvironment } from '@runanywhere/web';
@@ -210,9 +179,20 @@ await ONNX.register();                                // loads racommons-onnx-sh
 await RunAnywhere.completeServicesInitialization();
 ```
 
-`RunAnywhere.initialize()` loads `racommons.wasm` (commons only) and records core SDK state. Each backend `register()` call loads its own dedicated WASM, calls `rac_init()` against that module, registers the backend vtable(s) with the plugin registry, and installs the module on the core proto-byte adapters so subsequent operations route correctly.
+`RunAnywhere.initialize()` loads `racommons.wasm` (commons only) and records core SDK
+state. Each backend's `register()` loads its own dedicated WASM, calls `rac_init()`
+against that module, registers its vtable(s) with the plugin registry, and installs
+itself on the core proto-byte adapters so subsequent operations route correctly.
+`ONNX.register()` accepts an optional `wasmUrl` override; the previous
+`skipProtoBytePlugins` / `skipStandaloneSpeech` options were removed — proto-byte is
+the only path.
 
-`ONNX.register()` accepts an optional `wasmUrl` override. The previous `skipProtoBytePlugins` / `skipStandaloneSpeech` options have been removed — the proto-byte path is the only path.
+The root facade is intentionally small and Swift-shaped
+(`RunAnywhere.loadModel`, `generateStream`, `transcribeStream`, `ragQuery`, …).
+See [`docs/reference/PUBLIC_API_SURFACE.md`](docs/reference/PUBLIC_API_SURFACE.md)
+for the full method inventory. Keep namespaces only where Swift has them
+(`RunAnywhere.solutions`, `RunAnywhere.pluginLoader`); example/app code should
+prefer root methods and avoid `@runanywhere/web/internal`.
 
 ### Demo boot and runtime honesty
 
@@ -227,74 +207,28 @@ await RunAnywhere.completeServicesInitialization();
   failure, `runtime.degradedReason` explains the main-thread fallback.
   Nesting the pthread CPU artifact in a DedicatedWorker requires
   `mainScriptUrlOrBlob` so `em-pthread` children can boot.
-- Diffusion is exposed through `@runanywhere/web` core (Swift/Kotlin parity); there is no separate `@runanywhere/web-diffusion` package
-  until it ships a WASM artifact. Do not claim or package diffusion alongside
-  the four current canonical JS/WASM pairs.
+- Diffusion is exposed through `@runanywhere/web` core (Swift/Kotlin parity); there
+  is no separate `@runanywhere/web-diffusion` package until it ships a WASM
+  artifact — don't claim or package it alongside the four canonical JS/WASM pairs.
 - Hybrid STT registers `Cloud.registerBackend()` only after `ONNX.register()`;
   a missing optional cloud engine must not make local ONNX/Sherpa unavailable.
 
-## Build Artifacts
+## Build, Artifacts & Release Validation
 
-Expected publish-time artifacts:
+Canonical publish-time WASM/JS artifact pairs, the `prepack`/`verify:package`
+gates, and the browser-validation runbook (COOP/COEP, per-modality
+download→load→inference→output proof) are documented in
+[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md); the production deployment
+contract (headers, CSP, static-asset serving, storage/memory budgets) is in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Read both before cutting a release
+or touching headers/CSP — do not re-derive them here.
 
-- `packages/core/dist/**`
-- `packages/core/wasm/racommons.{js,wasm}`
-- `packages/llamacpp/dist/**`
-- `packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}`
-- `packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}`
-- `packages/onnx/dist/**`
-- `packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}`
-- `packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}`
-- `../proto-ts/dist/**`
+Two invariants worth restating because they are easy to violate by accident:
 
-`packages/onnx` must not publish `wasm/sherpa/**` (the directory no longer exists).
-
-Every canonical `.js` file is mandatory Emscripten runtime glue. A bundler may
-hash the main-thread import, while pthread-enabled CPU/ONNX modules can also
-request their canonical self-name from workers. The WebGPU release variant is
-deliberately non-threaded because its asynchronous waits use Asyncify, but its
-canonical glue remains required. Package and deployment gates must verify all
-four canonical JS/WASM pairs are non-empty, syntactically valid, served as
-JavaScript/`application/wasm`, and never answered by an SPA HTML fallback.
-
-## Validation
-
-Build/install/launch is smoke validation only. Full Web validation needs:
-
-1. Fresh browser context.
-2. Example app served with COOP/COEP headers.
-3. Model download.
-4. Model load.
-5. Real browser inference for the target modality.
-6. Logs/screenshots reviewed.
-
-The maintained browser suites and support code live under `tests/browser/` and
-run through `playwright.config.ts`; keep release assertions there.
-
-### Required release gates
-
-Run all static gates before browser validation:
-
-```bash
-cd bindings/web
-npm run typecheck
-npm run lint
-npm run test
-npm run build
-npm run test:browser
-npm run test:browser:release
-
-cd example
-npm run typecheck
-npm run build
-```
-
-Then launch the built application in a real browser with COOP/COEP enabled.
-For every claimed modality, verify model download, model load, real inference,
-visible output, cancellation/retry where supported, and reviewed console/page/
-network errors. A release that claims the full demo must exercise LLM, VLM,
-STT batch + streaming, TTS playback, VAD, Voice Agent, RAG/Documents, model
-storage/persistence, Settings reinitialization, CPU fallback, and WebGPU when
-the browser supports it. Production verification repeats the header, asset,
-backend-registration, and representative inference checks against the deployed
-origin.
+- `packages/onnx` must never publish `wasm/sherpa/**` — that standalone
+  artifact was removed; the proto-byte path through `racommons-onnx-sherpa.wasm`
+  is the only Sherpa surface.
+- A green `typecheck`/`lint`/`build` is smoke validation only. Claiming a
+  release covers a modality (LLM, VLM, STT, TTS, VAD, Voice Agent, RAG, …)
+  requires driving it in a real, COOP/COEP-enabled browser end to end — see
+  `npm run test:browser:release` and `tests/browser/release-app.e2e.spec.ts`.

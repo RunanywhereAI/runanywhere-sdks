@@ -93,6 +93,21 @@ static const rac_embeddings_config_t RAC_EMBEDDINGS_CONFIG_DEFAULT = {
     .pooling = RAC_EMBEDDINGS_POOLING_MEAN};
 
 // =============================================================================
+// INPUT TYPE
+// =============================================================================
+
+/**
+ * @brief What an embedding will be used for.
+ *
+ * Mirrors `runanywhere.v1.EmbeddingsInputType` wire values exactly.
+ */
+typedef enum rac_embeddings_input_type {
+    RAC_EMBEDDINGS_INPUT_TYPE_UNSPECIFIED = 0, /**< model default / symmetric model */
+    RAC_EMBEDDINGS_INPUT_TYPE_QUERY = 1,
+    RAC_EMBEDDINGS_INPUT_TYPE_DOCUMENT = 2
+} rac_embeddings_input_type_t;
+
+// =============================================================================
 // OPTIONS
 // =============================================================================
 
@@ -119,13 +134,32 @@ typedef struct rac_embeddings_options {
 
     /** Batch chunk size (0 = backend default) */
     int32_t batch_size;
+
+    /**
+     * What the vector will be used for (`rac_embeddings_input_type_t`).
+     *
+     * Asymmetric embedders prepend a different prompt for a query than for a
+     * document, and the difference is not cosmetic: Nemotron-3-Embed-1B scores
+     * an unprefixed query/passage pair at 0.70 against an unrelated passage's
+     * 0.70 -- no separation at all -- and 0.48 vs 0.007 once the declared
+     * `query: ` / `passage: ` prefixes are applied.
+     *
+     * A bundle that declares no prompt table ignores this and returns the same
+     * vector for QUERY and DOCUMENT. It never errors.
+     *
+     * Appended to this struct in plugin ABI v10. Safe because the receipt check
+     * already refuses any prebuilt engine built against an earlier ABI, so no
+     * engine can read this field off a caller that did not write it.
+     */
+    int32_t input_type;
 } rac_embeddings_options_t;
 
 /**
  * @brief Default embedding options
  */
 static const rac_embeddings_options_t RAC_EMBEDDINGS_OPTIONS_DEFAULT = {
-    .normalize = -1, .pooling = -1, .n_threads = 0, .truncate = -1, .batch_size = 0};
+    .normalize = -1, .pooling = -1, .n_threads = 0, .truncate = -1, .batch_size = 0,
+    .input_type = RAC_EMBEDDINGS_INPUT_TYPE_UNSPECIFIED};
 
 // =============================================================================
 // RESULT

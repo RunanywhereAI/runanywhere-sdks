@@ -11,6 +11,8 @@
 #ifndef RAC_LLM_LLAMACPP_H
 #define RAC_LLM_LLAMACPP_H
 
+#include <stdint.h>
+
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
@@ -52,6 +54,9 @@ extern "C" {
  *
  * Mirrors Swift's LlamaCPPGenerationConfig.
  */
+/** `gpu_layers` value meaning "let llama.cpp decide" (see the field docs). */
+#define RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO INT32_MIN
+
 typedef struct rac_llm_llamacpp_config {
     /** Context size (0 = auto-detect from model) */
     int32_t context_size;
@@ -59,7 +64,15 @@ typedef struct rac_llm_llamacpp_config {
     /** Number of threads (0 = auto-detect) */
     int32_t num_threads;
 
-    /** Number of layers to offload to GPU (Metal on iOS/macOS) */
+    /**
+     * Number of layers to offload to GPU (Metal on iOS/macOS).
+     *
+     * `RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO` leaves the decision to llama.cpp's own
+     * fitting pass; `-1` offloads every layer; `0` pins the model to the CPU.
+     * Zero used to double as "unspecified", which made pinning to CPU
+     * impossible to express: the value was indistinguishable from a caller who
+     * had simply left the field alone.
+     */
     int32_t gpu_layers;
 
     /** Batch size for prompt processing */
@@ -289,6 +302,53 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_from_context(
  * @return RAC_SUCCESS or error code
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle);
+
+// =============================================================================
+// GGML/LLAMA.CPP DIAGNOSTICS
+// =============================================================================
+
+/**
+ * Callback for ggml/llama.cpp's own log output (backend init, Metal/CUDA
+ * device probing, tensor loading, etc.) — the messages ggml would otherwise
+ * print straight to stderr via its internal GGML_LOG_* macros, independent of
+ * anything the LLM/VLM/rerank/embeddings request path logs through
+ * rac_logger.h.
+ *
+ * @param level     ggml's level, mapped onto rac_log_level_t (rac/core/rac_types.h).
+ *                  ggml's GGML_LOG_LEVEL_CONT (a continuation of the previous
+ *                  line) is folded into whatever level that previous line
+ *                  carried, so every call here already has a real severity.
+ * @param message   NUL-terminated message text for one ggml log line (no
+ *                  trailing newline).
+ * @param user_data The pointer passed to rac_llamacpp_set_log_callback().
+ */
+typedef void (*rac_llamacpp_log_callback_fn)(rac_log_level_t level, const char* message,
+                                             void* user_data);
+
+/**
+ * Installs a callback for ggml/llama.cpp's own log output.
+ *
+ * ggml_log_set() — the function that actually owns this sink — is compiled
+ * into the linked llama.cpp/ggml archive with no public header in the kit;
+ * this is the supported way to reach it without declaring the unpublished
+ * symbol by hand. The sink is process-global (ggml has one log callback, not
+ * one per model/handle) and shared by every llama.cpp-backed capability —
+ * LLM, VLM, rerank, embeddings — so installing it here is enough to cover
+ * ggml_metal_* init spam regardless of which one a caller uses first.
+ *
+ * Passing NULL restores the SDK's own routing of ggml output through
+ * rac_logger.h (RAC_LOG_ERROR/WARNING/DEBUG, category "LLM.LlamaCpp.GGML"),
+ * gated by rac_logger_set_min_level() like any other RAC_LOG_* call — that is
+ * also the default before this is ever called, so a caller that only wants
+ * ggml noise gated behind the SDK's existing quiet/verbose level (and not
+ * routed anywhere custom) does not need to call this at all.
+ *
+ * @param callback  Called for every ggml log line; NULL restores the default
+ *                  rac_logger.h routing described above.
+ * @param user_data Opaque pointer passed to every callback invocation.
+ */
+RAC_LLAMACPP_API void rac_llamacpp_set_log_callback(rac_llamacpp_log_callback_fn callback,
+                                                    void* user_data);
 
 // =============================================================================
 // BACKEND REGISTRATION

@@ -512,9 +512,12 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
     if (uses_language_prompt_) {
         const char* runtime_version = SherpaOnnxGetVersionStr();
         if (!runtime_version ||
-            !rac::backends::sherpa::sherpa_runtime_version_at_least(runtime_version, 1, 13, 4)) {
+            !rac::backends::sherpa::sherpa_runtime_version_at_least(runtime_version, 1, 13, 5)) {
+            // The corrected NeMo streaming-transducer greedy decoder first
+            // shipped in 1.13.5. A 1.13.4 runtime can load this graph but does
+            // not decode it correctly, so accepting it here would be unsafe.
             const std::string detail =
-                "Nemotron 3.5 prompted streaming ASR requires Sherpa-ONNX >= 1.13.4; "
+                "Nemotron 3.5 prompted streaming ASR requires Sherpa-ONNX >= 1.13.5; "
                 "packaged runtime is " +
                 std::string(runtime_version ? runtime_version : "unknown");
             RAC_LOG_ERROR("Sherpa.STT", "%s", detail.c_str());

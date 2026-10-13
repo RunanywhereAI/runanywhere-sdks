@@ -24,23 +24,12 @@ add_compile_definitions(RAC_LLAMACPP_VERSION="${RAC_LLAMACPP_VERSION}")
 
 # Repo + tag both come from core/VERSIONS (via LoadVersions)
 # so a fork swap (e.g. the PrismML Bonsai fork) is a VERSIONS-only change.
-# Fall back to upstream when the key is absent (older VERSIONS files).
+# Fall back to the maintained RunAnywhere fork when the key is absent (older
+# VERSIONS files), because the pinned compatibility tag may not exist upstream.
 if(NOT RAC_LLAMACPP_GIT_REPOSITORY)
-    set(RAC_LLAMACPP_GIT_REPOSITORY "https://github.com/ggerganov/llama.cpp.git")
+    set(RAC_LLAMACPP_GIT_REPOSITORY "https://github.com/RunanywhereAI/llama.cpp.git")
 endif()
 message(STATUS "llama.cpp source: ${RAC_LLAMACPP_GIT_REPOSITORY} @ ${RAC_LLAMACPP_VERSION}")
-
-# Keep the cross-platform armv7 compatibility patch first. On iOS, chain the
-# Metal residency-set capability guard after it instead of replacing it.
-set(LLAMACPP_PATCH_COMMAND
-    ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_DIR}/patch_ggml_armv7.cmake"
-)
-if(RAC_PLATFORM_IOS)
-    list(APPEND LLAMACPP_PATCH_COMMAND
-        COMMAND git apply --3way --unidiff-zero --ignore-whitespace
-                "${CMAKE_CURRENT_LIST_DIR}/patches/001-metal-residency-set-guard.patch"
-    )
-endif()
 
 FetchContent_Declare(
     llamacpp
@@ -48,9 +37,6 @@ FetchContent_Declare(
     GIT_TAG        ${RAC_LLAMACPP_VERSION}
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
-    # Fix the ggml arch/arm/quants.c armv7 build break (raw AArch64-only vqtbl1q_u8 -> portable wrapper).
-    # Idempotent + no-op when the pattern/file is absent, so it is safe on every arch and future llama.cpp bump.
-    PATCH_COMMAND ${LLAMACPP_PATCH_COMMAND}
 )
 
 # Configure llama.cpp build options
@@ -115,7 +101,7 @@ elseif(RAC_PLATFORM_ANDROID)
 
     # Enable ARM NEON only for ARM architectures (not x86/x86_64). armeabi-v7a keeps
     # NEON on; the ggml arch/arm/quants.c armv7 build break (raw AArch64-only
-    # vqtbl1q_u8) is fixed by the FetchContent PATCH_COMMAND above, not by dropping NEON.
+    # vqtbl1q_u8) is fixed in the pinned llama.cpp fork, not by dropping NEON.
     if(ANDROID_ABI MATCHES "arm64-v8a|armeabi-v7a")
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for ARM ABI: ${ANDROID_ABI}")
@@ -196,6 +182,25 @@ elseif(RAC_PLATFORM_WINDOWS)
         set(GGML_CUDA OFF CACHE BOOL "" FORCE)
         message(STATUS "Configuring llama.cpp for Windows (no CUDA; Vulkan=${GGML_VULKAN})")
     endif()
+
+    # ggml's MSVC ARM backend is an explicit FATAL_ERROR ("use clang").
+    # Windows-on-ARM hosts still report CMAKE_SYSTEM_PROCESSOR=ARM64 even
+    # when vcvarsall amd64 has selected Hostx64/x64/cl.exe, which is how
+    # the cpp-desktop-windows-x64 kit is built on Snapdragon boxes under
+    # Prism. Force AMD64 so ggml takes the AVX path, not ARM.
+    if(MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64")
+        if(CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
+           OR CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$"
+           OR CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
+            set(CMAKE_SYSTEM_PROCESSOR AMD64)
+            message(STATUS "llama.cpp: x64 MSVC on ARM host — CMAKE_SYSTEM_PROCESSOR=AMD64")
+        else()
+            message(FATAL_ERROR
+                "llama.cpp cannot be built with MSVC targeting ARM. "
+                "Use vcvarsall amd64 (x64 kit under Prism) or clang, "
+                "or set RAC_BACKEND_LLAMACPP=OFF.")
+        endif()
+    endif()
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORCE)
@@ -236,6 +241,10 @@ set(LLAMACPP_BACKEND_SOURCES
     # Cross-encoder reranking (rank-pooling GGUFs) — fills rerank_ops.
     rac_rerank_llamacpp.cpp
     rac_backend_llamacpp_register.cpp
+    # ggml/llama.cpp log routing shared by LLM/VLM/rerank/embeddings — see
+    # llamacpp_logging.h and rac_llamacpp_set_log_callback() in
+    # rac/backends/rac_llm_llamacpp.h.
+    rac_llamacpp_logging.cpp
     # Unified ABI plugin entry — fills both llm_ops and vlm_ops slots.
     rac_plugin_entry_llamacpp.cpp
     # VLM Backend (vision-language as a modality of the same engine).
@@ -248,6 +257,7 @@ set(LLAMACPP_BACKEND_SOURCES
 
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
+    llamacpp_logging.h
     llamacpp_stop_helpers.h
 )
 
@@ -313,7 +323,7 @@ list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 # ../../core.
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 rac_add_engine_plugin(llamacpp
     TARGET_NAME         rac_backend_llamacpp

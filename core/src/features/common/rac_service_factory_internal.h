@@ -54,6 +54,17 @@ struct ResolvedModelReference {
     ModelInfoPtr model_info;
 };
 
+/**
+ * @brief Resolves a model ID or path reference against the model registry.
+ *
+ * Performs model resolution by ID, full path, or extracted filename component across
+ * POSIX and Windows path formats, evaluating local path preferences and fallback frameworks.
+ *
+ * @param model_id Model identifier or filesystem path to resolve.
+ * @param options Resolution configuration options including log category and defaults.
+ * @param out_reference Output struct populated with resolved path, framework, and metadata.
+ * @return RAC_SUCCESS on successful resolution, or an error code on invalid parameters.
+ */
 inline rac_result_t resolve_model_reference(const char* model_id,
                                             const ModelReferenceOptions& options,
                                             ResolvedModelReference* out_reference) {
@@ -80,7 +91,11 @@ inline rac_result_t resolve_model_reference(const char* model_id,
     }
 
     if (result != RAC_SUCCESS && options.lookup_last_path_component) {
-        const char* last_slash = strrchr(model_id, '/');
+        const char* last_fwd = strrchr(model_id, '/');
+        const char* last_bck = strrchr(model_id, '\\');
+        const char* last_slash = (last_fwd && last_bck) ? std::max(last_fwd, last_bck)
+                                 : last_fwd             ? last_fwd
+                                                        : last_bck;
         if (last_slash && last_slash[1] != '\0') {
             const char* extracted_id = last_slash + 1;
             RAC_LOG_DEBUG(options.log_cat, "Trying extracted model ID from path: %s", extracted_id);
@@ -121,8 +136,18 @@ inline rac_result_t resolve_model_reference(const char* model_id,
                 rac_model_path_resolution_free(&resolution);
             }
         }
-        if (options.prefer_input_path_when_contains &&
-            strstr(model_id, options.prefer_input_path_when_contains) != nullptr) {
+        bool prefer_input = false;
+        if (options.prefer_input_path_when_contains) {
+            if (std::strcmp(options.prefer_input_path_when_contains, "/") == 0) {
+                // Path separator match: accept either '/' or '\' for cross-platform file paths
+                prefer_input =
+                    (strchr(model_id, '/') != nullptr || strchr(model_id, '\\') != nullptr);
+            } else {
+                prefer_input =
+                    (strstr(model_id, options.prefer_input_path_when_contains) != nullptr);
+            }
+        }
+        if (prefer_input) {
             out_reference->path = model_id;
         } else {
             out_reference->path = registry_path;
@@ -157,6 +182,13 @@ struct PluginServiceCreateSpec {
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
 };
 
+/**
+ * @brief Returns the preferred engine plugin identifier for a framework and primitive.
+ *
+ * @param framework Inference framework enum.
+ * @param primitive Primitive operation kind enum.
+ * @return Engine identifier string constant, or nullptr if no specific preference.
+ */
 inline const char* plugin_hint_for_framework(rac_inference_framework_t framework,
                                              rac_primitive_t primitive) {
     switch (framework) {
@@ -179,17 +211,28 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
         case RAC_FRAMEWORK_SYSTEM_TTS:
             return RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_COREML:
-            // The neurt engine serves BOTH Core ML modalities: DIFFUSION over MLModel
-            // and GENERATE_TEXT on the Apple Neural Engine. It used to serve diffusion
-            // only, so everything else fell through to `platform` (Apple Foundation
-            // Models / System TTS) — which for a COREML-framework LLM meant pinning the
-            // wrong engine and quietly generating from Foundation Models instead of the
-            // ANE bundle the caller asked for.
-            if (primitive == RAC_PRIMITIVE_DIFFUSION ||
-                primitive == RAC_PRIMITIVE_GENERATE_TEXT) {
-                return RAC_ENGINE_ID_NEURT;
-            }
-            return RAC_ENGINE_ID_PLATFORM;
+            // A Core ML model is a NeuRT model, for every primitive NeuRT serves.
+            //
+            // This used to be a per-primitive allow-list ({DIFFUSION, GENERATE_TEXT}),
+            // with everything else falling through to `platform` (Apple Foundation
+            // Models / System TTS). That list went stale twice: first for GENERATE_TEXT
+            // — a COREML-framework LLM pinned the wrong engine and quietly generated
+            // from Foundation Models instead of the ANE bundle the caller asked for —
+            // and again the moment NeuRT grew TRANSCRIBE, EMBED, RERANK and VLM.
+            //
+            // The second staleness is the dangerous one, because it does not fail: when
+            // the hinted engine does not serve the primitive, create_plugin_service()
+            // below falls back to plain priority. MLX is priority 110 and NeuRT is 100,
+            // and MLX also fills embedding_ops — so a Core ML embedding model would be
+            // served by MLX, silently, with a warning nobody reads.
+            //
+            // model_lifecycle.cpp's engine_name_for_framework() has always mapped
+            // COREML -> neurt unconditionally. Matching that invariant here is what
+            // stops the two paths disagreeing, and it cannot go stale again.
+            //
+            // See framework_requires_hinted_plugin() below for why COREML must not use
+            // the priority fallback at all.
+            return RAC_ENGINE_ID_NEURT;
         case RAC_FRAMEWORK_QHEXRT:
             return RAC_ENGINE_ID_QHEXRT;
         case RAC_FRAMEWORK_FLUID_AUDIO:
@@ -201,6 +244,28 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
     }
 }
 
+/**
+ * @brief Checks whether a framework requires its hinted engine strictly without priority fallback.
+ *
+ * @param framework Inference framework enum.
+ * @return True if fallback to alternative engines is disallowed.
+ */
+inline bool framework_requires_hinted_plugin(rac_inference_framework_t framework) {
+    return framework == RAC_FRAMEWORK_COREML;
+}
+
+/**
+ * @brief Instantiates a typed plugin service instance according to creation specifications.
+ *
+ * Routes primitive dispatch to the hinted or highest-priority plugin backend, invokes
+ * backend creation, and returns a heap-allocated service wrapper.
+ *
+ * @tparam ServiceT C service struct type.
+ * @tparam OpsT Engine vtable ops struct type.
+ * @param spec Configuration and model descriptor parameters.
+ * @param out_service Output pointer receiving the created service instance.
+ * @return RAC_SUCCESS on success, or a typed error code on failure.
+ */
 template <typename ServiceT, typename OpsT>
 rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>& spec,
                                    ServiceT** out_service) {
@@ -214,6 +279,13 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     if (engine_hint != nullptr) {
         vt = rac_plugin_find_for_engine(spec.primitive, engine_hint);
         if (vt == nullptr) {
+            if (framework_requires_hinted_plugin(spec.framework)) {
+                RAC_LOG_ERROR(spec.log_cat,
+                              "plugin '%s' does not serve %s and no other plugin can read this "
+                              "model's format; failing closed",
+                              engine_hint, rac_primitive_name(spec.primitive));
+                return RAC_ERROR_BACKEND_NOT_FOUND;
+            }
             RAC_LOG_WARNING(spec.log_cat, "plugin '%s' does not serve %s; falling back to priority",
                             engine_hint, rac_primitive_name(spec.primitive));
         }

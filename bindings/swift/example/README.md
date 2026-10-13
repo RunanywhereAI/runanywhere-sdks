@@ -52,8 +52,8 @@ call to make. **Download and load are automatic** — passing `options.model` is
 enough. The catalog is *not* auto-seeded, though: `ensureLoaded` rejects an
 unknown id with `Model '…' is not registered`, so the one `models.register`
 call above is required. To try a different model, change `modelId`/`modelURL`
-in `Sources/main.swift` (the canonical ids and URLs live in
-`rcli/src/catalog/catalog.cpp`).
+in `Sources/main.swift` (canonical ids and URLs live in
+[RCLI](https://github.com/RunanywhereAI/RCLI) `src/catalog/catalog.cpp`).
 
 Deliberately absent: model catalogs, download/load calls, theming, UI. Those
 either live in the SDK already or belong in a full example app.

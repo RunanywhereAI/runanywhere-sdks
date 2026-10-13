@@ -115,6 +115,8 @@ SDKComponent component_for_resource_type(rac_resource_type_t type) {
             return runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION;
         case RAC_RESOURCE_TYPE_RERANK_MODEL:
             return runanywhere::v1::SDK_COMPONENT_RERANK;
+        case RAC_RESOURCE_TYPE_OCR_MODEL:
+            return runanywhere::v1::SDK_COMPONENT_OCR;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -142,6 +144,8 @@ ModelCategory category_for_component(SDKComponent component) {
             return runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION;
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION:
             return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+        case runanywhere::v1::SDK_COMPONENT_OCR:
+            return runanywhere::v1::MODEL_CATEGORY_OCR;
         default:
             return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
     }
@@ -206,6 +210,12 @@ void decompose_service(SDKComponent component, rac_handle_t service, detail::Loa
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION: {
             auto* s = static_cast<rac_segmentation_service_t*>(service);
             entry->segmentation_ops = s->ops;
+            entry->impl = s->impl;
+            break;
+        }
+        case runanywhere::v1::SDK_COMPONENT_OCR: {
+            auto* s = static_cast<rac_ocr_service_t*>(service);
+            entry->ocr_ops = s->ops;
             entry->impl = s->impl;
             break;
         }

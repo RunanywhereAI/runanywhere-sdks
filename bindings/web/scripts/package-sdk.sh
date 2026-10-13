@@ -98,7 +98,13 @@ PACKAGE_VERSION="$(node -p "require('./package.json').version")"
 # proto-ts is still emitted as a first-class Web release asset, but the Web
 # core and LlamaCPP entry tarballs also vendor this exact payload. Installing
 # either entry package from GitHub Releases therefore never asks npm for an
-# unpublished proto-ts version.
+# unpublished proto-ts version. ONNX deliberately does NOT bundle its own copy
+# (validate_public_packages.py enforces this) since every real consumer also
+# installs core, whose bundled copy hoists to satisfy ONNX's unbundled
+# "@runanywhere/proto-ts" dependency — see the onnx case in
+# verify_candidate_install below, which supplies $PROTO_ARCHIVE explicitly to
+# model that same resolution locally, since the real release hasn't published
+# proto-ts yet at candidate-build time.
 echo ">> npm pack ../proto-ts"
 (cd ../proto-ts && npm pack --silent --pack-destination "$DIST_DIR" >/dev/null)
 PROTO_ARCHIVE="$DIST_DIR/runanywhere-proto-ts-$PACKAGE_VERSION.tgz"
@@ -150,8 +156,10 @@ for f in "$DIST_DIR"/*.tgz; do
 done
 
 # Exercise the same entry-package transactions documented for users. The
-# standalone proto tarball is intentionally omitted: these installs succeed
-# only when the advertised entry package carries its own exact proto payload.
+# standalone proto tarball is omitted for core/llamacpp: those installs
+# succeed only when the advertised entry package carries its own exact proto
+# payload. ONNX is the one exception (see below) since it deliberately does
+# not bundle its own proto-ts copy.
 INSTALL_SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-web-install.XXXXXX")"
 trap 'rm -rf "$INSTALL_SMOKE_ROOT"' EXIT
 verify_candidate_install() {
@@ -209,12 +217,20 @@ verify_candidate_install \
     @runanywhere/web-llamacpp \
     "$DIST_DIR/runanywhere-web-$PACKAGE_VERSION.tgz" \
     "$DIST_DIR/runanywhere-web-llamacpp-$PACKAGE_VERSION.tgz"
+# Unlike core/llamacpp, ONNX does not bundle its own proto-ts copy (see the
+# packaging loop above), so it relies on npm resolving its unbundled
+# "@runanywhere/proto-ts" dependency to a real published version. That
+# version does not exist yet at candidate-build time, so we hand npm the
+# just-built local proto tarball as an explicit install target — mirroring
+# what registry resolution will do for a real consumer once proto-ts is
+# published — instead of letting it hit the registry and fail with ETARGET.
 verify_candidate_install \
     onnx \
     @runanywhere/web-onnx \
     @runanywhere/web \
     "$DIST_DIR/runanywhere-web-$PACKAGE_VERSION.tgz" \
-    "$DIST_DIR/runanywhere-web-onnx-$PACKAGE_VERSION.tgz"
+    "$DIST_DIR/runanywhere-web-onnx-$PACKAGE_VERSION.tgz" \
+    "$PROTO_ARCHIVE"
 
 if [ -x "${REPO_ROOT}/scripts/release/validate-artifact.sh" ]; then
     echo ""

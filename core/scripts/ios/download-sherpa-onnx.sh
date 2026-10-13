@@ -22,7 +22,7 @@ if [ -z "${SHERPA_ONNX_IOS_SHA256:-}" ]; then
     exit 1
 fi
 SHERPA_VERSION="${SHERPA_ONNX_VERSION_IOS}"
-DOWNLOAD_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-ios.tar.bz2"
+DOWNLOAD_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/xcframework/sherpa-onnx-v${SHERPA_VERSION}-ios-static.xcframework.zip"
 VERSION_MARKER="${SHERPA_DIR}/.sherpa-version"
 
 echo "======================================="
@@ -34,6 +34,7 @@ echo "Version: ${SHERPA_VERSION}"
 # Check if already exists and is valid
 if [ -d "${SHERPA_DIR}/sherpa-onnx.xcframework" ]; then
     if [ "$(cat "${VERSION_MARKER}" 2>/dev/null || true)" = "${SHERPA_VERSION}" ] && \
+       [ -f "${SHERPA_DIR}/sherpa-onnx.xcframework/Info.plist" ] && \
        [ -f "${SHERPA_DIR}/sherpa-onnx.xcframework/ios-arm64/libsherpa-onnx.a" ] && \
        [ -f "${SHERPA_DIR}/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator/libsherpa-onnx.a" ] && \
        grep -q 'SherpaOnnxOfflineTtsGenerateWithConfig' \
@@ -53,7 +54,7 @@ fi
 # Create temp directory for download
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TEMP_DIR}"' EXIT
-TEMP_ARCHIVE="${TEMP_DIR}/sherpa-onnx-ios.tar.bz2"
+TEMP_ARCHIVE="${TEMP_DIR}/sherpa-onnx-ios.xcframework.zip"
 
 echo ""
 echo "Downloading from ${DOWNLOAD_URL}..."
@@ -71,22 +72,44 @@ if [ "${ACTUAL_SHA256}" != "${SHERPA_ONNX_IOS_SHA256}" ]; then
 fi
 
 mkdir -p "${TEMP_DIR}/extracted"
-tar -xjf "${TEMP_ARCHIVE}" -C "${TEMP_DIR}/extracted"
+unzip -q "${TEMP_ARCHIVE}" -d "${TEMP_DIR}/extracted"
 XCFRAMEWORK="$(find "${TEMP_DIR}/extracted" -type d -name 'sherpa-onnx.xcframework' -print -quit)"
 if [ -z "${XCFRAMEWORK}" ]; then
     echo "ERROR: sherpa-onnx.xcframework not found in verified archive" >&2
     exit 1
 fi
 
-HEADER="${XCFRAMEWORK}/ios-arm64/Headers/sherpa-onnx/c-api/c-api.h"
-if [ ! -f "${HEADER}" ] || ! grep -q 'SherpaOnnxOfflineTtsGenerateWithConfig' "${HEADER}"; then
+DEVICE_FRAMEWORK="${XCFRAMEWORK}/ios-arm64/SherpaOnnxC.framework"
+SIMULATOR_FRAMEWORK="${XCFRAMEWORK}/ios-arm64_x86_64-simulator/SherpaOnnxC.framework"
+HEADER="${DEVICE_FRAMEWORK}/Headers/sherpa-onnx/c-api/c-api.h"
+if [ ! -f "${DEVICE_FRAMEWORK}/SherpaOnnxC" ] || \
+   [ ! -f "${SIMULATOR_FRAMEWORK}/SherpaOnnxC" ] || \
+   [ ! -f "${HEADER}" ] || \
+   ! grep -q 'SherpaOnnxOfflineTtsGenerateWithConfig' "${HEADER}"; then
     echo "ERROR: downloaded Sherpa-ONNX headers do not expose the required current TTS API" >&2
     exit 1
 fi
 
 rm -rf "${SHERPA_DIR}"
+NORMALIZED_XCFRAMEWORK="${SHERPA_DIR}/sherpa-onnx.xcframework"
+NORMALIZED_INPUT="${TEMP_DIR}/normalized-input"
+for slice in ios-arm64 ios-arm64_x86_64-simulator; do
+    source_framework="${XCFRAMEWORK}/${slice}/SherpaOnnxC.framework"
+    destination_slice="${NORMALIZED_INPUT}/${slice}"
+    mkdir -p "${destination_slice}"
+    cp "${source_framework}/SherpaOnnxC" "${destination_slice}/libsherpa-onnx.a"
+    cp -R "${source_framework}/Headers" "${destination_slice}/Headers"
+done
+
+# Repackage the two static-library slices with xcodebuild so the normalized
+# bundle has a valid root Info.plist and can be consumed as a real XCFramework.
 mkdir -p "${SHERPA_DIR}"
-cp -R "${XCFRAMEWORK}" "${SHERPA_DIR}/"
+xcodebuild -create-xcframework \
+    -library "${NORMALIZED_INPUT}/ios-arm64/libsherpa-onnx.a" \
+    -headers "${NORMALIZED_INPUT}/ios-arm64/Headers" \
+    -library "${NORMALIZED_INPUT}/ios-arm64_x86_64-simulator/libsherpa-onnx.a" \
+    -headers "${NORMALIZED_INPUT}/ios-arm64_x86_64-simulator/Headers" \
+    -output "${NORMALIZED_XCFRAMEWORK}"
 printf '%s\n' "${SHERPA_VERSION}" > "${VERSION_MARKER}"
 
 echo ""

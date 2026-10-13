@@ -3,7 +3,11 @@
 # `electron-macos`) is the CI contract for the package split.
 #
 # Unit suite is hermetic (pure TypeScript — no models / no GPU). Native jobs
-# only prove link + export symbols + loadPlugin smoke.
+# only prove link + export symbols + loadPlugin smoke: llamacpp only, sherpa
+# forced OFF, no STAGING_BASE_URL, never packages. For the workflow that
+# actually builds every real backend (onnx/sherpa/neurt/qhexrt too) with the
+# real staging URL baked in and packages every tarball, see the sibling
+# electron-native-package.yml.
 name: electron-sdk-ci
 
 on:

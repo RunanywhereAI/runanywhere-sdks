@@ -18,15 +18,19 @@ set -euo pipefail
 #   until someone files a bug. A line in a runbook does not prevent that.
 #
 # THE TRIGGER
-#   Enforcement keys off "has this version actually been released?", i.e. does
-#   the monorepo tag v${VERSION} exist. That is the only point at which the
-#   split repo *can* be tagged (its manifest points at that release's assets)
-#   and therefore the only point at which being untagged is a real defect.
+#   Enforcement keys off "has this version actually been released as a full
+#   SDK train?", i.e. the monorepo tag v${VERSION} exists AND the GitHub
+#   Release is not a prerelease and includes RACommons-ios-v${VERSION}.zip.
+#   A kit-only prerelease on an existing tag (C++ desktop prefixes for RCLI)
+#   is not a Swift cut, and must not fail every subsequent PR.
 #
 #     - VERSION not yet tagged (an in-flight release PR, a version bump under
 #       review) -> nothing to compare, SKIP. A normal PR is never failed by
 #       this gate for work unrelated to releasing.
-#     - VERSION tagged -> runanywhere-swift MUST carry the matching tag.
+#     - Tag exists but GitHub Release is missing, prerelease, or kit-only
+#       (no iOS XCFramework zip) -> SKIP.
+#     - Full SDK GitHub Release published -> runanywhere-swift MUST carry
+#       the matching tag.
 #
 #   So the moment v0.20.18 is pushed here, every subsequent CI run fails until
 #   runanywhere-swift is cut at 0.20.18. Forgetting stops being possible; it
@@ -207,6 +211,52 @@ run_with_timeout() {
 
 if ! monorepo_tag_exists; then
   echo "[SKIP] v${VERSION} is not tagged yet; runanywhere-swift is cut after the release is published"
+  if [ "${FAILURES}" -ne 0 ]; then
+    echo "[FAIL] runanywhere-swift distribution sync: ${FAILURES} problem(s)" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+# A git tag is not a full SDK train. Kit-only / prerelease GitHub Releases
+# (C++ desktop prefixes attached to an existing VERSION tag) have no Swift
+# XCFrameworks, so cutting runanywhere-swift would publish a broken
+# `from: "<version>"`. Require the dist tag only for a non-prerelease GitHub
+# Release that actually ships the iOS commons zip.
+full_sdk_github_release() {
+  local repo="${GITHUB_REPOSITORY:-RunanywhereAI/runanywhere-sdks}"
+  local url="https://api.github.com/repos/${repo}/releases/tags/v${VERSION}"
+  local tmp http
+  tmp="$(mktemp)"
+  local -a curl_args=(-sS --max-time 30 -H "Accept: application/vnd.github+json")
+  if [ -n "${GITHUB_TOKEN:-${GH_TOKEN:-}}" ]; then
+    curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN:-${GH_TOKEN}}")
+  fi
+  http="$(curl "${curl_args[@]}" -o "${tmp}" -w '%{http_code}' "${url}" || true)"
+  if [ "${http}" != "200" ]; then
+    rm -f "${tmp}"
+    return 1
+  fi
+  python3 - "${tmp}" "${VERSION}" <<'PY'
+import json, sys
+path, version = sys.argv[1:]
+with open(path) as f:
+    rel = json.load(f)
+if rel.get("prerelease") or rel.get("draft"):
+    sys.exit(1)
+want = f"RACommons-ios-v{version}.zip"
+names = [a.get("name", "") for a in rel.get("assets") or []]
+sys.exit(0 if want in names else 1)
+PY
+  local rc=$?
+  rm -f "${tmp}"
+  return "${rc}"
+}
+
+if ! command -v curl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+  echo "[SKIP] curl/python3 unavailable; cannot tell kit-only tags from a full SDK train"
+elif ! full_sdk_github_release; then
+  echo "[SKIP] v${VERSION} is tagged but is not a full (non-prerelease) SDK GitHub Release with RACommons-ios-v${VERSION}.zip; runanywhere-swift is not due yet"
   if [ "${FAILURES}" -ne 0 ]; then
     echo "[FAIL] runanywhere-swift distribution sync: ${FAILURES} problem(s)" >&2
     exit 1

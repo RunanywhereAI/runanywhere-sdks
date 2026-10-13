@@ -1,0 +1,60 @@
+name: Agent skills gate
+
+# The agent instruction trees (`.claude/skills/`, `.claude/commands/`,
+# `.agents/skills/`) are TRACKED in this PUBLIC repo, which makes them a
+# publishing surface rather than scratch space. Two things have to be
+# machine-checked, because neither is visible in a normal diff review:
+#
+#   1. MIRROR DRIFT — `.claude/skills/` is the canonical, hand-edited tree;
+#      `.agents/skills/` is a generated copy for non-Claude tooling (a copy and
+#      not a symlink, because a checkout without core.symlinks=true materializes
+#      git symlinks as text files). Editing one and not the other publishes a
+#      stale runbook that some agents read and others don't.
+#
+#   2. PRIVATE COORDINATES CREEPING BACK IN — these skills describe real release
+#      machinery, so it is natural to paste in the Windows test box's hostname,
+#      an SSH identity file, or a runner's registered name while debugging. The
+#      standing rule is: describe the CAPABILITY ("a Windows ARM64 machine
+#      reachable over SSH; read the alias from the operator's ~/.ssh/config"),
+#      never the COORDINATES. An agent that has read the instructions can
+#      resolve the rest from the operator's own machine.
+#
+# Both checks live in scripts/ci/check_agent_skills.py so a green CI and a green
+# laptop mean the same thing. Fixing a failure locally:
+#
+#   scripts/setup/sync-skills.sh          # after editing .claude/skills/
+#   python3 scripts/ci/check_agent_skills.py
+
+on:
+  pull_request:
+    paths:
+      - '.claude/**'
+      - '.agents/**'
+      - '.gitignore'
+      - 'scripts/setup/sync-skills.sh'
+      - 'scripts/ci/check_agent_skills.py'
+      - '.github/workflows/agent-skills-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.claude/**'
+      - '.agents/**'
+      - '.gitignore'
+      - 'scripts/setup/sync-skills.sh'
+      - 'scripts/ci/check_agent_skills.py'
+      - '.github/workflows/agent-skills-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Mirror in sync, no private coordinates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      # No toolchain setup: the gate is stdlib-only Python plus the sync script,
+      # deliberately, so it cannot be broken by an unrelated toolchain change.
+      - name: Check agent skill trees
+        run: python3 scripts/ci/check_agent_skills.py

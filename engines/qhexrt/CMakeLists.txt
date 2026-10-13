@@ -52,7 +52,7 @@ endif()
 
 message(STATUS "Configuring QHexRT (Qualcomm Hexagon NPU) backend...")
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 function(_qhexrt_require_json_keys json_variable label expected_csv)
     set(_json "${${json_variable}}")
@@ -238,14 +238,33 @@ if(NOT _qhexrt_root_explicit AND EXISTS "${QHEXRT_ROOT}" AND NOT IS_SYMLINK "${Q
 endif()
 if(NOT _qhexrt_root_explicit AND IS_SYMLINK "${QHEXRT_ROOT}")
     file(READ_SYMLINK "${QHEXRT_ROOT}" _qhexrt_current_target)
-    get_filename_component(_qhexrt_current_name "${_qhexrt_current_target}" NAME)
-    string(LENGTH "${_qhexrt_current_name}" _qhexrt_current_name_length)
-    if(NOT _qhexrt_current_target MATCHES "^versions/[0-9a-f]+$" OR
-       NOT _qhexrt_current_name_length EQUAL 64)
-        message(FATAL_ERROR "QHexRT current must directly name versions/<64-hex-receipt>")
-    endif()
     get_filename_component(_qhexrt_current_parent "${QHEXRT_ROOT}" DIRECTORY)
-    set(_qhexrt_selected_entry "${_qhexrt_current_parent}/${_qhexrt_current_target}")
+    # Windows selects with a junction, because the runner service account cannot
+    # create symlinks. CMake does report a junction as IS_SYMLINK, but
+    # READ_SYMLINK hands back its ABSOLUTE target (optionally \\?\-prefixed),
+    # so normalize to the relative form both platforms then share.
+    # scripts/build/_selection.py is the reference implementation.
+    string(REPLACE "\\" "/" _qhexrt_current_target "${_qhexrt_current_target}")
+    string(REGEX REPLACE "^//[?.]/" "" _qhexrt_current_target "${_qhexrt_current_target}")
+    # Check the last two components rather than converting to a relative path:
+    # file(RELATIVE_PATH) rejects a drive-letter path on a POSIX host, and
+    # IS_ABSOLUTE is host-relative too, so either would leave this branch
+    # untestable off-Windows. The path actually used below is REBUILT from
+    # _qhexrt_current_parent and the receipt name, never the raw link text, so a
+    # target pointing outside this tree cannot smuggle in a different payload.
+    get_filename_component(_qhexrt_current_name "${_qhexrt_current_target}" NAME)
+    get_filename_component(_qhexrt_current_dir "${_qhexrt_current_target}" DIRECTORY)
+    get_filename_component(_qhexrt_current_dir_name "${_qhexrt_current_dir}" NAME)
+    string(LENGTH "${_qhexrt_current_name}" _qhexrt_current_name_length)
+    if(NOT _qhexrt_current_dir_name STREQUAL "versions" OR
+       NOT _qhexrt_current_name MATCHES "^[0-9a-f]+$" OR
+       NOT _qhexrt_current_name_length EQUAL 64)
+        message(FATAL_ERROR
+            "QHexRT current must directly name versions/<64-hex-receipt>, got: "
+            "${_qhexrt_current_target}")
+    endif()
+    set(_qhexrt_selected_entry
+        "${_qhexrt_current_parent}/versions/${_qhexrt_current_name}")
     if(IS_SYMLINK "${_qhexrt_selected_entry}" OR NOT IS_DIRECTORY "${_qhexrt_selected_entry}")
         message(FATAL_ERROR "QHexRT current target must be a real immutable version directory")
     endif()
@@ -556,7 +575,7 @@ if(_qhexrt_platform_supported AND _qhexrt_prebuilt_valid)
             find_file(QHEXRT_LIBCDSPRPC libcdsprpc.so
                 PATHS
                     "$ENV{HEXAGON_SDK_ROOT}/ipc/fastrpc/remote/ship/android_aarch64"
-                    "${CMAKE_SOURCE_DIR}/../hexagon-sdk/root/Hexagon_SDK/6.6.0.0/ipc/fastrpc/remote/ship/android_aarch64"
+                    "${RAC_ROOT_DIR}/../hexagon-sdk/root/Hexagon_SDK/6.6.0.0/ipc/fastrpc/remote/ship/android_aarch64"
                     "${CMAKE_CURRENT_SOURCE_DIR}/../../bindings/kotlin/src/main/jniLibs/arm64-v8a"
                 NO_DEFAULT_PATH)
         endif()
@@ -579,6 +598,16 @@ else()
         message(STATUS "  QHexRT engine archive absent under QHEXRT_ROOT=${QHEXRT_ROOT}")
     endif()
     message(STATUS "  -> building not-routable shell (rejects with RAC_ERROR_BACKEND_UNAVAILABLE)")
+endif()
+
+option(RAC_REQUIRE_QHEXRT_ENGINE
+    "Fail configure unless a real QHexRT prebuilt is present (desktop overlay CI)"
+    OFF)
+if(RAC_REQUIRE_QHEXRT_ENGINE AND NOT RAC_QHEXRT_ENGINE_AVAILABLE)
+    message(FATAL_ERROR
+        "RAC_REQUIRE_QHEXRT_ENGINE=ON but QHexRT is not routable "
+        "(QHEXRT_ROOT=${QHEXRT_ROOT}). "
+        "Run: NEURUN_TOKEN=... scripts/build/download-qhexrt.sh --abi win-arm64")
 endif()
 
 rac_add_engine_plugin(qhexrt

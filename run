@@ -69,11 +69,10 @@ ${C_BOLD}MINIMAL EXAMPLES${C_RESET}
   ${C_CMD}example electron${C_RESET} {build|start|clean}
   ${C_CMD}example flutter${C_RESET} {build|clean}   ${C_DIM}(bindings/flutter/example)${C_RESET}
 
-${C_BOLD}RCLI${C_RESET}
-  ${C_CMD}rcli build${C_RESET} ${C_DIM}[--env-staging]${C_RESET}    Build the desktop CLI (host preset). --env-staging bakes the
-                                staging backend URL from the git-ignored development_config.cpp
-                                so ${C_DIM}RUNANYWHERE_ENVIRONMENT=staging rcli ...${C_RESET} works keyless
-  ${C_CMD}rcli clean${C_RESET}                   Wipe rcli build outputs
+${C_BOLD}CLI${C_RESET}
+  The desktop CLI lives in ${C_CMD}github.com/RunanywhereAI/RCLI${C_RESET}.
+  It consumes the C++ desktop kit from this repo (${C_DIM}find_package(RunAnywhere)${C_RESET}).
+  ${C_DIM}./run rcli${C_RESET} is retired.
 
 ${C_BOLD}UTILITIES${C_RESET}
   ${C_CMD}clean${C_RESET}                        Clean every SDK + native + cache
@@ -264,35 +263,7 @@ cmd_example() {
 }
 
 cmd_rcli() {
-    local sub="${1:-}"
-    shift 2>/dev/null || true
-    local preset
-    case "$(uname -s)" in
-        Darwin) preset="rcli-macos-release" ;;
-        *)      preset="rcli-linux-release" ;;
-    esac
-    case "${sub}" in
-        build)
-            local extra=()
-            local arg
-            for arg in "$@"; do
-                case "${arg}" in
-                    --env-staging)
-                        # Staging build: bake credentials (incl. STAGING_BASE_URL) from the
-                        # git-ignored development_config.cpp so `RUNANYWHERE_ENVIRONMENT=staging`
-                        # needs no explicit URL. Nothing secret lives in this script.
-                        [ -f core/src/infrastructure/network/development_config.cpp ] \
-                            || die "--env-staging needs the git-ignored development_config.cpp (copy the .template next to it and fill STAGING_BASE_URL)"
-                        extra+=(-DRAC_INCLUDE_LOCAL_DEV_CONFIG=ON)
-                        ;;
-                    *) die "unknown rcli build flag: ${arg}" ;;
-                esac
-            done
-            cmake --preset="${preset}" "${extra[@]}" && cmake --build --preset="${preset}" --target rcli
-            ;;
-        clean) rm -rf build/rcli-* ;;
-        *)     bad_subcommand "rcli" "${sub}" ;;
-    esac
+    die "in-tree rcli is retired. Clone https://github.com/RunanywhereAI/RCLI and build it against the C++ desktop kit (docs/reference/cpp-desktop-kit.md)."
 }
 
 cmd_clean() {

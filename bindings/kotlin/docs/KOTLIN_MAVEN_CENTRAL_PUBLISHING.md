@@ -67,10 +67,13 @@ runanywhere-sdk AAR                  runanywhere-llamacpp AAR             runany
 Publishing uses the **Sonatype OSSRH Staging API**. Three explicit phases:
 
 ```
-Upload (Gradle) --> Close (validation) --> Release (promotes to Maven Central)
+Upload (Gradle) --> Transfer to Portal --> Validate + publish to Maven Central
 ```
 
-The Gradle `maven-publish` plugin only does the upload. Close and release must be done separately.
+The Gradle `maven-publish` plugin only writes files to Sonatype's OSSRH
+compatibility service. The deployment must then be transferred to the Central
+Publisher Portal. Using `publishing_type=automatic` validates and publishes it
+without a separate Portal click.
 
 ---
 
@@ -190,33 +193,62 @@ cd bindings/kotlin
   --no-daemon
 ```
 
-### 4. Close and Release Staging Repo
+### 4. Transfer the deployment to Central Portal
 
 ```bash
-# Drop any stale staging repo first (if previous publish failed)
-curl -s -X POST -u "$MAVEN_CENTRAL_USERNAME:$MAVEN_CENTRAL_PASSWORD" \
-  "https://ossrh-staging-api.central.sonatype.com/service/local/staging/bulk/drop" \
-  -H "Content-Type: application/json" \
-  -d '{"data":{"stagedRepositoryIds":["io.github.sanchitmonga22--default-repository"],"description":"Clean","autoDropAfterRelease":true}}'
+# Run this from the same host/IP that performed the Gradle upload. Sonatype's
+# compatibility service groups Maven-like PUT requests by source IP.
+CENTRAL_BEARER="$(printf '%s:%s' \
+  "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" |
+  base64 | tr -d '\r\n')"
 
-# ... then re-run the publish command above if needed ...
+curl --fail --request POST \
+  -H "Authorization: Bearer $CENTRAL_BEARER" \
+  'https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/io.github.sanchitmonga22?publishing_type=automatic'
 
-# Close (triggers validation)
-curl -X POST -u "$MAVEN_CENTRAL_USERNAME:$MAVEN_CENTRAL_PASSWORD" \
-  "https://ossrh-staging-api.central.sonatype.com/service/local/staging/bulk/close" \
-  -H "Content-Type: application/json" \
-  -d '{"data":{"stagedRepositoryIds":["io.github.sanchitmonga22--default-repository"],"description":"Release","autoDropAfterRelease":true}}'
+# This flow assumes the compatibility service was clean before the Gradle
+# upload. Require exactly one repository for this client IP and namespace so a
+# stale or concurrent deployment can never be selected by accident.
+REPOSITORIES_JSON="$(curl --fail --silent \
+  -H "Authorization: Bearer $CENTRAL_BEARER" \
+  'https://ossrh-staging-api.central.sonatype.com/manual/search/repositories?ip=client&profile_id=io.github.sanchitmonga22')"
+REPOSITORY_COUNT="$(jq '[.repositories[] | select(.portal_deployment_id != null)] | length' <<<"$REPOSITORIES_JSON")"
+[ "$REPOSITORY_COUNT" = 1 ] || {
+  echo "Expected exactly one transferred repository; found $REPOSITORY_COUNT" >&2
+  exit 1
+}
+DEPLOYMENT_ID="$(jq -r '.repositories[] | select(.portal_deployment_id != null) | .portal_deployment_id' <<<"$REPOSITORIES_JSON")"
+[ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != null ]
 
-# Wait ~30s, verify "type": "closed"
-curl -s -u "$MAVEN_CENTRAL_USERNAME:$MAVEN_CENTRAL_PASSWORD" \
-  "https://ossrh-staging-api.central.sonatype.com/service/local/staging/profile_repositories/io.github.sanchitmonga22" \
-  -H "Accept: application/json"
-
-# Release (promote to Maven Central)
-curl -X POST -u "$MAVEN_CENTRAL_USERNAME:$MAVEN_CENTRAL_PASSWORD" \
-  "https://ossrh-staging-api.central.sonatype.com/service/local/staging/bulk/promote" \
-  -H "Content-Type: application/json" \
-  -d '{"data":{"stagedRepositoryIds":["io.github.sanchitmonga22--default-repository"],"description":"Release","autoDropAfterRelease":true}}'
+# Poll for at most 15 minutes. Automatic deployments normally pass through
+# PENDING -> VALIDATING -> PUBLISHING -> PUBLISHED.
+DEPLOYMENT_STATE=
+for attempt in $(seq 1 90); do
+  STATUS_JSON="$(curl --fail --silent --request POST \
+    -H "Authorization: Bearer $CENTRAL_BEARER" \
+    "https://central.sonatype.com/api/v1/publisher/status?id=$DEPLOYMENT_ID")"
+  DEPLOYMENT_STATE="$(jq -r '.deploymentState' <<<"$STATUS_JSON")"
+  case "$DEPLOYMENT_STATE" in
+    PUBLISHED) break ;;
+    FAILED)
+      jq '.errors' <<<"$STATUS_JSON" >&2
+      exit 1
+      ;;
+    PENDING|VALIDATING|PUBLISHING) sleep 10 ;;
+    VALIDATED)
+      echo "Deployment is waiting for manual publication instead of automatic release; publish it in Central Portal or use the Portal publish endpoint, then resume status polling." >&2
+      exit 1
+      ;;
+    *)
+      echo "Unexpected Central Portal state: $DEPLOYMENT_STATE" >&2
+      exit 1
+      ;;
+  esac
+done
+[ "$DEPLOYMENT_STATE" = PUBLISHED ] || {
+  echo "Timed out waiting for Central Portal deployment $DEPLOYMENT_ID" >&2
+  exit 1
+}
 ```
 
 ### 5. Verify
@@ -238,8 +270,9 @@ Check: [Central Portal Deployments](https://central.sonatype.com/publishing/depl
 
 Maven Central publishing is **manual** (not automated in GitHub Actions).
 `.github/workflows/release.yml` only attaches a local Maven repository zip to
-the GitHub Release. Use the local release steps above to upload to OSSRH, then
-close/promote via the staging API.
+the GitHub Release. Use the local release steps above to upload to the OSSRH
+compatibility service, then transfer it to Central Portal with automatic
+publishing.
 
 ---
 
@@ -269,8 +302,8 @@ cd bindings/kotlin
   --no-daemon
 ```
 
-Then close/promote the staging repo with the same API commands as the core
-artifacts. Consumers depend on:
+Then transfer the staging repository with the same manual upload command as the
+core artifacts. Consumers depend on:
 
 ```kotlin
 implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
@@ -328,8 +361,8 @@ No `pickFirsts` or workarounds needed. Each AAR bundles only its own native libs
 | Missing native libs in AAR | Clean all `jniLibs/` dirs and rebuild. Check each module has its own libs. |
 | `UnsatisfiedLinkError: nativeRegisterVlm` | Native libs are stale (pre-VLM). Rebuild from source with `build-android.sh`. |
 | Duplicate `.so` across AARs | Stale files in module `jniLibs/`. Delete and rebuild. Check `.gitignore` covers `src/main/jniLibs/`. |
-| Staging repo "No objects found" | Drop the stale repo and re-upload |
-| OSSRH staging never auto-closes | Manually close/release via staging API |
+| Compatibility repository is stale or closed | Treat the compatibility repository and its Portal deployment as separate resources. Find the repository with `GET /manual/search/repositories?ip=any&profile_id=io.github.sanchitmonga22`. If `portal_deployment_id` is present, query `/api/v1/publisher/status` first: for `PUBLISHED`, verify the released artifacts and stop; for active states, wait; for `FAILED`, preserve the deployment when requesting support; for a retryable `VALIDATED` or `FAILED` deployment, explicitly delete it through `/api/v1/publisher/deployment/{id}`. Only when retrying a non-published deployment should you delete the compatibility repository with `DELETE /manual/drop/repository/{repository_key}` before re-uploading. |
+| Deployment never appears in Central Portal | Call `POST /manual/upload/defaultRepository/io.github.sanchitmonga22` from the same IP as the Gradle upload. |
 
 ---
 
@@ -359,3 +392,4 @@ No `pickFirsts` or workarounds needed. Each AAR bundles only its own native libs
 - **GPG Keyserver**: https://keys.openpgp.org
 - **GitHub Releases**: https://github.com/RunanywhereAI/runanywhere-sdks/releases
 - **OSSRH Staging API**: https://ossrh-staging-api.central.sonatype.com
+- **OSSRH compatibility-service guide**: https://central.sonatype.org/publish/publish-portal-ossrh-staging-api/

@@ -37,6 +37,7 @@ struct rac_llm_llamacpp_handle_impl {
     std::unique_ptr<runanywhere::LlamaCppBackend> backend;
     runanywhere::LlamaCppTextGeneration* text_gen;  // Owned by backend
     int32_t last_stream_prompt_tokens = 0;
+    int32_t last_stream_cached_prompt_tokens = 0;
     int32_t last_stream_completion_tokens = 0;
 
     rac_llm_llamacpp_handle_impl() : backend(nullptr), text_gen(nullptr) {}
@@ -180,7 +181,10 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
         if (config->context_size > 0) {
             model_config["context_size"] = config->context_size;
         }
-        if (config->gpu_layers != 0) {
+        // AUTO means "no opinion"; every other value, INCLUDING 0, is an
+        // explicit placement request and must reach the backend. Gating on
+        // `!= 0` here is what silently swallowed a CPU pin.
+        if (config->gpu_layers != RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO) {
             model_config["gpu_layers"] = config->gpu_layers;
         }
         if (config->batch_size > 0) {
@@ -299,9 +303,11 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     try {
         result = h->text_gen->generate(request);
     } catch (const std::exception& e) {
+        h->text_gen->clear_context();
         rac_error_set_details(e.what());
         return RAC_ERROR_INFERENCE_FAILED;
     } catch (...) {
+        h->text_gen->clear_context();
         rac_error_set_details("Unknown C++ exception during LLM generation");
         return RAC_ERROR_INFERENCE_FAILED;
     }
@@ -367,6 +373,7 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     }
 
     h->last_stream_prompt_tokens = 0;
+    h->last_stream_cached_prompt_tokens = 0;
     h->last_stream_completion_tokens = 0;
 
     runanywhere::TextGenerationRequest request;
@@ -475,6 +482,16 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     };
 
     int prompt_tokens = 0;
+    int cached_prompt_tokens = 0;
+    // Authoritative decode-loop count (LlamaCppTextGeneration::run_decode_loop's
+    // return value, forwarded through generate_stream()'s out_tokens_generated).
+    // `completion_tokens` above only counts callback flushes, and the sink
+    // coalesces the built-in stop-sequence window, so it fires far less than
+    // once per token. That undercount made a `--max-tokens 5` stream report
+    // completion_tokens=1 and look like "stop" to the commons finish_reason
+    // check. generate() already prefers this count; mirror it here. The call
+    // still records out_cached_prompt_tokens; the last pointer is the decode count.
+    int decoded_tokens = 0;
     bool success = false;
     try {
         success = h->text_gen->generate_stream(
@@ -503,24 +520,33 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 }
                 return true;
             },
-            &prompt_tokens);
+            &prompt_tokens, &cached_prompt_tokens, /*out_prompt_eval_ms=*/nullptr,
+            &decoded_tokens);
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("LLM.LlamaCpp.C-API", "generate_stream exception: %s", e.what());
+        h->text_gen->clear_context();
         rac_error_set_details(e.what());
         h->last_stream_prompt_tokens = prompt_tokens;
-        h->last_stream_completion_tokens = completion_tokens;
+        h->last_stream_cached_prompt_tokens = cached_prompt_tokens;
+        h->last_stream_completion_tokens =
+            decoded_tokens > 0 ? decoded_tokens : completion_tokens;
         emit_terminal();
         return RAC_ERROR_INFERENCE_FAILED;
     } catch (...) {
+        h->text_gen->clear_context();
         rac_error_set_details("Unknown C++ exception during streaming LLM generation");
         h->last_stream_prompt_tokens = prompt_tokens;
-        h->last_stream_completion_tokens = completion_tokens;
+        h->last_stream_cached_prompt_tokens = cached_prompt_tokens;
+        h->last_stream_completion_tokens =
+            decoded_tokens > 0 ? decoded_tokens : completion_tokens;
         emit_terminal();
         return RAC_ERROR_INFERENCE_FAILED;
     }
 
     h->last_stream_prompt_tokens = prompt_tokens;
-    h->last_stream_completion_tokens = completion_tokens;
+    h->last_stream_cached_prompt_tokens = cached_prompt_tokens;
+    h->last_stream_completion_tokens =
+        decoded_tokens > 0 ? decoded_tokens : completion_tokens;
 
     // Treat a caller-stop hit as a successful terminal exit so the final marker
     // is still emitted to the caller's accumulator. Without this, an early
@@ -530,7 +556,8 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         if (!stop_hit && !stop_window.empty()) {
             // Flush any tail bytes held back as potential stop prefix.
             (void)emit_bytes(stop_window.size());
-            h->last_stream_completion_tokens = completion_tokens;
+            h->last_stream_completion_tokens =
+                decoded_tokens > 0 ? decoded_tokens : completion_tokens;
         }
         emit_terminal();
         return RAC_SUCCESS;
@@ -553,6 +580,7 @@ rac_result_t rac_llm_llamacpp_get_stream_token_counts(rac_handle_t handle,
     auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
     out->prompt_tokens = h->last_stream_prompt_tokens;
     out->completion_tokens = h->last_stream_completion_tokens;
+    out->cached_prompt_tokens = h->last_stream_cached_prompt_tokens;
     return RAC_SUCCESS;
 }
 
@@ -693,6 +721,7 @@ rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t handle, const ch
     try {
         return h->text_gen->inject_system_prompt(prompt) ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
     } catch (const std::exception& e) {
+        h->text_gen->clear_context();
         rac_error_set_details(e.what());
         return RAC_ERROR_INFERENCE_FAILED;
     }
@@ -711,6 +740,7 @@ rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle, const char* te
     try {
         return h->text_gen->append_context(text) ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
     } catch (const std::exception& e) {
+        h->text_gen->clear_context();
         rac_error_set_details(e.what());
         return RAC_ERROR_INFERENCE_FAILED;
     }
@@ -780,6 +810,7 @@ rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const c
 
         return RAC_SUCCESS;
     } catch (const std::exception& e) {
+        h->text_gen->clear_context();
         rac_error_set_details(e.what());
         return RAC_ERROR_INFERENCE_FAILED;
     }

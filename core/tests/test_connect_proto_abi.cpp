@@ -415,6 +415,14 @@ void test_cluster_orchestration() {
           "Invalid layer boundary activation returns typed validation");
     CHECK(!invalid_boundary_validation.accepted(), "Invalid layer boundary is rejected");
 
+    // 11b. Activation validation rejection on undersized tensor bytes (e.g. 1 byte/element instead of min 2)
+    v1::ClusterActivation undersized_activation = valid_activation;
+    undersized_activation.set_tensor_data(std::string(4096 * 1, 'A')); // 4096 bytes < 4096 * 2 min_bytes
+    v1::ConnectInvocationValidation undersized_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, undersized_activation, &undersized_validation) == RAC_SUCCESS,
+          "Undersized activation tensor returns typed validation");
+    CHECK(!undersized_validation.accepted(), "Undersized activation tensor bytes are rejected");
+
     // 12. Stop cluster with mismatched cluster ID is rejected
     v1::ClusterStopRequest wrong_stop_request;
     wrong_stop_request.set_cluster_id("cluster-different");

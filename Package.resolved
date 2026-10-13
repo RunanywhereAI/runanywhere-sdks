@@ -1,5 +1,5 @@
 {
-  "originHash" : "e4abf80bc44e08aa295a17237e062af52849e21ed8b56aa32ca2c6629fc966c1",
+  "originHash" : "ed26e8335c5fad3034fe39febf3b51de3c7e6bfb0c9b89517e55f55945959adc",
   "pins" : [
     {
       "identity" : "devicekit",
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RunanywhereAI/mlx-audio-swift.git",
       "state" : {
-        "revision" : "580e952adda0cd6bdc5c04f402822adbb61525c8",
-        "version" : "0.1.4"
+        "revision" : "661fb564f013c8e396cb803899eead73bd299ef6",
+        "version" : "0.1.5"
       }
     },
     {
@@ -42,26 +42,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RunanywhereAI/mlx-swift.git",
       "state" : {
-        "revision" : "563961dfcfd4589755190d285555e4f9eface890",
-        "version" : "0.31.7"
+        "revision" : "7bf45022ebfe22c20b14b0d648451dbdf5e66bf4",
+        "version" : "0.31.8"
       }
     },
     {
       "identity" : "mlx-swift-lm",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift-lm",
+      "location" : "https://github.com/RunanywhereAI/mlx-swift-lm.git",
       "state" : {
-        "revision" : "bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57",
-        "version" : "3.31.4"
-      }
-    },
-    {
-      "identity" : "swift-argument-parser",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-argument-parser",
-      "state" : {
-        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
-        "version" : "1.8.2"
+        "revision" : "5270d2957d828fa8e65121ab5386c115060522bd",
+        "version" : "3.31.5"
       }
     },
     {

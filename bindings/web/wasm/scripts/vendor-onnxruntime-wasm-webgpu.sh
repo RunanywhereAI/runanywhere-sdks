@@ -60,6 +60,7 @@ PATCH_STATE="absent"
 ORT_REQUIRED_FILES=(
   "${ORT_ARCHIVE_DEST}"
   "${DEST_DIR}/include/onnxruntime_c_api.h"
+  "${DEST_DIR}/include/onnxruntime_error_code.h"
   "${DEST_DIR}/include/onnxruntime_cxx_api.h"
   "${DEST_DIR}/include/onnxruntime_cxx_inline.h"
   "${DEST_DIR}/include/onnxruntime_float16.h"
@@ -405,7 +406,38 @@ export PATH
 source "${EMSDK}/emsdk_env.sh"
 export EMSCRIPTEN="${EMSDK}/upstream/emscripten"
 export EM_CONFIG="${EMSDK}/.emscripten"
-export PATH="${EMSDK}:${EMSCRIPTEN}:${EMSDK}/upstream/bin:${PATH}"
+# emsdk 6.x deliberately omits its bundled Python dependency on Linux and
+# therefore does not export EMSDK_PYTHON there. macOS/Windows still provide it.
+# Resolve a host interpreter on Linux, but keep the explicit >=3.10 gate from
+# Emscripten 6 so an older Anaconda/system Python cannot silently win CMake's
+# discovery and fail much later in the Dawn build.
+if [ -z "${EMSDK_PYTHON:-}" ]; then
+  _emsdk_python_candidate="$(command -v python3 || true)"
+  if [ -n "${_emsdk_python_candidate}" ] && \
+      "${_emsdk_python_candidate}" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    EMSDK_PYTHON="${_emsdk_python_candidate}"
+  elif [ -x /usr/bin/python3 ] && \
+      /usr/bin/python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+    EMSDK_PYTHON=/usr/bin/python3
+  else
+    echo "ERROR: Emscripten ${EMSCRIPTEN_VERSION} requires Python 3.10 or newer." >&2
+    echo "       emsdk_env.sh did not export EMSDK_PYTHON and no compatible python3 was found." >&2
+    exit 1
+  fi
+fi
+if ! "${EMSDK_PYTHON}" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+  echo "ERROR: EMSDK_PYTHON must point to Python 3.10 or newer: ${EMSDK_PYTHON}" >&2
+  exit 1
+fi
+export EMSDK_PYTHON
+# Dawn launches Emscripten's Python helpers through CMake's discovered
+# interpreter. A host Anaconda installation can otherwise win discovery and
+# select Python 3.9, which Emscripten 6 rejects. Pin every spelling used by ORT
+# and Dawn to the interpreter shipped with the selected emsdk.
+export PYTHON="${EMSDK_PYTHON}"
+export Python_EXECUTABLE="${EMSDK_PYTHON}"
+export Python3_EXECUTABLE="${EMSDK_PYTHON}"
+export PATH="$(dirname "${EMSDK_PYTHON}"):${EMSDK}:${EMSCRIPTEN}:${EMSDK}/upstream/bin:${PATH}"
 
 echo "Pre-warming Emscripten sysroot at ${EMSDK}..."
 _warmup_c="$(mktemp -t rac_em_warmup.XXXXXX).c"
@@ -441,6 +473,8 @@ set +e
   --cmake_extra_defines \
     CMAKE_POLICY_VERSION_MINIMUM=3.5 \
     onnxruntime_BUILD_UNIT_TESTS=OFF \
+    "Python_EXECUTABLE=${EMSDK_PYTHON}" \
+    "Python3_EXECUTABLE=${EMSDK_PYTHON}" \
     "CMAKE_C_FLAGS=-fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
     "CMAKE_CXX_FLAGS=-fexceptions -Dprotobuf=rac_ort_protobuf -DHaveOffsetConverter=rac_ort_have_offset_converter -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
 BUILD_RC=$?
@@ -482,6 +516,7 @@ cp "${ORT_ARCHIVE}" "${DEST_DIR}/lib/libonnxruntime.a"
 HEADER_SRC="${SRC_DIR}/include/onnxruntime/core/session"
 for header in \
   onnxruntime_c_api.h \
+  onnxruntime_error_code.h \
   onnxruntime_cxx_api.h \
   onnxruntime_cxx_inline.h \
   onnxruntime_float16.h \

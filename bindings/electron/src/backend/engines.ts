@@ -41,7 +41,7 @@ export interface EngineRegistrySnapshot extends RegisteredEngines {
 
 /**
  * Map registry / package ids to {@link InferenceFramework} values.
- * Unknown names are ignored (cloud/mlx/neurt shells, test plugins, …).
+ * Unknown names are ignored (cloud/mlx shells, test plugins, …).
  */
 export function frameworksFromPluginNames(
   names: readonly string[]
@@ -83,6 +83,12 @@ function frameworkForPluginId(id: string): InferenceFramework | undefined {
     case BackendPluginId.QHexRT:
     case 'rac_backend_qhexrt':
       return InferenceFramework.QHEXRT;
+    // The engine's identity is `neurt`; the FRAMEWORK it executes is Core ML
+    // (see `@runanywhere/electron-neurt`'s README) — same distinction as
+    // qhexrt's target-stem alias above.
+    case BackendPluginId.NeuRT:
+    case 'rac_backend_neurt':
+      return InferenceFramework.COREML;
     default:
       return undefined;
   }

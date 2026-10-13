@@ -259,6 +259,19 @@ else
     "static readonly version = '${ONNX_VERSION_IOS_PIN}'"
 fi
 
+LLAMACPP_VERSION_PIN="$(read_version_pin LLAMACPP_VERSION)"
+if [ -z "${LLAMACPP_VERSION_PIN}" ]; then
+  echo "[FAIL] VERSIONS: missing LLAMACPP_VERSION pin" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  expect_literal "bindings/swift/Sources/LlamaCPPRuntime/LlamaCPP.swift" \
+    "public static let llamaCppVersion = \"${LLAMACPP_VERSION_PIN}\""
+  expect_literal "bindings/kotlin/modules/runanywhere-core-llamacpp/src/main/kotlin/com/runanywhere/sdk/llm/llamacpp/LlamaCPP.kt" \
+    "const val llamaCppVersion = \"${LLAMACPP_VERSION_PIN}\""
+  expect_literal "bindings/flutter/packages/runanywhere_llamacpp/lib/llamacpp.dart" \
+    "static const String llamaCppVersion = '${LLAMACPP_VERSION_PIN}'"
+fi
+
 expect_literal "bindings/proto-ts/package.json" "\"version\": \"${VERSION}\""
 expect_literal "bindings/proto-ts/package.json" '"license": "SEE LICENSE IN LICENSE"'
 expect_literal "bindings/proto-ts/package.json" '"LICENSE"'

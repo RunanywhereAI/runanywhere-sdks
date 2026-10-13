@@ -77,7 +77,7 @@ call to make. **Download and load are automatic** — passing `LlmOptions.model`
 is enough. The catalog is *not* auto-seeded, though: an unknown id is rejected
 before generation, so the one `models.register` call is required. To try a
 different model, change `MODEL_ID`/`MODEL_URL` in `MainActivity.kt` (the
-canonical ids and URLs live in `rcli/src/catalog/catalog.cpp`).
+canonical ids and URLs live in the [RCLI](https://github.com/RunanywhereAI/RCLI) catalog (`src/catalog/catalog.cpp`).
 
 Deliberately absent: Compose, a design system, model catalogs, navigation.
 

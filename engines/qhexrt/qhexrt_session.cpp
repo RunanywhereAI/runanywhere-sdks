@@ -28,6 +28,10 @@
 #include <cstdlib>
 #endif
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 #include "qhexrt_bundle_policy.h"
 
 #include "rac/core/rac_logger.h"
@@ -193,21 +197,68 @@ rac_qhexrt_set_skel_directory(const char* path) {
 }
 #endif
 
+#if defined(_WIN32)
+// QnnHtp.dll / QnnSystem.dll are not load-time imports of this DLL, so the
+// LOAD_WITH_ALTERED_SEARCH_PATH the plugin loader uses to load *us* (see
+// core/src/plugin/plugin_loader.cpp) never applies to them: that flag only
+// widens the search for the DLL being loaded by that specific call, not for
+// LoadLibrary calls made later by code already running inside it. Passing
+// nullptr here leaves qhx_runtime_create() to fall back to the OS's default
+// search order, which does not include this plugin's own directory — a
+// sibling next to a dynamically-loaded plugin DLL is otherwise invisible.
+// Resolve our own module directory instead and hand qhx_runtime_create
+// explicit paths there.
+std::string this_module_directory() {
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCSTR>(&this_module_directory), &module)) {
+        return {};
+    }
+    char buf[MAX_PATH];
+    DWORD len = GetModuleFileNameA(module, buf, sizeof(buf));
+    if (len == 0 || len >= sizeof(buf)) {
+        return {};
+    }
+    std::string path(buf, len);
+    auto slash = path.find_last_of("\\/");
+    return slash == std::string::npos ? std::string() : path.substr(0, slash);
+}
+#endif
+
 qhx_runtime* runtime_acquire() {
     std::lock_guard<std::mutex> lock(g_rt_mutex);
     if (g_rt == nullptr) {
 #if defined(__ANDROID__)
         static std::once_flag adsp_once;
         std::call_once(adsp_once, configure_adsp_library_path);
-#endif
         g_rt = qhx_runtime_create(nullptr, nullptr);  // default libQnnHtp.so / libQnnSystem.so
+#elif defined(_WIN32)
+        std::string dir = this_module_directory();
+        std::string qnn_htp = dir.empty() ? std::string() : dir + "\\QnnHtp.dll";
+        std::string qnn_system = dir.empty() ? std::string() : dir + "\\QnnSystem.dll";
+        g_rt = qhx_runtime_create(qnn_htp.empty() ? nullptr : qnn_htp.c_str(),
+                                   qnn_system.empty() ? nullptr : qnn_system.c_str());
+#else
+        g_rt = qhx_runtime_create(nullptr, nullptr);  // default libQnnHtp.so / libQnnSystem.so
+#endif
         if (g_rt == nullptr) {
             RAC_LOG_ERROR(LOG_CAT, "qhx_runtime_create failed (QNN libs unavailable?)");
             return nullptr;
         }
-        char arch[32] = {0};
-        qhx_runtime_device(g_rt, arch, sizeof(arch), nullptr, nullptr);
-        RAC_LOG_INFO(LOG_CAT, "QHexRT runtime up (arch=%s, %s)", arch, qhx_version());
+        // Do NOT query qhx_runtime_device() here for the log line: it forces the QNN HTP
+        // device (a live DSP session) into existence before any manifest is even read.
+        // A host_only plan (the Bonsai/Maple ternary decoder — QHexRT/src/hostop/qwen38_gen.cpp)
+        // has zero QNN graphs and instead opens its own raw FastRPC session directly
+        // (fastrpc_win.cpp / run_main_on_hexagon). On Windows the two contend for the same
+        // cDSP: with a QNN device already live, the FastRPC SET_PATH/GET_PATH session
+        // controls both return a non-zero rc and the subsequent remote_handle64_open for
+        // librun_main_on_hexagon_skel.so fails (0x80000406), surfacing as a bare
+        // HostOpFailed with the model otherwise loaded fine. session_open() below still
+        // queries the real arch via qhx_runtime_device() when it actually needs it (to
+        // pick the v75/v79/v81 manifest dir), which is the only place this call is load-
+        // bearing rather than cosmetic.
+        RAC_LOG_INFO(LOG_CAT, "QHexRT runtime up (%s)", qhx_version());
     }
     ++g_rt_refs;
     return g_rt;

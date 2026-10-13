@@ -1061,7 +1061,7 @@ export async function refreshModelRegistry(
   } = options;
   const native = requireNativeModule();
   try {
-    await ensureServicesReady();
+    await ensureServicesReadyOrIgnore();
     await native.refreshModelRegistry(
       includeRemoteCatalog,
       rescanLocal,

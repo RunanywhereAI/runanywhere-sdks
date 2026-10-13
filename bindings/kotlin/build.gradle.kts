@@ -1,5 +1,6 @@
 import org.gradle.api.artifacts.dsl.LockMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.security.MessageDigest
 import java.time.Duration
 
 plugins {
@@ -564,6 +565,48 @@ tasks.register("downloadJniLibs") {
                 ant.withGroovyBuilder {
                     "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
                 }
+
+                // VERIFY BEFORE EXTRACT. This path had no integrity check at all: it
+                // fetched a .zip over the network and unzipped it straight into jniLibs.
+                // Every release attaches a .sha256 sidecar next to each asset, and
+                // Flutter already verifies them
+                // (bindings/flutter/packages/runanywhere/android/build.gradle:135-152)
+                // — Kotlin simply never did. Ported here field for field, including the
+                // filename assertion, so a sidecar for a DIFFERENT asset cannot satisfy
+                // this one.
+                val sidecar = file("$tempDir/$packageName.sha256")
+                ant.withGroovyBuilder {
+                    "get"("src" to "$zipUrl.sha256", "dest" to sidecar, "verbose" to false)
+                }
+                val sidecarMatch =
+                    Regex("""^([0-9a-fA-F]{64})\s+\*?(.+)$""")
+                        .find(sidecar.readText().trim())
+                        ?: throw GradleException("Malformed checksum sidecar for $packageName")
+                val declaredName = File(sidecarMatch.groupValues[2].trim()).name
+                if (declaredName != packageName) {
+                    throw GradleException(
+                        "Checksum sidecar names $declaredName, expected $packageName",
+                    )
+                }
+                val expectedSha = sidecarMatch.groupValues[1].lowercase()
+                val actualSha =
+                    MessageDigest.getInstance("SHA-256").let { digest ->
+                        tempZip.inputStream().use { stream ->
+                            val buffer = ByteArray(8192)
+                            var read = stream.read(buffer)
+                            while (read > 0) {
+                                digest.update(buffer, 0, read)
+                                read = stream.read(buffer)
+                            }
+                        }
+                        digest.digest().joinToString("") { "%02x".format(it) }
+                    }
+                if (actualSha != expectedSha) {
+                    throw GradleException(
+                        "Checksum mismatch for $packageName: expected $expectedSha, got $actualSha",
+                    )
+                }
+                sidecar.delete()
 
                 val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
                 extractDir.mkdirs()

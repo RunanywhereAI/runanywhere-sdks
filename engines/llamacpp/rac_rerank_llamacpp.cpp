@@ -32,6 +32,8 @@
 #include "core/internal/platform_compat.h"
 #include <sys/stat.h>
 
+#include "llamacpp_logging.h"
+
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -343,7 +345,7 @@ rac_result_t llamacpp_rerank_initialize(void* implementation, const char* model_
 
     llama_model_params model_params = llama_model_default_params();
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-    model_params.use_mmap = false;
+    model_params.load_mode = LLAMA_LOAD_MODE_NONE;
 #endif
 #if defined(GGML_USE_METAL) || defined(GGML_USE_CUDA) || defined(GGML_USE_VULKAN) || \
     defined(GGML_USE_WEBGPU)
@@ -491,6 +493,7 @@ rac_result_t llamacpp_rerank_create(const char* model_id, const char* /*config_j
         return RAC_ERROR_NULL_POINTER;
     }
     *output = nullptr;
+    runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
     llama_backend_init();
     auto handle = std::make_unique<LlamaCppRerankHandle>();
     handle->model_id = model_id;

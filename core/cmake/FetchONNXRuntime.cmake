@@ -82,7 +82,7 @@ if(EMSCRIPTEN)
 
 elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # iOS: Use local ONNX Runtime xcframework from third_party
-    # Downloaded by: ./scripts/ios/download-onnx.sh
+    # Downloaded by: core/scripts/ios/download-onnx.sh
     # NOTE: Version must match what sherpa-onnx was built against
 
     set(ONNX_IOS_VERSION "${RAC_ONNX_VERSION_IOS}")
@@ -158,7 +158,7 @@ elseif(ANDROID)
     # Android: Use ONNX Runtime from Sherpa-ONNX (16KB aligned in v1.12.20+)
     # Sherpa-ONNX version is loaded from the canonical VERSIONS file.
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
-    # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
+    # Downloaded by: core/scripts/android/download-sherpa-onnx.sh
     # Anchor on this module's location so the lookup is stable under the
     # single-root CMake layout, where CMAKE_SOURCE_DIR is the repo
     # root but download-sherpa-onnx.sh populates core/third_party/.
@@ -219,7 +219,9 @@ elseif(ANDROID)
         message(STATUS "ONNX Runtime Android library: ${ONNX_LIB_PATH}")
         message(STATUS "ONNX Runtime Android headers: ${ONNX_HEADER_PATH}")
     else()
-        message(FATAL_ERROR "Sherpa-ONNX not found. Please run: ./scripts/android/download-sherpa-onnx.sh")
+        message(FATAL_ERROR
+            "Sherpa-ONNX not found. Please run, from the repo root: "
+            "bash core/scripts/android/download-sherpa-onnx.sh")
     endif()
 
 elseif(APPLE)

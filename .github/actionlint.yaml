@@ -1,0 +1,15 @@
+# actionlint config. Not currently wired into any CI gate in this repo
+# (grep -rl actionlint .github/ finds nothing else) — this exists so the tool
+# stays usable if it ever is, and for anyone running it locally.
+#
+# `native_win_arm64_qhexrt` in electron-native-package.yml targets a real
+# self-hosted runner via `runs-on: [self-hosted, Windows, ARM64, qhexrt]`.
+# actionlint's built-in label set only recognizes lowercase `windows`/`arm64`
+# for GitHub-hosted runners, so the capitalized labels used for this
+# self-hosted machine (registered with GitHub's own `Windows`/`ARM64` OS/arch
+# auto-labels) need declaring here too, alongside the custom `qhexrt` label.
+self-hosted-runner:
+  labels:
+    - Windows
+    - ARM64
+    - qhexrt

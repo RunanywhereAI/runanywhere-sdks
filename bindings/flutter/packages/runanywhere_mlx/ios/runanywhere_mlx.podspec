@@ -8,10 +8,10 @@
 #
 
 mlx_checksums = {
-  'RABackendMLX' => '0802fe58480c3e03e94498d46adb50fda7b9ade491807c7e0392a7fd68b83b59',
-  'RunAnywhereMLXRuntime' => '8e6f818b46325b8a70b2d473e34e5b0e19544adcdc48b7ba86a75142c17d811b',
+  'RABackendMLX' => '22fdca00edc3f0fbd5970189ffd329d30719a63b071e4db0e00dd29bf9cf1124',
+  'RunAnywhereMLXRuntime' => 'b95695111bfaa5f6b7fc73a003c2bd5bec1565a60e2b8e85820f1250952fb8f2',
   'RunAnywhereMLXMetal' => '17a2f8c4ce09ef691cde5e7d04171ce749fca89315205f90eb2eed5a76b682b1',
-  'RunAnywhereMLXResources' => '70de4c70143b4544204b2c0e8af296546bc31ccf3ffda2f7b813fffb5b720ae9'
+  'RunAnywhereMLXResources' => 'ace624c5cffa32f789cd3beee8d140740daadd793b1315c3583ab670410b3ca3'
 }.freeze
 
 checksum_for = lambda do |name|
@@ -25,13 +25,15 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
-  s.version          = '0.20.22'
-  # TEMP: iOS archives are downloaded from the v#{asset_version} GitHub release.
-  # s.version leads the published release because 0.20.20 republished only the
-  # Electron npm packages -- no v0.20.20 tag or iOS archives were ever cut, and
-  # the checksums below are still the 0.20.19 ones. Bump this back to
-  # s.version once a matching release exists.
-  asset_version      = '0.20.19'
+  s.version          = '0.20.37'
+  # iOS archives are downloaded from the v#{asset_version} GitHub release.
+  # Normally identical to s.version, and a literal on purpose:
+  # scripts/release/sync-versions.sh rewrites it and
+  # check_release_version_coherence.sh requires the exact string. It only
+  # diverges when a version republishes non-iOS packages without cutting iOS
+  # archives (0.20.20 did that) -- then pin the last
+  # release that has them.
+  asset_version      = '0.20.37'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

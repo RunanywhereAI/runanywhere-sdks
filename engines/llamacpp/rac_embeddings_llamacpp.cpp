@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "llamacpp_logging.h"
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -367,7 +368,7 @@ rac_result_t llamacpp_embeddings_initialize(void* implementation, const char* mo
 
     llama_model_params model_params = llama_model_default_params();
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-    model_params.use_mmap = false;
+    model_params.load_mode = LLAMA_LOAD_MODE_NONE;
 #endif
 #if defined(GGML_USE_METAL) || defined(GGML_USE_CUDA) || defined(GGML_USE_VULKAN) || \
     defined(GGML_USE_WEBGPU)
@@ -538,7 +539,10 @@ void llamacpp_embeddings_destroy(void* implementation) {
 // exit.
 void ensure_llama_backend_initialized() {
     static std::once_flag backend_once;
-    std::call_once(backend_once, []() { llama_backend_init(); });
+    std::call_once(backend_once, []() {
+        runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
+        llama_backend_init();
+    });
 }
 
 rac_result_t llamacpp_embeddings_create(const char* model_id, const char* /*config_json*/,

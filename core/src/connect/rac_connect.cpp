@@ -947,11 +947,14 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
                 break;
             }
         }
+        // Activation tensors carry floating-point activations (typically FP16 / BF16 at 2 bytes per
+        // element or FP32 at 4 bytes per element; minimum 2 bytes per element).
         const uint64_t min_elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
+        const uint64_t min_bytes = min_elements * 2;
         if (!valid_boundary) {
             validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
-        } else if (request.tensor_data().size() < min_elements) {
-            validation.set_rejection_reason("Activation tensor_data size is smaller than tensor dimensions");
+        } else if (request.tensor_data().size() < min_bytes) {
+            validation.set_rejection_reason("Activation tensor_data size is smaller than expected tensor bytes (minimum 2 bytes/element)");
         } else {
             validation.set_accepted(true);
         }

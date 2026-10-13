@@ -41,7 +41,7 @@
 #
 # Gate recipe (replace the current force-OFF):
 #   set(RAC_ONNX_WASM_RUNTIME_DIR
-#       "${CMAKE_SOURCE_DIR}/core/third_party/onnxruntime-wasm")
+#       "${RAC_ROOT_DIR}/core/third_party/onnxruntime-wasm")
 #   if(EMSCRIPTEN AND NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
 #       set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
 #   endif()
@@ -58,7 +58,7 @@ option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 if(EMSCRIPTEN)
     if(NOT DEFINED RAC_ONNX_WASM_RUNTIME_DIR OR RAC_ONNX_WASM_RUNTIME_DIR STREQUAL "")
         set(RAC_ONNX_WASM_RUNTIME_DIR
-            "${CMAKE_SOURCE_DIR}/core/third_party/onnxruntime-wasm"
+            "${RAC_ROOT_DIR}/core/third_party/onnxruntime-wasm"
             CACHE PATH "Vendored ONNX Runtime WASM root (CPU or WebGPU)" FORCE)
     endif()
     if(NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
@@ -112,7 +112,7 @@ endif()
 # Target declaration migrated to rac_add_engine_plugin() macro
 # (cmake/plugins.cmake).
 
-include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+include(${RAC_ROOT_DIR}/cmake/plugins.cmake)
 
 # Resolve the runanywhere-commons root for include paths.
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)

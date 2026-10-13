@@ -70,6 +70,7 @@ const FRAMEWORK_TO_PROTO: Record<InferenceFramework, ProtoFramework> = {
   [InferenceFramework.ONNX]: ProtoFramework.INFERENCE_FRAMEWORK_ONNX,
   [InferenceFramework.SHERPA]: ProtoFramework.INFERENCE_FRAMEWORK_SHERPA,
   [InferenceFramework.QHEXRT]: ProtoFramework.INFERENCE_FRAMEWORK_QHEXRT,
+  [InferenceFramework.COREML]: ProtoFramework.INFERENCE_FRAMEWORK_COREML,
 };
 
 const FRAMEWORK_FROM_PROTO = new Map<ProtoFramework, InferenceFramework>(
