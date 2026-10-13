@@ -23,6 +23,7 @@
 #include <mutex>
 
 #include "rac/core/rac_error.h"
+#include "rac/features/decision/rac_decision_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/rerank/rac_rerank_service.h"
@@ -44,6 +45,12 @@ extern RAC_LLAMACPP_API const rac_embeddings_service_ops_t g_llamacpp_embeddings
 extern RAC_LLAMACPP_API const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
 /* Defined in rac_rerank_llamacpp.cpp. */
 extern RAC_LLAMACPP_API const rac_rerank_service_ops_t g_llamacpp_rerank_ops;
+
+/* Defined in rac_decision_llamacpp.cpp — built only when the fetched
+ * llama.cpp revision carries the joint decision head and the span API. */
+#if defined(RAC_LLAMACPP_HAS_DECISION)
+extern RAC_LLAMACPP_API const rac_decision_service_ops_t g_llamacpp_decision_ops;
+#endif
 
 RAC_LLAMACPP_API rac_result_t rac_llamacpp_cpu_runtime_register(void);
 RAC_LLAMACPP_API void rac_llamacpp_cpu_runtime_unregister(void);
@@ -123,6 +130,9 @@ static const rac_primitive_t k_llamacpp_primitives[] = {
     RAC_PRIMITIVE_EMBED,
     RAC_PRIMITIVE_VLM,
     RAC_PRIMITIVE_RERANK,
+#if defined(RAC_LLAMACPP_HAS_DECISION)
+    RAC_PRIMITIVE_DECIDE,
+#endif
 };
 
 static const rac_engine_manifest_t k_llamacpp_manifest = {
@@ -164,11 +174,15 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
     /* rerank_ops       */ &g_llamacpp_rerank_ops,
+    /* image_embedding_ops */ nullptr,
+    /* ocr_ops          */ nullptr,
+#if defined(RAC_LLAMACPP_HAS_DECISION)
+    /* decision_ops    */ &g_llamacpp_decision_ops,
+#else
+    /* decision_ops    */ nullptr,
+#endif
 
-    /* reserved_slot_3..9 */
-    nullptr,
-    nullptr,
-    nullptr,
+    /* reserved_slot_6..9 */
     nullptr,
     nullptr,
     nullptr,
