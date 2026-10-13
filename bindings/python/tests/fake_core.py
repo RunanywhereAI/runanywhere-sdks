@@ -235,13 +235,30 @@ class FakeCore:
         self._record("load_embedding_model", path)
         return self._handle()
 
-    def embed(self, handle: int, text: str) -> np.ndarray:
-        self._record("embed", handle, text)
-        return np.arange(self.dimension, dtype=np.float32)
+    def embed(
+        self,
+        handle: int,
+        text: str,
+        normalize: Optional[bool] = None,
+        pooling: Optional[int] = None,
+    ) -> np.ndarray:
+        self._record("embed", handle, text, normalize, pooling)
+        vec = np.arange(self.dimension, dtype=np.float32)
+        if normalize is not False:
+            norm = float(np.linalg.norm(vec))
+            if norm > 0:
+                vec = vec / norm
+        return vec
 
-    def embed_batch(self, handle: int, texts: Sequence[str]) -> List[np.ndarray]:
-        self._record("embed_batch", handle, tuple(texts))
-        return [np.arange(self.dimension, dtype=np.float32) for _ in texts]
+    def embed_batch(
+        self,
+        handle: int,
+        texts: Sequence[str],
+        normalize: Optional[bool] = None,
+        pooling: Optional[int] = None,
+    ) -> List[np.ndarray]:
+        self._record("embed_batch", handle, tuple(texts), normalize, pooling)
+        return [self.embed(handle, t, normalize, pooling) for t in texts]
 
     def unload_embedding_model(self, handle: int) -> None:
         self._record("unload_embedding_model", handle)
