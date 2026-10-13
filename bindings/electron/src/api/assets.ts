@@ -146,7 +146,9 @@ export interface RefreshOptions {
   includeRemoteCatalog?: boolean;
   /** Rescan the model store for artifacts on disk. On by default. */
   rescanLocal?: boolean;
-  /** Clear downloaded state for rows whose files are gone. On by default. */
+  /**
+   * Request orphan pruning. The current native refresh API warns and leaves rows unchanged.
+   */
   pruneOrphans?: boolean;
 }
 
@@ -186,11 +188,11 @@ export interface ModelsNamespace {
    */
   unregister(id: string): Promise<void>;
   /**
-   * Re-read the registry: rescan the model store for artifacts that arrived or
-   * vanished outside the SDK, and clear the downloaded flag on rows whose files
-   * are gone.
+   * Re-read the registry and rescan the model store for artifacts that arrived
+   * outside the SDK. The current native refresh API does not prune rows for
+   * missing files; requesting `pruneOrphans` reports a warning instead.
    */
-  refresh(options?: RefreshOptions): Promise<ModelInfo[]>;
+  refresh(options?: RefreshOptions): Promise<void>;
   /**
    * Fetch a model, reporting progress and completion in one stream.
    *
@@ -561,16 +563,27 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     },
 
     async refresh(options = {}) {
-      const result = await abi.refresh({
-        includeRemoteCatalog: options.includeRemoteCatalog ?? false,
-        rescanLocal: options.rescanLocal ?? true,
-        pruneOrphans: options.pruneOrphans ?? true,
-        catalogUri: '',
-        forceRefresh: false,
-        includeDownloadedState: true,
-      });
-      if (result.error) throw SDKException.fromProto(result.error);
-      return (result.models?.models ?? []).map(toPublicModelInfo);
+      try {
+        const result = await abi.refresh({
+          includeRemoteCatalog: options.includeRemoteCatalog ?? false,
+          rescanLocal: options.rescanLocal ?? true,
+          pruneOrphans: options.pruneOrphans ?? false,
+          catalogUri: '',
+          forceRefresh: false,
+          includeDownloadedState: true,
+        });
+        if (result.error) {
+          console.warn(`[runanywhere] models.refresh failed: ${result.error.message}`);
+        }
+        for (const warning of result.warnings) {
+          console.warn(`[runanywhere] models.refresh: ${warning}`);
+        }
+      } catch (error: unknown) {
+        console.warn(
+          '[runanywhere] models.refresh failed:',
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     },
 
     download(id) {
