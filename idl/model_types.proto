@@ -113,6 +113,7 @@ enum ModelCategory {
     MODEL_CATEGORY_SPEAKER_DIARIZATION      = 10 [(runanywhere.v1.rac_wire_string) = "speaker-diarization"];
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION    = 11 [(runanywhere.v1.rac_wire_string) = "semantic-segmentation"];
     MODEL_CATEGORY_RERANK                   = 12 [(runanywhere.v1.rac_wire_string) = "rerank"];
+    MODEL_CATEGORY_OCR                      = 13 [(runanywhere.v1.rac_wire_string) = "ocr"];
 }
 
 // ---------------------------------------------------------------------------

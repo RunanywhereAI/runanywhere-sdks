@@ -1,94 +1,49 @@
-/**
- * @file openai_handler.h
- * @brief OpenAI API endpoint handlers
- *
- * Handles the OpenAI-compatible HTTP endpoints:
- *   - GET  /v1/models
- *   - POST /v1/chat/completions
- *   - GET  /health
- */
-
+/** @file openai_handler.h OpenAI-compatible endpoints for one loaded LLM. */
 #ifndef RAC_OPENAI_HANDLER_H
 #define RAC_OPENAI_HANDLER_H
 
 #include <httplib.h>
 
 #include <atomic>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <string>
 
 #include "rac/features/llm/rac_llm_service.h"
-#include "rac/server/rac_openai_types.h"
 
-namespace rac {
-namespace server {
+namespace rac::server {
 
-/**
- * @brief OpenAI API request handler
- *
- * Handles incoming HTTP requests and translates them to/from
- * the RunAnywhere LLM service.
- */
 class OpenAIHandler {
    public:
-    /**
-     * @brief Construct handler with LLM handle
-     *
-     * @param llmHandle Generic LLM service handle (must remain valid)
-     * @param modelId Model ID to report
-     */
-    OpenAIHandler(rac_handle_t llmHandle, const std::string& modelId);
-
-    /**
-     * @brief Handle GET /v1/models
-     */
+    OpenAIHandler(rac_handle_t llmHandle, const std::string& modelId, int32_t threads = 0,
+                  int32_t timeoutSeconds = 300);
     void handleModels(const httplib::Request& req, httplib::Response& res);
-
-    /**
-     * @brief Handle POST /v1/chat/completions
-     */
     void handleChatCompletions(const httplib::Request& req, httplib::Response& res);
-
-    /**
-     * @brief Handle GET /health
-     */
     void handleHealth(const httplib::Request& req, httplib::Response& res);
-
-    /**
-     * @brief Get total tokens generated
-     */
+    void requestStop();
     int64_t getTotalTokensGenerated() const { return totalTokensGenerated_.load(); }
+    int32_t getActiveRequests() const { return activeRequests_.load(); }
 
    private:
-    /**
-     * @brief Process a non-streaming chat completion request
-     */
     void processNonStreaming(const httplib::Request& req, httplib::Response& res,
-                             const nlohmann::json& requestJson);
-
-    /**
-     * @brief Process a streaming chat completion request
-     */
+                             const nlohmann::json& request);
     void processStreaming(const httplib::Request& req, httplib::Response& res,
-                          const nlohmann::json& requestJson);
-
-    /**
-     * @brief Parse generation options from request
-     */
-    rac_llm_options_t parseOptions(const nlohmann::json& requestJson);
-
-    /**
-     * @brief Send an error response
-     */
-    void sendError(httplib::Response& res, int statusCode, const std::string& message,
-                   const std::string& type);
+                          const nlohmann::json& request);
+    static void sendError(httplib::Response& res, int status, const std::string& message,
+                          const std::string& type);
 
     rac_handle_t llmHandle_;
     std::string modelId_;
+    int32_t threads_;
+    int32_t timeoutSeconds_;
+    bool ready_;
+    // One backend session owns one KV cache. Hold this through the SSE provider,
+    // whose invocation happens AFTER the route handler has returned.
+    std::mutex generationMutex_;
+    std::atomic<bool> stopping_{false};
+    std::atomic<int32_t> activeRequests_{0};
     std::atomic<int64_t> totalTokensGenerated_{0};
 };
 
-}  // namespace server
-}  // namespace rac
-
-#endif  // RAC_OPENAI_HANDLER_H
+}  // namespace rac::server
+#endif

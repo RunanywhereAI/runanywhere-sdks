@@ -135,7 +135,12 @@ fetch_slice() {
 
     # Fail closed on the archive set; a partial extract fails much later at link.
     local missing=0
-    for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a libneurt_rac_diffusion.a; do
+    # Every archive engines/neurt/CMakeLists.txt links must be present here too;
+    # a partial release otherwise passes the receipt check and fails at configure.
+    for lib in libneurt_core.a libneurt_rac_llm_ops.a libneurt_rac_stt_ops.a \
+               libneurt_rac_diffusion.a libneurt_rac_embedding_ops.a \
+               libneurt_rac_rerank_ops.a libneurt_rac_vlm_ops.a \
+               libneurt_rac_image_embedding_ops.a; do
         [[ -f "${dest}/lib/${lib}" ]] || { echo "[ERROR] ${slice}: missing ${lib}" >&2; missing=1; }
     done
     [[ -f "${dest}/include/rac_diffusion_coreml.h" ]] \

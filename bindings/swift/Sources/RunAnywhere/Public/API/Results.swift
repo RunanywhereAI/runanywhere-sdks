@@ -7,6 +7,7 @@
 //  result carries a success flag or an error message — failures throw.
 //
 
+import CoreGraphics
 import Foundation
 
 // MARK: - FinishReason
@@ -406,6 +407,65 @@ public struct SegmentationResult: Sendable {
         self.height = Int(proto.height)
         self.classes = proto.classSummaries.map { ClassInfo(proto: $0) }
     }
+}
+
+// MARK: - OCRPageResult
+
+/// One text region read off a page.
+public struct OCRRegion: Sendable {
+    public let text: String
+    /// Mean per-character confidence in 0...1, or nil when the engine reports
+    /// none. Deliberately optional rather than 0 — a model that does not score
+    /// its output is not a model that scored it zero.
+    public let confidence: Float?
+    /// Four corner points in SOURCE-image pixels, clockwise from top-left.
+    /// Detectors in this family emit rotated boxes, so this is a quad and not
+    /// a `CGRect`; `boundingBox` computes the axis-aligned hull when that is
+    /// all a caller needs.
+    public let quad: [CGPoint]
+
+    init(proto: RAOCRRegion) {
+        self.text = proto.text
+        self.confidence = proto.hasConfidence ? proto.confidence : nil
+        self.quad = [
+            CGPoint(x: CGFloat(proto.quad.x0), y: CGFloat(proto.quad.y0)),
+            CGPoint(x: CGFloat(proto.quad.x1), y: CGFloat(proto.quad.y1)),
+            CGPoint(x: CGFloat(proto.quad.x2), y: CGFloat(proto.quad.y2)),
+            CGPoint(x: CGFloat(proto.quad.x3), y: CGFloat(proto.quad.y3))
+        ]
+    }
+
+    /// The axis-aligned hull of `quad`, for callers that only need a rect.
+    public var boundingBox: CGRect {
+        guard let first = quad.first else { return .zero }
+        var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
+        for point in quad.dropFirst() {
+            minX = min(minX, point.x); maxX = max(maxX, point.x)
+            minY = min(minY, point.y); maxY = max(maxY, point.y)
+        }
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+}
+
+/// Everything read off one page.
+public struct OCRPageResult: Sendable {
+    public let regions: [OCRRegion]
+    public let processingTimeMs: Int
+    public let modelId: String
+    /// Whether the loaded model can also serve `recognizeLine`. False for the
+    /// detector-coupled families, whose recognizer consumes the detector's
+    /// feature map rather than pixels.
+    public let supportsLineRecognition: Bool
+
+    init(proto: RAOCRResult) {
+        self.regions = proto.regions.map { OCRRegion(proto: $0) }
+        self.processingTimeMs = Int(proto.processingTimeMs)
+        self.modelId = proto.modelID
+        self.supportsLineRecognition = proto.supportsLineRecognition
+    }
+
+    /// Region texts joined in the order the detector returned them.
+    public var text: String { regions.map(\.text).joined(separator: "\n") }
 }
 
 // MARK: - RAG results

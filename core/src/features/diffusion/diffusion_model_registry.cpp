@@ -8,7 +8,9 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -28,6 +30,34 @@ const char* LOG_CAT = "DiffusionModelRegistry";
 // BUILT-IN MODEL DEFINITIONS (CoreML only for now - iOS/macOS)
 // =============================================================================
 
+// WHAT THE APPLE ENGINE ACTUALLY DOES, and why these rows changed.
+//
+// A model definition here is a capability PROMISE the SDK reports through get_capabilities() and
+// surfaces in pickers. Both CoreML rows promised three things `rac_diffusion_coreml.mm` does not do:
+//
+//   * `scheduler: DPM_PP_2M` — the engine implements DDIM ONLY, hardcoded (ddim_step, scaled-linear
+//     betas, linear timestep spacing). There is no scheduler selection at all, so advertising DPM++
+//     meant a caller asking for it silently got DDIM.
+//   * `supports_img2img: TRUE` — the engine REJECTS img2img and inpainting outright, and its own
+//     get_info() reports supports_image_to_image=false. The registry and the engine contradicted
+//     each other about the same model.
+//   * `coreml_path` did not match anything in the published repo. Corrected to
+//     `split_einsum_v2/compiled`, which is where the compiled models actually live under
+//     `base_url`. Note this field is DECLARATIVE: the only code that touches it (builtin_select_
+//     backend, below) null-checks it and never resolves it, so neither value was breaking a
+//     download today — but a path that matches nothing is a trap for whoever wires it up next.
+//     Two namings legitimately exist and they are easy to confuse: the repo TREE has
+//     `split_einsum_v2/compiled/`, while the compiled ZIP extracts to a single
+//     `coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled/` directory. Verified by
+//     downloading and extracting the real 1.57 GB asset: it contains TextEncoder/Unet/VAEDecoder/
+//     VAEEncoder/SafetyChecker .mlmodelc plus vocab.json and merges.txt, all at that one level.
+//
+// Sizes were also wrong: the published
+// `coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip` is 1.57 GB (checked against
+// the HF file metadata), not 1.2 GB.
+//
+// Corrected rather than left aspirational: an untrue capability is worse than a missing one, because
+// the caller has no way to discover it is untrue.
 // SD 1.5 CoreML (iOS/macOS - uses Apple Neural Engine)
 static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
     .model_id = "stable-diffusion-v1-5-coreml",
@@ -41,16 +71,16 @@ static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
                  .height = 512,
                  .steps = 20,
                  .guidance_scale = 7.5f,
-                 .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
+                 .scheduler = RAC_DIFFUSION_SCHEDULER_DDIM,
                  .requires_cfg = RAC_TRUE},
     .download = {.base_url = "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized",
                  .onnx_path = nullptr,
-                 .coreml_path = "split_einsum_v2_compiled",
-                 .size_bytes = 1200000000ULL,
+                 .coreml_path = "split_einsum_v2/compiled",
+                 .size_bytes = 1570000000ULL,
                  .checksum = nullptr},
     .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_1_5, .custom_url = nullptr},
     .is_recommended = RAC_TRUE,
-    .supports_img2img = RAC_TRUE,
+    .supports_img2img = RAC_FALSE,
     .supports_inpainting = RAC_FALSE};
 
 // SD 2.1 CoreML (iOS/macOS)
@@ -66,17 +96,17 @@ static const rac_diffusion_model_def_t MODEL_SD21_COREML = {
                  .height = 768,
                  .steps = 20,
                  .guidance_scale = 7.5f,
-                 .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
+                 .scheduler = RAC_DIFFUSION_SCHEDULER_DDIM,
                  .requires_cfg = RAC_TRUE},
     .download = {.base_url =
                      "https://huggingface.co/apple/coreml-stable-diffusion-2-1-base-palettized",
                  .onnx_path = nullptr,
-                 .coreml_path = "split_einsum_v2_compiled",
+                 .coreml_path = "split_einsum_v2/compiled",
                  .size_bytes = 1500000000ULL,
                  .checksum = nullptr},
     .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_2_X, .custom_url = nullptr},
     .is_recommended = RAC_FALSE,
-    .supports_img2img = RAC_TRUE,
+    .supports_img2img = RAC_FALSE,
     .supports_inpainting = RAC_FALSE};
 
 // All built-in models (CoreML only)
@@ -339,6 +369,14 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
                 if (result == RAC_SUCCESS) {
                     return RAC_SUCCESS;
                 }
+                // Preserve genuine strategy failures (allocation, init,
+                // backend) instead of masking them as "model not found".
+                // Only RAC_ERROR_NOT_FOUND falls through to the next strategy.
+                if (result != RAC_ERROR_NOT_FOUND) {
+                    RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to resolve model '%s' (result %d)",
+                                    strategy.name, model_id, static_cast<int>(result));
+                    return result;
+                }
             }
         }
     }
@@ -348,10 +386,12 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
 }
 
 rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
-                                               size_t* out_count) {
+                                               size_t* out_count) try {
     if (!out_models || !out_count) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_models = nullptr;
+    *out_count = 0;
 
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
@@ -359,24 +399,51 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
     // Collect all models from all strategies
     std::vector<rac_diffusion_model_def_t> all_models;
 
-    for (const auto& strategy : state.strategies) {
-        if (strategy.list_models) {
-            rac_diffusion_model_def_t* models = nullptr;
-            size_t count = 0;
+    try {
+        for (const auto& strategy : state.strategies) {
+            if (strategy.list_models) {
+                rac_diffusion_model_def_t* models = nullptr;
+                size_t count = 0;
 
-            if (strategy.list_models(&models, &count, strategy.user_data) == RAC_SUCCESS &&
-                models) {
-                for (size_t i = 0; i < count; i++) {
-                    all_models.push_back(models[i]);
+                rac_result_t list_result;
+                try {
+                    list_result = strategy.list_models(&models, &count, strategy.user_data);
+                } catch (const std::bad_alloc&) {
+                    std::free(models);
+                    return RAC_ERROR_OUT_OF_MEMORY;
+                } catch (...) {
+                    std::free(models);
+                    RAC_LOG_ERROR(LOG_CAT, "Strategy '%s' threw while listing models",
+                                  strategy.name);
+                    return RAC_ERROR_INTERNAL;
                 }
-                std::free(models);
+                std::unique_ptr<rac_diffusion_model_def_t[], decltype(&std::free)> models_owner(
+                    models, &std::free);
+
+                if (list_result == RAC_SUCCESS && models_owner) {
+                    for (size_t i = 0; i < count; i++) {
+                        all_models.push_back(models_owner[i]);
+                    }
+                }
+
+                if (list_result != RAC_SUCCESS && list_result != RAC_ERROR_NOT_FOUND) {
+                    // Preserve genuine strategy failures (allocation, init,
+                    // backend) instead of reporting a successful empty/partial
+                    // list. Only RAC_ERROR_NOT_FOUND falls through.
+                    RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to list models (result %d)",
+                                    strategy.name, static_cast<int>(list_result));
+                    return list_result;
+                }
             }
         }
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        RAC_LOG_ERROR(LOG_CAT, "Unexpected exception while aggregating model definitions");
+        return RAC_ERROR_INTERNAL;
     }
 
     if (all_models.empty()) {
-        *out_models = nullptr;
-        *out_count = 0;
         return RAC_SUCCESS;
     }
 
@@ -397,14 +464,33 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
     *out_models = result;
     *out_count = all_models.size();
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    if (out_models) {
+        *out_models = nullptr;
+    }
+    if (out_count) {
+        *out_count = 0;
+    }
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    if (out_models) {
+        *out_models = nullptr;
+    }
+    if (out_count) {
+        *out_count = 0;
+    }
+    RAC_LOG_ERROR(LOG_CAT, "Unexpected exception while listing model definitions");
+    return RAC_ERROR_INTERNAL;
 }
 
 rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {
     rac_diffusion_model_def_t model_def;
 
-    if (rac_diffusion_model_registry_get(model_id, &model_def) != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using CoreML (Apple only)",
-                      model_id ? model_id : "(null)");
+    rac_result_t result = rac_diffusion_model_registry_get(model_id, &model_def);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_DEBUG(LOG_CAT,
+                      "Model lookup failed for '%s' (result %d), using CoreML (Apple only)",
+                      model_id ? model_id : "(null)", static_cast<int>(result));
         return RAC_DIFFUSION_BACKEND_COREML;
     }
 
@@ -448,7 +534,11 @@ rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_de
     size_t count = 0;
 
     rac_result_t result = rac_diffusion_model_registry_list(&models, &count);
-    if (result != RAC_SUCCESS || !models || count == 0) {
+    if (result != RAC_SUCCESS) {
+        std::free(models);
+        return result;
+    }
+    if (!models || count == 0) {
         std::free(models);
         return RAC_ERROR_NOT_FOUND;
     }

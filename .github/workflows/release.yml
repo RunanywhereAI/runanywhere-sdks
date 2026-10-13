@@ -70,6 +70,10 @@ on:
           Run id whose native-web artifact to reuse instead of rebuilding (skips native_web).
           Only safe when nothing under bindings/web/wasm, engines, or commons changed
           since that run; a packaging-only re-release is the intended case.
+          In practice that means the SAME version: racommons.wasm embeds
+          RAC_VERSION_STRING, and validate_public_packages.py asserts it matches the
+          version being packaged -- so reusing a PRIOR release's run always fails
+          sdk_web, no matter how little source changed.
         required: false
         default: ''
       rebuild_cpp_desktop:

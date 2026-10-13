@@ -156,19 +156,24 @@ bindings/kotlin/.idea/
 *.swo
 *~
 
-# Claude. Local session state stays ignored. The handoff README/scripts can
-# stay tracked, but plans and memory are local agent working notes.
+# Claude. Local session state stays ignored. The handoff README/scripts, the
+# shared slash commands, and the skill tree ARE tracked; plans, memory, local
+# permission overrides (`settings.local.json`) and worktrees are not.
 # Uses `.claude/*` rather than `.claude/` because git will not descend into
-# an excluded directory, which would make the negation below unreachable.
+# an excluded directory, which would make the negations below unreachable.
 .claude/*
 !.claude/handoff/
 .claude/handoff/plans/
 .claude/handoff/memory/
+!.claude/commands/
+!.claude/skills/
 
 # Agents. `.agents/skills/` is a generated mirror of `.claude/skills/` for non-Claude
-# tooling (see scripts/setup/sync-skills.sh) — kept local/ignored for now, same as the
-# canonical tree, until there's a decision on what's safe to publish from this public repo.
+# tooling (see scripts/setup/sync-skills.sh). Both trees are tracked and CI
+# (.github/workflows/agent-skills-gate.yml) fails if the mirror drifts or if either
+# tree grows a private hostname/credential. Everything else under .agents/ is local.
 .agents/*
+!.agents/skills/
 
 # Playwright MCP
 .playwright-mcp/

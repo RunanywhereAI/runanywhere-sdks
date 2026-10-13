@@ -15,7 +15,7 @@ lives where it does) is [`scripts/README.md`](README.md); don't duplicate its ta
 | `release/` | version bump, artifact validation, npm/consumer-app publish helpers (see below) | `README.md` |
 | `setup/` | `doctor.sh`, `setup.sh`, `setup-toolchain.sh`, `detect-mode.sh`, `sync-skills.sh` | `README.md` |
 | `validation/` | CI gates (`gates/`), C++ commons checks (`commons/`), the seven-lane e2e harness (`e2e/`), plus root-level `verify_default_pool.sh` (cross-language default-value parity check) | [`validation/README.md`](validation/README.md) |
-| `ci/` | `verify_cpp_desktop_kit.py` — kit tarball contract (proto headers, SCHEMA_LOCK, Windows `zlibstatic`/`bz2`/`libcurl`, sherpa routability). `oss_keyless_telemetry_blast.sh` is retired (CLI lives in RunanywhereAI/RCLI). Windows ARM64 public kits must ship `lib/libcurl.lib`; `v0.20.28` did not (packager only globbed x64-windows-static). | — |
+| `ci/` | `check_agent_skills.py` — the agent-instruction-tree gate (mirror drift + private-coordinate scan; see below). `verify_cpp_desktop_kit.py` — kit tarball contract (proto headers, SCHEMA_LOCK, Windows `zlibstatic`/`bz2`/`libcurl`, sherpa routability). `oss_keyless_telemetry_blast.sh` is retired (CLI lives in RunanywhereAI/RCLI). Windows ARM64 public kits must ship `lib/libcurl.lib`; `v0.20.28` did not (packager only globbed x64-windows-static). | — |
 | `models/` | empty on this branch — a BigVGAN ONNX exporter and a Parakeet CTC prep script have existed here on other commits/branches; a stale `__pycache__` from one of those checkouts may linger locally and is safe to delete | — |
 
 ## Path resolution: every script derives repo root from its own location, never cwd
@@ -57,13 +57,28 @@ or identity-mismatched selection.
 
 ## Skills: `.claude/skills/` is canonical, `.agents/skills/` is a generated mirror
 
-Both trees are gitignored (skill content isn't public yet), but non-Claude tooling (e.g.
-Codex, which has no native skills mechanism) reads `.agents/skills/` as plain markdown.
-Edit only `.claude/skills/`, then run `scripts/setup/sync-skills.sh` to regenerate the
-mirror (`--check` verifies it's in sync without writing, for CI/pre-commit use). Never
-hand-edit `.agents/skills/` — it's a plain `cp -R`, not a symlink, because a checkout
-without `core.symlinks=true` (common on Windows) would materialize a git symlink as a text
-file and silently break Codex's reads.
+Both trees are **tracked** and therefore **public**. Non-Claude tooling (e.g. Codex, which
+has no native skills mechanism) reads `.agents/skills/` as plain markdown, so the mirror
+has to exist as real files. Edit only `.claude/skills/`, then run
+`scripts/setup/sync-skills.sh` to regenerate the mirror (`--check` verifies it's in sync
+without writing). Never hand-edit `.agents/skills/` — it's a plain `cp -R`, not a symlink,
+because a checkout without `core.symlinks=true` (common on Windows) would materialize a git
+symlink as a text file and silently break Codex's reads.
+
+Because they're public, a skill describes the **capability**, never the **coordinates**:
+"a Windows ARM64 machine reachable over SSH; read the alias out of the operator's
+`~/.ssh/config`" — not a hostname, tailnet name, identity file, runner name, private IP, or
+`/Users/<someone>/...` path. An agent that has read the instructions can resolve the rest
+from the operator's own machine. `.claude/settings.local.json` and `.claude/worktrees/`
+stay gitignored for the same reason: they are one person's machine state.
+
+Both rules are enforced by `scripts/ci/check_agent_skills.py`, wired into CI as
+`.github/workflows/agent-skills-gate.yml`. Run it exactly as CI does:
+
+```bash
+scripts/setup/sync-skills.sh              # after editing .claude/skills/
+python3 scripts/ci/check_agent_skills.py  # mirror drift + private-coordinate scan
+```
 
 ## Release scripts: why they're this paranoid
 

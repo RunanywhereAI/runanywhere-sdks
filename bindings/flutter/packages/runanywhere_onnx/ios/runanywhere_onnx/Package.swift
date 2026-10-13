@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let sdkVersion = "0.20.31"
+let sdkVersion = "0.20.37"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -23,11 +23,11 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let onnxTarget = runAnywhereBinaryTarget(
     name: "RABackendONNX",
-    checksum: "990dd26b4e743a63068c1c107e44e78fb83b234bef4806971da89defb34e2733"
+    checksum: "7aa05c5ee68f39fef65a776a8b47ec173b029534934c167b1b76ee5a6a28f88f"
 )
 let sherpaTarget = runAnywhereBinaryTarget(
     name: "RABackendSherpa",
-    checksum: "976029f81edd3ba95cd398fc3c2e6e45b6382ce8d128b0d43f103babab6baa81"
+    checksum: "a3a51aca86d3ef5cff15cb8f4cf0d561611be77e483de74f762fb41d724e0ea5"
 )
 // Apple CoreML Stable-Diffusion engine. RACommons references
 // _rac_plugin_entry_neurt (0.20.10 enabled the CoreML backend in commons),
@@ -36,7 +36,7 @@ let sherpaTarget = runAnywhereBinaryTarget(
 // makes on-device image generation (diffusion.generateImage) routable.
 let coremlTarget = runAnywhereBinaryTarget(
     name: "RABackendNeuRT",
-    checksum: "57d9e8487acc77b02d07c426094ffb92719d1f0312cd2452402670c9cc6ddb39"
+    checksum: "f2a850c9b29b0b5cb1d75fb0f737fd2ae76a2cbab2eda6e916a8f71417d97262"
 )
 
 let package = Package(

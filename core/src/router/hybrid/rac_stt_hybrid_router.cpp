@@ -428,6 +428,13 @@ rac_stt_service_t* rac_stt_hybrid_router_create_service(const char* engine_hint,
                           ? model_id_or_path
                           : (engine_hint != nullptr ? engine_hint : "");
     service->model_id = rac_strdup(tag);
+    if (service->model_id == nullptr) {
+        if (vt->stt_ops->destroy != nullptr) {
+            vt->stt_ops->destroy(impl);
+        }
+        std::free(service);
+        return nullptr;
+    }
 
     return service;
 }
