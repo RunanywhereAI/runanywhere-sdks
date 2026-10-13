@@ -26,6 +26,7 @@ export const RunAnywhere: typeof RunAnywhereV3 & typeof deprecatedForwarders =
   );
 
 export type { Environment, InitializeOptions } from './Public/API/RunAnywhere.js';
+export type { RefreshOptions } from './Public/API/Namespaces/models.js';
 
 // Inputs
 export { AudioInput, ImageInput, RagDocument } from './Public/API/Inputs.js';
