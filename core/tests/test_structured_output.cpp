@@ -189,6 +189,42 @@ int test_prepare_prompt_proto_uses_generated_contract() {
     return 0;
 }
 
+int test_prepare_prompt_proto_defaults_schema_into_prompt() {
+    // include_schema_in_prompt is `optional bool` with rac_default "true"
+    // (idl/structured_output.proto), so a request that constrains decoding but
+    // says nothing about the prompt must still get the schema rendered in.
+    // Reading the field by value makes an absent one look like an explicit
+    // false, and prepare_prompt then returns `text` verbatim.
+    runanywhere::v1::StructuredOutputParseRequest request;
+    request.set_text("Return a status");
+    auto* options = request.mutable_options();
+    options->set_schema(
+        "{\"type\":\"object\",\"required\":[\"status\"],"
+        "\"properties\":{\"status\":{\"type\":\"string\"}}}");
+    ASSERT_TRUE(!options->has_include_schema_in_prompt());
+
+    std::string bytes;
+    ASSERT_TRUE(request.SerializeToString(&bytes));
+
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    const rac_result_t rc = rac_structured_output_prepare_prompt_proto(
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+    ASSERT_TRUE(result_bytes.data != nullptr);
+
+    runanywhere::v1::StructuredOutputPromptResult result;
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.error().c_abi_code(), RAC_SUCCESS);
+    ASSERT_SUBSTR(result.prepared_prompt().c_str(), "Return a status");
+    ASSERT_SUBSTR(result.prepared_prompt().c_str(), "\"status\"");
+    ASSERT_TRUE(result.prepared_prompt() != "Return a status");
+
+    rac_proto_buffer_free(&result_bytes);
+    return 0;
+}
+
 int test_validate_proto_uses_generated_contract() {
     // StructuredOutputValidationRequest was deleted outright — the sole
     // request envelope shared by parse/validate/prepare-prompt is now
@@ -262,6 +298,8 @@ int main() {
          .fn = test_parse_proto_extracts_array_with_brace_in_string},
         {.name = "prepare_prompt_proto_uses_generated_contract",
          .fn = test_prepare_prompt_proto_uses_generated_contract},
+        {.name = "prepare_prompt_proto_defaults_schema_into_prompt",
+         .fn = test_prepare_prompt_proto_defaults_schema_into_prompt},
         {.name = "validate_proto_uses_generated_contract",
          .fn = test_validate_proto_uses_generated_contract},
     };

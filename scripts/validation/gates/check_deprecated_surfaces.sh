@@ -306,11 +306,14 @@ scan_grep "core/include" \
   "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "cpp:deprecated-declaration"
 
 # 6d. Packaged header mirrors are public API too. A clean canonical header is
-# insufficient if SwiftPM or an AAR still advertises a retired declaration.
+# insufficient if SwiftPM still advertises a retired declaration, because that
+# mirror is committed and can drift from core/include on its own.
+# There is deliberately no React Native arm here: that package's header tree is
+# a verbatim `cp -R core/include/rac` performed by package-sdk.sh into a
+# gitignored jniLibs/include (.gitignore), so it cannot carry a declaration
+# 6c has not already seen, and it does not exist at all when this gate runs.
 scan_grep "bindings/swift/Sources/RunAnywhere/CRACommons/include" \
   "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "swift-c:deprecated-declaration"
-scan_grep "bindings/react-native/packages/core/android/src/main/jniLibs/include" \
-  "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "rn-c:deprecated-declaration"
 
 # 6e. Retired compatibility surfaces that must never reappear under a neutral
 # name or in one hand-maintained package mirror.
@@ -323,8 +326,7 @@ scan_git_grep \
 scan_git_grep \
   "rac_extract_archive[[:space:]]*\\(" \
   "all:retired-archive-adapter-api" "core/include" \
-  "bindings/swift/Sources/RunAnywhere/CRACommons/include" \
-  "bindings/react-native/packages/core/android/src/main/jniLibs/include"
+  "bindings/swift/Sources/RunAnywhere/CRACommons/include"
 
 # ---------------------------------------------------------------------------
 # Report

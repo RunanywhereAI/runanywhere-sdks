@@ -153,6 +153,10 @@ rac_inference_framework_t rac_model_category_default_framework(rac_model_categor
         case RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION:
         case RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return RAC_FRAMEWORK_ONNX;
+        case RAC_MODEL_CATEGORY_OCR:
+            // Matches rac_ocr_service.cpp's own default_framework: the only
+            // engine that fills `ocr_ops` today is NeuRT, via Core ML.
+            return RAC_FRAMEWORK_COREML;
         default:
             return RAC_FRAMEWORK_UNKNOWN;
     }
