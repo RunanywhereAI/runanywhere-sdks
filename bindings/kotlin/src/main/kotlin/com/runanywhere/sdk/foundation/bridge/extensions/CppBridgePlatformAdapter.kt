@@ -10,6 +10,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
@@ -143,6 +144,8 @@ object CppBridgePlatformAdapter {
      *
      * This MUST be called before any other C++ operations.
      * It is safe to call multiple times; subsequent calls are no-ops.
+     *
+     * @throws SDKException if the C++ core refuses the adapter.
      */
     fun register() {
         synchronized(lock) {
@@ -153,7 +156,7 @@ object CppBridgePlatformAdapter {
             val result = RunAnywhereBridge.racSetPlatformAdapter(this)
             if (result != 0) {
                 logCallback(LogLevel.ERROR, TAG, "Failed to set platform adapter: $result")
-                return
+                SDKException.throwIfError(result)
             }
 
             isRegistered = true
