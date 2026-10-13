@@ -43,6 +43,7 @@
 // are part of the C ABI surface and already widely included by the
 // service layer; the internal header is private to the lifecycle TUs.
 #include "rac/features/diarization/rac_diarization_service.h"
+#include "rac/features/decision/rac_decision_service.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -127,6 +128,7 @@ struct LoadedModel {
     const rac_diarization_service_ops_t* diarization_ops{nullptr};
     const rac_segmentation_service_ops_t* segmentation_ops{nullptr};
     const rac_ocr_service_ops_t* ocr_ops{nullptr};
+    const rac_decision_service_ops_t* decision_ops{nullptr};
     void* impl{nullptr};
     int active_refs{0};
     std::atomic<bool> cancel_requested{false};
