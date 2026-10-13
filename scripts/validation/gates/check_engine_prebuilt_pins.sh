@@ -268,16 +268,19 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
         want=()
         for s in "${NEURT_SLICES[@]}"; do want+=("neurt-${s}-v${nv}.tar.gz"); done
         for w in "${want[@]}"; do
-            if ! grep -qx "$w" <<<"$listing"; then bad "release is missing $w"
-            elif ! grep -qx "${w}.sha256" <<<"$listing"; then bad "release is missing ${w}.sha256"
+            # -F: these asset names are full of dots, and without it grep reads
+            # each one as "any character", so a malformed name can satisfy the
+            # check for a well-formed one.
+            if ! grep -qxF "$w" <<<"$listing"; then bad "release is missing $w"
+            elif ! grep -qxF "${w}.sha256" <<<"$listing"; then bad "release is missing ${w}.sha256"
             fi
         done
         qwant=()
         for a in "${QHEXRT_ABIS[@]}"; do qwant+=("qhexrt-${a}-v${qv}.tar.gz"); done
         for w in "${qwant[@]}"; do
-            if ! grep -qx "$w" <<<"$qhexrt_listing"; then
+            if ! grep -qxF "$w" <<<"$qhexrt_listing"; then
                 bad "release $QHEXRT_RELEASE_TAG is missing $w"
-            elif ! grep -qx "${w}.sha256" <<<"$qhexrt_listing"; then
+            elif ! grep -qxF "${w}.sha256" <<<"$qhexrt_listing"; then
                 bad "release $QHEXRT_RELEASE_TAG is missing ${w}.sha256"
             fi
         done
@@ -300,8 +303,8 @@ for a in rel.get('assets',[]): print(a['name'])" 2>/dev/null || true)"
             done
             qairt_fail_before=$fail
             for w in "${qairt_want[@]}"; do
-                if ! grep -qx "$w" <<<"$qairt_listing"; then bad "QAIRT release is missing $w"
-                elif ! grep -qx "${w}.sha256" <<<"$qairt_listing"; then bad "QAIRT release is missing ${w}.sha256"
+                if ! grep -qxF "$w" <<<"$qairt_listing"; then bad "QAIRT release is missing $w"
+                elif ! grep -qxF "${w}.sha256" <<<"$qairt_listing"; then bad "QAIRT release is missing ${w}.sha256"
                 fi
             done
             [[ $fail -eq $qairt_fail_before ]] && ok "QAIRT release carries all $(( ${#qairt_want[@]} * 2 )) expected files"

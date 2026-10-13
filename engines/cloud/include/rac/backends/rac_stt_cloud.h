@@ -19,6 +19,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/stt/rac_stt_service.h"
+#include "rac/backends/rac_cloud_api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +32,7 @@ extern "C" {
  * or register the backend with a plugin registry. Most callers should use
  * rac_stt_cloud_create() / rac_stt_cloud_create_from_json() instead.
  */
-extern const rac_stt_service_ops_t g_cloud_stt_ops;
+extern RAC_CLOUD_API const rac_stt_service_ops_t g_cloud_stt_ops;
 
 /**
  * @brief Create a fully-wrapped cloud STT service using the default provider.

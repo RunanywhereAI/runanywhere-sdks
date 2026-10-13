@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "pipeline.pb.h"
@@ -1067,6 +1068,41 @@ TEST(voice_agent_solution_compiles) {
 }
 
 // ---------------------------------------------------------------------------
+// 9b. An explicit temperature of 0.0 is greedy decoding. llm_options.proto
+//     documents it as "honoured as an explicit request", so it has to reach
+//     the llm operator instead of looking identical to an unset field.
+// ---------------------------------------------------------------------------
+TEST(voice_agent_explicit_zero_temperature_reaches_llm_operator) {
+    SolutionConfig cfg;
+    auto* va = cfg.mutable_voice_agent();
+    va->set_llm_model_id("qwen3-4b");
+    va->set_stt_model_id("whisper");
+    va->set_tts_model_id("kokoro");
+    va->set_vad_model_id("silero");
+    va->mutable_generation()->set_temperature(0.0f);
+
+    runanywhere::v1::PipelineSpec spec;
+    CHECK(rac::solutions::convert_solution_to_pipeline(cfg, &spec) == RAC_SUCCESS);
+
+    const runanywhere::v1::OperatorSpec* llm = nullptr;
+    for (const auto& op : spec.operators()) {
+        if (op.name() == "llm") {
+            llm = &op;
+            break;
+        }
+    }
+    CHECK(llm != nullptr);
+    if (llm == nullptr) {
+        return;
+    }
+    const auto it = llm->params().find("temperature");
+    CHECK(it != llm->params().end());
+    if (it != llm->params().end()) {
+        CHECK(std::stof(it->second) == 0.0f);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // 10. SolutionConfig (RAG) expands + compiles with explicit stand-ins.
 //     Topology: query (source) → retrieve → context → llm. The retrieve
 //     operator owns the embedding lookup via the host-supplied RAG
@@ -1086,6 +1122,59 @@ TEST(rag_solution_compiles) {
     const auto& spec = runner.spec();
     CHECK(spec.operators_size() == 4);
     CHECK(spec.edges_size() == 3);
+    runner.close_input();
+    runner.wait();
+}
+
+// ---------------------------------------------------------------------------
+// 10b. RAG retrieval tuning knobs reach the graph.
+//      config_loader.cpp parses vector_store / bm25_k1 / bm25_b / rrf_k out of
+//      the solution YAML. vector_store is the sharpest of the four: dropping
+//      it while forwarding vector_store_path splits one setting in half.
+// ---------------------------------------------------------------------------
+TEST(rag_retrieval_params_reach_the_retrieve_operator) {
+    ScopedSolutionStandins standins;
+
+    SolutionConfig cfg;
+    auto* rag = cfg.mutable_rag();
+    rag->set_embed_model_id("bge-small");
+    rag->set_llm_model_id("qwen3-4b");
+    rag->set_vector_store(runanywhere::v1::VECTOR_STORE_USEARCH);
+    rag->set_vector_store_path("/tmp/store");
+    rag->set_bm25_k1(1.5f);
+    rag->set_bm25_b(0.6f);
+    rag->set_rrf_k(30);
+
+    SolutionRunner runner(cfg);
+    CHECK(runner.start() == RAC_SUCCESS);
+
+    const runanywhere::v1::OperatorSpec* retrieve = nullptr;
+    for (const auto& op : runner.spec().operators()) {
+        if (op.name() == "retrieve")
+            retrieve = &op;
+    }
+    CHECK(retrieve != nullptr);
+    const auto& params = retrieve->params();
+    // The path was already forwarded; assert it and the type travel together.
+    const auto path = params.find("vector_store_path");
+    CHECK(path != params.end());
+    CHECK(path->second == "/tmp/store");
+    const auto store = params.find("vector_store");
+    CHECK(store != params.end());
+    CHECK(store->second == "VECTOR_STORE_USEARCH");
+    // Values, not just presence: a converter that forwarded the wrong number
+    // would satisfy a presence-only check. Compared against std::to_string so
+    // the assertion tracks the converter's own float formatting.
+    const auto bm25_k1 = params.find("bm25_k1");
+    CHECK(bm25_k1 != params.end());
+    CHECK(bm25_k1->second == std::to_string(1.5f));
+    const auto bm25_b = params.find("bm25_b");
+    CHECK(bm25_b != params.end());
+    CHECK(bm25_b->second == std::to_string(0.6f));
+    const auto rrf = params.find("rrf_k");
+    CHECK(rrf != params.end());
+    CHECK(rrf->second == "30");
+
     runner.close_input();
     runner.wait();
 }
@@ -1114,6 +1203,61 @@ TEST(c_abi_proto_bytes_lifecycle) {
     CHECK(rac_solution_feed(h, "why is the sky blue?") == RAC_SUCCESS);
     CHECK(rac_solution_close_input(h) == RAC_SUCCESS);
     rac_solution_destroy(h);
+}
+
+// ---------------------------------------------------------------------------
+// 11b. VoiceAgent barge-in knobs reach the graph.
+//     config_loader.cpp parses enable_barge_in / barge_in_threshold_ms out of
+//     the solution YAML, so the expansion has to carry them onto an operator
+//     or a caller's setting stops at the proto. Explicit false is the case
+//     that matters: it is the only way to turn barge-in off, and it is
+//     indistinguishable from "unset" unless presence is honoured.
+// ---------------------------------------------------------------------------
+TEST(voice_agent_barge_in_params_reach_the_vad_operator) {
+    ScopedSolutionStandins standins;
+
+    SolutionConfig cfg;
+    auto* va = cfg.mutable_voice_agent();
+    va->set_llm_model_id("qwen3-4b");
+    va->set_stt_model_id("whisper");
+    va->set_tts_model_id("kokoro");
+    va->set_vad_model_id("silero");
+    va->set_enable_barge_in(false);
+    va->set_barge_in_threshold_ms(250);
+    va->mutable_generation()->mutable_reasoning()->set_include_in_output(true);
+
+    SolutionRunner runner(cfg);
+    CHECK(runner.start() == RAC_SUCCESS);
+    const auto& spec = runner.spec();
+
+    const runanywhere::v1::OperatorSpec* vad = nullptr;
+    for (const auto& op : spec.operators()) {
+        if (op.name() == "vad")
+            vad = &op;
+    }
+    CHECK(vad != nullptr);
+    const auto& params = vad->params();
+    const auto enabled = params.find("enable_barge_in");
+    CHECK(enabled != params.end());
+    CHECK(enabled->second == "false");
+    const auto threshold = params.find("barge_in_threshold_ms");
+    CHECK(threshold != params.end());
+    CHECK(threshold->second == "250");
+
+    // emit_thoughts rides `generation.reasoning`, which was the other knob the
+    // loader parsed and the expansion dropped.
+    const runanywhere::v1::OperatorSpec* llm = nullptr;
+    for (const auto& op : spec.operators()) {
+        if (op.name() == "llm")
+            llm = &op;
+    }
+    CHECK(llm != nullptr);
+    const auto thoughts = llm->params().find("emit_thoughts");
+    CHECK(thoughts != llm->params().end());
+    CHECK(thoughts->second == "true");
+
+    runner.close_input();
+    runner.wait();
 }
 
 // ---------------------------------------------------------------------------
@@ -1270,8 +1414,11 @@ int main() {
     run_test_time_series_solution_compiles_with_builtin_window();
     run_test_context_build_builtin_applies_prompt_template();
     run_test_voice_agent_solution_compiles();
+    run_test_voice_agent_explicit_zero_temperature_reaches_llm_operator();
     run_test_rag_solution_compiles();
+    run_test_rag_retrieval_params_reach_the_retrieve_operator();
     run_test_c_abi_proto_bytes_lifecycle();
+    run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_c_abi_yaml_solution_lifecycle();
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();

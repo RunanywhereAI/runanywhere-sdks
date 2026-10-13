@@ -10,7 +10,7 @@
 #   - engines/                 — engine plugins (llamacpp, onnx, sherpa,
 #                                qhexrt, neurt). Each publishes
 #                                a `rac_engine_vtable_t` at
-#                                `RAC_PLUGIN_API_VERSION=7u` via
+#                                `RAC_PLUGIN_API_VERSION=11u` via
 #                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
 #                                `rac_plugin_entry` symbol.
 #   - tools/plugin-loader-smoke/ — CLI smoke test for the plugin loader
@@ -723,6 +723,55 @@ if(RAC_BUILD_TESTS)
         # and CTest reports a PASS, which is how test_stt_neurt_e2e went its whole life reported
         # green without ever running.
         set_tests_properties(image_embedding_neurt_e2e_tests PROPERTIES
+            LABELS "neurt" SKIP_RETURN_CODE 77)
+    endif()
+
+    # OCR end to end through the LIFECYCLE PROTO ABI -- rac_model_lifecycle_load_proto by
+    # category, then rac_ocr_read_page_lifecycle_proto. Deliberately NOT the handle API
+    # (rac_ocr_create/_read_page): that path already worked in 0.20.35 while no platform SDK
+    # could reach OCR at all, because none of them use it. Skips (77) without
+    # RAC_TEST_NEURT_OCR_BUNDLE.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
+       AND RAC_ENABLE_PROTOBUF
+       AND NOT TARGET test_ocr_neurt_e2e)
+        add_executable(test_ocr_neurt_e2e
+            core/tests/test_ocr_neurt_e2e.cpp)
+        target_include_directories(test_ocr_neurt_e2e PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/src
+            # _RAC_PROTO_GEN_DIR is set inside core/CMakeLists.txt and does not
+            # reach this scope; spell the same path out rather than leaking a
+            # PARENT_SCOPE variable for one test.
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/src/generated/proto
+        )
+        target_link_libraries(test_ocr_neurt_e2e PRIVATE
+            rac_commons
+            rac_backend_neurt
+        )
+        # rac_commons keeps its proto headers and protobuf includes PRIVATE by
+        # design (the C ABI exposes byte buffers, not runanywhere::v1:: types),
+        # so a test that speaks the proto ABI has to bring protobuf itself.
+        target_include_directories(test_ocr_neurt_e2e PRIVATE ${Protobuf_INCLUDE_DIRS})
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE protobuf::libprotobuf)
+        else()
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(TARGET archive_static)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_ocr_neurt_e2e PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_ocr_neurt_e2e PRIVATE cxx_std_17)
+        add_test(NAME ocr_neurt_e2e_tests COMMAND test_ocr_neurt_e2e)
+        set_tests_properties(ocr_neurt_e2e_tests PROPERTIES
             LABELS "neurt" SKIP_RETURN_CODE 77)
     endif()
 

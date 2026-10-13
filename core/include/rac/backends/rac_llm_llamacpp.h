@@ -304,6 +304,53 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_from_context(
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle);
 
 // =============================================================================
+// GGML/LLAMA.CPP DIAGNOSTICS
+// =============================================================================
+
+/**
+ * Callback for ggml/llama.cpp's own log output (backend init, Metal/CUDA
+ * device probing, tensor loading, etc.) — the messages ggml would otherwise
+ * print straight to stderr via its internal GGML_LOG_* macros, independent of
+ * anything the LLM/VLM/rerank/embeddings request path logs through
+ * rac_logger.h.
+ *
+ * @param level     ggml's level, mapped onto rac_log_level_t (rac/core/rac_types.h).
+ *                  ggml's GGML_LOG_LEVEL_CONT (a continuation of the previous
+ *                  line) is folded into whatever level that previous line
+ *                  carried, so every call here already has a real severity.
+ * @param message   NUL-terminated message text for one ggml log line (no
+ *                  trailing newline).
+ * @param user_data The pointer passed to rac_llamacpp_set_log_callback().
+ */
+typedef void (*rac_llamacpp_log_callback_fn)(rac_log_level_t level, const char* message,
+                                             void* user_data);
+
+/**
+ * Installs a callback for ggml/llama.cpp's own log output.
+ *
+ * ggml_log_set() — the function that actually owns this sink — is compiled
+ * into the linked llama.cpp/ggml archive with no public header in the kit;
+ * this is the supported way to reach it without declaring the unpublished
+ * symbol by hand. The sink is process-global (ggml has one log callback, not
+ * one per model/handle) and shared by every llama.cpp-backed capability —
+ * LLM, VLM, rerank, embeddings — so installing it here is enough to cover
+ * ggml_metal_* init spam regardless of which one a caller uses first.
+ *
+ * Passing NULL restores the SDK's own routing of ggml output through
+ * rac_logger.h (RAC_LOG_ERROR/WARNING/DEBUG, category "LLM.LlamaCpp.GGML"),
+ * gated by rac_logger_set_min_level() like any other RAC_LOG_* call — that is
+ * also the default before this is ever called, so a caller that only wants
+ * ggml noise gated behind the SDK's existing quiet/verbose level (and not
+ * routed anywhere custom) does not need to call this at all.
+ *
+ * @param callback  Called for every ggml log line; NULL restores the default
+ *                  rac_logger.h routing described above.
+ * @param user_data Opaque pointer passed to every callback invocation.
+ */
+RAC_LLAMACPP_API void rac_llamacpp_set_log_callback(rac_llamacpp_log_callback_fn callback,
+                                                    void* user_data);
+
+// =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================
 

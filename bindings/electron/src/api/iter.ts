@@ -45,7 +45,29 @@ export function bridgeStream<T>(
   producer: (sink: StreamSink<T>) => void | Promise<void>,
   onCancel?: () => void | Promise<void>
 ): AsyncIterableIterator<T> {
-  return sharedBridgeStream<T>((sink) => producer(withTypedFail(sink)), onCancel);
+  return sharedBridgeStream<T>((sink) => {
+    // `pushStream` reports a producer that throws or rejects through the sink
+    // it owns, not the one the producer was handed, so those failures would
+    // skip `withTypedFail`. Route them ourselves.
+    //
+    // A synchronous producer must stay synchronous: returning a promise from
+    // this callback makes `pushStream` auto-`end()` the stream once it
+    // settles, which would truncate a producer that is still pushing.
+    const typed = withTypedFail(sink);
+    let pending: void | Promise<void>;
+    try {
+      pending = producer(typed);
+    } catch (error) {
+      typed.fail(error);
+      return;
+    }
+    if (pending != null && typeof (pending as Promise<void>).then === 'function') {
+      return (pending as Promise<void>).catch((error: unknown) => {
+        typed.fail(error);
+      });
+    }
+    return pending;
+  }, onCancel);
 }
 
 /** Wrap a ready array as a bridge-safe stream (used for synthetic events). */

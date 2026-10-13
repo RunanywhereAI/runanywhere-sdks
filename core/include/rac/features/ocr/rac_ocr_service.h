@@ -29,7 +29,10 @@
 #ifndef RAC_OCR_SERVICE_H
 #define RAC_OCR_SERVICE_H
 
+#include <stddef.h>
+
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -152,6 +155,23 @@ RAC_API rac_result_t rac_ocr_cleanup(rac_handle_t handle);
 
 /** Destroy the service. */
 RAC_API void rac_ocr_destroy(rac_handle_t handle);
+
+/**
+ * SDK-facing ABI over runanywhere.v1.OCRRequest/OCRResult, against the model the
+ * canonical lifecycle currently holds on `SDK_COMPONENT_OCR`.
+ *
+ * This — not the handle API above — is how a platform SDK reaches OCR. The
+ * handle API is for a caller that owns its own service (RCLI does), and it
+ * cannot participate in load/unload, model switching, or cross-modality
+ * eviction because commons does not know the handle exists.
+ *
+ * Accepts RGBA8 and BGRA8 in addition to RGB8: platform decoders hand back
+ * four-channel buffers, and stripping alpha in every SDK is precisely the
+ * per-platform logic that belongs down here.
+ */
+RAC_API rac_result_t rac_ocr_read_page_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                       size_t request_proto_size,
+                                                       rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

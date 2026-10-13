@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -90,6 +91,25 @@ uint8_t* copy_bytes(const ::std::string& bytes) {
     if (out)
         std::memcpy(out, bytes.data(), bytes.size());
     return out;
+}
+
+bool checked_raw_image_size(int32_t width, int32_t height, size_t bytes_per_pixel,
+                            size_t* out_size) {
+    if (!out_size || width <= 0 || height <= 0 || bytes_per_pixel == 0)
+        return false;
+
+    const size_t width_size = static_cast<size_t>(width);
+    const size_t height_size = static_cast<size_t>(height);
+    const size_t max_size = std::numeric_limits<size_t>::max();
+    if (width_size > max_size / height_size)
+        return false;
+
+    const size_t pixels = width_size * height_size;
+    if (pixels > max_size / bytes_per_pixel)
+        return false;
+
+    *out_size = pixels * bytes_per_pixel;
+    return true;
 }
 
 // ---- Audio format enum mapping --------------------------------------------
@@ -342,6 +362,10 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
         return false;
     rac_vlm_options_t defaults = RAC_VLM_OPTIONS_DEFAULT;
     *out = defaults;
+    auto fail = [&]() {
+        rac_vlm_options_free_owned(out);
+        return false;
+    };
     // LLMGenerationOptions has explicit presence on every knob: ABSENT means
     // the annotated default applies (already loaded via RAC_VLM_OPTIONS_DEFAULT
     // above), and any value the caller sets -- including 0 -- is honoured
@@ -394,22 +418,35 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
             const auto& proto_tpl = vision->custom_chat_template();
             auto* tpl =
                 static_cast<rac_vlm_chat_template_t*>(rac_alloc(sizeof(rac_vlm_chat_template_t)));
-            if (tpl) {
-                tpl->template_str = proto_tpl.template_text().empty()
-                                        ? nullptr
-                                        : rac_strdup(proto_tpl.template_text().c_str());
-                tpl->image_marker = proto_tpl.has_image_marker()
-                                        ? rac_strdup(proto_tpl.image_marker().c_str())
-                                        : nullptr;
-                tpl->default_system_prompt =
-                    proto_tpl.has_default_system_prompt()
-                        ? rac_strdup(proto_tpl.default_system_prompt().c_str())
-                        : nullptr;
-                out->custom_chat_template = tpl;
+            if (!tpl) {
+                return fail();
+            }
+            *tpl = {};
+            out->custom_chat_template = tpl;
+            if (!proto_tpl.template_text().empty()) {
+                tpl->template_str = rac_strdup(proto_tpl.template_text().c_str());
+                if (!tpl->template_str) {
+                    return fail();
+                }
+            }
+            if (proto_tpl.has_image_marker()) {
+                tpl->image_marker = rac_strdup(proto_tpl.image_marker().c_str());
+                if (!tpl->image_marker) {
+                    return fail();
+                }
+            }
+            if (proto_tpl.has_default_system_prompt()) {
+                tpl->default_system_prompt = rac_strdup(proto_tpl.default_system_prompt().c_str());
+                if (!tpl->default_system_prompt) {
+                    return fail();
+                }
             }
         }
         if (vision->has_image_marker_override() && !vision->image_marker_override().empty()) {
             out->image_marker_override = rac_strdup(vision->image_marker_override().c_str());
+            if (!out->image_marker_override) {
+                return fail();
+            }
         }
     } else {
         out->model_family = RAC_VLM_MODEL_FAMILY_AUTO;
@@ -422,29 +459,37 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
     // enforcement parity with LLM.
     if (in.has_system_prompt() && !in.system_prompt().empty()) {
         out->system_prompt = rac_strdup(in.system_prompt().c_str());
+        if (!out->system_prompt) {
+            return fail();
+        }
     }
     const int stop_count = in.stop_sequences_size();
     if (stop_count > 0) {
         auto** arr =
-            static_cast<const char**>(std::malloc(static_cast<size_t>(stop_count) * sizeof(char*)));
-        if (arr) {
-            size_t written = 0;
-            for (int i = 0; i < stop_count; ++i) {
-                const auto& seq = in.stop_sequences(i);
-                if (seq.empty()) {
-                    continue;
-                }
-                arr[written] = rac_strdup(seq.c_str());
-                if (arr[written] != nullptr) {
-                    ++written;
-                }
+            static_cast<const char**>(std::calloc(static_cast<size_t>(stop_count), sizeof(char*)));
+        if (!arr) {
+            return fail();
+        }
+        out->stop_sequences = arr;
+        out->num_stop_sequences = static_cast<size_t>(stop_count);
+        size_t written = 0;
+        for (int i = 0; i < stop_count; ++i) {
+            const auto& seq = in.stop_sequences(i);
+            if (seq.empty()) {
+                continue;
             }
-            if (written > 0) {
-                out->stop_sequences = arr;
-                out->num_stop_sequences = written;
-            } else {
-                std::free(static_cast<void*>(arr));
+            arr[written] = rac_strdup(seq.c_str());
+            if (!arr[written]) {
+                return fail();
             }
+            ++written;
+        }
+        if (written > 0) {
+            out->num_stop_sequences = written;
+        } else {
+            std::free(static_cast<void*>(arr));
+            out->stop_sequences = nullptr;
+            out->num_stop_sequences = 0;
         }
     }
 
@@ -531,14 +576,20 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         out->file_path = copy_string_required(in.file_path());
     } else if (in.has_raw_rgb()) {
         // 3 bytes/px, tightly packed -- no alpha to drop.
-        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
         const ::std::string& src = in.raw_rgb();
-        out->data_size = src.size();
-        if (out->data_size > 0) {
-            uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-            std::memcpy(buf, src.data(), out->data_size);
-            out->pixel_data = buf;
-        }
+        size_t rgb_size = 0;
+        if (!checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
+            src.size() != rgb_size)
+            return false;
+
+        uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
+        if (!buf)
+            return false;
+        std::memcpy(buf, src.data(), rgb_size);
+
+        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
+        out->data_size = rgb_size;
+        out->pixel_data = buf;
     } else if (in.has_raw_rgba()) {
         // raw_rgba is now its own oneof arm (4 B/px) instead of being
         // disambiguated out of raw_rgb via a deleted `format` field. The
@@ -547,22 +598,30 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         // path. Without this, a 4 B/px buffer reaches mtmd_bitmap_init,
         // which reads it as 3 B/px, overshoots the heap by 33%, and either
         // hallucinates or EXC_BAD_ACCESSes.
-        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
         const ::std::string& src = in.raw_rgba();
-        const size_t pixels = static_cast<size_t>(out->width) * out->height;
-        if (pixels == 0 || src.size() < pixels * 4) {
+        size_t rgba_size = 0;
+        size_t rgb_size = 0;
+        if (!checked_raw_image_size(in.width(), in.height(), 4, &rgba_size) ||
+            !checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
+            src.size() != rgba_size) {
             // Dimensions inconsistent with RGBA payload — refuse rather
             // than read past the buffer.
             return false;
         }
-        out->data_size = pixels * 3;
-        uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
+        uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
+        if (!buf)
+            return false;
+
         const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
+        const size_t pixels = rgb_size / 3;
         for (size_t i = 0; i < pixels; ++i) {
             buf[i * 3 + 0] = in_px[i * 4 + 0];
             buf[i * 3 + 1] = in_px[i * 4 + 1];
             buf[i * 3 + 2] = in_px[i * 4 + 2];
         }
+
+        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
+        out->data_size = rgb_size;
         out->pixel_data = buf;
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
@@ -849,11 +908,13 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
         return false;
     *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
 
-    // EmbeddingsOptions.normalize is a plain proto3 bool with no unset sentinel;
-    // the backends default to L2 unit vectors (EmbeddingsConfiguration.normalize
-    // rac_default = true), so an explicit true and the proto default both resolve
-    // to L2 here. Disabling normalization is a component-configuration concern.
-    out->normalize = RAC_EMBEDDINGS_NORMALIZE_L2;
+    // EmbeddingsOptions.normalize is `optional` with rac_default "true", so
+    // presence separates "caller said false" from "caller said nothing"
+    // (embeddings_options.proto: "Unset = true. false returns the raw pooled
+    // vector"). Unset keeps the L2 that RAC_EMBEDDINGS_OPTIONS_DEFAULT already
+    // set; an explicit false is the only way to ask for the raw vector.
+    out->normalize = (!in.has_normalize() || in.normalize()) ? RAC_EMBEDDINGS_NORMALIZE_L2
+                                                             : RAC_EMBEDDINGS_NORMALIZE_NONE;
 
     switch (in.pooling()) {
         case ::runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED:

@@ -27,7 +27,6 @@
 #include <vector>
 
 #include "../embeddings/embeddings_service_internal.h"
-#include "features/llm/llm_thinking_tags_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -46,6 +45,7 @@
 #include "rag.pb.h"
 #include "sdk_events.pb.h"
 
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "foundation/rac_proto_marshal_internal.h"
 #include "infrastructure/events/sdk_event_publish.h"
 #endif
@@ -422,11 +422,18 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     // Base off RAC_LLM_OPTIONS_DEFAULT, then apply the embedded generation
     // knobs with the RAG pipeline defaults (max 512 tokens, top_p 0.9) when
     // unset.
+    //
+    // temperature and top_k are `optional` in llm_options.proto, so presence
+    // is what "unset" means: reading the value instead yields 0, which is a
+    // legal explicit setting for both (greedy / top-k disabled) and therefore
+    // cannot double as a sentinel. has_generation() is not a substitute -- a
+    // caller that sets any other generation knob makes the submessage present
+    // while leaving these two absent.
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.max_tokens = gen.max_output_tokens() > 0 ? gen.max_output_tokens() : 512;
-    opts.temperature = query_proto.has_generation() ? gen.temperature() : opts.temperature;
+    opts.temperature = gen.has_temperature() ? gen.temperature() : opts.temperature;
     opts.top_p = gen.top_p() > 0.0f ? gen.top_p() : 0.9f;
-    opts.top_k = gen.top_k();
+    opts.top_k = gen.has_top_k() ? gen.top_k() : opts.top_k;
     opts.disable_thinking =
         (gen.has_reasoning() && gen.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF)
             ? RAC_TRUE
@@ -781,6 +788,17 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         rc = rac_llm_create(llm_path.c_str(), &llm_handle);
         if (rc != RAC_SUCCESS || !llm_handle) {
             rc = rc != RAC_SUCCESS ? rc : RAC_ERROR_INITIALIZATION_FAILED;
+            rac_embeddings_destroy(embed_handle);
+            publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
+            return rc;
+        }
+        // `create` only builds the session; backends that defer the weight load
+        // (MLX) finish it in `initialize`, so generation would fail here with
+        // "model is not loaded". Same reason HttpServer::loadModel calls this
+        // (#735) and llm_create_service has always called it.
+        rc = rac_llm_initialize(llm_handle, llm_path.c_str());
+        if (rc != RAC_SUCCESS) {
+            rac_llm_destroy(llm_handle);
             rac_embeddings_destroy(embed_handle);
             publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
             return rc;
