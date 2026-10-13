@@ -34,6 +34,7 @@
 #   bindings/flutter package/plugin/native metadata (Dart, Gradle, Swift, Kotlin)
 #   dependencies/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
 #   SDK AGENTS/architecture/install docs                   (release-facing version examples)
+#   README.md                                              (version line + install-command pins)
 #
 # Does NOT touch (intentional, documented SoT for distinct domains):
 #   - package CHANGELOG prose — release notes require a reviewed, human-written
@@ -583,6 +584,18 @@ for release_doc in \
     "${REPO_ROOT}/bindings/swift/Sources/ONNXRuntime/README.md" \
     "${REPO_ROOT}/bindings/kotlin/README.md"; do
     bump_all_on_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
+done
+# The root README pins every install command. Match each pin by its shape rather
+# than CURRENT_VERSION, so a bump also heals a pin that is already stale.
+for readme_pin in \
+    'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+    'runanywhere[a-z_]*: \^' \
+    '@runanywhere/[a-z-]+@' \
+    'runanywhere==' \
+    'version line, currently \*\*'; do
+    bump_all_on_line "${REPO_ROOT}/README.md" \
+        "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?" \
+        "\\1${NEW_VERSION}"
 done
 
 # Every anchor above validated. Only now does anything on disk change, so a
