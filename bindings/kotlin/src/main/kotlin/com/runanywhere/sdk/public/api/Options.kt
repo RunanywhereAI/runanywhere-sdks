@@ -56,14 +56,16 @@ public sealed class ToolChoice {
 }
 
 /** Schema the generated text must conform to. */
-public data class StructuredOutput @JvmOverloads constructor(
-    val schema: JsonSchema,
-    val strict: Boolean = true,
-    val mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
-) {
-    /** Backward compatibility constructor for callers passing (schema, mode). */
-    public constructor(schema: JsonSchema, mode: StructuredOutputMode) : this(schema, strict = true, mode = mode)
-}
+public data class StructuredOutput
+    @JvmOverloads
+    constructor(
+        val schema: JsonSchema,
+        val strict: Boolean = true,
+        val mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
+    ) {
+        /** Backward compatibility constructor for callers passing (schema, mode). */
+        public constructor(schema: JsonSchema, mode: StructuredOutputMode) : this(schema, strict = true, mode = mode)
+    }
 
 /** Enforcement level `llm.generateStructured` applies to its schema. */
 public enum class StructuredOutputMode {

@@ -9,6 +9,8 @@
 
 package com.runanywhere.sdk.public.api
 
+import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
+import ai.runanywhere.proto.v1.DiarizationOptions as ProtoDiarizationOptions
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.EmbeddingsOptions
 import ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy
@@ -18,7 +20,10 @@ import ai.runanywhere.proto.v1.ModelQuery
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGRetrievalOptions
+import ai.runanywhere.proto.v1.ReasoningMode as ProtoReasoningMode
+import ai.runanywhere.proto.v1.ReasoningOptions as ProtoReasoningOptions
 import ai.runanywhere.proto.v1.RerankOptions
+import ai.runanywhere.proto.v1.SegmentationOptions as ProtoSegmentationOptions
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.StructuredOutputMode as ProtoStructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
@@ -30,11 +35,6 @@ import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VLMGenerationRequest
 import ai.runanywhere.proto.v1.VLMImage
 import com.runanywhere.sdk.generated.convenience.defaults
-import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
-import ai.runanywhere.proto.v1.DiarizationOptions as ProtoDiarizationOptions
-import ai.runanywhere.proto.v1.ReasoningMode as ProtoReasoningMode
-import ai.runanywhere.proto.v1.ReasoningOptions as ProtoReasoningOptions
-import ai.runanywhere.proto.v1.SegmentationOptions as ProtoSegmentationOptions
 
 /** The IDL's neutral repetition penalty, used when the caller leaves it unset. */
 private val NEUTRAL_REPETITION_PENALTY = LLMGenerationOptions.defaults().repeat_penalty
@@ -119,11 +119,12 @@ internal fun StructuredOutput.toProto(): StructuredOutputOptions =
     StructuredOutputOptions(
         schema = schema.rawJson,
         include_schema_in_prompt = true,
-        mode = when (mode) {
-            StructuredOutputMode.CONSTRAINED -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED
-            StructuredOutputMode.VALIDATION_ONLY -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY
-            StructuredOutputMode.REPAIR -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR
-        },
+        mode =
+            when (mode) {
+                StructuredOutputMode.CONSTRAINED -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED
+                StructuredOutputMode.VALIDATION_ONLY -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY
+                StructuredOutputMode.REPAIR -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR
+            },
     )
 
 internal fun SttOptions?.orDefault(): SttOptions = this ?: SttOptions()
