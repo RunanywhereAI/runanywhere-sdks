@@ -35,10 +35,23 @@ rac_add_engine_plugin(mlx
         ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
+target_include_directories(rac_backend_mlx PRIVATE
+    ${RAC_COMMONS_ROOT_DIR}/src/generated/proto
+)
+if(TARGET protobuf::libprotobuf)
+    target_link_libraries(rac_backend_mlx PRIVATE protobuf::libprotobuf)
+endif()
+
 if(RAC_BUILD_TESTS)
     find_package(Threads REQUIRED)
     add_executable(test_mlx_cancellation tests/test_mlx_cancellation.cpp)
+    target_include_directories(test_mlx_cancellation PRIVATE
+        ${RAC_COMMONS_ROOT_DIR}/src/generated/proto
+    )
     target_link_libraries(test_mlx_cancellation PRIVATE rac_backend_mlx Threads::Threads)
+    if(TARGET protobuf::libprotobuf)
+        target_link_libraries(test_mlx_cancellation PRIVATE protobuf::libprotobuf)
+    endif()
 endif()
 
 message(STATUS "mlx engine Configuration:")
