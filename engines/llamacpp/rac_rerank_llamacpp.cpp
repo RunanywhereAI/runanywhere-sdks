@@ -32,6 +32,8 @@
 #include "core/internal/platform_compat.h"
 #include <sys/stat.h>
 
+#include "llamacpp_logging.h"
+
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -491,6 +493,7 @@ rac_result_t llamacpp_rerank_create(const char* model_id, const char* /*config_j
         return RAC_ERROR_NULL_POINTER;
     }
     *output = nullptr;
+    runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
     llama_backend_init();
     auto handle = std::make_unique<LlamaCppRerankHandle>();
     handle->model_id = model_id;
