@@ -57,4 +57,9 @@ message TokenUsage {
     // rather than reported by the engine. Absence of the flag (false) means
     // the counts are engine-measured.
     bool   counts_estimated = 10;
+
+    // Input tokens reused from a backend prompt/KV cache. Included in
+    // input_tokens and total_tokens; 0 when no cache was reused or the backend
+    // does not report cache accounting.
+    int32  cached_input_tokens = 11;
 }
