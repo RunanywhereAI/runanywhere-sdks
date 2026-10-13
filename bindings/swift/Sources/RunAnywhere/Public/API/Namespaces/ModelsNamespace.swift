@@ -513,11 +513,12 @@ extension RunAnywhere {
         request.modelID = model.id
         request.category = category == .unspecified ? category.defaultLoadCategory : category
         request.forceReload = options?.forceReload ?? false
-        // Preserve catalog routing for a lone unspecified legacy choice, but
-        // do not pin the catalog ahead of later ordered caller preferences.
-        if let backend = options?.backendPreferences.first?.backend,
-           backend != .unspecified || (options?.backendPreferences.count ?? 0) > 1 {
-            request.framework = backend
+        // A lone unspecified choice leaves native catalog preference resolution
+        // intact. In a longer list, preserve it ahead of later caller choices.
+        if let backend = options?.backendPreferences.first?.backend {
+            if backend != .unspecified || (options?.backendPreferences.count ?? 0) > 1 {
+                request.framework = backend
+            }
         } else if model.framework != .unspecified {
             request.framework = model.framework
         }
@@ -530,7 +531,7 @@ extension RunAnywhere {
             request.contextLength = wireContextLength
         }
         // The full ordered list rides `backend_preferences`; `.framework` above
-        // stays pinned to the first entry for wire compatibility.
+        // pins its first entry except for a lone unspecified preference.
         request.backendPreferences = options?.backendPreferences.map(\.backend) ?? []
         request.validateAvailability = true
 
@@ -541,7 +542,8 @@ extension RunAnywhere {
 private extension LoadOptions {
     /// `contextLength` and the ordered `backendPreferences` list reach commons
     /// through `RAModelLoadRequest.context_length`/`.backend_preferences`;
-    /// `backendPreferences.first` also pins the legacy `.framework` field.
+    /// `backendPreferences.first` also pins the legacy `.framework` field,
+    /// except when a lone unspecified preference defers to catalog routing.
     /// `threads` was retired from the load ABI (reserved tag 7) and
     /// `accelerator` is not wired through this bridge, so both still fail
     /// preflight. `required` cannot ride `backend_preferences` because that

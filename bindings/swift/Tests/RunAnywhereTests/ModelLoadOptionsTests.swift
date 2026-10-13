@@ -64,11 +64,22 @@ final class ModelLoadOptionsTests: XCTestCase {
     }
 
     func testLoneUnspecifiedPreferenceKeepsCatalogRouting() throws {
-        let request = try makeRequest(options: LoadOptions(backendPreferences: [
-            BackendPreference(backend: .unspecified)
-        ]))
-        XCTAssertEqual(request.framework, .llamaCpp)
-        XCTAssertEqual(request.backendPreferences, [.unspecified])
+        var model = ModelInfo()
+        model.id = "demo-model"
+        model.framework = .llamaCpp
+        model.preferredFramework = .mlx
+        let request = try RunAnywhere.modelLoadRequest(
+            model: model,
+            category: .language,
+            options: LoadOptions(backendPreferences: [
+                BackendPreference(backend: .unspecified)
+            ])
+        )
+        let decoded = try RAModelLoadRequest(serializedBytes: request.serializedData())
+
+        XCTAssertFalse(request.hasFramework)
+        XCTAssertFalse(decoded.hasFramework)
+        XCTAssertEqual(decoded.backendPreferences, [.unspecified])
     }
 
     func testUnspecifiedFirstEntryDoesNotPinCatalogAheadOfLaterPreferences() throws {
