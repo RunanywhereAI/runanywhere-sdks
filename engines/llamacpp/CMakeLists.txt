@@ -241,6 +241,10 @@ set(LLAMACPP_BACKEND_SOURCES
     # Cross-encoder reranking (rank-pooling GGUFs) — fills rerank_ops.
     rac_rerank_llamacpp.cpp
     rac_backend_llamacpp_register.cpp
+    # ggml/llama.cpp log routing shared by LLM/VLM/rerank/embeddings — see
+    # llamacpp_logging.h and rac_llamacpp_set_log_callback() in
+    # rac/backends/rac_llm_llamacpp.h.
+    rac_llamacpp_logging.cpp
     # Unified ABI plugin entry — fills both llm_ops and vlm_ops slots.
     rac_plugin_entry_llamacpp.cpp
     # VLM Backend (vision-language as a modality of the same engine).
@@ -253,6 +257,7 @@ set(LLAMACPP_BACKEND_SOURCES
 
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
+    llamacpp_logging.h
     llamacpp_stop_helpers.h
 )
 

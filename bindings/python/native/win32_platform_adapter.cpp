@@ -124,8 +124,8 @@ rac_result_t win_file_write(const char* path, const void* data, size_t size, voi
     FILE* f = wfopen_utf8(utf8_path(path), L"wb");
     if (!f) return RAC_ERROR_FILE_WRITE_FAILED;
     size_t put = size ? fwrite(data, 1, size, f) : 0;
-    fclose(f);
-    return (put == size) ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
+    int close_rc = fclose(f);
+    return (put == size && close_rc == 0) ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
 }
 
 rac_result_t win_file_delete(const char* path, void*) {
@@ -260,6 +260,9 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
         out_entries[written].is_dir = is_dir ? RAC_TRUE : RAC_FALSE;
         out_entries[written].size_bytes =
             is_dir ? 0 : static_cast<int64_t>(fs::file_size(it->path(), ec2));
+        if (ec2) {
+            out_entries[written].size_bytes = 0;
+        }
         ++written;
     }
     *in_out_count = out_entries ? written : total;

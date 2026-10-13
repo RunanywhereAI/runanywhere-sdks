@@ -3,7 +3,9 @@
  * @brief Deterministic cancellation coverage for the MLX callback bridge.
  */
 
+#include "llm_service.pb.h"
 #include "rac_mlx_callbacks_internal.h"
+#include "rac/backends/rac_mlx_chat_bridge.h"
 
 #include <atomic>
 #include <chrono>
@@ -45,6 +47,10 @@ struct BlockingState {
     int cancel_calls = 0;
     int stop_calls = 0;
     int clear_calls = 0;
+    std::string structured_model;
+    std::string structured_role;
+    std::string structured_tool;
+    int32_t structured_max_tokens = 0;
 
     void reset() {
         std::lock_guard<std::mutex> lock(mutex);
@@ -60,6 +66,10 @@ struct BlockingState {
         cancel_calls = 0;
         stop_calls = 0;
         clear_calls = 0;
+        structured_model.clear();
+        structured_role.clear();
+        structured_tool.clear();
+        structured_max_tokens = 0;
     }
 };
 
@@ -128,6 +138,29 @@ rac_result_t fake_llm_generate(rac_handle_t handle, const char*, const rac_llm_o
 rac_result_t fake_llm_generate_stream(rac_handle_t, const char*, const rac_llm_options_t*,
                                       rac_llm_stream_callback_fn, void*, void*) {
     return RAC_ERROR_NOT_SUPPORTED;
+}
+
+rac_result_t fake_llm_generate_chat(rac_handle_t, const ra_mlx_chat_request_view_t* request,
+                                    rac_llm_stream_callback_fn callback, void* callback_user_data,
+                                    void*) {
+    if (!request || !callback || request->message_count == 0) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_state.mutex);
+        g_state.structured_model = request->model_id;
+        g_state.structured_role = request->messages[0].role;
+        g_state.structured_max_tokens = request->options.max_output_tokens;
+        if (request->tool_count > 0) {
+            g_state.structured_tool = request->tools[0].name;
+        }
+    }
+    if (callback("cached", RAC_FALSE, nullptr, 1, callback_user_data) != RAC_TRUE) {
+        return RAC_ERROR_CANCELLED;
+    }
+    rac_mlx_note_stream_token_counts(120, 7, 96);
+    callback("", RAC_TRUE, "stop", 0, callback_user_data);
+    return RAC_SUCCESS;
 }
 
 rac_result_t fake_vlm_process(rac_handle_t, const rac_vlm_image_t*, const char*,
@@ -222,7 +255,7 @@ void fake_clear_cancel(rac_handle_t handle, void*) {
     g_state.clear_calls += 1;
 }
 
-bool install_callbacks() {
+rac_mlx_callbacks_t make_callbacks() {
     rac_mlx_callbacks_t callbacks = {};
     callbacks.struct_size = sizeof(callbacks);
     callbacks.create = fake_create;
@@ -238,8 +271,14 @@ bool install_callbacks() {
     callbacks.cancel = fake_cancel;
     callbacks.cleanup = fake_cleanup;
     callbacks.destroy = fake_destroy;
+    return callbacks;
+}
+
+bool install_callbacks() {
+    auto callbacks = make_callbacks();
     return ra_mlx_set_clear_cancel_callback(fake_clear_cancel, nullptr) == RAC_SUCCESS &&
-           rac_mlx_set_callbacks(&callbacks) == RAC_SUCCESS;
+           rac_mlx_set_callbacks(&callbacks) == RAC_SUCCESS &&
+           ra_mlx_set_chat_callback(fake_llm_generate_chat, nullptr) == RAC_SUCCESS;
 }
 
 const rac_engine_vtable_t* mlx_vtable() {
@@ -391,14 +430,74 @@ void test_tts_stop_during_blocked_unary_synthesis() {
     ops->destroy(impl);
 }
 
+rac_bool_t capture_stream(const char*, rac_bool_t, const char*, int32_t, void*) {
+    return RAC_TRUE;
+}
+
+void test_structured_stream_maps_proto_and_cached_usage() {
+    std::cout << "test_structured_stream_maps_proto_and_cached_usage\n";
+    g_state.reset();
+    const auto* ops = mlx_vtable()->llm_ops;
+    void* impl = nullptr;
+    check(ops->create("mlx-test-chat", nullptr, &impl) == RAC_SUCCESS,
+          "structured LLM session creates");
+    check(ops->initialize(impl, "/tmp/mlx-test-chat") == RAC_SUCCESS,
+          "structured LLM session initializes");
+
+    runanywhere::v1::LLMGenerateRequest request;
+    request.set_model_id("mlx/model");
+    request.mutable_options()->set_max_output_tokens(64);
+    auto* tool = request.mutable_options()->mutable_tool_calling()->add_tools();
+    tool->set_name("weather");
+    tool->set_parameters(R"({"type":"object"})");
+    auto* message = request.add_messages();
+    message->set_role(runanywhere::v1::MESSAGE_ROLE_USER);
+    message->set_content("hello");
+    const std::string bytes = request.SerializeAsString();
+    check(ops->generate_chat_stream(impl, reinterpret_cast<const uint8_t*>(bytes.data()),
+                                    bytes.size(), capture_stream, nullptr) == RAC_SUCCESS,
+          "structured stream callback succeeds");
+    {
+        std::lock_guard<std::mutex> lock(g_state.mutex);
+        check(g_state.structured_model == "mlx/model", "generated model id reaches Swift bridge");
+        check(g_state.structured_role == "user", "generated message role reaches Swift bridge");
+        check(g_state.structured_tool == "weather", "generated tool reaches Swift bridge");
+        check(g_state.structured_max_tokens == 64,
+              "generated generation options reach Swift bridge");
+    }
+    rac_llm_token_counts_t counts = {};
+    check(ops->get_stream_token_counts(impl, &counts) == RAC_SUCCESS,
+          "structured stream usage is available");
+    check(counts.prompt_tokens == 120, "full logical prompt tokens are reported");
+    check(counts.completion_tokens == 7, "completion tokens are reported");
+    check(counts.cached_prompt_tokens == 96, "exact cached prompt tokens are reported");
+    ops->destroy(impl);
+}
+
+void test_legacy_callback_table_is_still_accepted() {
+    std::cout << "test_legacy_callback_table_is_still_accepted\n";
+    auto callbacks = make_callbacks();
+    callbacks.struct_size = RAC_MLX_CALLBACKS_LEGACY_SIZE;
+    callbacks.llm_generate_chat_stream = nullptr;
+    check(ra_mlx_set_chat_callback(nullptr, nullptr) == RAC_SUCCESS,
+          "typed callback can be cleared");
+    check(rac_mlx_set_callbacks(&callbacks) == RAC_SUCCESS,
+          "legacy callback table remains ABI-compatible");
+    check(mlx_vtable()->llm_ops->generate_chat_stream == nullptr,
+          "legacy callback table preserves commons prompt fallback");
+    check(install_callbacks(), "full callback table restores structured support");
+    check(mlx_vtable()->llm_ops->generate_chat_stream != nullptr,
+          "full callback table advertises structured generation");
+}
+
 }  // namespace
 
 int main() {
     std::cout << "test_mlx_cancellation\n";
+    test_legacy_callback_table_is_still_accepted();
     check(install_callbacks(), "MLX test callbacks install");
     const auto* vtable = mlx_vtable();
-    check(vtable && vtable->llm_ops && vtable->tts_ops,
-          "MLX LLM/TTS vtables are available");
+    check(vtable && vtable->llm_ops && vtable->tts_ops, "MLX LLM/TTS vtables are available");
     if (!vtable || !vtable->llm_ops || !vtable->tts_ops) {
         return EXIT_FAILURE;
     }
@@ -408,6 +507,7 @@ int main() {
     test_llm_cancel_during_blocked_inference();
     test_late_interrupt_does_not_poison_successor();
     test_tts_stop_during_blocked_unary_synthesis();
+    test_structured_stream_maps_proto_and_cached_usage();
     check(rac_plugin_unregister("mlx") == RAC_SUCCESS, "MLX test registration unloads cleanly");
 
     std::cout << "  "
