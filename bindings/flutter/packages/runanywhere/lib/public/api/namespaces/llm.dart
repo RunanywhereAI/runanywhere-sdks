@@ -131,45 +131,29 @@ class LlmApi {
       modelId: options?.model,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     );
+    final effectiveMode = options?.structuredOutput?.mode ?? mode;
     final effective = (options ?? LlmOptions()).copyWith(
-      structuredOutput: StructuredOutput(schema: schema, mode: mode),
+      structuredOutput: StructuredOutput(
+        schema: schema,
+        mode: effectiveMode,
+        strict: options?.structuredOutput?.strict ?? true,
+      ),
+      toolChoice: const ToolChoice.none(),
     );
-    final model =
-        await ModelGate.currentId(ModelCategory.MODEL_CATEGORY_LANGUAGE) ?? '';
-    final protoOptions = effective.toProto(
-      registeredTools: RunAnywhereTools.shared.getRegisteredTools(),
-    );
+    final protoOptions = effective.toProto();
     final generation =
         await RunAnywhereStructuredOutput.generateWithStructuredOutput(
       prompt: prompt,
       structuredOutput: protoOptions.structuredOutput,
       options: protoOptions,
     );
-    var proto = RunAnywhereLLM.shared.extractStructuredOutput(
+    final proto = RunAnywhereLLM.shared.extractStructuredOutput(
       text: generation.text,
       schema: schema,
     );
-    if (mode == StructuredOutputMode.repair && !proto.validation.isValid) {
-      final repairPrompt =
-          '$prompt\n\n'
-          'Your previous answer did not match the required JSON schema. '
-          'Reply again with ONLY JSON that satisfies this schema.\n\n'
-          'Previous invalid answer: '
-          '${proto.hasRawText() ? proto.rawText : ''}';
-      final repairGeneration =
-          await RunAnywhereStructuredOutput.generateWithStructuredOutput(
-        prompt: repairPrompt,
-        structuredOutput: protoOptions.structuredOutput,
-        options: protoOptions,
-      );
-      proto = RunAnywhereLLM.shared.extractStructuredOutput(
-        text: repairGeneration.text,
-        schema: schema,
-      );
-    }
     return StructuredResult.fromProto(
       proto,
-      GenerationResult(text: proto.hasRawText() ? proto.rawText : '', model: model),
+      GenerationResult.fromLlm(generation),
     );
   }
 

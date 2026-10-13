@@ -90,21 +90,11 @@ public extension RunAnywhere {
             options: LlmOptions? = nil
         ) async throws -> StructuredResult {
             var effective = options ?? LlmOptions()
-            effective.structuredOutput = StructuredOutput(schema: schema, mode: mode)
+            effective.structuredOutput = StructuredOutput(schema: schema, strict: effective.structuredOutput?.strict ?? true, mode: mode)
+            effective.toolChoice = .none
 
-            var generation = try await generate(prompt: prompt, history: [], options: effective)
-            var parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
-
-            let isValid = parsed.hasValidation ? parsed.validation.isValid : false
-            if mode == .repair, !isValid {
-                let repairPrompt = RunAnywhere.structuredRepairPrompt(
-                    original: prompt,
-                    invalidOutput: generation.text,
-                    schema: schema
-                )
-                generation = try await generate(prompt: repairPrompt, history: [], options: effective)
-                parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
-            }
+            let generation = try await generate(prompt: prompt, history: [], options: effective)
+            let parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
 
             return StructuredResult(proto: parsed, generation: generation, mode: mode)
         }

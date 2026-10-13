@@ -93,6 +93,11 @@ def llm_kwargs(options: Optional[LlmOptions], *, vlm: bool = False) -> dict:
                 "structured_output on vlm: the bridge's generate_vlm() has no "
                 "StructuredOutputOptions parameter"
             )
+        if structured.mode not in (None, StructuredOutputMode.CONSTRAINED):
+            raise SDKException.not_implemented(
+                f"structured_output.mode={structured.mode}: only constrained decoding "
+                "(StructuredOutputMode.CONSTRAINED) is exposed on this bridge"
+            )
         if not structured.strict:
             raise SDKException.not_implemented(
                 "structured_output.strict=False: only constrained decoding "

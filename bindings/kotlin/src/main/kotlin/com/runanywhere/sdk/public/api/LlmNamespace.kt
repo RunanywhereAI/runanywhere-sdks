@@ -139,16 +139,12 @@ public class LlmNamespace internal constructor() {
         mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
         options: LlmOptions? = null,
     ): StructuredResult {
-        val opts = options.orDefault()
-        val structuredOutput = StructuredOutput(schema = schema, mode = mode)
-        var generation = generateStructuredUnary(prompt, opts, structuredOutput)
-        var parsed = parseStructuredOutput(generation, structuredOutput)
-
-        if (mode == StructuredOutputMode.REPAIR && parsed.validation?.is_valid != true) {
-            val repairPrompt = structuredRepairPrompt(prompt, generation.text, schema)
-            generation = generateStructuredUnary(repairPrompt, opts, structuredOutput)
-            parsed = parseStructuredOutput(generation, structuredOutput)
-        }
+        val opts = options.orDefault().copy(toolChoice = ToolChoice.None)
+        val effectiveMode = opts.structuredOutput?.mode ?: mode
+        val effectiveStrict = opts.structuredOutput?.strict ?: true
+        val structuredOutput = StructuredOutput(schema = schema, strict = effectiveStrict, mode = effectiveMode)
+        val generation = generateStructuredUnary(prompt, opts, structuredOutput)
+        val parsed = parseStructuredOutput(generation, structuredOutput)
 
         return StructuredResult(
             value = parsed.json,

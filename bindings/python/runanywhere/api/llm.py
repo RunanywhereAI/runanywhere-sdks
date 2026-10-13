@@ -12,7 +12,7 @@ from .._runtime import runtime
 from ..errors import SDKException
 from ..events import GenerationEvent, GenerationEventKind
 from ..inputs import JsonSchema, ModelCategory, ToolDefinition
-from ..options import LlmOptions, StructuredOutput, ToolChoice, ToolChoiceMode
+from ..options import LlmOptions, StructuredOutput, StructuredOutputMode, ToolChoice, ToolChoiceMode
 from ..results import FinishReason, GenerationResult, StructuredResult, ToolCall
 from ..structured import ToolSpec, parse_structured, tool_call_prompt, tool_call_schema
 from ._common import Prompt, prepare
@@ -318,6 +318,7 @@ def _structured(result: GenerationResult) -> StructuredResult:
         value=value,
         raw=result.text,
         valid=valid,
+        mode=StructuredOutputMode.CONSTRAINED,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         time_to_first_token_ms=result.time_to_first_token_ms,

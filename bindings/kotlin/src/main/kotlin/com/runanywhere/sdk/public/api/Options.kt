@@ -58,8 +58,8 @@ public sealed class ToolChoice {
 /** Schema the generated text must conform to. */
 public data class StructuredOutput(
     val schema: JsonSchema,
-    val mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
     val strict: Boolean = true,
+    val mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
 )
 
 /** Enforcement level `llm.generateStructured` applies to its schema. */

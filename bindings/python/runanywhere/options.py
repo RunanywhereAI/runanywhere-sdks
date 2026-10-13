@@ -77,6 +77,11 @@ class StructuredOutput:
 
     schema: JsonSchema
     strict: bool = True
+    mode: "StructuredOutputMode" = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.mode is None:
+            self.mode = StructuredOutputMode.CONSTRAINED
 
 
 class StructuredOutputMode(IntEnum):

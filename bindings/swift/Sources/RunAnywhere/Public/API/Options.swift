@@ -97,12 +97,12 @@ public struct StructuredOutput: Sendable {
     /// Build a structured-output constraint.
     public init(
         schema: JsonSchema,
-        mode: StructuredEnforcementMode = .constrained,
-        strict: Bool = true
+        strict: Bool = true,
+        mode: StructuredEnforcementMode = .constrained
     ) {
         self.schema = schema
-        self.mode = mode
         self.strict = strict
+        self.mode = mode
     }
 
     func toProto() -> RAStructuredOutputOptions {

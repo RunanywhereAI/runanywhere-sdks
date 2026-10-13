@@ -113,12 +113,8 @@ internal fun ReasoningOptions.toProto(): ProtoReasoningOptions =
     )
 
 /**
- * `StructuredOutputOptions.strict_mode`/`.mode`/`.repair_json` are all
- * deleted (idl/structured_output.proto): the message shrank to
- * `include_schema_in_prompt` plus a `oneof constraint { schema | grammar |
- * regex }`. [StructuredOutput.strict] has no wire home any more — retry
- * behaviour for an invalid first pass is owned entirely by the Kotlin-side
- * `llm.generateStructured(mode = REPAIR)` loop, not by a commons flag.
+ * Build the proto structured-output options for [StructuredOutput].
+ */
 internal fun StructuredOutput.toProto(): StructuredOutputOptions =
     StructuredOutputOptions(
         schema = schema.rawJson,
