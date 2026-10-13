@@ -165,6 +165,31 @@
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
         },
         {
+            "name": "cpp-desktop-linux-arm64",
+            "displayName": "C++ desktop kit — Linux arm64 (no CLI)",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_PROCESSOR": "aarch64",
+                "RAC_BUILD_CLI": "OFF",
+                "RAC_PACKAGE_CPP_DESKTOP": "ON",
+                "RAC_DESKTOP_ADAPTER": "ON",
+                "RAC_BUILD_BACKENDS": "ON",
+                "RAC_BACKEND_LLAMACPP": "ON",
+                "RAC_BACKEND_SHERPA": "ON",
+                "RAC_BACKEND_ONNX": "ON",
+                "RAC_BACKEND_MLX": "OFF",
+                "RAC_BACKEND_NEURT": "OFF",
+                "RAC_BACKEND_QHEXRT": "OFF",
+                "RAC_RUNTIME_ONNXRT": "ON",
+                "RAC_BACKEND_RAG": "ON",
+                "RAC_BUILD_SERVER": "ON",
+                "RAC_STATIC_PLUGINS": "ON",
+                "RAC_BUILD_SHARED": "OFF",
+                "RAC_BUILD_PLATFORM": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+        },
+        {
             "name": "cpp-desktop-macos-arm64-neurt",
             "displayName": "C++ desktop overlay — macOS arm64 NeuRT (private)",
             "inherits": "cpp-desktop-macos-arm64",
@@ -457,6 +482,7 @@
         { "name": "cpp-desktop-macos-arm64", "configurePreset": "cpp-desktop-macos-arm64", "targets": ["package-cpp-desktop-tarball"] },
         { "name": "cpp-desktop-windows-x64", "configurePreset": "cpp-desktop-windows-x64", "targets": ["package-cpp-desktop-tarball"], "configuration": "Release" },
         { "name": "cpp-desktop-linux-x64", "configurePreset": "cpp-desktop-linux-x64", "targets": ["package-cpp-desktop-tarball"] },
+        { "name": "cpp-desktop-linux-arm64", "configurePreset": "cpp-desktop-linux-arm64", "targets": ["package-cpp-desktop-tarball"] },
         { "name": "cpp-desktop-macos-arm64-neurt", "configurePreset": "cpp-desktop-macos-arm64-neurt" },
         { "name": "cpp-desktop-windows-arm64", "configurePreset": "cpp-desktop-windows-arm64", "targets": ["package-cpp-desktop-tarball"], "configuration": "Release" },
         { "name": "cpp-desktop-windows-arm64-qhexrt", "configurePreset": "cpp-desktop-windows-arm64-qhexrt", "configuration": "Release" },

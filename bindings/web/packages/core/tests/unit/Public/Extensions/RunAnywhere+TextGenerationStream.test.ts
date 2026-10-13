@@ -30,6 +30,7 @@ import {
   type LLMGenerationResult as ProtoLLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
+import { SDKError } from '@runanywhere/proto-ts/errors';
 
 import {
   ModalityProtoAdapter,
@@ -314,6 +315,21 @@ function terminalStreamEvent(text: string, tokenCount: number): ProtoLLMStreamEv
   });
 }
 
+// A mid-stream failure: the producer reports it on `LLMStreamEvent.error`
+// (idl/llm_service.proto) instead of finishing with a COMPLETED event.
+function errorStreamEvent(message: string): ProtoLLMStreamEvent {
+  return LLMStreamEvent.fromPartial({
+    eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
+    error: SDKError.fromPartial({ cAbiCode: -42, message }),
+  });
+}
+
+async function drain<T>(iterable: AsyncIterable<T>, into: T[] = []): Promise<void> {
+  for await (const value of iterable) {
+    into.push(value);
+  }
+}
+
 describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', () => {
   afterEach(() => {
     ModalityProtoAdapter.clearDefaultModule();
@@ -538,6 +554,64 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
       tokens.push(token);
     }
     expect(tokens).toContain('partial');
+  });
+
+  it('throws a mid-stream failure from `stream` and `events` and still rejects `result`', async () => {
+    const module = makeFakeLLMModule({
+      generateStream(_request, emit) {
+        emit(streamingTokenEvent('partial'));
+        emit(errorStreamEvent('forced mid-stream failure'));
+        return 0;
+      },
+    });
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
+
+    const handle = await TextGeneration.generateStream({ prompt: 'fail midway' });
+
+    const tokens: string[] = [];
+    await expect(drain(handle.stream, tokens)).rejects.toThrow(/forced mid-stream failure/);
+    expect(tokens).toEqual(['partial']);
+
+    const eventStream = handle.events;
+    if (!eventStream) throw new Error('generateStream should expose `events`');
+    const events: ProtoLLMStreamEvent[] = [];
+    await expect(drain(eventStream, events)).rejects.toThrow(/forced mid-stream failure/);
+    expect(events.map((event) => event.eventKind)).toEqual([
+      LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+      LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
+    ]);
+
+    await expect(handle.result).rejects.toThrow(/forced mid-stream failure/);
+  });
+
+  it('does not leak an unhandled rejection when `result` is never awaited', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const module = makeFakeLLMModule({
+        generateStream(_request, emit) {
+          emit(streamingTokenEvent('partial'));
+          emit(errorStreamEvent('forced mid-stream failure'));
+          return 0;
+        },
+      });
+      ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
+
+      // The README pattern: iterate `stream`, leave through the throw, and
+      // never touch `result`.
+      const handle = await TextGeneration.generateStream({ prompt: 'fail midway' });
+      await expect(drain(handle.stream)).rejects.toThrow(/forced mid-stream failure/);
+
+      // Node reports unhandled rejections once the current macrotask's
+      // microtasks drain, so yield a full turn before checking.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+    expect(unhandled).toEqual([]);
   });
 
   it('fails fast when no proto-byte LLM module is registered', async () => {
