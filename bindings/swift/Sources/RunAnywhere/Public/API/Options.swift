@@ -76,7 +76,7 @@ public struct ReasoningOptions: Sendable {
 
 // MARK: - StructuredOutput
 
-/// Force generation to satisfy a JSON schema.
+/// Schema constraints enforced on generation according to the specified mode.
 public struct StructuredOutput: Sendable {
     /// Schema the output must validate against, as raw JSON Schema text.
     public var schema: JsonSchema

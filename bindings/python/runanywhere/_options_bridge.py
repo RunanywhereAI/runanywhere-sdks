@@ -21,6 +21,7 @@ from .options import (
     PoolingMode,
     ReasoningMode,
     SttOptions,
+    StructuredOutputMode,
     TtsOptions,
 )
 
