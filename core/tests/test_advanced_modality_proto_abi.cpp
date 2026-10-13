@@ -116,13 +116,17 @@ bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t
 
 int test_vlm_raw_image_proto_adapter_validation() {
     const std::string rgb_bytes{'\x01', '\x02', '\x03', '\x04', '\x05', '\x06'};
+    // The adapter reports failures through a proto error buffer as well as its
+    // return code; init once and free it after the last assertion.
+    rac_proto_buffer_t err;
+    rac_proto_buffer_init(&err);
     runanywhere::v1::VLMImage rgb;
     rgb.set_width(2);
     rgb.set_height(1);
     rgb.set_raw_rgb(rgb_bytes);
 
     rac_vlm_image_t out{};
-    CHECK(rac::foundation::rac_vlm_image_from_proto(rgb, &out),
+    CHECK(rac::foundation::rac_vlm_image_from_proto(rgb, &out, &err) == RAC_SUCCESS,
           "exact-size raw RGB converts");
     CHECK(out.format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && out.width == 2 && out.height == 1 &&
               out.data_size == rgb_bytes.size(),
@@ -137,7 +141,7 @@ int test_vlm_raw_image_proto_adapter_validation() {
     short_rgb.set_height(1);
     short_rgb.set_raw_rgb(std::string(5, '\x01'));
     out = {};
-    CHECK(!rac::foundation::rac_vlm_image_from_proto(short_rgb, &out),
+    CHECK(rac::foundation::rac_vlm_image_from_proto(short_rgb, &out, &err) != RAC_SUCCESS,
           "short raw RGB payload is rejected");
     CHECK(out.pixel_data == nullptr && out.data_size == 0,
           "rejected raw RGB publishes no pixel buffer");
@@ -147,7 +151,7 @@ int test_vlm_raw_image_proto_adapter_validation() {
     long_rgb.set_height(1);
     long_rgb.set_raw_rgb(std::string(7, '\x01'));
     out = {};
-    CHECK(!rac::foundation::rac_vlm_image_from_proto(long_rgb, &out),
+    CHECK(rac::foundation::rac_vlm_image_from_proto(long_rgb, &out, &err) != RAC_SUCCESS,
           "long raw RGB payload is rejected");
     CHECK(out.pixel_data == nullptr && out.data_size == 0,
           "oversized raw RGB publishes no pixel buffer");
@@ -157,7 +161,7 @@ int test_vlm_raw_image_proto_adapter_validation() {
     zero_width_rgb.set_height(1);
     zero_width_rgb.set_raw_rgb(std::string(3, '\x01'));
     out = {};
-    CHECK(!rac::foundation::rac_vlm_image_from_proto(zero_width_rgb, &out),
+    CHECK(rac::foundation::rac_vlm_image_from_proto(zero_width_rgb, &out, &err) != RAC_SUCCESS,
           "zero-width raw RGB is rejected");
     CHECK(out.pixel_data == nullptr && out.data_size == 0,
           "zero-width raw RGB publishes no pixel buffer");
@@ -167,7 +171,7 @@ int test_vlm_raw_image_proto_adapter_validation() {
     negative_height_rgba.set_height(-1);
     negative_height_rgba.set_raw_rgba(std::string(4, '\x01'));
     out = {};
-    CHECK(!rac::foundation::rac_vlm_image_from_proto(negative_height_rgba, &out),
+    CHECK(rac::foundation::rac_vlm_image_from_proto(negative_height_rgba, &out, &err) != RAC_SUCCESS,
           "negative-height raw RGBA is rejected");
     CHECK(out.pixel_data == nullptr && out.data_size == 0,
           "negative-height raw RGBA publishes no pixel buffer");
@@ -180,7 +184,7 @@ int test_vlm_raw_image_proto_adapter_validation() {
         pixel_count_overflow.set_height(max_dimension);
         pixel_count_overflow.set_raw_rgb("");
         out = {};
-        CHECK(!rac::foundation::rac_vlm_image_from_proto(pixel_count_overflow, &out),
+        CHECK(rac::foundation::rac_vlm_image_from_proto(pixel_count_overflow, &out, &err) != RAC_SUCCESS,
               "32-bit raw RGB pixel-count overflow is rejected");
         CHECK(out.pixel_data == nullptr && out.data_size == 0,
               "raw RGB overflow publishes no pixel buffer");
@@ -190,7 +194,7 @@ int test_vlm_raw_image_proto_adapter_validation() {
         byte_count_overflow.set_height(2);
         byte_count_overflow.set_raw_rgba("");
         out = {};
-        CHECK(!rac::foundation::rac_vlm_image_from_proto(byte_count_overflow, &out),
+        CHECK(rac::foundation::rac_vlm_image_from_proto(byte_count_overflow, &out, &err) != RAC_SUCCESS,
               "32-bit raw RGBA byte-count overflow is rejected");
         CHECK(out.pixel_data == nullptr && out.data_size == 0,
               "raw RGBA overflow publishes no pixel buffer");
@@ -206,7 +210,7 @@ int test_vlm_raw_image_proto_adapter_validation() {
     rgba.set_height(1);
     rgba.set_raw_rgba(rgba_bytes);
     out = {};
-    CHECK(rac::foundation::rac_vlm_image_from_proto(rgba, &out),
+    CHECK(rac::foundation::rac_vlm_image_from_proto(rgba, &out, &err) == RAC_SUCCESS,
           "exact-size raw RGBA converts");
     CHECK(out.format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && out.width == 2 && out.height == 1 &&
               out.data_size == sizeof(expected_rgb),
@@ -221,10 +225,12 @@ int test_vlm_raw_image_proto_adapter_validation() {
     long_rgba.set_height(1);
     long_rgba.set_raw_rgba(std::string(9, '\x01'));
     out = {};
-    CHECK(!rac::foundation::rac_vlm_image_from_proto(long_rgba, &out),
+    CHECK(rac::foundation::rac_vlm_image_from_proto(long_rgba, &out, &err) != RAC_SUCCESS,
           "long raw RGBA payload is rejected");
     CHECK(out.pixel_data == nullptr && out.data_size == 0,
           "oversized raw RGBA publishes no pixel buffer");
+
+    rac_proto_buffer_free(&err);
 
     return 0;
 }
