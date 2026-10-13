@@ -40,7 +40,7 @@
 # Exit codes:
 #   0  No re-declared defaults found.
 #   1  At least one violation.
-#   2  Repo layout unexpected (idl/sdk_defaults.proto missing).
+#   2  Repo layout unexpected (idl/sdk_defaults.proto or a scan root missing).
 
 set -euo pipefail
 
@@ -71,17 +71,31 @@ LIST_ONLY=0
 # and this gate has to be runnable locally to reproduce a CI failure. Same
 # reasoning as bindings/swift/scripts/sync-dist-repo.sh and
 # scripts/build/build-core-android.sh.
+SCAN_ROOTS=(
+  bindings/swift/Sources
+  bindings/kotlin/src/main
+  bindings/flutter/packages
+  bindings/react-native/packages
+  bindings/web/packages
+  bindings/python/runanywhere
+)
+
+# A renamed or removed root would otherwise make `find` fail quietly (stderr is
+# discarded below) and the gate would pass while scanning fewer files.
+for _root in "${SCAN_ROOTS[@]}"; do
+  if [[ ! -d "${_root}" ]]; then
+    printf "::error::Scan root '%s' is missing — the SDK layout moved. Update SCAN_ROOTS in this gate.\n" \
+      "${_root}" >&2
+    exit 2
+  fi
+done
+
 FILES=()
 while IFS= read -r _file; do
   FILES+=("$_file")
 done < <(
   find \
-    bindings/swift/Sources \
-    bindings/kotlin/src/main \
-    bindings/flutter/packages \
-    bindings/react-native/packages \
-    bindings/web/packages \
-    bindings/python/runanywhere \
+    "${SCAN_ROOTS[@]}" \
     -type f \
     \( -name '*.swift' -o -name '*.kt' -o -name '*.dart' -o -name '*.ts' -o -name '*.py' \) \
     2>/dev/null \
