@@ -181,7 +181,7 @@ int main() {
     // that actually protects rerank, because a promotion which shifted wire 11 would reroute every
     // rerank call silently. v10 promoted a RESERVED slot and left rerank's offset and wire value
     // untouched (locked by test_engine_vtable.cpp's 17-pointer tail assertion).
-    check(RAC_PLUGIN_API_VERSION == 12u, "RAC_PLUGIN_API_VERSION must be 12");
+    check(RAC_PLUGIN_API_VERSION == 13u, "RAC_PLUGIN_API_VERSION must be 13");
     check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_RERANK), "rerank") == 0,
           "rac_primitive_name(RAC_PRIMITIVE_RERANK) == \"rerank\"");
     check(static_cast<int>(RAC_PRIMITIVE_RERANK) == 11, "RAC_PRIMITIVE_RERANK wire value is 11");

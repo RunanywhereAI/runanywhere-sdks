@@ -405,6 +405,34 @@ if(RAC_BUILD_TESTS)
         add_test(NAME rerank_tests COMMAND test_rerank)
         set_tests_properties(rerank_tests PROPERTIES LABELS "native;rerank")
     endif()
+    # Decision primitive (RAC_PRIMITIVE_DECIDE, ABI v13) contract test. Same shape
+    # as test_rerank: an in-test fake decision engine, no backend linkage.
+    if(RAC_PROTOBUF_RUNTIME_ENABLED AND TARGET rac_commons AND NOT TARGET test_decision)
+        add_executable(test_decision
+            core/tests/test_decision.cpp)
+        target_include_directories(test_decision PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/src/generated/proto
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        target_compile_definitions(test_decision PRIVATE RAC_HAVE_PROTOBUF=1)
+        target_link_libraries(test_decision PRIVATE rac_commons)
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_decision PRIVATE protobuf::libprotobuf)
+        elseif(Protobuf_LIBRARIES)
+            target_link_libraries(test_decision PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(test_decision PRIVATE ${RAC_ABSL_LIBS})
+        endif()
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_decision)
+        endif()
+        target_compile_features(test_decision PRIVATE cxx_std_20)
+        add_test(NAME decision_tests COMMAND test_decision)
+        set_tests_properties(decision_tests PROPERTIES LABELS "native;decision")
+    endif()
     # The ONNX engine is configured after commons/tests. Keep this plugin-entry
     # contract gate alive in both RAG modes: segmentation is unconditional,
     # while embeddings are intentionally compiled only when RAG is enabled.
