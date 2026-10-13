@@ -1615,10 +1615,10 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
         options.max_tokens = opts.max_output_tokens();
     }
 
-    // temperature: when the canonical LLMGenerationOptions is set, pass its value through
-    // unconditionally so the documented greedy-decoding sentinel (0.0) reaches the engine
-    // (idl/llm_options.proto:49).
-    if (has_options) {
+    // temperature, top_k and min_p are `optional` in idl/llm_options.proto: presence, not
+    // value, means "set". An explicit 0 (greedy / top-k disabled) reaches the engine; an
+    // absent field keeps the RAC_LLM_OPTIONS_DEFAULT value.
+    if (has_options && opts.has_temperature()) {
         options.temperature = std::clamp(opts.temperature(), 0.0f, 2.0f);
     }
 
@@ -1637,14 +1637,18 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     // struct default. repeat_penalty uses 1.0 = "no penalty"; proto3 zero
     // means unset, so only override when positive (mirrors Swift's
     // RALLMTypes+CppBridge defaults, which carry repeatPenalty=1.0).
-    options.top_k = has_options ? opts.top_k() : 0;
+    if (has_options && opts.has_top_k()) {
+        options.top_k = opts.top_k();
+    }
     const float repeat_penalty = has_options ? opts.repeat_penalty() : 0.0f;
     if (repeat_penalty > 0.0f) {
         options.repetition_penalty = repeat_penalty;
     }
     options.frequency_penalty = has_options ? opts.frequency_penalty() : 0.0f;
     options.presence_penalty = has_options ? opts.presence_penalty() : 0.0f;
-    options.min_p = has_options ? opts.min_p() : 0.0f;
+    if (has_options && opts.has_min_p()) {
+        options.min_p = opts.min_p();
+    }
     options.seed = has_options ? opts.seed() : 0;
     // n_threads was deleted from LLMGenerationOptions (idl/llm_options.proto):
     // thread count is now a load-time-only decision the engine makes when it
