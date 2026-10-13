@@ -118,6 +118,45 @@ jobs:
             dist/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz.sha256
           if-no-files-found: error
 
+  linux-x64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          # No libprotobuf-dev: Ubuntu 24.04 ships protobuf 3.21, which is
+          # below RAC_PROTOBUF_MIN_VERSION=5.0 and would register a system
+          # IMPORTED protobuf::libprotobuf before FetchContent can add its
+          # own ALIAS (see the linux-debug job in pr-build.yml). Leaving it
+          # out forces the vendored FetchContent path cleanly.
+          sudo apt-get install -y ninja-build libcurl4-openssl-dev
+      - name: Sherpa-ONNX prebuilts (required for a ROUTABLE sherpa backend)
+        run: bash core/scripts/linux/download-sherpa-onnx.sh
+      - name: Configure + package
+        run: |
+          set -euo pipefail
+          cmake --preset cpp-desktop-linux-x64
+          cmake --build --preset cpp-desktop-linux-x64 --target package-cpp-desktop-tarball \
+            -j "$(nproc)"
+          ls -la dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz
+          tar=$(echo dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz)
+          python3 scripts/ci/verify_cpp_desktop_kit.py "$tar" --source-root . --linux --forbid-private-engines
+          (
+            cd dist
+            name="RunAnywhere-cpp-desktop-linux-x64-v$(tr -d '[:space:]' < ../core/VERSION).tar.gz"
+            sha256sum "$name" | tee "$name.sha256"
+          )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-desktop-linux-x64
+          path: |
+            dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz
+            dist/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz.sha256
+          if-no-files-found: error
+
   windows-arm64:
     runs-on: windows-11-arm
     timeout-minutes: 90
@@ -255,7 +294,7 @@ jobs:
 
   attach-release:
     if: github.event_name == 'workflow_dispatch' && inputs.attach_tag != ''
-    needs: [macos-arm64, windows-x64, windows-arm64]
+    needs: [macos-arm64, windows-x64, windows-arm64, linux-x64]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -278,4 +317,5 @@ jobs:
             artifacts/RunAnywhere-cpp-desktop-macos-arm64-v*.tar.gz* \
             artifacts/RunAnywhere-cpp-desktop-windows-x64-v*.tar.gz* \
             artifacts/RunAnywhere-cpp-desktop-windows-arm64-v*.tar.gz* \
+            artifacts/RunAnywhere-cpp-desktop-linux-x64-v*.tar.gz* \
             --repo "${{ github.repository }}" --clobber
