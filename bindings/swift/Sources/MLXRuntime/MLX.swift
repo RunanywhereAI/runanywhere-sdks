@@ -30,6 +30,8 @@ import MLXAudioTTS
 private func raMLXMetalResourceAnchor() -> Int32
 #endif
 
+private typealias RacLoggerGetMinLevelFn = @convention(c) () -> Int32
+
 private struct MLXRuntimeLog {
     private let category: String
 
@@ -38,22 +40,34 @@ private struct MLXRuntimeLog {
     }
 
     func debug(_ message: String) {
-        write(level: "debug", message)
+        write(level: "debug", severity: 1, message)
     }
 
     func info(_ message: String) {
-        write(level: "info", message)
+        write(level: "info", severity: 2, message)
     }
 
     func warning(_ message: String) {
-        write(level: "warning", message)
+        write(level: "warning", severity: 3, message)
     }
 
     func error(_ message: String) {
-        write(level: "error", message)
+        write(level: "error", severity: 4, message)
     }
 
-    private func write(level: String, _ message: String) {
+    private static let getMinLevel: RacLoggerGetMinLevelFn? = {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "rac_logger_get_min_level") else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: RacLoggerGetMinLevelFn.self)
+    }()
+
+    private static var currentMinLevel: Int32 {
+        getMinLevel?() ?? 2 // Default to RAC_LOG_INFO (2) matching rac_logger.cpp
+    }
+
+    private func write(level: String, severity: Int32, _ message: String) {
+        guard severity >= Self.currentMinLevel else { return }
         let line = "[RunAnywhereMLX][\(category)][\(level)] \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
         FileHandle.standardError.write(data)
