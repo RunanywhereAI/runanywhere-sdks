@@ -9,13 +9,14 @@ import urllib.parse
 from typing import AsyncIterator, Iterator, List, Optional
 
 from .._runtime import runtime
+from .._model_registry_bridge import refresh as refresh_model_registry
 from .._streaming import aiter_tokens, iter_tokens
 from ..catalog import CATALOG, CatalogEntry, CatalogFile
 from ..download import models_root
 from ..errors import SDKException
 from ..events import DownloadEvent, DownloadEventKind
 from ..inputs import ModelCategory, ModelFilter, ModelRegistration
-from ..options import LoadOptions
+from ..options import LoadOptions, ModelRefreshOptions
 from ..results import DownloadProgress, LoadedModel, ModelInfo, ModelsState
 
 __all__ = ["models"]
@@ -62,6 +63,22 @@ def _entry(registration: ModelRegistration) -> CatalogEntry:
 
 class Models:
     """The model catalog and everything that changes what is on disk or resident."""
+
+    def refresh(self, options: Optional[ModelRefreshOptions] = None) -> None:
+        """Reconcile the shared native registry with managed model files.
+
+        This best-effort operation is a no-op before initialization and logs refresh
+        failures instead of raising, except that a native extension missing the refresh
+        ABI raises ``SDKException`` with ``NOT_IMPLEMENTED``. The current native API
+        reports ``prune_orphans`` as unsupported and leaves missing-file rows unchanged.
+        Protobuf-backed refresh requires the optional ``runanywhere[rag]`` extra.
+        """
+        refresh_model_registry(options or ModelRefreshOptions())
+
+    async def arefresh(self, options: Optional[ModelRefreshOptions] = None) -> None:
+        """Async form of :meth:`refresh` (runs on the loop's default executor)."""
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, lambda: self.refresh(options))
 
     def list(self, filter: Optional[ModelFilter] = None) -> List[ModelInfo]:
         """Every known model, narrowed by ``filter``.
