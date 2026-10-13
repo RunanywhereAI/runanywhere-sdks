@@ -20,10 +20,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DEST_DIR="${RAC_SHERPA_DIR:-${ROOT_DIR}/third_party/sherpa-onnx-linux}"
 
-# Load versions from centralized VERSIONS file
+# Load versions from centralized VERSIONS file. Clear the keys first: sourcing
+# load-versions.sh exports them, so a value inherited from an earlier shell
+# would satisfy the :? checks below even after core/VERSIONS stopped defining
+# the key, which is the same stale-version silence this script fails closed to
+# avoid.
+unset SHERPA_ONNX_VERSION_LINUX SHERPA_ONNX_REPO_DESKTOP \
+    SHERPA_ONNX_RELEASE_TAG_DESKTOP SHERPA_ONNX_COMMIT_DESKTOP
 source "${ROOT_DIR}/scripts/load-versions.sh"
 
-VERSION="${SHERPA_ONNX_VERSION_LINUX:-1.12.18}"
+VERSION="${SHERPA_ONNX_VERSION_LINUX:?SHERPA_ONNX_VERSION_LINUX is not set (load-versions.sh should export it from core/VERSIONS)}"
 REPOSITORY="${SHERPA_ONNX_REPO_DESKTOP:?SHERPA_ONNX_REPO_DESKTOP is not set}"
 RELEASE_TAG="${SHERPA_ONNX_RELEASE_TAG_DESKTOP:?SHERPA_ONNX_RELEASE_TAG_DESKTOP is not set}"
 SOURCE_COMMIT="${SHERPA_ONNX_COMMIT_DESKTOP:?SHERPA_ONNX_COMMIT_DESKTOP is not set}"
