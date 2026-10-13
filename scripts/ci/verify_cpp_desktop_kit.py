@@ -74,6 +74,12 @@ def main() -> int:
     parser.add_argument("--source-root", required=True)
     parser.add_argument("--windows", action="store_true")
     parser.add_argument(
+        "--linux",
+        action="store_true",
+        help="Linux kit: sherpa-onnx-c-api.so and its private onnxruntime.so "
+        "are staged under third_party/ (SHARED, not the macOS static .a)",
+    )
+    parser.add_argument(
         "--allow-missing-onnxruntime",
         action="store_true",
         help="Windows arm64 OSS kit has no ONNX Runtime (llamacpp/onnx are off)",
@@ -191,6 +197,18 @@ def main() -> int:
                 missing.append("lib/sherpa-onnx-c-api.lib")
             # Windows Sherpa-ONNX is SHARED: ORT is onnxruntime.dll +
             # onnxruntime.lib (checked above), never libonnxruntime.a.
+        elif args.linux:
+            # Linux Sherpa-ONNX is SHARED too, same as Windows, but ships as a
+            # bare .so pair under third_party/ instead of a DLL + import lib.
+            if not any(
+                n.replace("\\", "/").endswith("third_party/libsherpa-onnx-c-api.so")
+                for n in canon
+            ):
+                missing.append("third_party/libsherpa-onnx-c-api.so")
+            if not args.allow_missing_onnxruntime and not any(
+                n.replace("\\", "/").endswith("third_party/libonnxruntime.so") for n in canon
+            ):
+                missing.append("third_party/libonnxruntime.so")
         else:
             if not any(n.replace("\\", "/").endswith("libsherpa-onnx-c-api.a") for n in canon):
                 missing.append("lib/libsherpa-onnx-c-api.a")
