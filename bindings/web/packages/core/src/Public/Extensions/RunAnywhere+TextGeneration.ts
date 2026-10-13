@@ -194,6 +194,10 @@ function streamingResultFromEvents(
     };
     start();
   });
+  // A mid-stream failure already throws from `stream`/`events`, so a caller
+  // that leaves its `for await` through that throw may never await `result`.
+  // Mark it handled; `await result` still rejects for callers that do.
+  void result.catch(() => undefined);
 
   return {
     events: eventQueue,
