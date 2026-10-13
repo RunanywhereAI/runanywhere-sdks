@@ -237,6 +237,8 @@ public extension RunAnywhere {
         /// forwarded on `ModelLoadRequest`; a `required` backend preference is
         /// rejected because `backend_preferences` carries framework enums only.
         /// `threads` (retired) and `accelerator` still fail preflight.
+        /// Context length is advisory at the engine boundary; engines may use
+        /// their defaults. Native load warnings are exposed as `fallbackReason`.
         ///
         /// - Throws: `SDKException` when the model cannot be loaded, or when
         ///   `options` sets a placement knob the load ABI cannot honor yet.
@@ -478,38 +480,14 @@ extension RunAnywhere {
         return modelId
     }
 
+    /// Load the validated request shared by explicit and automatic loading.
     @discardableResult
     internal static func loadResolved(
         model: ModelInfo,
         category: ModelCategory,
         options: LoadOptions?
     ) async throws -> RAModelLoadResult {
-        if let options {
-            try options.requireCarriableByLoadABI()
-        }
-
-        var request = RAModelLoadRequest()
-        request.modelID = model.id
-        request.category = category == .unspecified ? category.defaultLoadCategory : category
-        request.forceReload = options?.forceReload ?? false
-        if let backend = options?.backendPreferences.first?.backend {
-            request.framework = backend
-        } else if model.framework != .unspecified {
-            request.framework = model.framework
-        }
-        if let contextLength = options?.contextLength {
-            guard let wireContextLength = Int32(exactly: contextLength) else {
-                throw SDKException.invalidConfiguration(
-                    "LoadOptions.contextLength must fit ModelLoadRequest.context_length (int32)"
-                )
-            }
-            request.contextLength = wireContextLength
-        }
-        // The full ordered list rides `backend_preferences`; `.framework` above
-        // stays pinned to the first entry for wire compatibility.
-        request.backendPreferences = options?.backendPreferences.map(\.backend) ?? []
-        request.validateAvailability = true
-
+        let request = try modelLoadRequest(model: model, category: category, options: options)
         let result = await performLoad(request)
         guard !result.hasError else {
             throw SDKException(
@@ -519,6 +497,44 @@ extension RunAnywhere {
             )
         }
         return result
+    }
+
+    /// Build the exact protobuf request used by `models.load` before native work.
+    internal static func modelLoadRequest(
+        model: ModelInfo,
+        category: ModelCategory,
+        options: LoadOptions?
+    ) throws -> RAModelLoadRequest {
+        if let options {
+            try options.requireCarriableByLoadABI()
+        }
+
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = category == .unspecified ? category.defaultLoadCategory : category
+        request.forceReload = options?.forceReload ?? false
+        // Preserve catalog routing for a lone unspecified legacy choice, but
+        // do not pin the catalog ahead of later ordered caller preferences.
+        if let backend = options?.backendPreferences.first?.backend,
+           backend != .unspecified || (options?.backendPreferences.count ?? 0) > 1 {
+            request.framework = backend
+        } else if model.framework != .unspecified {
+            request.framework = model.framework
+        }
+        if let contextLength = options?.contextLength {
+            guard contextLength >= 0, let wireContextLength = Int32(exactly: contextLength) else {
+                throw SDKException.invalidConfiguration(
+                    "LoadOptions.contextLength must be non-negative and fit ModelLoadRequest.context_length (int32)"
+                )
+            }
+            request.contextLength = wireContextLength
+        }
+        // The full ordered list rides `backend_preferences`; `.framework` above
+        // stays pinned to the first entry for wire compatibility.
+        request.backendPreferences = options?.backendPreferences.map(\.backend) ?? []
+        request.validateAvailability = true
+
+        return request
     }
 }
 
@@ -545,7 +561,7 @@ private extension LoadOptions {
         if accelerator != nil { unsupported.append("accelerator") }
         guard unsupported.isEmpty else {
             throw SDKException.invalidConfiguration(
-                "LoadOptions.\(unsupported.joined(separator: ", ")) cannot be carried by the native load ABI yet"
+                "LoadOptions.\(unsupported.joined(separator: ", ")) is not supported by this Swift binding"
             )
         }
     }

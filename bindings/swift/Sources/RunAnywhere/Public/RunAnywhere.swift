@@ -634,7 +634,11 @@ extension RunAnywhere {
                     reason: "Engine-constrained decoding is not wired in yet; use .validationOnly or .repair"
                 ),
                 .init(name: "loadOptions.threads", reason: "Not carried by the native load ABI yet"),
-                .init(name: "loadOptions.accelerator", reason: "Not carried by the native load ABI yet")
+                .init(name: "loadOptions.accelerator", reason: "Not forwarded by this Swift binding"),
+                .init(
+                    name: "loadOptions.backendPreferences.required",
+                    reason: "The required flag cannot be carried by the framework-only preference list"
+                )
             ]
         )
     }

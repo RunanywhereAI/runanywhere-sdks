@@ -1,6 +1,6 @@
 /**
  * Characterizes which `LoadOptions` fields `models.load()` rejects at
- * preflight because the commons load ABI has no wire path for them yet
+ * preflight because this binding does not support them yet
  * (PR #605 review issue 8). Per the v4 public API spec, silently dropping
  * an accepted field is forbidden, so unsupported knobs are reported for
  * `models.load` to throw on rather than merely warn about.
@@ -10,7 +10,11 @@
  * remain unsupported.
  */
 
-import { unsupportedLoadOptionKeys } from '../../../../src/Public/Api/LoadOptionsSupport';
+import {
+  requireValidContextLength,
+  unsupportedLoadOptionKeys,
+} from '../../../../src/Public/Api/LoadOptionsSupport';
+import { SDKException } from '../../../../src/Foundation/Errors/SDKException';
 import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 
 describe('unsupportedLoadOptionKeys', () => {
@@ -43,8 +47,12 @@ describe('unsupportedLoadOptionKeys', () => {
 
   it('reports threads and accelerator individually', () => {
     expect(unsupportedLoadOptionKeys({ threads: 4 })).toEqual(['threads']);
-    expect(unsupportedLoadOptionKeys({ accelerator: 'gpu' })).toEqual(['accelerator']);
-    expect(unsupportedLoadOptionKeys({ useGpu: true })).toEqual(['accelerator']);
+    expect(unsupportedLoadOptionKeys({ accelerator: 'gpu' })).toEqual([
+      'accelerator',
+    ]);
+    expect(unsupportedLoadOptionKeys({ useGpu: true })).toEqual([
+      'accelerator',
+    ]);
   });
 
   it('combines every unsupported knob in a stable order', () => {
@@ -56,4 +64,22 @@ describe('unsupportedLoadOptionKeys', () => {
       })
     ).toEqual(['threads', 'accelerator']);
   });
+});
+
+describe('requireValidContextLength', () => {
+  it.each([undefined, 0, 4096, 2_147_483_647])(
+    'preserves the valid context value %s',
+    (contextLength) => {
+      expect(() => requireValidContextLength(contextLength)).not.toThrow();
+    }
+  );
+
+  it.each([-1, 0.5, NaN, Infinity, -Infinity, 2_147_483_648])(
+    'rejects the context value %s before protobuf encoding',
+    (contextLength) => {
+      expect(() => requireValidContextLength(contextLength)).toThrow(
+        SDKException
+      );
+    }
+  );
 });
