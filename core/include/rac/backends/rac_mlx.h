@@ -16,6 +16,7 @@
 #if __has_include("rac/core/rac_error.h")
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/features/decision/rac_decision_service.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -23,6 +24,7 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #else
+#include "rac_decision_service.h"
 #include "rac_diarization_service.h"
 #include "rac_embeddings_service.h"
 #include "rac_error.h"
@@ -50,6 +52,7 @@ typedef int32_t rac_mlx_session_kind_t;
 #define RAC_MLX_SESSION_KIND_VLM 5
 #define RAC_MLX_SESSION_KIND_EMBEDDINGS 8
 #define RAC_MLX_SESSION_KIND_DIARIZATION 11
+#define RAC_MLX_SESSION_KIND_DECISION 15
 
 typedef rac_result_t (*rac_mlx_create_fn)(rac_mlx_session_kind_t kind, const char* model_id,
                                           rac_handle_t* out_handle, void* user_data);
@@ -69,6 +72,12 @@ typedef rac_result_t (*rac_mlx_llm_generate_stream_fn)(rac_handle_t handle, cons
 typedef rac_result_t (*rac_mlx_llm_generate_chat_stream_fn)(
     rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_llm_stream_callback_fn callback, void* callback_user_data, void* user_data);
+
+typedef rac_result_t (*rac_mlx_decision_fn)(rac_handle_t handle, const char* state,
+                                            const rac_decision_question_t* questions,
+                                            size_t question_count,
+                                            const rac_decision_options_t* options,
+                                            rac_decision_result_t* out_result, void* user_data);
 
 typedef rac_result_t (*rac_mlx_vlm_process_fn)(rac_handle_t handle, const rac_vlm_image_t* image,
                                                const char* prompt, const rac_vlm_options_t* options,
@@ -169,6 +178,14 @@ typedef struct rac_mlx_callbacks {
      * rac_mlx_set_callbacks probes struct_size before reading this slot.
      */
     rac_mlx_llm_generate_chat_stream_fn llm_generate_chat_stream;
+
+    /**
+     * Joint decision scoring (optional). Runs one forward pass over the encoded
+     * request and fills `out_result` with one answer per question, in request
+     * order. Appended for ABI compatibility; rac_mlx_set_callbacks probes
+     * struct_size before reading this slot.
+     */
+    rac_mlx_decision_fn decision;
 } rac_mlx_callbacks_t;
 
 #define RAC_MLX_CALLBACKS_LEGACY_SIZE \
