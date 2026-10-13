@@ -563,7 +563,7 @@ tasks.register("downloadJniLibs") {
 
             try {
                 ant.withGroovyBuilder {
-                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
+                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false, "connectiontimeout" to 30_000, "readtimeout" to 60_000)
                 }
 
                 // VERIFY BEFORE EXTRACT. This path had no integrity check at all: it
@@ -576,7 +576,7 @@ tasks.register("downloadJniLibs") {
                 // this one.
                 val sidecar = file("$tempDir/$packageName.sha256")
                 ant.withGroovyBuilder {
-                    "get"("src" to "$zipUrl.sha256", "dest" to sidecar, "verbose" to false)
+                    "get"("src" to "$zipUrl.sha256", "dest" to sidecar, "verbose" to false, "connectiontimeout" to 30_000, "readtimeout" to 60_000)
                 }
                 val sidecarMatch =
                     Regex("""^([0-9a-fA-F]{64})\s+\*?(.+)$""")
