@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 
+#include "features/llm/qhexrt_thinking_prefill_internal.h"
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/diarization/rac_diarization_service.h"
@@ -35,8 +37,6 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
-#include "features/llm/qhexrt_thinking_prefill_internal.h"
-#include "rac/core/rac_core.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_ids.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -365,6 +365,24 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 };
             }
             break;
+        case RAC_PRIMITIVE_DECIDE:
+            if (!vt->decision_ops || !vt->decision_ops->create) {
+                return RAC_ERROR_BACKEND_NOT_FOUND;
+            }
+            rc = vt->decision_ops->create(resolved_path.c_str(), nullptr, &impl);
+            if (rc == RAC_SUCCESS && impl && vt->decision_ops->initialize) {
+                rc = vt->decision_ops->initialize(impl, resolved_path.c_str());
+            }
+            if (rc == RAC_SUCCESS && impl) {
+                auto* ops = vt->decision_ops;
+                *out_destroy = [ops, impl]() {
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
+                };
+            }
+            break;
         default:
             return RAC_ERROR_UNSUPPORTED_MODALITY;
     }
@@ -415,6 +433,11 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 case RAC_PRIMITIVE_OCR:
                     if (vt->ocr_ops && vt->ocr_ops->destroy) {
                         vt->ocr_ops->destroy(impl);
+                    }
+                    break;
+                case RAC_PRIMITIVE_DECIDE:
+                    if (vt->decision_ops && vt->decision_ops->destroy) {
+                        vt->decision_ops->destroy(impl);
                     }
                     break;
                 default:
@@ -696,15 +719,14 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                 " only apply to text-generation/VLM loads and were rejected (not silently "
                 "ignored) for category " +
                 ModelCategory_Name(category);
-            ModelLoadResult result = detail::make_load_result(
-                false, request.model_id(), category, framework, resolved_path,
-                artifact_resolution.artifacts, 0, message,
-                detail::LoadPlacement{/*requested_backend=*/framework});
-            detail::publish_component_event(component,
-                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
-                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-                                            request.model_id(), &result, nullptr,
-                                            result.error().message().c_str());
+            ModelLoadResult result =
+                detail::make_load_result(false, request.model_id(), category, framework,
+                                         resolved_path, artifact_resolution.artifacts, 0, message,
+                                         detail::LoadPlacement{/*requested_backend=*/framework});
+            detail::publish_component_event(
+                component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+                runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result,
+                nullptr, result.error().message().c_str());
             return detail::copy_proto(result, out_result);
         }
     }
@@ -863,11 +885,13 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     detail::LoadPlacement placement;
     placement.requested_backend = framework;
     if (vt) {
-        if (used_priority_fallback && framework != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
-            placement.fallback_reason = "no registered engine for the requested/preferred "
-                                        "framework(s); used '" +
-                                        std::string(vt->metadata.name ? vt->metadata.name : "?") +
-                                        "' via plain priority order instead";
+        if (used_priority_fallback &&
+            framework != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+            placement.fallback_reason =
+                "no registered engine for the requested/preferred "
+                "framework(s); used '" +
+                std::string(vt->metadata.name ? vt->metadata.name : "?") +
+                "' via plain priority order instead";
         } else if (pinned_candidate_index > 0) {
             placement.fallback_reason =
                 "primary framework '" + runanywhere::v1::InferenceFramework_Name(framework) +
@@ -890,14 +914,13 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             std::string(vt->metadata.name ? vt->metadata.name : "?") +
             "' is not the NPU (QHexRT) engine; rejected rather than silently loading on a "
             "different accelerator";
-        ModelLoadResult result = detail::make_load_result(
-            false, request.model_id(), category, framework, resolved_path,
-            artifact_resolution.artifacts, 0, message, placement);
-        detail::publish_component_event(component,
-                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
-                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-                                        request.model_id(), &result, nullptr,
-                                        result.error().message().c_str());
+        ModelLoadResult result =
+            detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
+                                     artifact_resolution.artifacts, 0, message, placement);
+        detail::publish_component_event(
+            component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
+            result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -1090,6 +1113,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->segmentation_ops = vt->segmentation_ops;
     } else if (primitive == RAC_PRIMITIVE_OCR) {
         loaded->ocr_ops = vt->ocr_ops;
+    } else if (primitive == RAC_PRIMITIVE_DECIDE) {
+        loaded->decision_ops = vt->decision_ops;
     }
     loaded->impl = impl;
     // QHexRT reasoning templates may prefill `<think>` into the prompt
