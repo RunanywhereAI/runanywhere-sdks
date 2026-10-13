@@ -9,6 +9,7 @@
 #include <wincrypt.h>  // DPAPI: CryptProtectData / CryptUnprotectData (crypt32)
 
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -110,10 +111,13 @@ rac_result_t win_file_read(const char* path, void** out_data, size_t* out_size, 
     FILE* f = wfopen_utf8(utf8_path(path), L"rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
     // Use 64-bit seek/tell — plain ftell/long truncates files >2GB on Win32.
-    _fseeki64(f, 0, SEEK_END);
+    if (_fseeki64(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
     __int64 n = _ftelli64(f);
-    _fseeki64(f, 0, SEEK_SET);
-    if (n < 0) {
+    if (_fseeki64(f, 0, SEEK_SET) != 0 || n < 0 ||
+        static_cast<unsigned __int64>(n) > SIZE_MAX) {
         fclose(f);
         return RAC_ERROR_FILE_READ_FAILED;
     }
