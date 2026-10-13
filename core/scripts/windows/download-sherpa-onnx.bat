@@ -19,8 +19,14 @@ set "SCRIPT_DIR=%~dp0"
 set "ROOT_DIR=%SCRIPT_DIR%..\.."
 set "DEST_DIR=%ROOT_DIR%\third_party\sherpa-onnx-windows"
 
-:: Load versions
+:: Load versions. Clear every key first so a value inherited from the calling
+:: shell cannot satisfy the checks below after a key is renamed or removed.
+for %%K in (SHERPA_ONNX_VERSION_WINDOWS SHERPA_ONNX_WINDOWS_X64_SHA256 SHERPA_ONNX_REPO_DESKTOP SHERPA_ONNX_RELEASE_TAG_DESKTOP SHERPA_ONNX_COMMIT_DESKTOP ONNX_VERSION_WINDOWS) do set "%%K="
 call :load_versions
+if errorlevel 1 (
+    echo [ERROR] Could not read core\VERSIONS.
+    exit /b 1
+)
 :: Fail closed rather than falling back. The old hardcoded default (1.12.23)
 :: had already drifted from core/VERSIONS (now 1.13.5), so an unreadable
 :: VERSIONS file would silently request a nonexistent release asset and the
@@ -31,6 +37,22 @@ if not defined SHERPA_ONNX_VERSION_WINDOWS (
 )
 if not defined SHERPA_ONNX_WINDOWS_X64_SHA256 (
     echo [ERROR] SHERPA_ONNX_WINDOWS_X64_SHA256 not loaded from core\VERSIONS.
+    exit /b 1
+)
+if not defined SHERPA_ONNX_REPO_DESKTOP (
+    echo [ERROR] SHERPA_ONNX_REPO_DESKTOP not loaded from core\VERSIONS.
+    exit /b 1
+)
+if not defined SHERPA_ONNX_RELEASE_TAG_DESKTOP (
+    echo [ERROR] SHERPA_ONNX_RELEASE_TAG_DESKTOP not loaded from core\VERSIONS.
+    exit /b 1
+)
+if not defined SHERPA_ONNX_COMMIT_DESKTOP (
+    echo [ERROR] SHERPA_ONNX_COMMIT_DESKTOP not loaded from core\VERSIONS.
+    exit /b 1
+)
+if not defined ONNX_VERSION_WINDOWS (
+    echo [ERROR] ONNX_VERSION_WINDOWS not loaded from core\VERSIONS.
     exit /b 1
 )
 set "VERSION=%SHERPA_ONNX_VERSION_WINDOWS%"
