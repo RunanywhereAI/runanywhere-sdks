@@ -15,8 +15,12 @@ import {
   ErrorSeverity,
   SDKError,
 } from '@runanywhere/proto-ts/errors';
+// Same reasoning one level up: the code -> category range table is shared, not
+// re-declared here. `@runanywhere/proto-ts/convenience/errors_category` is the
+// canonical table for Web, React Native and Electron, and says so.
+import { categoryForCode } from '@runanywhere/proto-ts/convenience/errors_category';
 
-export { ErrorCategory, ErrorCode, ErrorSeverity };
+export { ErrorCategory, ErrorCode, ErrorSeverity, categoryForCode };
 
 /** Strip a generated enum's `ERROR_CODE_` / `ERROR_CATEGORY_` prefix from a member name. */
 type ShortName<Key extends string, Prefix extends string> = Key extends `${Prefix}${infer Rest}`
@@ -57,32 +61,6 @@ export const ErrorCodes: Readonly<Record<ErrorCodeName, ErrorCode>> = Object.fre
 export const ErrorCategories: Readonly<Record<ErrorCategoryName, ErrorCategory>> = Object.freeze(
   shortNames(ErrorCategory, 'ERROR_CATEGORY_')
 ) as Readonly<Record<ErrorCategoryName, ErrorCategory>>;
-
-/**
- * Map a code to its category — a verbatim port of the canonical range table in
- * commons `rac_proto_adapters.cpp::rac_result_to_proto_category()`, including its
- * `INTERNAL` fallback. Commons reads a negative `rac_result_t`; this reads the
- * positive proto `ErrorCode`, so the bounds are compared on the magnitude.
- *
- * FALLBACK ONLY. Whenever the wire supplies a category (commons produced it with
- * the same table) that value wins and this function is not consulted.
- */
-export function categoryForCode(code: number): ErrorCategory {
-  const abs = Math.abs(Math.trunc(code));
-  if (abs === 0) return ErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
-  if (abs >= 150 && abs <= 179) return ErrorCategory.ERROR_CATEGORY_NETWORK;
-  if (abs >= 250 && abs <= 279) return ErrorCategory.ERROR_CATEGORY_VALIDATION;
-  if (abs >= 110 && abs <= 129) return ErrorCategory.ERROR_CATEGORY_MODEL;
-  if ((abs >= 180 && abs <= 219) || (abs >= 280 && abs <= 299)) {
-    return ErrorCategory.ERROR_CATEGORY_IO;
-  }
-  if (abs >= 320 && abs <= 329) return ErrorCategory.ERROR_CATEGORY_AUTH;
-  if (abs >= 100 && abs <= 109) return ErrorCategory.ERROR_CATEGORY_CONFIGURATION;
-  if ((abs >= 230 && abs <= 249) || (abs >= 300 && abs <= 319)) {
-    return ErrorCategory.ERROR_CATEGORY_COMPONENT;
-  }
-  return ErrorCategory.ERROR_CATEGORY_INTERNAL;
-}
 
 export interface SDKErrorFields {
   code: ErrorCode;
@@ -288,7 +266,7 @@ type ErrorLike = {
 /**
  * Decode the `SDKError` bytes the addon attaches to every proto-path failure.
  * This is the authoritative mapping — commons produced it via
- * `rac_result_to_proto_error`, so when it is present the local `categoryForCode`
+ * `rac_result_to_proto_error`, so when it is present the shared `categoryForCode`
  * table is not consulted at all.
  */
 function fromSerializedSdkError(value: unknown): SDKException | null {

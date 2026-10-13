@@ -378,6 +378,7 @@ rac_link_archive_deps(test_tool_calling_session_proto)
 target_compile_features(test_tool_calling_session_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_session_proto)
 add_test(NAME tool_calling_session_proto_tests COMMAND test_tool_calling_session_proto)
+set_tests_properties(tool_calling_session_proto_tests PROPERTIES TIMEOUT 90)
 
 # --- Synchronous tool-calling run loop --------------------------------
 # Mirrors the session proto test setup but exercises the single-call API
@@ -394,6 +395,7 @@ rac_link_archive_deps(test_tool_calling_run_loop)
 target_compile_features(test_tool_calling_run_loop PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_run_loop)
 add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
+set_tests_properties(tool_calling_run_loop_tests PROPERTIES TIMEOUT 90)
 
 # --- TC-1: tool-call grammar derivation --------------------------------
 # Pure-function test over build_tool_call_grammar() (no mock LLM plugin
@@ -1683,4 +1685,15 @@ if(CURL_FOUND)
     target_link_libraries(test_development_keyless_live PRIVATE rac_commons CURL::libcurl Threads::Threads)
     rac_link_archive_deps(test_development_keyless_live)
     target_compile_features(test_development_keyless_live PRIVATE cxx_std_20)
+endif()
+
+# Loopback HTTP contract tests with a deterministic LLM backend. No model download.
+if(TARGET rac_server)
+    add_executable(test_openai_server test_openai_server.cpp)
+    target_include_directories(test_openai_server PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../src/server)
+    target_link_libraries(test_openai_server PRIVATE rac_server)
+    rac_test_define_have_protobuf(test_openai_server)
+    rac_link_archive_deps(test_openai_server)
+    add_test(NAME openai_server_tests COMMAND test_openai_server)
+    set_tests_properties(openai_server_tests PROPERTIES TIMEOUT 30)
 endif()
