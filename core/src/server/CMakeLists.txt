@@ -83,6 +83,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(rac_server PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+if(MSVC)
+    target_compile_options(rac_server PRIVATE
+        "/FI${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/win_msvc_compat.h")
+endif()
+
 # Symbol visibility
 set_target_properties(rac_server PROPERTIES
     C_VISIBILITY_PRESET hidden
