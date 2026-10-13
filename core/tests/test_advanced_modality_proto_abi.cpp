@@ -11,6 +11,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <thread>
 #include <vector>
@@ -26,6 +27,7 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/rag/rac_rag.h"
+#include "rac/features/vlm/rac_vlm_proto_adapters.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
@@ -110,6 +112,121 @@ std::string g_dummy_llm_stream_response;
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
     return out->empty() || message.SerializeToArray(out->data(), static_cast<int>(out->size()));
+}
+
+int test_vlm_raw_image_proto_adapter_validation() {
+    const std::string rgb_bytes{'\x01', '\x02', '\x03', '\x04', '\x05', '\x06'};
+    runanywhere::v1::VLMImage rgb;
+    rgb.set_width(2);
+    rgb.set_height(1);
+    rgb.set_raw_rgb(rgb_bytes);
+
+    rac_vlm_image_t out{};
+    CHECK(rac::foundation::rac_vlm_image_from_proto(rgb, &out),
+          "exact-size raw RGB converts");
+    CHECK(out.format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && out.width == 2 && out.height == 1 &&
+              out.data_size == rgb_bytes.size(),
+          "raw RGB conversion preserves dimensions and size");
+    CHECK(out.pixel_data != nullptr &&
+              std::memcmp(out.pixel_data, rgb_bytes.data(), rgb_bytes.size()) == 0,
+          "raw RGB conversion copies every byte");
+    rac_free(const_cast<uint8_t*>(out.pixel_data));
+
+    runanywhere::v1::VLMImage short_rgb;
+    short_rgb.set_width(2);
+    short_rgb.set_height(1);
+    short_rgb.set_raw_rgb(std::string(5, '\x01'));
+    out = {};
+    CHECK(!rac::foundation::rac_vlm_image_from_proto(short_rgb, &out),
+          "short raw RGB payload is rejected");
+    CHECK(out.pixel_data == nullptr && out.data_size == 0,
+          "rejected raw RGB publishes no pixel buffer");
+
+    runanywhere::v1::VLMImage long_rgb;
+    long_rgb.set_width(2);
+    long_rgb.set_height(1);
+    long_rgb.set_raw_rgb(std::string(7, '\x01'));
+    out = {};
+    CHECK(!rac::foundation::rac_vlm_image_from_proto(long_rgb, &out),
+          "long raw RGB payload is rejected");
+    CHECK(out.pixel_data == nullptr && out.data_size == 0,
+          "oversized raw RGB publishes no pixel buffer");
+
+    runanywhere::v1::VLMImage zero_width_rgb;
+    zero_width_rgb.set_width(0);
+    zero_width_rgb.set_height(1);
+    zero_width_rgb.set_raw_rgb(std::string(3, '\x01'));
+    out = {};
+    CHECK(!rac::foundation::rac_vlm_image_from_proto(zero_width_rgb, &out),
+          "zero-width raw RGB is rejected");
+    CHECK(out.pixel_data == nullptr && out.data_size == 0,
+          "zero-width raw RGB publishes no pixel buffer");
+
+    runanywhere::v1::VLMImage negative_height_rgba;
+    negative_height_rgba.set_width(1);
+    negative_height_rgba.set_height(-1);
+    negative_height_rgba.set_raw_rgba(std::string(4, '\x01'));
+    out = {};
+    CHECK(!rac::foundation::rac_vlm_image_from_proto(negative_height_rgba, &out),
+          "negative-height raw RGBA is rejected");
+    CHECK(out.pixel_data == nullptr && out.data_size == 0,
+          "negative-height raw RGBA publishes no pixel buffer");
+
+    if constexpr (sizeof(size_t) == sizeof(uint32_t)) {
+        const int32_t max_dimension = std::numeric_limits<int32_t>::max();
+
+        runanywhere::v1::VLMImage pixel_count_overflow;
+        pixel_count_overflow.set_width(max_dimension);
+        pixel_count_overflow.set_height(max_dimension);
+        pixel_count_overflow.set_raw_rgb("");
+        out = {};
+        CHECK(!rac::foundation::rac_vlm_image_from_proto(pixel_count_overflow, &out),
+              "32-bit raw RGB pixel-count overflow is rejected");
+        CHECK(out.pixel_data == nullptr && out.data_size == 0,
+              "raw RGB overflow publishes no pixel buffer");
+
+        runanywhere::v1::VLMImage byte_count_overflow;
+        byte_count_overflow.set_width(max_dimension);
+        byte_count_overflow.set_height(2);
+        byte_count_overflow.set_raw_rgba("");
+        out = {};
+        CHECK(!rac::foundation::rac_vlm_image_from_proto(byte_count_overflow, &out),
+              "32-bit raw RGBA byte-count overflow is rejected");
+        CHECK(out.pixel_data == nullptr && out.data_size == 0,
+              "raw RGBA overflow publishes no pixel buffer");
+    } else {
+        std::fprintf(stdout, "  skip: raw image size_t overflow checks require a 32-bit build\n");
+    }
+
+    const std::string rgba_bytes{'\x01', '\x02', '\x03', '\xAA',
+                                 '\x04', '\x05', '\x06', '\xBB'};
+    const uint8_t expected_rgb[] = {1, 2, 3, 4, 5, 6};
+    runanywhere::v1::VLMImage rgba;
+    rgba.set_width(2);
+    rgba.set_height(1);
+    rgba.set_raw_rgba(rgba_bytes);
+    out = {};
+    CHECK(rac::foundation::rac_vlm_image_from_proto(rgba, &out),
+          "exact-size raw RGBA converts");
+    CHECK(out.format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && out.width == 2 && out.height == 1 &&
+              out.data_size == sizeof(expected_rgb),
+          "raw RGBA conversion publishes tightly packed RGB metadata");
+    CHECK(out.pixel_data != nullptr &&
+              std::memcmp(out.pixel_data, expected_rgb, sizeof(expected_rgb)) == 0,
+          "raw RGBA conversion drops alpha byte-for-byte");
+    rac_free(const_cast<uint8_t*>(out.pixel_data));
+
+    runanywhere::v1::VLMImage long_rgba;
+    long_rgba.set_width(2);
+    long_rgba.set_height(1);
+    long_rgba.set_raw_rgba(std::string(9, '\x01'));
+    out = {};
+    CHECK(!rac::foundation::rac_vlm_image_from_proto(long_rgba, &out),
+          "long raw RGBA payload is rejected");
+    CHECK(out.pixel_data == nullptr && out.data_size == 0,
+          "oversized raw RGBA publishes no pixel buffer");
+
+    return 0;
 }
 
 template <typename T>
@@ -2018,6 +2135,7 @@ int main() {
 #else
     try {
         test_missing_component_and_parse_error();
+        test_vlm_raw_image_proto_adapter_validation();
         test_vlm_process_stream_events();
         test_vlm_stream_decode_rate_excludes_prefill();
         test_vlm_stream_without_tokens_falls_back();
