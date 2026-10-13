@@ -281,6 +281,78 @@ TEST_F(ChunkerTest, OnlyPunctuation) {
 }
 
 // ============================================================================
+// UTF-8 & Multilingual Boundary Tests
+// ============================================================================
+
+namespace {
+
+bool is_valid_utf8(const std::string& s) {
+    size_t i = 0;
+    while (i < s.size()) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        size_t need = 0;
+        if (c < 0x80) {
+            need = 0;
+        } else if ((c & 0xE0) == 0xC0) {
+            need = 1;
+        } else if ((c & 0xF0) == 0xE0) {
+            need = 2;
+        } else if ((c & 0xF8) == 0xF0) {
+            need = 3;
+        } else {
+            return false;  // continuation byte or invalid lead
+        }
+        for (size_t k = 1; k <= need; ++k) {
+            if (i + k >= s.size() || (static_cast<unsigned char>(s[i + k]) & 0xC0) != 0x80) {
+                return false;  // truncated or malformed sequence
+            }
+        }
+        i += need + 1;
+    }
+    return true;
+}
+
+}  // namespace
+
+TEST_F(ChunkerTest, SpaceFreeCJKParagraphKeepsValidUtf8) {
+    // Space-free CJK text contains none of the standard whitespace/punctuation separators,
+    // exercising the last-resort size-based fallback split.
+    for (const char* prefix : {"", "a", "ab"}) {
+        std::string doc = prefix;
+        for (int i = 0; i < 200; ++i) {
+            doc += "\xe6\x9c\xba\xe5\x99\xa8\xe5\xad\xa6\xe4\xb9\xa0";  // 机器学习 (12 bytes per 4 characters)
+        }
+        auto chunks = chunker_.chunk_document(doc);
+        EXPECT_GT(chunks.size(), 1ul);
+        for (const auto& chunk : chunks) {
+            EXPECT_TRUE(is_valid_utf8(chunk.text))
+                << "Chunk is not valid UTF-8 (prefix=\"" << prefix << "\"): " << chunk.text;
+        }
+    }
+}
+
+TEST_F(ChunkerTest, NarrowBudgetWithMultiByteUtf8) {
+    // A budget narrower than one 3-byte CJK character must emit whole characters
+    // rather than splitting them mid-byte.
+    ChunkerConfig tiny;
+    tiny.chunk_size = 1;
+    tiny.chars_per_token = 2;  // 2-byte budget, narrower than a 3-byte CJK char
+    DocumentChunker narrow_chunker{tiny};
+
+    std::string doc;
+    for (int i = 0; i < 40; ++i) {
+        doc += "\xe6\x9c\xba\xe5\x99\xa8";  // 机器 (6 bytes)
+    }
+
+    auto chunks = narrow_chunker.chunk_document(doc);
+    EXPECT_GT(chunks.size(), 1ul);
+    for (const auto& chunk : chunks) {
+        EXPECT_TRUE(is_valid_utf8(chunk.text))
+            << "Narrow-budget chunk is not valid UTF-8: " << chunk.text;
+    }
+}
+
+// ============================================================================
 // Thread Safety - Basic Const Correctness Tests
 // ============================================================================
 
@@ -300,3 +372,4 @@ TEST_F(ChunkerTest, ConstMethodsDoNotModifyState) {
 }
 
 }  // namespace runanywhere::rag
+
