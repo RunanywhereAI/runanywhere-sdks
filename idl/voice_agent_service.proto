@@ -33,6 +33,10 @@ message VoiceAgentResult {
 
 // Turn detection. Field names, units and semantics follow OpenAI Realtime
 // `session.audio.input.turn_detection`.
+//
+// NOT HONORED YET. Nothing under core/src reads VoiceAgentComposeConfig.
+// turn_detection or any field of this message, so the "commons applies"
+// defaults below are the only values in effect regardless of what is set.
 message TurnDetection {
     enum Type {
         TURN_DETECTION_TYPE_UNSPECIFIED = 0;  // treated as VAD
@@ -75,8 +79,9 @@ message VoiceAgentTurnRequest {
     bytes audio_data = 3;
 
     // BCP-47 STT language for this turn only. Overrides
-    // VoiceAgentComposeConfig.language. Unset means the session language, or
-    // model auto-detection when that is unset too.
+    // VoiceAgentComposeConfig.language. Unset means model auto-detection:
+    // the session-wide language is NOT HONORED YET (see its note), so there is
+    // no session language to fall back to.
     optional string language = 4;
 
     map<string, string> metadata = 5;
@@ -132,6 +137,10 @@ message VoiceAgentComposeConfig {
     // BCP-47 STT language for the whole session. One spelling across this
     // domain and stt_options.proto. Unset means the model auto-detects.
     // Per-turn override: VoiceAgentTurnRequest.language.
+    //
+    // NOT HONORED YET. Nothing in core/src/features/voice_agent reads this
+    // session-wide field; only VoiceAgentTurnRequest.language reaches STT.
+    // Today the model auto-detects unless the turn sets its own language.
     optional string language = 11;
 }
 
