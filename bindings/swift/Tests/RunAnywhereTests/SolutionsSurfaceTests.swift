@@ -222,8 +222,11 @@ final class SolutionsSurfaceTests: XCTestCase {
     /// protobuf JSON so the test does not depend on hand-maintained Swift
     /// spellings for snake_case IDL fields. Extracted from the test body to keep
     /// that function inside SwiftLint's `function_body_length` limit.
-    private func makeRAGConfig(embeddingID: String, llmID: String,
-                               vocabularyPath: String) throws -> RARAGConfiguration {
+    private func makeRAGConfig(
+        embeddingID: String,
+        llmID: String,
+        vocabularyPath: String
+    ) throws -> RARAGConfiguration {
         let embeddingConfigData = try JSONSerialization.data(
             withJSONObject: ["vocab_path": vocabularyPath]
         )
