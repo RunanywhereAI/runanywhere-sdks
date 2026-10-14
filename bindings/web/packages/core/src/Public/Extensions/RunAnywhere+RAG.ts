@@ -1329,17 +1329,21 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
 
   // Build the list of token spans. In whitespace-delimited scripts (English, etc.),
   // each non-whitespace sequence is roughly one token. In scripts without spaces
-  // (CJK, etc.) or for oversized runs (long URLs, base64 blobs), a single regex
-  // match can exceed the chunk size budget. We enforce a character/code-point
-  // limit by splitting any token whose code-point count exceeds `size` on Unicode
-  // code-point boundaries (preventing surrogate pair corruption). Tokens within
-  // the budget remain atomic.
+  // (CJK, Thai, Lao, Myanmar, Khmer, etc.) or for oversized runs (long URLs, base64 blobs > 40 chars),
+  // a single regex match can exceed the chunk size budget. We enforce a character/code-point
+  // limit by splitting any token whose code-point count exceeds `size` and represents a
+  // space-free script or an oversized run (> 40 code points) on Unicode code-point boundaries
+  // (preventing surrogate pair corruption). Ordinary spaced words within or slightly exceeding
+  // tiny budgets remain atomic tokens, matching the C++ core separator-first behavior.
+  const SCRIPT_FREE_SPACE_REGEX =
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}]/u;
+
   const tokens: RAGTokenSpan[] = [];
   for (const match of matches) {
     const matchText = match[0];
     const matchStart = match.index ?? 0;
     const cpCount = countCodePoints(matchText);
-    const isOversized = cpCount > size;
+    const isOversized = cpCount > size && (SCRIPT_FREE_SPACE_REGEX.test(matchText) || cpCount > 40);
 
     if (!isOversized) {
       tokens.push({
@@ -1379,7 +1383,7 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
 
 /**
  * Truncates and formats retrieved RAG search result chunks into a single context string,
- * adhering to a maximum token budget using code-point-aware tokenization.
+ * adhering to a maximum token budget using word/token-aware context bounding.
  *
  * @param chunks - Retrieved RAG search result chunks to format.
  * @param requestedMaxTokens - Maximum allowable token budget for the formatted context.
@@ -1389,17 +1393,36 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
   const maxTokens = Math.max(1, Math.floor(requestedMaxTokens));
   const parts: string[] = [];
   let used = 0;
+  const SCRIPT_FREE_SPACE_REGEX =
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}]/u;
+
   // `RAGSearchResult.rank` was deleted outright (idl/rag.proto): rank was
   // always just this array's position, so the 1-based index reconstructs it
   // exactly.
   chunks.forEach((chunk, index) => {
     const available = maxTokens - used;
     if (available <= 0) return;
-    const [fragment] = splitRAGText(chunk.text, available, 0);
-    const text = fragment?.text ?? '';
+    const words = chunk.text.split(/\s+/).filter(Boolean);
+    let text = '';
+    let tokenCount = 0;
+
+    if (words.length === 1 && (SCRIPT_FREE_SPACE_REGEX.test(words[0]!) || [...words[0]!].length > 40)) {
+      const codePoints = [...words[0]!];
+      const selected = codePoints.slice(0, available);
+      text = selected.join('');
+      tokenCount = selected.length;
+    } else if (words.length > 0) {
+      const selectedWords = words.slice(0, available);
+      text = selectedWords.join(' ');
+      tokenCount = selectedWords.length;
+    } else {
+      text = chunk.text;
+      tokenCount = 1;
+    }
+
     if (!text) return;
     parts.push(`[Source ${index + 1}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
-    used += fragment?.tokenCount ?? 0;
+    used += Math.min(tokenCount, available);
   });
   return parts.join('\n\n');
 }

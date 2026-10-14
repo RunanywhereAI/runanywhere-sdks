@@ -452,6 +452,14 @@ describe('splitRAGText', () => {
     expect(chunks[1]!.tokenCount).toBe(3);
     expect(chunks[2]!.text).toBe('sat on the');
     expect(chunks[3]!.text).toBe('the rug now');
+
+    // Regression check: ordinary English words are never split mid-word at small budgets
+    const englishNineWords = 'The quick brown fox jumps over the lazy dog';
+    const engChunks = __testing__.splitRAGText(englishNineWords, 4, 0);
+    expect(engChunks.length).toBe(3);
+    expect(engChunks[0]!.text).toBe('The quick brown fox');
+    expect(engChunks[1]!.text).toBe('jumps over the lazy');
+    expect(engChunks[2]!.text).toBe('dog');
   });
 
   it('handles mixed English and whitespace-free CJK content', () => {
@@ -476,20 +484,37 @@ describe('splitRAGText', () => {
     expect(chunks[0]!.endOffset).toBe(4);
   });
 
-  it('splits non-CJK runs exceeding chunkSize into bounded chunks (#922)', () => {
-    // 24-character non-CJK token with chunkSize 8, overlap 2
-    const token = 'abcdefghijklmnopqrstuvwx';
-    const chunks = __testing__.splitRAGText(token, 8, 2);
+  it('splits non-CJK runs exceeding 40 characters into bounded chunks (#922)', () => {
+    // 80-character non-CJK token (Cyrillic) with chunkSize 20, overlap 0
+    const token = 'Ж'.repeat(80);
+    const chunks = __testing__.splitRAGText(token, 20, 0);
 
-    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBe(4);
     for (const chunk of chunks) {
-      expect(chunk.tokenCount).toBeLessThanOrEqual(8);
-      expect([...chunk.text].length).toBeLessThanOrEqual(8);
+      expect(chunk.tokenCount).toBe(20);
+      expect([...chunk.text].length).toBe(20);
       expect(token.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
     }
   });
 
-  it('bounds retrieved CJK context using token-aware fragmenting in boundedRAGContext (#922)', () => {
+  it('splits whitespace-free Thai script runs into bounded chunks (#922)', () => {
+    // 80-character Thai token with chunkSize 20, overlap 0
+    const thaiDoc = 'ก'.repeat(80);
+    const chunks = __testing__.splitRAGText(thaiDoc, 20, 0);
+
+    expect(chunks.length).toBe(4);
+    for (const chunk of chunks) {
+      expect(chunk.tokenCount).toBe(20);
+      expect([...chunk.text].length).toBe(20);
+      expect(thaiDoc.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
+    }
+  });
+
+  it('bounds retrieved CJK context and preserves whole English words in boundedRAGContext (#922)', () => {
+    // English context retains full words rather than slicing characters
+    const englishContext = __testing__.boundedRAGContext([{ text: 'Paris France', score: 1 }], 2);
+    expect(englishContext).toBe('[Source 1: Document]\nParis France');
+
     const cjkText = '人工智能机器学习深度学习自然语言处理计算机视觉强化学习';
     const chunks = [
       {
