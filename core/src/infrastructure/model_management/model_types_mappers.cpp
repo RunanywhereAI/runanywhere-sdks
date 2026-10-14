@@ -62,6 +62,7 @@ constexpr int32_t kProtoMcSemanticSegmentation = 11;
 // 12 is MODEL_CATEGORY_RERANK, which has no C enumerator (rerank models never
 // cross this boundary — see model_lifecycle_translation.cpp).
 constexpr int32_t kProtoMcOcr = 13;
+constexpr int32_t kProtoMcDecision = 14;
 
 // ModelSource
 constexpr int32_t kProtoMsUnspecified = 0;
@@ -256,6 +257,9 @@ rac_result_t rac_model_category_from_proto(int32_t proto_value, rac_model_catego
         case kProtoMcOcr:
             *out = RAC_MODEL_CATEGORY_OCR;
             return RAC_SUCCESS;
+        case kProtoMcDecision:
+            *out = RAC_MODEL_CATEGORY_DECISION;
+            return RAC_SUCCESS;
         default:
             *out = RAC_MODEL_CATEGORY_UNKNOWN;
             return RAC_ERROR_INVALID_ARGUMENT;
@@ -302,6 +306,9 @@ rac_result_t rac_model_category_to_proto(rac_model_category_t value, int32_t* ou
             return RAC_SUCCESS;
         case RAC_MODEL_CATEGORY_OCR:
             *out = kProtoMcOcr;
+            return RAC_SUCCESS;
+        case RAC_MODEL_CATEGORY_DECISION:
+            *out = kProtoMcDecision;
             return RAC_SUCCESS;
         case RAC_MODEL_CATEGORY_UNKNOWN:
             // No proto equivalent — map to UNSPECIFIED (0).
