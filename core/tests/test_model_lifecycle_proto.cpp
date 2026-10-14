@@ -55,6 +55,7 @@ std::string g_last_llm_config_json;
 
 struct DummyLlm {
     std::string model_path;
+    int32_t effective_context_length{2048};
     bool initialized{false};
 };
 
@@ -133,6 +134,12 @@ rac_result_t dummy_llm_create(const char* model_id, const char* config_json, voi
     g_last_llm_config_json = config_json ? config_json : "";
     auto* impl = new DummyLlm();
     impl->model_path = model_id;
+    int requested_context = 0;
+    if (config_json &&
+        std::sscanf(config_json, "{\"context_length\":%d}", &requested_context) == 1 &&
+        requested_context > 0) {
+        impl->effective_context_length = requested_context;
+    }
     *out_impl = impl;
     ++g_create_count;
     return RAC_SUCCESS;
@@ -155,6 +162,13 @@ rac_result_t dummy_llm_initialize(void* impl, const char* model_path) {
     dummy->initialized = true;
     dummy->model_path = model_path;
     ++g_initialize_count;
+    return RAC_SUCCESS;
+}
+
+rac_result_t dummy_llm_get_info(void* impl, rac_llm_info_t* info) {
+    if (!impl || !info)
+        return RAC_ERROR_NULL_POINTER;
+    info->context_length = static_cast<DummyLlm*>(impl)->effective_context_length;
     return RAC_SUCCESS;
 }
 
@@ -787,6 +801,7 @@ int test_resident_context_length_change_reloads_model(
     rac_llm_service_ops_t ops{};
     ops.create = dummy_llm_create;
     ops.initialize = dummy_llm_initialize;
+    ops.get_info = dummy_llm_get_info;
     ops.cleanup = dummy_llm_cleanup;
     ops.destroy = dummy_llm_destroy;
 
@@ -839,6 +854,19 @@ int test_resident_context_length_change_reloads_model(
         CHECK(g_create_count == 1 && g_initialize_count == 1 && g_cleanup_count == 0 &&
                   g_destroy_count == 0,
               "repeated default load is idempotent");
+    }
+
+    // A concrete request matching the observed default context does not reload,
+    // even though the previous request omitted context_length.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(2048);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "effective-match load returns parsable result");
+        CHECK(!result.has_error(), "effective-match load reports success");
+        CHECK(g_create_count == 1 && g_destroy_count == 0,
+              "effective-match reuses the default resident model");
     }
 
     // (c) A different explicit context length reloads the resident model.
@@ -934,6 +962,26 @@ int test_resident_context_length_change_reloads_model(
               "omitted after zero is idempotent");
         CHECK(g_last_llm_config_json == "{\"context_length\":0}",
               "omitted after zero keeps the model-default intent");
+    }
+
+    // An unobservable backend cannot prove an identical positive request
+    // was honored. Do not reload forever or report a false cache hit.
+    rac_model_lifecycle_reset();
+    ops.get_info = nullptr;
+    const int creates_before_unknown = g_create_count;
+    const int destroys_before_unknown = g_destroy_count;
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(4096);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result) && !result.has_error(),
+              "initial unknown-context load completes");
+        CHECK(do_load(request, &result) && result.has_error(),
+              "repeating an unverified positive context returns a load error");
+        CHECK(g_create_count == creates_before_unknown + 1 &&
+                  g_destroy_count == destroys_before_unknown,
+              "unknown-context repeat preserves the existing backend");
     }
 
     rac_plugin_unregister("llamacpp");

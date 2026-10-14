@@ -106,6 +106,9 @@ struct LoadedModel {
     // model/default context, matching ModelLoadRequest semantics. This is not
     // an observation of the context length the engine ultimately allocated.
     int32_t requested_context_length{0};
+    // Effective context reported by the initialized LLM/VLM backend.
+    // Zero means unavailable; it is never inferred from request intent.
+    int32_t effective_context_length{0};
     int64_t loaded_at_ms{0};
     int64_t updated_at_ms{0};
     std::string error_message;
