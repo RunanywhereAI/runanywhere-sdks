@@ -14,10 +14,9 @@
  * proto codes keep meaningful categories instead of collapsing to INTERNAL.
  *
  * C++ commons (`rac::foundation::rac_result_to_proto_category` in
- * `core/src/foundation/rac_proto_adapters.cpp`) currently
- * only maps |100|–|329| and falls through to INTERNAL — that is a known
- * under-mapping, deliberately deferred (see `ts_shared_layer.md` Known issue).
- * Do NOT “fix” this TS table down to match commons.
+ * `core/src/foundation/rac_proto_adapters.cpp`) uses the same 18-range table
+ * for serialized `SDKError` payloads. Negative values outside the mapped
+ * ranges return `UNSPECIFIED`.
  *
  * Callers may pass either the signed C ABI code or the positive proto
  * `ErrorCode` (abs magnitude); both are accepted via `Math.abs`.

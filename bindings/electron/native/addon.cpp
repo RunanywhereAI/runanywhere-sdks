@@ -58,6 +58,7 @@
 #include "voice_bridge.h"
 
 #include "rac/core/rac_types.h"
+#include "rac/core/rac_error_proto.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diarization/rac_diarization_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -273,6 +274,17 @@ Napi::Error make_rac_error(Napi::Env env, rac_result_t code, const std::string& 
     Napi::Object value = error.Value();
     value.Set("code", Napi::Number::New(env, rac_code_abs(code)));  // canonical positive ErrorCode
     value.Set("cAbiCode", Napi::Number::New(env, static_cast<int>(code)));  // raw rac_result_t
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    // Only attach sdkError for genuine failures; rac_result_to_proto_error serializes a
+    // success proto when code == RAC_SUCCESS (no skip-on-success branch in commons), which
+    // would make asSDKException() see a success payload and misreport the error category.
+    if (code != RAC_SUCCESS &&
+        rac_result_to_proto_error(code, &buffer) == RAC_SUCCESS && buffer.data != nullptr &&
+        buffer.size > 0) {
+        value.Set("sdkError", Napi::Buffer<uint8_t>::Copy(env, buffer.data, buffer.size));
+    }
+    rac_proto_buffer_free(&buffer);
     return error;
 }
 
@@ -3589,14 +3601,18 @@ Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
 // releasing the native buffer.
 static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const char* what) {
     if (buf->status != RAC_SUCCESS || buf->data == nullptr) {
-        std::string msg = std::string(what) + " failed: " + std::to_string(buf->status);
+        // Capture status and message before freeing: rac_proto_buffer_free resets
+        // buf->status to RAC_SUCCESS via release_fields/reset_fields, so reading
+        // buf->status after the free would always report success.
+        rac_result_t status = buf->status;
+        std::string msg = std::string(what) + " failed: " + std::to_string(status);
         if (buf->error_message) {
             msg += " (";
             msg += buf->error_message;
             msg += ")";
         }
         rac_proto_buffer_free(buf);
-        make_rac_error(env, buf->status, msg).ThrowAsJavaScriptException();
+        make_rac_error(env, status, msg).ThrowAsJavaScriptException();
         return env.Undefined();
     }
     Napi::Buffer<uint8_t> out = Napi::Buffer<uint8_t>::Copy(env, buf->data, buf->size);

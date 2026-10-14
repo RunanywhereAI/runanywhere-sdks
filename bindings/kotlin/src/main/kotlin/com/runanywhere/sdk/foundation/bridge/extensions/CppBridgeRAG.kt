@@ -5,16 +5,14 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.ErrorCategory
-import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGSearchResponse
-import ai.runanywhere.proto.v1.RAGStatistics
 import ai.runanywhere.proto.v1.RAGStreamEvent
+import ai.runanywhere.proto.v1.RAGStatistics
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -241,27 +239,9 @@ object CppBridgeRAG {
         if (rc == RunAnywhereBridge.RAC_SUCCESS) {
             return SDKException.operation("racRagSessionCreateProto returned 0")
         }
-        val magnitude = if (rc < 0) -rc else rc
-        val code = ErrorCode.fromValue(magnitude) ?: ErrorCode.ERROR_CODE_UNKNOWN
-        return SDKException.make(
-            code = code,
-            message = "RAG proto session create failed: $rc",
-            category = categoryForRacResult(magnitude),
-            cAbiCode = rc,
-        )
+        return SDKException.fromRACResult(rc)
+            ?: SDKException.operation("RAG proto session create failed: $rc")
     }
-
-    private fun categoryForRacResult(magnitude: Int): ErrorCategory =
-        when (magnitude) {
-            in 110..129 -> ErrorCategory.ERROR_CATEGORY_MODEL
-            in 150..179 -> ErrorCategory.ERROR_CATEGORY_NETWORK
-            in 180..219, in 330..369 -> ErrorCategory.ERROR_CATEGORY_IO
-            in 250..279 -> ErrorCategory.ERROR_CATEGORY_VALIDATION
-            in 320..329 -> ErrorCategory.ERROR_CATEGORY_AUTH
-            in 100..109 -> ErrorCategory.ERROR_CATEGORY_CONFIGURATION
-            in 400..499, in 600..999 -> ErrorCategory.ERROR_CATEGORY_INTERNAL
-            else -> ErrorCategory.ERROR_CATEGORY_COMPONENT
-        }
 
     private fun <M : Message<M, *>> decodeOrThrow(
         adapter: ProtoAdapter<M>,
