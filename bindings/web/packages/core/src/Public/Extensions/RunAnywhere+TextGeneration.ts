@@ -362,10 +362,9 @@ export async function* generateStructuredStream(
     yield { kind: 'completed', result };
   } catch (error) {
     // Producer self-terminated (stream/result/parse failure) — never fire
-    // the native cancel for it. Swallow the duplicate rejection carried by
-    // the terminal result promise before rethrowing the original error.
+    // the native cancel for it. `generateStream` already marks `result`
+    // handled, so its duplicate rejection needs no guard here.
     nativeStreamDone = true;
-    void streaming.result.catch(() => undefined);
     throw error;
   } finally {
     if (!nativeStreamDone) streaming.cancel();
