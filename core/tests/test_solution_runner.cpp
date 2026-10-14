@@ -1378,8 +1378,11 @@ TEST(retrieve_without_session_handle_fails_honestly) {
 // 13b. RetrieveNode rejects VECTOR_STORE_PGVECTOR honestly.
 // ---------------------------------------------------------------------------
 TEST(retrieve_pgvector_is_rejected) {
-    rac_solutions_ensure_engine_backed_operators_registered();
+    // Needs the engine-backed retrieve factory registered, so the PGVECTOR
+    // guard it exercises is the one RetrieveNode actually installs. Same call
+    // as test 13 above, which is the only registration entry point here.
     auto& registry = OperatorRegistry::instance();
+    static_cast<void>(rac::solutions::register_engine_backed_operators(registry));
 
     PipelineSpec spec;
     spec.set_name("retrieve_pgvector_rejection");
