@@ -164,6 +164,27 @@ namespace {
 constexpr int32_t kAcceleratorPolicyUnspecified = 0;
 constexpr int32_t kAcceleratorPolicyNpu = 4;
 
+// Query initialized backend state, not the context length originally requested.
+// Zero means unavailable (including engines that do not expose get_info).
+int32_t query_effective_context_length(const rac_engine_vtable_t* vt,
+                                       rac_primitive_t primitive, void* impl) {
+    if (!vt || !impl) {
+        return 0;
+    }
+    if (primitive == RAC_PRIMITIVE_GENERATE_TEXT && vt->llm_ops && vt->llm_ops->get_info) {
+        rac_llm_info_t info{};
+        if (vt->llm_ops->get_info(impl, &info) == RAC_SUCCESS) {
+            return info.context_length;
+        }
+    } else if (primitive == RAC_PRIMITIVE_VLM && vt->vlm_ops && vt->vlm_ops->get_info) {
+        rac_vlm_info_t info{};
+        if (vt->vlm_ops->get_info(impl, &info) == RAC_SUCCESS) {
+            return info.context_length;
+        }
+    }
+    return 0;
+}
+
 rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t primitive,
                                  const std::string& resolved_path, const std::string& mmproj_path,
                                  const std::string& options_json, void** out_impl,
@@ -795,10 +816,37 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                 existing->second->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
             const int32_t requested_context_length =
                 request.has_context_length() ? request.context_length() : 0;
+            // Runtime-observed context takes precedence when it is known. When
+            // the effective window already matches an explicit request, reuse
+            // even if the original request used the model/default context.
+            // Otherwise retain #949's implicit reload on an explicit change.
+            const int32_t resident_context = existing->second->effective_context_length;
+            const bool effective_matches =
+                requested_context_length > 0 && resident_context == requested_context_length;
             const bool context_length_changed =
                 same_ready_model && request.has_context_length() &&
-                existing->second->requested_context_length != requested_context_length;
+                existing->second->requested_context_length != requested_context_length &&
+                !effective_matches;
             if (!request.force_reload() && same_ready_model && !context_length_changed) {
+                // Repeating a previously requested positive context must not
+                // silently claim success if the backend reported a different
+                // window or cannot report it. Another reload with identical
+                // parameters is unlikely to fix this; preserve the resident.
+                if (requested_context_length > 0 && !effective_matches) {
+                    const std::string resident_label =
+                        resident_context > 0 ? std::to_string(resident_context) : "unknown";
+                    const std::string message =
+                        "ModelLoadRequest.context_length=" +
+                        std::to_string(requested_context_length) + " is not verified for model '" +
+                        request.model_id() + "' (effective context_length=" + resident_label +
+                        "); the resident model was preserved; retry with force_reload=true to recreate it";
+                    ModelLoadResult result = detail::make_load_result(
+                        false, existing->second->model_id, existing->second->category,
+                        existing->second->framework, existing->second->resolved_path,
+                        existing->second->resolved_artifacts, existing->second->loaded_at_ms,
+                        message, detail::placement_from_loaded(*existing->second));
+                    return detail::copy_proto(result, out_result);
+                }
                 ModelLoadResult result = detail::make_load_result(
                     true, existing->second->model_id, existing->second->category,
                     existing->second->framework, existing->second->resolved_path,
@@ -1130,6 +1178,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->decision_ops = vt->decision_ops;
     }
     loaded->impl = impl;
+    loaded->effective_context_length = detail::query_effective_context_length(vt, primitive, impl);
     // QHexRT reasoning templates may prefill `<think>` into the prompt
     // (`chat.assistant.gen_prefill`). Stamp that onto ModelInfo so the stream
     // splitter can call start_inside_reasoning() instead of the ambiguous hold.
