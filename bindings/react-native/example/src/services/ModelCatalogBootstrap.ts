@@ -547,7 +547,7 @@ export async function registerAll(
         framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
         category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         // Sum of file Content-Lengths.
-        memoryRequirementBytes: 145_295_768,
+        downloadSizeBytes: 145_295_768,
       }),
     ]);
   }

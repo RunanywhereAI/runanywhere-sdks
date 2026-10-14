@@ -20,6 +20,7 @@ import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelFormatFromUrlRequest
 import ai.runanywhere.proto.v1.ModelFormatFromUrlResult
 import ai.runanywhere.proto.v1.SingleFileArtifact
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAModelInfo
 
@@ -109,9 +110,11 @@ internal object ModelTypesCppBridge {
         val request = ModelFormatFromUrlRequest(url = url)
         val bytes =
             callProtoBytes("racModelFormatFromUrlProto") {
-                RunAnywhereBridge.racModelFormatFromUrlProto(
-                    ModelFormatFromUrlRequest.ADAPTER.encode(request),
-                )
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racModelFormatFromUrlProto(
+                        ModelFormatFromUrlRequest.ADAPTER.encode(request),
+                    )
+                }
             } ?: return null
 
         return try {
@@ -126,9 +129,11 @@ internal object ModelTypesCppBridge {
         val request = ArtifactInferFromUrlRequest(url = url, model_id = modelId)
         val bytes =
             callProtoBytes("racArtifactInferFromUrlProto") {
-                RunAnywhereBridge.racArtifactInferFromUrlProto(
-                    ArtifactInferFromUrlRequest.ADAPTER.encode(request),
-                )
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racArtifactInferFromUrlProto(
+                        ArtifactInferFromUrlRequest.ADAPTER.encode(request),
+                    )
+                }
             } ?: return null
 
         return try {
