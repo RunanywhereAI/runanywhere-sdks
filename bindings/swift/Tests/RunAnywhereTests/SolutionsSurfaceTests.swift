@@ -210,7 +210,7 @@ final class SolutionsSurfaceTests: XCTestCase {
         // session rather than merely accepting the handle at attach time.
         let queryCompleted = expectation(description: "RAG solution query completed")
         var completionSubscription: AnyCancellable?
-        completionSubscription = RunAnywhere.events.ragEvents.sink { event in
+        completionSubscription = RunAnywhere.events.eventBus.ragEvents.sink { event in
             guard event.operationID == "rag.query",
                   event.hasCapability,
                   event.capability.kind.rawValue == 14 else { return }
