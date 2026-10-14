@@ -159,23 +159,9 @@ final class SolutionsSurfaceTests: XCTestCase {
         try await CppBridge.ModelRegistry.shared.save(embeddingModel)
         try await CppBridge.ModelRegistry.shared.save(llmModel)
 
-        // MiniLM needs its vocabulary sidecar. Build the generated proto via
-        // protobuf JSON so this test does not depend on hand-maintained Swift
-        // spellings for snake_case IDL fields.
-        let embeddingConfigData = try JSONSerialization.data(
-            withJSONObject: ["vocab_path": vocabularyPath]
+        let ragConfig = try makeRAGConfig(
+            embeddingID: embeddingID, llmID: llmID, vocabularyPath: vocabularyPath
         )
-        let embeddingConfig = String(decoding: embeddingConfigData, as: UTF8.self)
-        let ragConfigData = try JSONSerialization.data(withJSONObject: [
-            "embeddingModelId": embeddingID,
-            "llmModelId": llmID,
-            "embeddingConfigJson": embeddingConfig,
-            "topK": 4,
-            "chunkSize": 64,
-            "chunkOverlap": 8,
-            "maxContextTokens": 1024
-        ])
-        let ragConfig = try RARAGConfiguration(jsonUTF8Data: ragConfigData)
 
         // Hand the borrowed handle straight to the actor, which takes ownership:
         // `RagSession.close()` calls `destroySession` itself, so there is no
@@ -228,6 +214,30 @@ final class SolutionsSurfaceTests: XCTestCase {
         try solution.closeInput()
 
         await fulfillment(of: [queryCompleted], timeout: 120.0)
+    }
+
+    /// Build the RAG configuration the live-session test feeds to the pipeline.
+    ///
+    /// MiniLM needs its vocabulary sidecar, and the generated proto is built via
+    /// protobuf JSON so the test does not depend on hand-maintained Swift
+    /// spellings for snake_case IDL fields. Extracted from the test body to keep
+    /// that function inside SwiftLint's `function_body_length` limit.
+    private func makeRAGConfig(embeddingID: String, llmID: String,
+                               vocabularyPath: String) throws -> RARAGConfiguration {
+        let embeddingConfigData = try JSONSerialization.data(
+            withJSONObject: ["vocab_path": vocabularyPath]
+        )
+        let embeddingConfig = String(bytes: embeddingConfigData, encoding: .utf8) ?? ""
+        let ragConfigData = try JSONSerialization.data(withJSONObject: [
+            "embeddingModelId": embeddingID,
+            "llmModelId": llmID,
+            "embeddingConfigJson": embeddingConfig,
+            "topK": 4,
+            "chunkSize": 64,
+            "chunkOverlap": 8,
+            "maxContextTokens": 1024
+        ])
+        return try RARAGConfiguration(jsonUTF8Data: ragConfigData)
     }
 
     /// The generated handle descriptor carries its canonical fields.
