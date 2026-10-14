@@ -942,7 +942,7 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
     } else {
         bool valid_boundary = (request.from_layer() == 0);
         for (const auto& a : cluster.assignments) {
-            if (request.from_layer() == a.layer_start() || request.from_layer() == a.layer_end()) {
+            if (request.from_layer() == a.layer_start()) {
                 valid_boundary = true;
                 break;
             }
