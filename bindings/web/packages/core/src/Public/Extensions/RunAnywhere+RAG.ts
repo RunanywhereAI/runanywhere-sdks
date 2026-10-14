@@ -1289,25 +1289,85 @@ interface SplitRAGChunk {
   tokenCount: number;
 }
 
+interface RAGTokenSpan {
+  startOffset: number;
+  endOffset: number;
+}
+
+/**
+ * Counts the number of Unicode code points in a string, correctly counting surrogate pairs as one code point.
+ */
+function countCodePoints(str: string): number {
+  let count = 0;
+  for (const char of str) {
+    if (char) count++;
+  }
+  return count;
+}
+
+/**
+ * Splits input text into sliding-window chunks bounded by token count and chunk overlap.
+ * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK,
+ * Thai, Cyrillic, or long whitespace-free strings exceeding the budget) by Unicode code
+ * points without breaking surrogate pairs. Iteratively appends chunks to avoid stack limits.
+ */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
   if (matches.length === 0) return [];
   const size = Math.max(1, Math.floor(requestedSize));
   const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
   const stride = Math.max(1, size - overlap);
+
+  // In whitespace-delimited scripts (English, etc.), each non-whitespace sequence
+  // is roughly one token. In scripts without spaces (CJK, Thai, Lao, Myanmar, Khmer, etc.)
+  // or for oversized runs (long URLs, base64 blobs, or non-spaced words), a single regex
+  // match can exceed the chunk size budget. We enforce a character/code-point
+  // limit by splitting any token whose code-point count exceeds `size` and represents a
+  // space-free script or an oversized run (> 40 code points) on Unicode code-point boundaries
+  // (preventing surrogate pair corruption). Ordinary spaced words within or slightly exceeding
+  // tiny budgets remain atomic tokens, matching the C++ core separator-first behavior.
+  const SCRIPT_FREE_SPACE_REGEX =
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}]/u;
+
+  const tokens: RAGTokenSpan[] = [];
+  for (const match of matches) {
+    const matchText = match[0];
+    const matchStart = match.index ?? 0;
+    const cpCount = countCodePoints(matchText);
+    const isOversized = cpCount > size && (SCRIPT_FREE_SPACE_REGEX.test(matchText) || cpCount > 40);
+
+    if (!isOversized) {
+      tokens.push({
+        startOffset: matchStart,
+        endOffset: matchStart + matchText.length,
+      });
+    } else {
+      let currentOffset = matchStart;
+      for (const char of matchText) {
+        tokens.push({
+          startOffset: currentOffset,
+          endOffset: currentOffset + char.length,
+        });
+        currentOffset += char.length;
+      }
+    }
+  }
+
+  if (tokens.length === 0) return [];
+
   const chunks: SplitRAGChunk[] = [];
-  for (let start = 0; start < matches.length; start += stride) {
-    const end = Math.min(matches.length, start + size);
-    const startOffset = matches[start]!.index ?? 0;
-    const last = matches[end - 1]!;
-    const endOffset = (last.index ?? 0) + last[0].length;
+  for (let start = 0; start < tokens.length; start += stride) {
+    const end = Math.min(tokens.length, start + size);
+    const startOffset = tokens[start]!.startOffset;
+    const last = tokens[end - 1]!;
+    const endOffset = last.endOffset;
     chunks.push({
       text: text.slice(startOffset, endOffset),
       startOffset,
       endOffset,
       tokenCount: end - start,
     });
-    if (end === matches.length) break;
+    if (end === tokens.length) break;
   }
   return chunks;
 }
@@ -1964,6 +2024,7 @@ export const __testing__ = {
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
   renderRAGPrompt,
+  splitRAGText,
 };
 
 /**

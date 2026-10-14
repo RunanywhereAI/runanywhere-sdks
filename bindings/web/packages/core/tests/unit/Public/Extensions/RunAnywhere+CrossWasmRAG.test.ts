@@ -376,6 +376,65 @@ describe('renderRAGPrompt', () => {
   });
 });
 
+describe('splitRAGText (#1014)', () => {
+  it('preserves existing behavior for whitespace-separated English words without cutting mid-word', () => {
+    const text = 'The quick brown fox jumps over the lazy dog';
+    const chunks = __testing__.splitRAGText(text, 4, 0);
+
+    expect(chunks.length).toBe(3);
+    expect(chunks[0]!.text).toBe('The quick brown fox');
+    expect(chunks[0]!.tokenCount).toBe(4);
+    expect(chunks[1]!.text).toBe('jumps over the lazy');
+    expect(chunks[1]!.tokenCount).toBe(4);
+    expect(chunks[2]!.text).toBe('dog');
+    expect(chunks[2]!.tokenCount).toBe(1);
+  });
+
+  it('splits 80-character runs of Thai, Cyrillic, ASCII, and supplementary-plane CJK to character budget', () => {
+    const size = 20;
+    const overlap = 0;
+
+    // Thai (U+0E01)
+    const thaiDoc = 'ก'.repeat(80);
+    const thaiChunks = __testing__.splitRAGText(thaiDoc, size, overlap);
+    expect(thaiChunks.length).toBe(4);
+    for (const c of thaiChunks) {
+      expect([...c.text].length).toBeLessThanOrEqual(size);
+    }
+
+    // Cyrillic (U+0416)
+    const cyrDoc = 'Ж'.repeat(80);
+    const cyrChunks = __testing__.splitRAGText(cyrDoc, size, overlap);
+    expect(cyrChunks.length).toBe(4);
+    for (const c of cyrChunks) {
+      expect([...c.text].length).toBeLessThanOrEqual(size);
+    }
+
+    // ASCII letters (> 40 chars run)
+    const asciiDoc = 'a'.repeat(80);
+    const asciiChunks = __testing__.splitRAGText(asciiDoc, size, overlap);
+    expect(asciiChunks.length).toBe(4);
+    for (const c of asciiChunks) {
+      expect([...c.text].length).toBeLessThanOrEqual(size);
+    }
+
+    // Supplementary-plane CJK (U+20000, 2 UTF-16 code units per code point)
+    const supplCjk = String.fromCodePoint(0x20000).repeat(80);
+    const supplChunks = __testing__.splitRAGText(supplCjk, size, overlap);
+    expect(supplChunks.length).toBe(4);
+    for (const c of supplChunks) {
+      expect([...c.text].length).toBeLessThanOrEqual(size);
+    }
+  });
+
+  it('handles 140,000-code-point document without throwing RangeError', () => {
+    const largeDoc = '中'.repeat(140000);
+    const chunks = __testing__.splitRAGText(largeDoc, 20, 19);
+    expect(chunks.length).toBe(139981);
+    expect(chunks[0]!.text).toBe('中'.repeat(20));
+  });
+});
+
 function installBackendSpies() {
   // Cross-WASM RAG ranks chunks via commons `rac_embeddings_similarity`.
   // Register a math-only WASM stub so retrieval never fabricates cosine in TS.
