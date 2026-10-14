@@ -269,10 +269,17 @@ type ErrorLike = {
  * `rac_result_to_proto_error`, so when it is present the shared `categoryForCode`
  * table is not consulted at all.
  */
-function fromSerializedSdkError(value: unknown): SDKException | null {
+function fromSerializedSdkError(value: unknown, contextualMessage?: string): SDKException | null {
   if (!(value instanceof Uint8Array) || value.length === 0) return null;
   try {
-    return SDKException.fromProto(SDKError.decode(value));
+    const proto = SDKError.decode(value);
+    // Prefer the contextual message from make_rac_error (e.g. "ragClear failed: -42")
+    // over the generic proto message when the proto carries none, so operation details
+    // remain visible to the caller.
+    if (contextualMessage && !proto.message) {
+      proto.message = contextualMessage;
+    }
+    return SDKException.fromProto(proto);
   } catch {
     return null;
   }
@@ -367,7 +374,8 @@ export function asSDKException(error: unknown): SDKException {
   if (error instanceof SDKException) return error;
   if (error && typeof error === 'object') {
     const candidate = error as ErrorLike;
-    const structured = fromSerializedSdkError(candidate.sdkError);
+    const contextualMessage = stringValue(candidate.message);
+    const structured = fromSerializedSdkError(candidate.sdkError, contextualMessage);
     if (structured) return structured;
     const message =
       stringValue(candidate.message) ??
