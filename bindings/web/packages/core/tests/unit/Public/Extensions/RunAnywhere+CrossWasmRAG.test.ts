@@ -399,7 +399,17 @@ describe('splitRAGText (#1014)', () => {
     const thaiChunks = __testing__.splitRAGText(thaiDoc, size, overlap);
     expect(thaiChunks.length).toBe(4);
     for (const c of thaiChunks) {
-      expect([...c.text].length).toBeLessThanOrEqual(size);
+      expect(c.text).toBe('ก'.repeat(size));
+      expect([...c.text].length).toBe(size);
+    }
+
+    // Tibetan (U+0F40)
+    const tibetanDoc = 'ཀ'.repeat(80);
+    const tibetanChunks = __testing__.splitRAGText(tibetanDoc, size, overlap);
+    expect(tibetanChunks.length).toBe(4);
+    for (const c of tibetanChunks) {
+      expect(c.text).toBe('ཀ'.repeat(size));
+      expect([...c.text].length).toBe(size);
     }
 
     // Cyrillic (U+0416)
@@ -407,7 +417,8 @@ describe('splitRAGText (#1014)', () => {
     const cyrChunks = __testing__.splitRAGText(cyrDoc, size, overlap);
     expect(cyrChunks.length).toBe(4);
     for (const c of cyrChunks) {
-      expect([...c.text].length).toBeLessThanOrEqual(size);
+      expect(c.text).toBe('Ж'.repeat(size));
+      expect([...c.text].length).toBe(size);
     }
 
     // ASCII letters (> 40 chars run)
@@ -415,7 +426,8 @@ describe('splitRAGText (#1014)', () => {
     const asciiChunks = __testing__.splitRAGText(asciiDoc, size, overlap);
     expect(asciiChunks.length).toBe(4);
     for (const c of asciiChunks) {
-      expect([...c.text].length).toBeLessThanOrEqual(size);
+      expect(c.text).toBe('a'.repeat(size));
+      expect([...c.text].length).toBe(size);
     }
 
     // Supplementary-plane CJK (U+20000, 2 UTF-16 code units per code point)
@@ -423,8 +435,26 @@ describe('splitRAGText (#1014)', () => {
     const supplChunks = __testing__.splitRAGText(supplCjk, size, overlap);
     expect(supplChunks.length).toBe(4);
     for (const c of supplChunks) {
-      expect([...c.text].length).toBeLessThanOrEqual(size);
+      expect(c.text).toBe(String.fromCodePoint(0x20000).repeat(size));
+      expect([...c.text].length).toBe(size);
     }
+  });
+
+  it('splits 21-40 character whitespace-free ASCII and Cyrillic documents exceeding size', () => {
+    const size = 20;
+    const overlap = 0;
+
+    const asciiDoc30 = 'a'.repeat(30);
+    const asciiChunks = __testing__.splitRAGText(asciiDoc30, size, overlap);
+    expect(asciiChunks.length).toBe(2);
+    expect(asciiChunks[0]!.text).toBe('a'.repeat(20));
+    expect(asciiChunks[1]!.text).toBe('a'.repeat(10));
+
+    const cyrDoc30 = 'Ж'.repeat(30);
+    const cyrChunks = __testing__.splitRAGText(cyrDoc30, size, overlap);
+    expect(cyrChunks.length).toBe(2);
+    expect(cyrChunks[0]!.text).toBe('Ж'.repeat(20));
+    expect(cyrChunks[1]!.text).toBe('Ж'.repeat(10));
   });
 
   it('handles 140,000-code-point document without throwing RangeError', () => {
