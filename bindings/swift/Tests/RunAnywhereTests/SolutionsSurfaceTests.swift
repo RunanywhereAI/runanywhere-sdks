@@ -177,9 +177,13 @@ final class SolutionsSurfaceTests: XCTestCase {
         ])
         let ragConfig = try RARAGConfiguration(jsonUTF8Data: ragConfigData)
 
-        let nativeSession = try await CppBridge.RAG.shared.createPipeline(ragConfig)
+        // Hand the borrowed handle straight to the actor, which takes ownership:
+        // `RagSession.close()` calls `destroySession` itself, so there is no
+        // local `defer` to race with. Production does the same at
+        // RagNamespace.swift:56.
+        let nativeSession = try CppBridge.RAG.shared.createPipeline(ragConfig)
         let session = RagSession(handle: nativeSession, llmModelId: llmID, defaultTopK: 4)
-        defer { CppBridge.RAG.shared.destroySession(handle: nativeSession) }
+        defer { Task { await session.close() } }
 
         let document = """
         The Zephyr Protocol avoids transmitting duplicate data by assigning a
