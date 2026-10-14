@@ -212,8 +212,8 @@ final class SolutionsSurfaceTests: XCTestCase {
         var completionSubscription: AnyCancellable?
         completionSubscription = RunAnywhere.eventBus.ragEvents.sink { event in
             guard event.operationID == "rag.query",
-                  event.hasCapability,
-                  event.capability.kind.rawValue == 14 else { return }
+                  case .capability(let capability)? = event.event,
+                  capability.kind == .ragQueryCompleted else { return }
             queryCompleted.fulfill()
         }
         defer { completionSubscription?.cancel() }
