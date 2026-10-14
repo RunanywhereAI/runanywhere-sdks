@@ -13,8 +13,9 @@ namespace runanywhere {
 namespace rag {
 
 std::vector<SearchResult> fuse_rankings(const std::vector<std::vector<std::string>>& rankings,
-                                        const VectorStoreUSearch* vector_store, size_t top_k) {
-    static constexpr float kRRFConstant = 60.0f;
+                                        const VectorStoreUSearch* vector_store, size_t top_k,
+                                        int32_t rrf_k) {
+    const float kRRFConstant = rrf_k > 0 ? static_cast<float>(rrf_k) : 60.0f;
 
     std::unordered_map<std::string, float> rrf_scores;
     for (const auto& ranking : rankings) {

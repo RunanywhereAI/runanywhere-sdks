@@ -741,14 +741,29 @@ class RetrieveNode final : public OperatorNode {
           model_id_(spec.model_id()),
           retrieval_top_k_(param_int_or(spec, "k", 0)),
           similarity_threshold_(param_float_or(spec, "similarity_threshold", 0.0f)),
+          bm25_k1_(param_float_or(spec, "bm25_k1", 0.0f)),
+          bm25_b_(param_float_or(spec, "bm25_b", -1.0f)),
+          rrf_k_(param_int_or(spec, "rrf_k", 0)),
           has_session_handle_(param_uint64(spec, "session_handle_id", &session_handle_id_)) {
         if (const std::string* p = find_param(spec, "system_prompt"); p) {
             system_prompt_ = *p;
+        }
+        if (const std::string* vs = find_param(spec, "vector_store"); vs) {
+            vector_store_ = *vs;
         }
     }
 
    protected:
     void process(Item item, OutputEdge& out) override {
+        if (!vector_store_.empty()) {
+            if (vector_store_ == "VECTOR_STORE_PGVECTOR" || vector_store_ == "pgvector") {
+                set_error_detail(name(),
+                                 "VECTOR_STORE_PGVECTOR is not supported on-device; only "
+                                 "VECTOR_STORE_USEARCH is supported");
+                cancel_graph(this->cancel_token());
+                return;
+            }
+        }
         if (!has_session_handle_) {
             set_error_detail(name(),
                              "retrieve requires OperatorSpec.params['session_handle_id'] "
@@ -784,6 +799,21 @@ class RetrieveNode final : public OperatorNode {
         }
         if (similarity_threshold_ > 0.0f) {
             request.mutable_retrieval()->set_score_threshold(similarity_threshold_);
+        }
+        if (bm25_k1_ > 0.0f) {
+            request.mutable_retrieval()->set_bm25_k1(bm25_k1_);
+        }
+        if (bm25_b_ >= 0.0f) {
+            request.mutable_retrieval()->set_bm25_b(bm25_b_);
+        }
+        if (rrf_k_ > 0) {
+            request.mutable_retrieval()->set_rrf_k(rrf_k_);
+        }
+        if (!vector_store_.empty()) {
+            if (vector_store_ == "VECTOR_STORE_USEARCH" || vector_store_ == "usearch") {
+                request.mutable_retrieval()->set_vector_store(
+                    runanywhere::v1::VECTOR_STORE_USEARCH);
+            }
         }
         // Per the RAG service contract, retrieve does not generate. Setting
         // max_tokens to 0 still produces a RAGResult with retrieved_chunks
@@ -860,6 +890,10 @@ class RetrieveNode final : public OperatorNode {
     std::string model_id_;
     int retrieval_top_k_;
     float similarity_threshold_;
+    float bm25_k1_{0.0f};
+    float bm25_b_{-1.0f};
+    int rrf_k_{0};
+    std::string vector_store_;
     std::uint64_t session_handle_id_{0};
     bool has_session_handle_{false};
     std::string system_prompt_;

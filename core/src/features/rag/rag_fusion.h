@@ -27,7 +27,8 @@ namespace rag {
  * materialized (text + metadata) from `vector_store` when non-null.
  */
 std::vector<SearchResult> fuse_rankings(const std::vector<std::vector<std::string>>& rankings,
-                                        const VectorStoreUSearch* vector_store, size_t top_k);
+                                        const VectorStoreUSearch* vector_store, size_t top_k,
+                                        int32_t rrf_k = 60);
 
 /**
  * @brief Parse an LLM query-rewrite response into up to `count` variants.

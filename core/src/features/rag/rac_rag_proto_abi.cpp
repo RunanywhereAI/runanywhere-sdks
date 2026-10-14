@@ -319,12 +319,26 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
         bc.prompt_template = proto.prompt_template();
     bc.rerank = proto.rerank_results();
     bc.embedding_model_id = proto.embedding_model_id();
+    if (proto.has_bm25_k1() && proto.bm25_k1() > 0.0f)
+        bc.bm25_k1 = proto.bm25_k1();
+    if (proto.has_bm25_b() && proto.bm25_b() >= 0.0f)
+        bc.bm25_b = proto.bm25_b();
+    if (proto.has_rrf_k() && proto.rrf_k() > 0)
+        bc.rrf_k = proto.rrf_k();
     return bc;
 }
 
 bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
                                 std::string* out_message) {
     const RAGBackendConfig defaults;
+
+    if (proto.has_vector_store() &&
+        proto.vector_store() == runanywhere::v1::VECTOR_STORE_PGVECTOR) {
+        if (out_message)
+            *out_message =
+                "VECTOR_STORE_PGVECTOR is not supported on-device; only VECTOR_STORE_USEARCH is supported";
+        return false;
+    }
 
     if (proto.has_embedding_dimension() && proto.embedding_dimension() < 1) {
         if (out_message)
@@ -454,6 +468,20 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     }
     if (retrieval.has_scope_prefix())
         overrides.scope_prefix = retrieval.scope_prefix();
+
+    if (retrieval.has_vector_store() &&
+        retrieval.vector_store() == runanywhere::v1::VECTOR_STORE_PGVECTOR) {
+        if (out_error)
+            *out_error =
+                "VECTOR_STORE_PGVECTOR is not supported on-device; only VECTOR_STORE_USEARCH is supported";
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (retrieval.has_bm25_k1())
+        overrides.bm25_k1 = retrieval.bm25_k1();
+    if (retrieval.has_bm25_b())
+        overrides.bm25_b = retrieval.bm25_b();
+    if (retrieval.has_rrf_k())
+        overrides.rrf_k = retrieval.rrf_k();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.query", 0.0f, 1, 0, nullptr, 0.0,
@@ -640,6 +668,20 @@ rac_result_t execute_rag_search(const std::shared_ptr<Session>& s,
     }
     if (retrieval.has_scope_prefix())
         overrides.scope_prefix = retrieval.scope_prefix();
+
+    if (retrieval.has_vector_store() &&
+        retrieval.vector_store() == runanywhere::v1::VECTOR_STORE_PGVECTOR) {
+        if (out_error)
+            *out_error =
+                "VECTOR_STORE_PGVECTOR is not supported on-device; only VECTOR_STORE_USEARCH is supported";
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (retrieval.has_bm25_k1())
+        overrides.bm25_k1 = retrieval.bm25_k1();
+    if (retrieval.has_bm25_b())
+        overrides.bm25_b = retrieval.bm25_b();
+    if (retrieval.has_rrf_k())
+        overrides.rrf_k = retrieval.rrf_k();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.search", 0.0f, 1, 0, nullptr, 0.0, s->embedding_model_id.c_str());

@@ -1935,6 +1935,39 @@ int test_rag_search_retrieval_only() {
     CHECK(query_result.answer() == "mock answer", "rag.query still invokes the LLM");
     rac_proto_buffer_free(&out);
 
+    // VECTOR_STORE_PGVECTOR rejection check at session create and search
+    runanywhere::v1::RAGConfiguration pgvector_config = full_config;
+    pgvector_config.set_vector_store(runanywhere::v1::VECTOR_STORE_PGVECTOR);
+    std::vector<uint8_t> pgv_bytes;
+    CHECK(serialize(pgvector_config, &pgv_bytes), "pgvector RAGConfiguration serializes");
+    rac_handle_t pgv_session = nullptr;
+    rc = rac_rag_session_create_proto(pgv_bytes.data(), pgv_bytes.size(), &pgv_session);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "VECTOR_STORE_PGVECTOR is rejected at session creation");
+
+    runanywhere::v1::RAGSearchRequest pgv_search;
+    pgv_search.set_query("Where does RAG live?");
+    pgv_search.mutable_retrieval()->set_vector_store(runanywhere::v1::VECTOR_STORE_PGVECTOR);
+    std::vector<uint8_t> pgv_search_bytes;
+    CHECK(serialize(pgv_search, &pgv_search_bytes), "pgvector search request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(full_session, pgv_search_bytes.data(), pgv_search_bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_NOT_SUPPORTED, "VECTOR_STORE_PGVECTOR is rejected in rag.search");
+    rac_proto_buffer_free(&out);
+
+    // BM25 and RRF retrieval tuning options are accepted on RAGSearchRequest
+    runanywhere::v1::RAGSearchRequest tuned_search;
+    tuned_search.set_query("Where does RAG live?");
+    tuned_search.mutable_retrieval()->set_vector_store(runanywhere::v1::VECTOR_STORE_USEARCH);
+    tuned_search.mutable_retrieval()->set_bm25_k1(1.5f);
+    tuned_search.mutable_retrieval()->set_bm25_b(0.8f);
+    tuned_search.mutable_retrieval()->set_rrf_k(30);
+    std::vector<uint8_t> tuned_search_bytes;
+    CHECK(serialize(tuned_search, &tuned_search_bytes), "tuned RAGSearchRequest serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(full_session, tuned_search_bytes.data(), tuned_search_bytes.size(), &out);
+    CHECK(rc == RAC_SUCCESS, "rag.search with custom BM25/RRF params succeeds");
+    rac_proto_buffer_free(&out);
+
     rac_rag_session_destroy_proto(full_session);
     (void)rac_plugin_unregister("onnx");
     (void)rac_plugin_unregister("llamacpp");

@@ -1375,6 +1375,46 @@ TEST(retrieve_without_session_handle_fails_honestly) {
 }
 
 // ---------------------------------------------------------------------------
+// 13b. RetrieveNode rejects VECTOR_STORE_PGVECTOR honestly.
+// ---------------------------------------------------------------------------
+TEST(retrieve_pgvector_is_rejected) {
+    rac_solutions_ensure_engine_backed_operators_registered();
+    auto& registry = OperatorRegistry::instance();
+
+    PipelineSpec spec;
+    spec.set_name("retrieve_pgvector_rejection");
+    auto* src = spec.add_operators();
+    src->set_name("query");
+    src->set_type("source");
+    auto* retrieve = spec.add_operators();
+    retrieve->set_name("retrieve");
+    retrieve->set_type("retrieve");
+    (*retrieve->mutable_params())["session_handle_id"] = "12345";
+    (*retrieve->mutable_params())["vector_store"] = "VECTOR_STORE_PGVECTOR";
+    auto* sink = spec.add_operators();
+    sink->set_name("ctx");
+    sink->set_type("sink");
+    auto* e1 = spec.add_edges();
+    e1->set_from("query.out");
+    e1->set_to("retrieve.in");
+    auto* e2 = spec.add_edges();
+    e2->set_from("retrieve.results");
+    e2->set_to("ctx.in");
+
+    SolutionRunner runner(spec);
+    CHECK(runner.start() == RAC_SUCCESS);
+    CHECK(runner.feed(Item::text("why is the sky blue?")) == RAC_SUCCESS);
+    runner.wait();
+    const char* details = rac_error_get_details();
+    CHECK(details != nullptr);
+    CHECK(std::string(details).find("VECTOR_STORE_PGVECTOR is not supported on-device") !=
+          std::string::npos);
+
+    registry.unregister_factory("retrieve");
+    rac::solutions::register_builtin_operators(registry);
+}
+
+// ---------------------------------------------------------------------------
 // 14. Null / invalid handle paths.
 // ---------------------------------------------------------------------------
 TEST(null_handle_paths) {
@@ -1422,6 +1462,7 @@ int main() {
     run_test_c_abi_yaml_solution_lifecycle();
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();
+    run_test_retrieve_pgvector_is_rejected();
     run_test_null_handle_paths();
 
     std::fprintf(stderr, "\n%d passed / %d failed\n", g_passed, g_failed);

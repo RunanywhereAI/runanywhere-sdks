@@ -71,6 +71,19 @@ int main() {
               "fused score normalized to (0,1]");
     }
 
+    // --- custom rrf_k alters score decay and ranking weights ---
+    {
+        // Compare ranking score ratio between rank 1 and rank 2 under default rrf_k (60) vs small rrf_k (1).
+        // For rrf_k=60: rank1 = 1/61, rank2 = 1/62. Ratio = 62/61 ~= 1.016
+        // For rrf_k=1:  rank1 = 1/2,  rank2 = 1/3.  Ratio = 3/2  = 1.5
+        auto f_def = fuse_rankings({{"first", "second"}}, nullptr, 10, 60);
+        auto f_low = fuse_rankings({{"first", "second"}}, nullptr, 10, 1);
+        CHECK(f_def.size() == 2 && f_low.size() == 2, "rrf_k returns both items");
+        float ratio_def = f_def[0].score / f_def[1].score;
+        float ratio_low = f_low[0].score / f_low[1].score;
+        CHECK(ratio_low > ratio_def + 0.3f, "lower rrf_k gives steeper rank decay");
+    }
+
     // --- empty input ---
     {
         auto f = fuse_rankings({}, nullptr, 10);
