@@ -132,12 +132,14 @@ RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes
                                                     rac_proto_buffer_t* out_cluster_state);
 
 /**
- * Validate and route an intermediate activation tensor payload between
- * pipeline stages. Accepts ClusterActivation and verifies cluster/session binding.
+ * Validate an intermediate activation tensor payload between pipeline stages.
+ * Accepts ClusterActivation and verifies cluster binding, tensor dimensions,
+ * and valid layer boundaries. (Validation only; transport occurs out-of-band).
  */
-RAC_API rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
-                                                                   size_t request_size,
-                                                                   rac_proto_buffer_t* out_validation);
+RAC_API rac_result_t
+rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
+                                              size_t request_size,
+                                              rac_proto_buffer_t* out_validation);
 
 #ifdef __cplusplus
 }

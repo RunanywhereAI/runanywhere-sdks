@@ -202,6 +202,73 @@ rac_result_t reject_handshake(const HostRuntime& host, const char* reason,
     return serialize_message(response, out_response);
 }
 
+struct ClusterRuntime {
+    bool is_active = false;
+    std::string cluster_id;
+    v1::ConnectModelDescriptor model;
+    std::vector<v1::ClusterLayerAssignment> assignments;
+    std::unordered_map<std::string, v1::ClusterLayerAssignment> peer_assignments;
+};
+
+ClusterRuntime& cluster_runtime() {
+    static ClusterRuntime instance;
+    return instance;
+}
+
+bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
+                                std::string* out_rejection_reason) {
+    if (assignments.empty()) {
+        if (out_rejection_reason != nullptr) {
+            *out_rejection_reason = "Cluster must have at least one layer assignment";
+        }
+        return false;
+    }
+
+    std::unordered_set<std::string> seen_instance_ids;
+    std::vector<v1::ClusterLayerAssignment> sorted_assignments;
+    sorted_assignments.reserve(assignments.size());
+
+    for (int i = 0; i < assignments.size(); ++i) {
+        const v1::ClusterLayerAssignment& assignment = assignments[i];
+        if (assignment.instance_id().empty()) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Peer assignment has empty instance_id";
+            }
+            return false;
+        }
+        if (!seen_instance_ids.insert(assignment.instance_id()).second) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Duplicate instance_id in cluster assignment";
+            }
+            return false;
+        }
+        if (assignment.layer_end() <= assignment.layer_start()) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Invalid layer range: layer_end must be greater than layer_start";
+            }
+            return false;
+        }
+        sorted_assignments.push_back(assignment);
+    }
+
+    std::sort(sorted_assignments.begin(), sorted_assignments.end(),
+              [](const v1::ClusterLayerAssignment& a, const v1::ClusterLayerAssignment& b) {
+                  return a.layer_start() < b.layer_start();
+              });
+
+    uint32_t expected_start = 0;
+    for (const auto& assignment : sorted_assignments) {
+        if (assignment.layer_start() != expected_start) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Layer range gap or mismatch in cluster assignment";
+            }
+            return false;
+        }
+        expected_start = assignment.layer_end();
+    }
+    return true;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -637,75 +704,6 @@ rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* request_bytes
  * Cluster Orchestration Implementations (Issue #541)
  * =========================================================================== */
 
-#if defined(RAC_HAVE_PROTOBUF)
-struct ClusterRuntime {
-    bool is_active = false;
-    std::string cluster_id;
-    v1::ConnectModelDescriptor model;
-    std::vector<v1::ClusterLayerAssignment> assignments;
-    std::unordered_map<std::string, v1::ClusterLayerAssignment> peer_assignments;
-};
-
-ClusterRuntime& cluster_runtime() {
-    static ClusterRuntime instance;
-    return instance;
-}
-
-bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
-                                std::string* out_rejection_reason) {
-    if (assignments.empty()) {
-        if (out_rejection_reason != nullptr) {
-            *out_rejection_reason = "Cluster must have at least one layer assignment";
-        }
-        return false;
-    }
-
-    std::unordered_set<std::string> seen_instance_ids;
-    std::vector<v1::ClusterLayerAssignment> sorted_assignments;
-    sorted_assignments.reserve(assignments.size());
-
-    for (int i = 0; i < assignments.size(); ++i) {
-        const v1::ClusterLayerAssignment& assignment = assignments[i];
-        if (assignment.instance_id().empty()) {
-            if (out_rejection_reason != nullptr) {
-                *out_rejection_reason = "Peer assignment has empty instance_id";
-            }
-            return false;
-        }
-        if (!seen_instance_ids.insert(assignment.instance_id()).second) {
-            if (out_rejection_reason != nullptr) {
-                *out_rejection_reason = "Duplicate instance_id in cluster assignment";
-            }
-            return false;
-        }
-        if (assignment.layer_end() <= assignment.layer_start()) {
-            if (out_rejection_reason != nullptr) {
-                *out_rejection_reason = "Invalid layer range: layer_end must be greater than layer_start";
-            }
-            return false;
-        }
-        sorted_assignments.push_back(assignment);
-    }
-
-    std::sort(sorted_assignments.begin(), sorted_assignments.end(),
-              [](const v1::ClusterLayerAssignment& a, const v1::ClusterLayerAssignment& b) {
-                  return a.layer_start() < b.layer_start();
-              });
-
-    uint32_t expected_start = 0;
-    for (const auto& assignment : sorted_assignments) {
-        if (assignment.layer_start() != expected_start) {
-            if (out_rejection_reason != nullptr) {
-                *out_rejection_reason = "Layer range gap or mismatch in cluster assignment";
-            }
-            return false;
-        }
-        expected_start = assignment.layer_end();
-    }
-    return true;
-}
-#endif
-
 rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
                                              size_t request_size,
                                              rac_proto_buffer_t* out_cluster_state) {
@@ -950,7 +948,7 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
         // Activation tensors carry floating-point activations (typically FP16 / BF16 at 2 bytes per
         // element or FP32 at 4 bytes per element; minimum 2 bytes per element).
         const uint64_t min_elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
-        const uint64_t min_bytes = min_elements * 2;
+        const uint64_t min_bytes = min_elements > UINT64_MAX / 2 ? UINT64_MAX : min_elements * 2;
         if (!valid_boundary) {
             validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
         } else if (request.tensor_data().size() < min_bytes) {
