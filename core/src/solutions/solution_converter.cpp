@@ -72,11 +72,13 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSp
         (*llm->mutable_params())["temperature"] = std::to_string(cfg.generation().temperature());
     }
     (*tts->mutable_params())["emit_partials"] = cfg.emit_partials() ? "true" : "false";
-    // Barge-in is detected on the VAD side (user speech arriving while the
-    // assistant is talking), which is why these ride the vad op alongside
-    // sample_rate_hz/chunk_ms rather than tts. config_loader.cpp parses both
-    // out of the solution YAML, so without forwarding them here a caller's
-    // `enable_barge_in: false` reaches the proto and then stops.
+    // Barge-in parameters (enable_barge_in, barge_in_threshold_ms) are forwarded
+    // to the VAD operator params to preserve configuration across conversion.
+    // Note: in the solutions graph pipeline, DetectVoiceNode acts solely as a speech
+    // gate and has no visibility into TTS playback state; full echo-margin barge-in
+    // interruption is handled by the canonical rac_voice_agent feed pipeline
+    // (voice_agent_feed_abi.cpp). These keys are currently inert in graph execution
+    // and omitted from the public solution YAML surface.
     if (cfg.has_enable_barge_in()) {
         (*vad->mutable_params())["enable_barge_in"] = cfg.enable_barge_in() ? "true" : "false";
     }
