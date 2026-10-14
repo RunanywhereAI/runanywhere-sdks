@@ -166,6 +166,14 @@ def test_readme_pin_with_a_prerelease_suffix_is_rejected(tmp_path):
     assert f"found 'runanywhere=={version}-rc.1'" in result.stderr
 
 
+def test_readme_pin_with_an_attached_prerelease_suffix_is_rejected(tmp_path):
+    # PEP 440 attaches the suffix with no separator; a prefix match would pass it.
+    version = _core_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}rc1")
+    assert result.returncode == 1
+    assert f"found 'runanywhere=={version}rc1'" in result.stderr
+
+
 def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
     # A shape with no match means the README was reworded under the gate, which
     # would otherwise stop checking that install command without saying so.

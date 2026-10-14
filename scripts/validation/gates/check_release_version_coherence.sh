@@ -462,7 +462,7 @@ for readme_pin in \
   '@runanywhere/[a-z-]+@' \
   'runanywhere==' \
   'version line, currently \*\*'; do
-  readme_pins="$(grep -Eo -- "${readme_pin}[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?" "${REPO_ROOT}/README.md" || true)"
+  readme_pins="$(grep -Eo -- "${readme_pin}[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9.-]+)?" "${REPO_ROOT}/README.md" || true)"
   if [ -z "${readme_pins}" ]; then
     echo "[FAIL] README.md: no version pin matches '${readme_pin}'" >&2
     FAILURES=$((FAILURES + 1))

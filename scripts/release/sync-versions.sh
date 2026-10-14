@@ -594,7 +594,7 @@ for readme_pin in \
     'runanywhere==' \
     'version line, currently \*\*'; do
     bump_all_on_line "${REPO_ROOT}/README.md" \
-        "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?" \
+        "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9.-]+)?" \
         "\\1${NEW_VERSION}"
 done
 
