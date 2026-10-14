@@ -839,7 +839,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                         "ModelLoadRequest.context_length=" +
                         std::to_string(requested_context_length) + " is not verified for model '" +
                         request.model_id() + "' (effective context_length=" + resident_label +
-                        "); the resident model was preserved";
+                        "); the resident model was preserved; retry with force_reload=true to recreate it";
                     ModelLoadResult result = detail::make_load_result(
                         false, existing->second->model_id, existing->second->category,
                         existing->second->framework, existing->second->resolved_path,
