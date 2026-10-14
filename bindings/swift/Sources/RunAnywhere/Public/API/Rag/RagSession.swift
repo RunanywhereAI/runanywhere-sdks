@@ -198,6 +198,15 @@ public actor RagSession {
         CppBridge.RAG.shared.destroySession(handle: handle)
     }
 
+    /// Borrow the native session token for another in-process commons API.
+    ///
+    /// Used by `SolutionHandle.attachRagSession(_:)`; ownership remains with
+    /// this actor and callers must not destroy the returned handle.
+    internal func nativeHandleForSolution() throws -> rac_handle_t {
+        try requireOpen()
+        return handle
+    }
+
     // MARK: - Private
 
     private func queryOptions(question: String, options: RagQueryOptions?) -> RARAGQueryOptions {
