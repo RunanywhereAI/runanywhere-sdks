@@ -974,9 +974,11 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
     } else if (request.seq_len() == 0 || request.hidden_size() == 0) {
         validation.set_rejection_reason("Invalid activation tensor dimensions (seq_len/hidden_size zero)");
     } else {
-        bool valid_boundary = (request.from_layer() == 0);
+        // An activation is the handoff out of a real stage, so layer 0 (the first stage's input) is never a
+        // valid source boundary.
+        bool valid_boundary = false;
         for (const auto& a : cluster.assignments) {
-            if (request.from_layer() == a.layer_start()) {
+            if (a.layer_start() > 0 && request.from_layer() == a.layer_start()) {
                 valid_boundary = true;
                 break;
             }
