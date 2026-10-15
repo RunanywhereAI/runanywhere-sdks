@@ -328,6 +328,25 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
     return bc;
 }
 
+// Rejects non-finite or out-of-range BM25 / RRF tuning values at the ABI boundary:
+// b outside [0, 1] or an infinite k1 makes every BM25 score drop out of the
+// `score > 0` filter (negative or NaN), which would silently return no hits.
+bool validate_bm25_rrf_params(bool has_k1, float k1, bool has_b, float b, bool has_rrf_k,
+                              int32_t rrf_k, const char* owner, std::string* out_message) {
+    const auto fail = [&](const char* detail) {
+        if (out_message)
+            *out_message = std::string(owner) + "." + detail;
+        return false;
+    };
+    if (has_k1 && (!std::isfinite(k1) || k1 < 0.0f))
+        return fail("bm25_k1 must be a finite value >= 0");
+    if (has_b && (!std::isfinite(b) || b < 0.0f || b > 1.0f))
+        return fail("bm25_b must be a finite value in 0.0...1.0");
+    if (has_rrf_k && rrf_k < 0)
+        return fail("rrf_k must be >= 0");
+    return true;
+}
+
 bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
                                 std::string* out_message) {
     const RAGBackendConfig defaults;
@@ -387,7 +406,9 @@ bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
         return false;
     }
 
-    return true;
+    return validate_bm25_rrf_params(proto.has_bm25_k1(), proto.bm25_k1(), proto.has_bm25_b(),
+                                    proto.bm25_b(), proto.has_rrf_k(), proto.rrf_k(),
+                                    "RAGConfiguration", out_message);
 }
 
 runanywhere::v1::RAGStatistics make_stats(RAGBackend& backend) {
@@ -475,6 +496,12 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
             *out_error =
                 "VECTOR_STORE_PGVECTOR is not supported on-device; only VECTOR_STORE_USEARCH is supported";
         return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (!validate_bm25_rrf_params(retrieval.has_bm25_k1(), retrieval.bm25_k1(),
+                                  retrieval.has_bm25_b(), retrieval.bm25_b(),
+                                  retrieval.has_rrf_k(), retrieval.rrf_k(),
+                                  "RAGRetrievalOptions", out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
     }
     if (retrieval.has_bm25_k1())
         overrides.bm25_k1 = retrieval.bm25_k1();
@@ -675,6 +702,12 @@ rac_result_t execute_rag_search(const std::shared_ptr<Session>& s,
             *out_error =
                 "VECTOR_STORE_PGVECTOR is not supported on-device; only VECTOR_STORE_USEARCH is supported";
         return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (!validate_bm25_rrf_params(retrieval.has_bm25_k1(), retrieval.bm25_k1(),
+                                  retrieval.has_bm25_b(), retrieval.bm25_b(),
+                                  retrieval.has_rrf_k(), retrieval.rrf_k(),
+                                  "RAGRetrievalOptions", out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
     }
     if (retrieval.has_bm25_k1())
         overrides.bm25_k1 = retrieval.bm25_k1();

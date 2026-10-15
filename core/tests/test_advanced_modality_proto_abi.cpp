@@ -1968,6 +1968,25 @@ int test_rag_search_retrieval_only() {
     CHECK(rc == RAC_SUCCESS, "rag.search with custom BM25/RRF params succeeds");
     rac_proto_buffer_free(&out);
 
+    // Out-of-range / non-finite BM25 tuning is rejected, not silently dropped at scoring.
+    runanywhere::v1::RAGSearchRequest bad_b_search = tuned_search;
+    bad_b_search.mutable_retrieval()->set_bm25_b(100.0f);
+    std::vector<uint8_t> bad_b_bytes;
+    CHECK(serialize(bad_b_search, &bad_b_bytes), "bm25_b out-of-range request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(full_session, bad_b_bytes.data(), bad_b_bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "rag.search rejects bm25_b outside [0, 1]");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGSearchRequest inf_k1_search = tuned_search;
+    inf_k1_search.mutable_retrieval()->set_bm25_k1(std::numeric_limits<float>::infinity());
+    std::vector<uint8_t> inf_k1_bytes;
+    CHECK(serialize(inf_k1_search, &inf_k1_bytes), "bm25_k1 infinite request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(full_session, inf_k1_bytes.data(), inf_k1_bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "rag.search rejects non-finite bm25_k1");
+    rac_proto_buffer_free(&out);
+
     rac_rag_session_destroy_proto(full_session);
     (void)rac_plugin_unregister("onnx");
     (void)rac_plugin_unregister("llamacpp");

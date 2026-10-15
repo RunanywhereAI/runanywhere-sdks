@@ -1418,6 +1418,62 @@ TEST(retrieve_pgvector_is_rejected) {
 }
 
 // ---------------------------------------------------------------------------
+// 13c. RetrieveNode rejects malformed numeric params and unknown vector stores
+//      instead of falling back to defaults.
+// ---------------------------------------------------------------------------
+TEST(retrieve_rejects_malformed_params) {
+    auto& registry = OperatorRegistry::instance();
+    static_cast<void>(rac::solutions::register_engine_backed_operators(registry));
+
+    struct Case {
+        const char* key;
+        const char* value;
+        const char* expected;
+    };
+    const Case cases[] = {
+        {"k", "30junk", "fully-numeric"},
+        {"bm25_k1", "0,8", "fully-numeric"},
+        {"bm25_k1", "inf", "fully-numeric"},
+        {"bm25_b", "100", "0.0...1.0"},
+        {"rrf_k", "-5", "rrf_k"},
+        {"vector_store", "PGVECTOR", "unknown vector_store"},
+        {"vector_store", "usearch ", "unknown vector_store"},
+    };
+    for (const Case& c : cases) {
+        PipelineSpec spec;
+        spec.set_name("retrieve_param_rejection");
+        auto* src = spec.add_operators();
+        src->set_name("query");
+        src->set_type("source");
+        auto* retrieve = spec.add_operators();
+        retrieve->set_name("retrieve");
+        retrieve->set_type("retrieve");
+        (*retrieve->mutable_params())["session_handle_id"] = "12345";
+        (*retrieve->mutable_params())[c.key] = c.value;
+        auto* sink = spec.add_operators();
+        sink->set_name("ctx");
+        sink->set_type("sink");
+        auto* e1 = spec.add_edges();
+        e1->set_from("query.out");
+        e1->set_to("retrieve.in");
+        auto* e2 = spec.add_edges();
+        e2->set_from("retrieve.results");
+        e2->set_to("ctx.in");
+
+        SolutionRunner runner(spec);
+        CHECK(runner.start() == RAC_SUCCESS);
+        CHECK(runner.feed(Item::text("why is the sky blue?")) == RAC_SUCCESS);
+        runner.wait();
+        const char* details = rac_error_get_details();
+        CHECK(details != nullptr);
+        CHECK(std::string(details).find(c.expected) != std::string::npos);
+    }
+
+    registry.unregister_factory("retrieve");
+    rac::solutions::register_builtin_operators(registry);
+}
+
+// ---------------------------------------------------------------------------
 // 14. Null / invalid handle paths.
 // ---------------------------------------------------------------------------
 TEST(null_handle_paths) {
@@ -1466,6 +1522,7 @@ int main() {
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();
     run_test_retrieve_pgvector_is_rejected();
+    run_test_retrieve_rejects_malformed_params();
     run_test_null_handle_paths();
 
     std::fprintf(stderr, "\n%d passed / %d failed\n", g_passed, g_failed);

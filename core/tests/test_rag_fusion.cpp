@@ -13,8 +13,10 @@
 #include <string>
 #include <vector>
 
+#include "features/rag/bm25_index.h"
 #include "features/rag/rag_fusion.h"
 
+using runanywhere::rag::BM25Index;
 using runanywhere::rag::fuse_rankings;
 using runanywhere::rag::parse_query_variants;
 using runanywhere::rag::SearchResult;
@@ -69,6 +71,22 @@ int main() {
         auto f = fuse_rankings({{"a"}, {"a"}}, nullptr, 10);
         CHECK(f.size() == 1 && f[0].score > 0.0f && f[0].score <= 1.0f,
               "fused score normalized to (0,1]");
+    }
+
+    // --- bm25_k1 / bm25_b measurably change BM25 scores ---
+    {
+        BM25Index index;
+        index.add_chunk("short", "apple apple apple");
+        index.add_chunk("long", "apple banana cherry date elder fig grape honey iris jade kiwi lime");
+        const auto base = index.search("apple", 2, 1.2f, 0.75f);
+        const auto high_k1 = index.search("apple", 2, 3.0f, 0.75f);
+        const auto no_len_norm = index.search("apple", 2, 1.2f, 0.0f);
+        CHECK(base.size() == 2 && high_k1.size() == 2 && no_len_norm.size() == 2,
+              "BM25 returns both matching chunks");
+        CHECK(base[0].first == "short" && base[0].second != high_k1[0].second,
+              "bm25_k1 changes the term-frequency saturation score");
+        CHECK(base[1].second != no_len_norm[1].second,
+              "bm25_b changes the document-length normalization score");
     }
 
     // --- custom rrf_k alters score decay and ranking weights ---
