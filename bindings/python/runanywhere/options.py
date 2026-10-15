@@ -77,12 +77,17 @@ class StructuredOutput:
 
     schema: JsonSchema
     strict: bool = True
+    mode: "StructuredOutputMode" = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.mode is None:
+            self.mode = StructuredOutputMode.CONSTRAINED
 
 
 class StructuredOutputMode(IntEnum):
     """Enforcement level ``llm.generate_structured`` applies to its schema."""
 
-    #: Engine-constrained decoding; fails preflight until wired in.
+    #: Engine-constrained decoding (GBNF grammar sampling).
     CONSTRAINED = 0
     #: Generate freely, then validate against the schema.
     VALIDATION_ONLY = 1
