@@ -298,6 +298,8 @@ void test_cluster_orchestration() {
     d1->set_instance_id("peer-1");
     d1->set_layer_start(0);
     d1->set_layer_end(16);
+    // A valid coordinator, so the duplicate id is the only thing that can fail this start.
+    d1->set_is_coordinator(true);
     auto* d2 = dup_request.add_assignments();
     d2->set_instance_id("peer-1");
     d2->set_layer_start(16);
@@ -340,7 +342,8 @@ void test_cluster_orchestration() {
     n2->set_layer_start(16);
     n2->set_layer_end(32);
     v1::ClusterState no_coordinator_state;
-    CHECK(call_proto(rac_connect_cluster_start_proto, no_coordinator_request, &no_coordinator_state) == RAC_ERROR_INVALID_ARGUMENT,
+    CHECK(call_proto(rac_connect_cluster_start_proto, no_coordinator_request,
+                     &no_coordinator_state) == RAC_ERROR_INVALID_ARGUMENT,
           "Cluster start rejects an assignment set with no coordinator");
 
     v1::ClusterStartRequest two_coordinators_request = no_coordinator_request;
@@ -348,7 +351,8 @@ void test_cluster_orchestration() {
     two_coordinators_request.mutable_assignments(0)->set_is_coordinator(true);
     two_coordinators_request.mutable_assignments(1)->set_is_coordinator(true);
     v1::ClusterState two_coordinators_state;
-    CHECK(call_proto(rac_connect_cluster_start_proto, two_coordinators_request, &two_coordinators_state) == RAC_ERROR_INVALID_ARGUMENT,
+    CHECK(call_proto(rac_connect_cluster_start_proto, two_coordinators_request,
+                     &two_coordinators_state) == RAC_ERROR_INVALID_ARGUMENT,
           "Cluster start rejects an assignment set with several coordinators");
 
     // 4. Valid cluster start with unordered assignments: [16, 32) then [0, 16)
@@ -412,7 +416,8 @@ void test_cluster_orchestration() {
 
     // 7a. The accepted peer's capability is retrievable from cluster state
     v1::ClusterState state_after_join;
-    CHECK(call_proto(rac_connect_cluster_start_proto, valid_request, &state_after_join) == RAC_SUCCESS,
+    CHECK(call_proto(rac_connect_cluster_start_proto, valid_request, &state_after_join) ==
+              RAC_SUCCESS,
           "Cluster state is readable after a peer joins");
     CHECK(state_after_join.peer_capabilities_size() == 1 &&
               state_after_join.peer_capabilities(0).instance_id() == "android-snapdragon" &&

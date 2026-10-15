@@ -217,8 +217,9 @@ ClusterRuntime& cluster_runtime() {
     return instance;
 }
 
-bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
-                                std::string* out_rejection_reason) {
+bool validate_layer_assignments(
+    const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
+    std::string* out_rejection_reason) {
     if (assignments.empty()) {
         if (out_rejection_reason != nullptr) {
             *out_rejection_reason = "Cluster must have at least one layer assignment";
