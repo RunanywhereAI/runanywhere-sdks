@@ -1079,8 +1079,20 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                     if (args_status == ToolParseStatus::kSuccess) {
                         std::unique_ptr<char, decltype(&std::free)> owned_args_value(args_value,
                                                                                     &std::free);
+                        json decoded_args;
                         if (args_kind == JSON_VALUE_OBJECT) {
                             *out_args_json = owned_args_value.release();
+                        } else if (in_envelope && args_kind == JSON_VALUE_STRING &&
+                                   parse_json_value(owned_args_value.get(), &decoded_args) &&
+                                   decoded_args.is_object()) {
+                            // OpenAI's function envelope carries arguments as a JSON-encoded
+                            // string: {"function":{"name":...,"arguments":"{\"city\":...}"}}
+                            *out_args_json = dup_owned_string(decoded_args.dump());
+                            if (!*out_args_json) {
+                                free(*out_tool_name);
+                                *out_tool_name = nullptr;
+                                return ToolParseStatus::kOutOfMemory;
+                            }
                         } else {
                             // Wrap scalar/array/string in {"input": value} - escape the value for
                             // valid JSON

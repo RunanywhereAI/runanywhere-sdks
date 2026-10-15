@@ -97,22 +97,29 @@ int test_parse_default_nested_keys_stay_arguments() {
     struct Case {
         const char* input;
         const char* tool_name;
-        const char* args_substr;
+        const char* arguments_json;
     };
     const Case cases[] = {
         // Hermes / Qwen native shape, tool with a `name` parameter
         {R"(<tool_call>{"name":"create_contact","arguments":{"name":"Alice"}}</tool_call>)",
-         "create_contact", R"("name":"Alice")"},
+         "create_contact", R"({"name":"Alice"})"},
         // the shape the default prompt asks for, tool with a `tool` parameter
         {R"(<tool_call>{"tool":"run_command","arguments":{"tool":"git"}}</tool_call>)",
-         "run_command", R"("tool":"git")"},
+         "run_command", R"({"tool":"git"})"},
         // flat arguments: a nested `input` is not the argument wrapper
         {R"(<tool_call>{"tool":"translate","text":"hi","options":{"input":"en"}}</tool_call>)",
-         "translate", R"("text":"hi")"},
-        // OpenAI-style envelope still resolves one level down
+         "translate", R"({"options":{"input":"en"},"text":"hi"})"},
+        // OpenAI-style envelope resolves one level down
         {R"(<tool_call>{"type":"function",)"
          R"("function":{"name":"get_weather","arguments":{"city":"Paris"}}}</tool_call>)",
-         "get_weather", R"("city":"Paris")"},
+         "get_weather", R"({"city":"Paris"})"},
+        // ...including its JSON-encoded string arguments
+        {R"(<tool_call>{"type":"function",)"
+         R"("function":{"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}</tool_call>)",
+         "get_weather", R"({"city":"Paris"})"},
+        // outside the envelope a string argument is still wrapped, not decoded
+        {R"(<tool_call>{"tool":"echo","arguments":"{\"a\":1}"}</tool_call>)", "echo",
+         R"({"input":"{\"a\":1}"})"},
     };
     for (const Case& c : cases) {
         rac_tool_call_t result;
@@ -120,7 +127,7 @@ int test_parse_default_nested_keys_stay_arguments() {
         ASSERT_EQ_INT(rc, RAC_SUCCESS);
         ASSERT_EQ_INT(result.has_tool_call, RAC_TRUE);
         ASSERT_EQ_STR(result.tool_name, c.tool_name);
-        ASSERT_SUBSTR(result.arguments_json, c.args_substr);
+        ASSERT_EQ_STR(result.arguments_json, c.arguments_json);
         rac_tool_call_free(&result);
     }
     return 0;
