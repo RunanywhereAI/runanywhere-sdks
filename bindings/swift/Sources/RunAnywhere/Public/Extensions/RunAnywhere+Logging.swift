@@ -6,6 +6,8 @@
 //
 
 
+import CRACommons
+
 extension RunAnywhere {
 
     // MARK: - Logging Configuration
@@ -14,6 +16,7 @@ extension RunAnywhere {
     /// - Parameter config: The logging configuration to apply
     public static func configureLogging(_ config: RALoggingConfiguration) {
         Logging.shared.configure(config)
+        rac_logger_set_min_level(config.minLogLevel.racLogLevel)
     }
 
     /// Enable or disable local console logging
@@ -22,10 +25,11 @@ extension RunAnywhere {
         Logging.shared.setLocalLoggingEnabled(enabled)
     }
 
-    /// Set minimum log level for SDK logging
+    /// Set minimum log level for SDK logging and synchronize with the C++ commons logger
     /// - Parameter level: Minimum log level to capture
     public static func setLogLevel(_ level: RALogLevel) {
         Logging.shared.setMinLogLevel(level)
+        rac_logger_set_min_level(level.racLogLevel)
     }
 
     /// Add a custom log destination
