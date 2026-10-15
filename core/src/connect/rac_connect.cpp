@@ -1005,9 +1005,12 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
         } else if (element_size == 0) {
             validation.set_rejection_reason("Activation dtype is unspecified or unknown");
         } else if (size_overflows) {
-            validation.set_rejection_reason("Activation tensor dimensions overflow the expected byte count");
+            validation.set_rejection_reason(
+                "Activation tensor dimensions overflow the expected byte count");
         } else if (request.tensor_data().size() != elements * element_size) {
-            validation.set_rejection_reason("Activation tensor_data size does not equal seq_len * hidden_size * element size for dtype");
+            validation.set_rejection_reason(
+                "Activation tensor_data size does not equal seq_len * hidden_size * element size "
+                "for dtype");
         } else {
             validation.set_accepted(true);
         }

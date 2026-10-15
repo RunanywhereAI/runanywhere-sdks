@@ -269,7 +269,8 @@ message ClusterStartResponse {
 }
 
 // Element format of ClusterActivation.tensor_data. The payload is a packed,
-// little-endian array of `seq_len * hidden_size` elements of this format.
+// little-endian, row-major `[seq_len][hidden_size]` array (hidden_size is the
+// contiguous dimension) of `seq_len * hidden_size` elements of this format.
 enum ClusterActivationDtype {
     CLUSTER_ACTIVATION_DTYPE_UNSPECIFIED = 0;
     CLUSTER_ACTIVATION_DTYPE_FP16        = 1; // IEEE 754 binary16, 2 bytes per element
