@@ -229,9 +229,9 @@ interface RagGeneration {
   systemPrompt?: string;
 }
 
-// Every sampling knob commons' RAG pipeline reads -- the same set the LLM path
-// forwards in llm-abi.ts toProtoOptions; tools and structured output are not part
-// of a grounded-answer request. An unset knob stays absent so commons applies its
+// The same sampling knobs the LLM path forwards in llm-abi.ts toProtoOptions, so a
+// RAG query carries everything commons' RAG pipeline can honour (#1073); tools and
+// structured output are not part of a grounded-answer request. An unset knob stays absent so commons applies its
 // own `rac_default`, the same contract the LLM path uses.
 function toRagGeneration(options: LlmOptions = {}): RagGeneration {
   const out: RagGeneration = {};
