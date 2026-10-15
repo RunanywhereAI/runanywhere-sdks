@@ -138,10 +138,10 @@ public final class Logging: @unchecked Sendable {
     public func configure(_ config: RALoggingConfiguration) {
         lock.withLock { state in
             state.configuration = config
+            rac_logger_set_min_level(config.minLogLevel.racLogLevel)
         }
 
         syncOSLogDestination(for: config)
-        rac_logger_set_min_level(config.minLogLevel.racLogLevel)
     }
 
     public func setLocalLoggingEnabled(_ enabled: Bool) {
@@ -149,8 +149,10 @@ public final class Logging: @unchecked Sendable {
     }
 
     public func setMinLogLevel(_ level: RALogLevel) {
-        lock.withLock { $0.configuration.minLogLevel = level }
-        rac_logger_set_min_level(level.racLogLevel)
+        lock.withLock { state in
+            state.configuration.minLogLevel = level
+            rac_logger_set_min_level(level.racLogLevel)
+        }
     }
 
     public func setIncludeDeviceMetadata(_ include: Bool) {
