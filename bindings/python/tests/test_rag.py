@@ -260,6 +260,20 @@ def test_query_threads_bm25_rrf_and_vector_store_into_the_proto(rag_core) -> Non
     assert retrieval.vector_store == RagVectorStore.USEARCH
 
 
+@pytest.mark.parametrize(
+    "retrieval",
+    [
+        RagRetrievalOptions(rrf_k=-0.5),  # type: ignore[arg-type]
+        RagRetrievalOptions(rrf_k=2**31),
+        RagRetrievalOptions(vector_store=7),  # type: ignore[arg-type]
+    ],
+)
+def test_query_rejects_malformed_retrieval_knobs_before_serializing(rag_core, retrieval) -> None:
+    session = _open(rag_core)
+    with pytest.raises(SDKException):
+        session.query("Capital of France?", RagQueryOptions(retrieval=retrieval))
+
+
 def test_query_stream_accepts_rag_query_options(rag_core) -> None:
     session = _open(rag_core)
     session.ingest(RagDocument("Paris is the capital of France."))

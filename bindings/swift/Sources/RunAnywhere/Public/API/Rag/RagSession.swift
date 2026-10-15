@@ -75,7 +75,7 @@ public actor RagSession {
         try requireGenerationModel()
         let result = try CppBridge.RAG.shared.query(
             handle: handle,
-            queryOptions(question: question, options: options)
+            try queryOptions(question: question, options: options)
         )
         try RagSession.throwIfFailed(result)
         return RagResult(proto: result, model: llmModelId)
@@ -100,7 +100,7 @@ public actor RagSession {
         let sessionHandle = RagSessionHandleRef(handle: handle)
         let events = try CppBridge.RAG.shared.runQueryStream(
             handle: handle,
-            queryOptions(question: question, options: options)
+            try queryOptions(question: question, options: options)
         )
         let model = llmModelId
 
@@ -209,18 +209,18 @@ public actor RagSession {
 
     // MARK: - Private
 
-    private func queryOptions(question: String, options: RagQueryOptions?) -> RARAGQueryOptions {
+    private func queryOptions(question: String, options: RagQueryOptions?) throws -> RARAGQueryOptions {
         var queryOptions = RARAGQueryOptions.defaults(question: question)
         // retrievalTopK/similarityThreshold moved onto the nested
         // `RAGRetrievalOptions retrieval` sub-message (idl/rag.proto).
         var retrieval = RARAGRetrievalOptions()
-        retrieval.topK = Int32(options?.retrievalTopK ?? defaultTopK)
+        retrieval.topK = try Self.int32Field(options?.retrievalTopK ?? defaultTopK, "retrievalTopK")
         if let similarityThreshold = options?.similarityThreshold {
             retrieval.scoreThreshold = similarityThreshold
         }
         if let bm25K1 = options?.bm25K1 { retrieval.bm25K1 = bm25K1 }
         if let bm25B = options?.bm25B { retrieval.bm25B = bm25B }
-        if let rrfK = options?.rrfK { retrieval.rrfK = Int32(rrfK) }
+        if let rrfK = options?.rrfK { retrieval.rrfK = try Self.int32Field(rrfK, "rrfK") }
         if let vectorStore = options?.vectorStore {
             switch vectorStore {
             case .usearch: retrieval.vectorStore = .usearch
@@ -231,6 +231,17 @@ public actor RagSession {
             queryOptions.generation = generation.toProto()
         }
         return queryOptions
+    }
+
+    /// Narrow a caller-supplied `Int` to its int32 wire field, throwing instead of trapping
+    /// when it does not fit (commons then range-checks the value itself).
+    private static func int32Field(_ value: Int, _ name: String) throws -> Int32 {
+        guard let wire = Int32(exactly: value) else {
+            throw SDKException.invalidConfiguration(
+                "RagQueryOptions.\(name) must fit RAGRetrievalOptions (int32); got \(value)"
+            )
+        }
+        return wire
     }
 
     private func requireOpen() throws {
