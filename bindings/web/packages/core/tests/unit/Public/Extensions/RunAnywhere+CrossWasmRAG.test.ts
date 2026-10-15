@@ -160,6 +160,32 @@ describe('CrossWasmRAGProvider', () => {
     ]);
   });
 
+  it('ingests a 140,000-code-point document through ragIngest without RangeError (#1014)', async () => {
+    // splitRAGText alone never reaches the provider's append into its chunk index,
+    // which is where a spread of ~140k chunks used to throw.
+    installBackendSpies();
+    vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
+      async (request: EmbeddingsRequest): Promise<EmbeddingsResult> => embeddingsResult(
+        request.texts.map((text: string, index: number) => vector([1, 0], text, index)),
+      ),
+    );
+    const provider = __testing__.createCrossWasmRAGProvider();
+    await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+      chunkSize: 20,
+      chunkOverlap: 19,
+    }));
+    await provider.ragIngest('中'.repeat(140000), JSON.stringify({
+      docId: 'large-document',
+      docName: 'Large document',
+    }));
+    await expect(provider.ragGetStatistics?.()).resolves.toMatchObject({
+      indexedDocuments: 1,
+      indexedChunks: 139981,
+    });
+  });
+
   it('supports typed document removal, clear, and statistics', async () => {
     installBackendSpies();
     vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
