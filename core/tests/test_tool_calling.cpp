@@ -117,6 +117,9 @@ int test_parse_default_nested_keys_stay_arguments() {
         {R"(<tool_call>{"type":"function",)"
          R"("function":{"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}</tool_call>)",
          "get_weather", R"({"city":"Paris"})"},
+        // a string alias names the call; an object under another alias is an argument
+        {R"(<tool_call>{"name":"open_ticket","tool":{"function":"inner"}}</tool_call>)",
+         "open_ticket", R"({"tool":{"function":"inner"}})"},
         // outside the envelope a string argument is still wrapped, not decoded
         {R"(<tool_call>{"tool":"echo","arguments":"{\"a\":1}"}</tool_call>)", "echo",
          R"({"input":"{\"a\":1}"})"},

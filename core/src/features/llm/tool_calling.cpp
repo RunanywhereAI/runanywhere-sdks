@@ -1048,15 +1048,6 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
             return name_status;
         }
         if (name_status == ToolParseStatus::kSuccess) {
-            if (kind == JSON_VALUE_OBJECT && !in_envelope) {
-                const std::unique_ptr<char, decltype(&std::free)> owned_envelope(value, &std::free);
-                const ToolParseStatus envelope_status = extract_tool_name_and_args(
-                    owned_envelope.get(), out_tool_name, out_args_json, /*in_envelope=*/true);
-                if (envelope_status != ToolParseStatus::kNoMatch) {
-                    return envelope_status;
-                }
-                continue;
-            }
             // Tool name must be a string literal (not object/array/raw literal)
             if (kind == JSON_VALUE_STRING && value && strlen(value) > 0) {
                 *out_tool_name = value;
@@ -1199,6 +1190,29 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
 
     if (in_envelope) {
         return ToolParseStatus::kNoMatch;
+    }
+
+    // An object under a tool-name key may be an envelope. Only try it once no
+    // alias names the call directly, so in {"name": "a", "tool": {...}} the
+    // object stays an argument of "a".
+    for (int i = 0; TOOL_NAME_KEYS[i] != nullptr; i++) {
+        char* value = nullptr;
+        json_value_kind_t kind = JSON_VALUE_STRING;
+        const ToolParseStatus envelope_key_status =
+            extract_json_value(json_obj, TOOL_NAME_KEYS[i], &value, &kind);
+        if (envelope_key_status == ToolParseStatus::kOutOfMemory) {
+            return envelope_key_status;
+        }
+        const std::unique_ptr<char, decltype(&std::free)> owned_envelope(value, &std::free);
+        if (envelope_key_status != ToolParseStatus::kSuccess || kind != JSON_VALUE_OBJECT ||
+            !owned_envelope) {
+            continue;
+        }
+        const ToolParseStatus envelope_status = extract_tool_name_and_args(
+            owned_envelope.get(), out_tool_name, out_args_json, /*in_envelope=*/true);
+        if (envelope_status != ToolParseStatus::kNoMatch) {
+            return envelope_status;
+        }
     }
 
     // Strategy 3 & 4: Tool name as key (non-standard key)
