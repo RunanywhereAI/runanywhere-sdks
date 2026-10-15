@@ -269,6 +269,19 @@ bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::Clu
     return true;
 }
 
+// Bytes per element for a ClusterActivation dtype; 0 for UNSPECIFIED or an unknown value.
+uint64_t activation_element_size(v1::ClusterActivationDtype dtype) {
+    switch (dtype) {
+        case v1::CLUSTER_ACTIVATION_DTYPE_FP16:
+        case v1::CLUSTER_ACTIVATION_DTYPE_BF16:
+            return 2;
+        case v1::CLUSTER_ACTIVATION_DTYPE_FP32:
+            return 4;
+        default:
+            return 0;
+    }
+}
+
 // True when `current` and `incoming` describe the same coordinator layout (order-insensitive).
 bool same_layer_assignments(
     const std::vector<v1::ClusterLayerAssignment>& current,
@@ -981,14 +994,20 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
                 break;
             }
         }
-        // Activation tensors carry floating-point activations (typically FP16 / BF16 at 2 bytes per
-        // element or FP32 at 4 bytes per element; minimum 2 bytes per element).
-        const uint64_t min_elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
-        const uint64_t min_bytes = min_elements > UINT64_MAX / 2 ? UINT64_MAX : min_elements * 2;
+        // tensor_data is a packed array of seq_len * hidden_size elements in the format named by
+        // `dtype`, so the exact byte count is known and a mismatch means a truncated, padded or
+        // wrongly-typed payload.
+        const uint64_t element_size = activation_element_size(request.dtype());
+        const uint64_t elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
+        const bool size_overflows = element_size != 0 && elements > UINT64_MAX / element_size;
         if (!valid_boundary) {
             validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
-        } else if (request.tensor_data().size() < min_bytes) {
-            validation.set_rejection_reason("Activation tensor_data size is smaller than expected tensor bytes (minimum 2 bytes/element)");
+        } else if (element_size == 0) {
+            validation.set_rejection_reason("Activation dtype is unspecified or unknown");
+        } else if (size_overflows) {
+            validation.set_rejection_reason("Activation tensor dimensions overflow the expected byte count");
+        } else if (request.tensor_data().size() != elements * element_size) {
+            validation.set_rejection_reason("Activation tensor_data size does not equal seq_len * hidden_size * element size for dtype");
         } else {
             validation.set_accepted(true);
         }

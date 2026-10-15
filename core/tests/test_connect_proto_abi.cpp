@@ -3,6 +3,7 @@
  * @brief Contract tests for the transport-independent Connect policy and handshake.
  */
 
+#include <cstdint>
 #include <cstdio>
 #include <string>
 
@@ -410,6 +411,7 @@ void test_cluster_orchestration() {
     valid_activation.set_tensor_data(std::string(4096 * 2, 'A'));
     valid_activation.set_seq_len(1);
     valid_activation.set_hidden_size(4096);
+    valid_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP16);
 
     v1::ConnectInvocationValidation activation_validation;
     CHECK(call_proto(rac_connect_cluster_validate_activation_proto, valid_activation, &activation_validation) == RAC_SUCCESS,
@@ -432,13 +434,51 @@ void test_cluster_orchestration() {
           "Invalid layer boundary activation returns typed validation");
     CHECK(!invalid_boundary_validation.accepted(), "Invalid layer boundary is rejected");
 
-    // 11b. Activation validation rejection on undersized tensor bytes (e.g. 1 byte/element instead of min 2)
+    // 11b. Activation validation rejection on undersized tensor bytes (e.g. 1 byte/element instead of 2)
     v1::ClusterActivation undersized_activation = valid_activation;
-    undersized_activation.set_tensor_data(std::string(4096 * 1, 'A')); // 4096 bytes < 4096 * 2 min_bytes
+    undersized_activation.set_tensor_data(std::string(4096 * 1, 'A')); // 4096 bytes != 4096 * 2 FP16 bytes
     v1::ConnectInvocationValidation undersized_validation;
     CHECK(call_proto(rac_connect_cluster_validate_activation_proto, undersized_activation, &undersized_validation) == RAC_SUCCESS,
           "Undersized activation tensor returns typed validation");
     CHECK(!undersized_validation.accepted(), "Undersized activation tensor bytes are rejected");
+
+    // 11c. Exact byte count is enforced for the named dtype
+    v1::ClusterActivation oversized_activation = valid_activation;
+    oversized_activation.set_tensor_data(std::string(4096 * 2 + 2, 'A'));
+    v1::ConnectInvocationValidation oversized_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, oversized_activation, &oversized_validation) == RAC_SUCCESS,
+          "Oversized activation tensor returns typed validation");
+    CHECK(!oversized_validation.accepted(), "Activation tensor with extra bytes is rejected");
+
+    v1::ClusterActivation wrong_format_activation = valid_activation;
+    wrong_format_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP32); // payload is FP16-sized
+    v1::ConnectInvocationValidation wrong_format_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, wrong_format_activation, &wrong_format_validation) == RAC_SUCCESS,
+          "Wrong-format activation tensor returns typed validation");
+    CHECK(!wrong_format_validation.accepted(), "FP16-sized payload declared as FP32 is rejected");
+
+    v1::ClusterActivation fp32_activation = valid_activation;
+    fp32_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP32);
+    fp32_activation.set_tensor_data(std::string(4096 * 4, 'A'));
+    v1::ConnectInvocationValidation fp32_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, fp32_activation, &fp32_validation) == RAC_SUCCESS,
+          "FP32 activation tensor returns typed validation");
+    CHECK(fp32_validation.accepted(), "Exact-size FP32 activation tensor is accepted");
+
+    v1::ClusterActivation unspecified_dtype_activation = valid_activation;
+    unspecified_dtype_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_UNSPECIFIED);
+    v1::ConnectInvocationValidation unspecified_dtype_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, unspecified_dtype_activation, &unspecified_dtype_validation) == RAC_SUCCESS,
+          "Activation without dtype returns typed validation");
+    CHECK(!unspecified_dtype_validation.accepted(), "Activation with unspecified dtype is rejected");
+
+    v1::ClusterActivation overflow_activation = valid_activation;
+    overflow_activation.set_seq_len(UINT32_MAX);
+    overflow_activation.set_hidden_size(UINT32_MAX);
+    v1::ConnectInvocationValidation overflow_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, overflow_activation, &overflow_validation) == RAC_SUCCESS,
+          "Overflowing activation dimensions return typed validation");
+    CHECK(!overflow_validation.accepted(), "Overflowing activation dimensions are rejected");
 
     // 12. Stop cluster with mismatched cluster ID is rejected
     v1::ClusterStopRequest wrong_stop_request;
