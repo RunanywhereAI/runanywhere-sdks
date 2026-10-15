@@ -132,7 +132,9 @@ class RAGBackend {
         // Scoped retrieval: only chunks whose document_id starts with this
         // prefix are eligible. Empty = whole index.
         std::string scope_prefix;
-        // BM25 / RRF retrieval tuning overrides (0/default = use config).
+        // BM25 / RRF retrieval tuning overrides. Each field has its own "unset" sentinel
+        // meaning "use the session config": bm25_k1 <= 0, bm25_b < 0 (so b = 0, no length
+        // normalization, is a real override), rrf_k <= 0.
         float bm25_k1 = 0.0f;
         float bm25_b = -1.0f;
         int32_t rrf_k = 0;

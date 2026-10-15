@@ -1438,10 +1438,15 @@ TEST(retrieve_rejects_malformed_params) {
         {"rrf_k", "-5", "rrf_k"},
         {"rrf_k", "0", "rrf_k"},
         {"bm25_k1", "0", "bm25_k1"},
+        {"bm25_b", "-0.5", "0.0...1.0"},
+        {"k", "0", "'k' must be >= 1"},
+        {"similarity_threshold", "1.5", "similarity_threshold"},
         {"vector_store", "PGVECTOR", "unknown vector_store"},
         {"vector_store", "usearch ", "unknown vector_store"},
     };
     for (const Case& c : cases) {
+        // A case that records no detail must not pass on the previous case's message.
+        rac_error_clear_details();
         PipelineSpec spec;
         spec.set_name("retrieve_param_rejection");
         auto* src = spec.add_operators();

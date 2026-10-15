@@ -81,11 +81,12 @@ int main() {
         const auto base = index.search("apple", 2, 1.2f, 0.75f);
         const auto high_k1 = index.search("apple", 2, 3.0f, 0.75f);
         const auto no_len_norm = index.search("apple", 2, 1.2f, 0.0f);
-        CHECK(base.size() == 2 && high_k1.size() == 2 && no_len_norm.size() == 2,
-              "BM25 returns both matching chunks");
-        CHECK(base[0].first == "short" && base[0].second != high_k1[0].second,
+        const bool sized = base.size() == 2 && high_k1.size() == 2 && no_len_norm.size() == 2;
+        CHECK(sized, "BM25 returns both matching chunks");
+        // Index only after the size check so a short result is a failure, not UB.
+        CHECK(sized && base[0].first == "short" && base[0].second != high_k1[0].second,
               "bm25_k1 changes the term-frequency saturation score");
-        CHECK(base[1].second != no_len_norm[1].second,
+        CHECK(sized && base[1].second != no_len_norm[1].second,
               "bm25_b changes the document-length normalization score");
     }
 

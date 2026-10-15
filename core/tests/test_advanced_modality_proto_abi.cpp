@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <string>
 #include <thread>
 #include <vector>
@@ -1954,6 +1955,19 @@ int test_rag_search_retrieval_only() {
     CHECK(rc == RAC_ERROR_NOT_SUPPORTED, "VECTOR_STORE_PGVECTOR is rejected in rag.search");
     rac_proto_buffer_free(&out);
 
+    // proto3 keeps unknown enum numbers; they must be rejected, not run against USearch.
+    runanywhere::v1::RAGSearchRequest unknown_store_search = pgv_search;
+    unknown_store_search.mutable_retrieval()->set_vector_store(
+        static_cast<runanywhere::v1::VectorStore>(42));
+    std::vector<uint8_t> unknown_store_bytes;
+    CHECK(serialize(unknown_store_search, &unknown_store_bytes),
+          "unknown vector_store search request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(full_session, unknown_store_bytes.data(), unknown_store_bytes.size(),
+                              &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "unknown vector_store value is rejected in rag.search");
+    rac_proto_buffer_free(&out);
+
     // BM25 and RRF retrieval tuning options are accepted on RAGSearchRequest
     runanywhere::v1::RAGSearchRequest tuned_search;
     tuned_search.set_query("Where does RAG live?");
@@ -1967,6 +1981,60 @@ int test_rag_search_retrieval_only() {
     rc = rac_rag_search_proto(full_session, tuned_search_bytes.data(), tuned_search_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS, "rag.search with custom BM25/RRF params succeeds");
     rac_proto_buffer_free(&out);
+
+    // The knobs must measurably change retrieval, not only be accepted. Two more chunks that
+    // match the query term: "tune/long" repeats it in a long chunk, "tune/short" is the bare
+    // term. Turning off BM25 length normalization (bm25_b = 0) moves the long chunk to the top
+    // of the BM25 ranking, and a small rrf_k reshapes every fused score.
+    for (const auto& [doc_id, doc_text] : std::vector<std::pair<std::string, std::string>>{
+             {"tune/long",
+              "RAG RAG one two three four five six seven eight nine ten eleven twelve thirteen "
+              "fourteen fifteen sixteen seventeen eighteen"},
+             {"tune/short", "RAG"}}) {
+        runanywhere::v1::RAGDocument tuning_doc;
+        tuning_doc.set_id(doc_id);
+        tuning_doc.set_text(doc_text);
+        std::vector<uint8_t> tuning_doc_bytes;
+        CHECK(serialize(tuning_doc, &tuning_doc_bytes), "tuning corpus document serializes");
+        rac_proto_buffer_init(&out);
+        CHECK(rac_rag_ingest_proto(full_session, tuning_doc_bytes.data(), tuning_doc_bytes.size(),
+                                   &out) == RAC_SUCCESS,
+              "tuning corpus document ingests");
+        rac_proto_buffer_free(&out);
+    }
+    const auto fused_scores = [&](const runanywhere::v1::RAGRetrievalOptions& retrieval) {
+        runanywhere::v1::RAGSearchRequest request;
+        request.set_query("Where does RAG live?");
+        *request.mutable_retrieval() = retrieval;
+        request.mutable_retrieval()->set_top_k(4);
+        std::map<std::string, float> scores;
+        std::vector<uint8_t> request_bytes;
+        if (!serialize(request, &request_bytes))
+            return scores;
+        rac_proto_buffer_t response_buffer;
+        rac_proto_buffer_init(&response_buffer);
+        runanywhere::v1::RAGSearchResponse response;
+        if (rac_rag_search_proto(full_session, request_bytes.data(), request_bytes.size(),
+                                 &response_buffer) == RAC_SUCCESS &&
+            parse_buffer(response_buffer, &response)) {
+            for (const auto& chunk : response.chunks())
+                scores[chunk.text()] = chunk.score();
+        }
+        rac_proto_buffer_free(&response_buffer);
+        return scores;
+    };
+    const auto default_scores = fused_scores(runanywhere::v1::RAGRetrievalOptions());
+    runanywhere::v1::RAGRetrievalOptions small_rrf_k;
+    small_rrf_k.set_rrf_k(1);
+    runanywhere::v1::RAGRetrievalOptions no_length_norm;
+    no_length_norm.set_bm25_b(0.0f);
+    const auto small_rrf_k_scores = fused_scores(small_rrf_k);
+    const auto no_length_norm_scores = fused_scores(no_length_norm);
+    CHECK(default_scores.size() == 3 && small_rrf_k_scores.size() == 3 &&
+              no_length_norm_scores.size() == 3,
+          "tuning searches return the three matching chunks");
+    CHECK(small_rrf_k_scores != default_scores, "rrf_k = 1 changes the fused scores");
+    CHECK(no_length_norm_scores != default_scores, "bm25_b = 0 changes the fused scores");
 
     // Out-of-range / non-finite BM25 tuning is rejected, not silently dropped at scoring.
     runanywhere::v1::RAGSearchRequest bad_b_search = tuned_search;
