@@ -327,11 +327,11 @@ public struct RagQueryOptions: Sendable {
     public var retrievalTopK: Int?
     public var similarityThreshold: Float?
     public var generation: LlmOptions?
-    /// BM25 term-frequency saturation; finite and `>= 0`. Unset uses the session default.
+    /// BM25 term-frequency saturation; finite and `> 0` (0 is rejected). Unset uses the session default.
     public var bm25K1: Float?
     /// BM25 document-length normalization in `0...1`. Unset uses the session default.
     public var bm25B: Float?
-    /// Reciprocal-rank-fusion constant, `>= 0`. Unset uses the session default.
+    /// Reciprocal-rank-fusion constant, `> 0` (0 is rejected). Unset uses the session default.
     public var rrfK: Int?
     public var vectorStore: RagVectorStore?
 

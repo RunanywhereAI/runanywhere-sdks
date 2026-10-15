@@ -66,6 +66,12 @@ function isRagQueryOptions(
 function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQueryOverrides {
   if (!options) return {};
   if (isRagQueryOptions(options)) {
+    const vectorStore: unknown = options.retrieval?.vectorStore;
+    if (vectorStore !== undefined && vectorStore !== 'usearch') {
+      throw SDKException.invalidConfiguration(
+        `RagRetrievalOptions.vectorStore must be 'usearch' (the only on-device store); got ${String(vectorStore)}`,
+      );
+    }
     return {
       retrieval: {
         topK: options.retrieval?.topK,
@@ -74,8 +80,7 @@ function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQuery
         bm25K1: options.retrieval?.bm25K1,
         bm25B: options.retrieval?.bm25B,
         rrfK: options.retrieval?.rrfK,
-        vectorStore:
-          options.retrieval?.vectorStore === 'usearch' ? VectorStore.VECTOR_STORE_USEARCH : undefined,
+        vectorStore: vectorStore === 'usearch' ? VectorStore.VECTOR_STORE_USEARCH : undefined,
       },
       generation: options.generation ? toProtoLlmOptions(options.generation) : undefined,
     };
