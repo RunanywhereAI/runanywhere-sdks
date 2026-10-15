@@ -97,6 +97,13 @@ function buildQueryOptions(
   config: RagConfig | undefined
 ): RAGQueryOptions {
   const retrievalOverrides = options?.retrieval;
+  const vectorStore: unknown = retrievalOverrides?.vectorStore;
+  if (vectorStore !== undefined && vectorStore !== 'usearch') {
+    // A plain-JS caller can pass any string; dropping it would silently run the default.
+    throw SDKException.invalidConfiguration(
+      `RagRetrievalOptions.vectorStore must be 'usearch' (the only on-device store); got ${String(vectorStore)}`
+    );
+  }
   const topK = options?.retrieval?.topK ?? config?.topK;
   const scoreThreshold =
     options?.retrieval?.similarityThreshold ?? config?.similarityThreshold;
@@ -109,9 +116,7 @@ function buildQueryOptions(
       ...(retrievalOverrides?.bm25K1 !== undefined ? { bm25K1: retrievalOverrides.bm25K1 } : {}),
       ...(retrievalOverrides?.bm25B !== undefined ? { bm25B: retrievalOverrides.bm25B } : {}),
       ...(retrievalOverrides?.rrfK !== undefined ? { rrfK: retrievalOverrides.rrfK } : {}),
-      ...(retrievalOverrides?.vectorStore === 'usearch'
-        ? { vectorStore: VectorStore.VECTOR_STORE_USEARCH }
-        : {}),
+      ...(vectorStore === 'usearch' ? { vectorStore: VectorStore.VECTOR_STORE_USEARCH } : {}),
     },
   });
 }
