@@ -297,18 +297,18 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts
     if (!out)
         return false;
     *out = RAC_TTS_OPTIONS_DEFAULT;
+    out->language = nullptr;
     char* voice = copy_string(in.voice());
     if (!in.voice().empty() && !voice)
         return false;
-    if (!in.language_code().empty()) {
-        char* language = copy_string(in.language_code());
-        if (!language) {
-            rac_free(voice);
-            return false;
-        }
-        out->language = language;
+    char* language = rac_strdup(in.language_code().empty() ? RAC_TTS_OPTIONS_DEFAULT.language
+                                                           : in.language_code().c_str());
+    if (!language) {
+        rac_free(voice);
+        return false;
     }
     out->voice = voice;
+    out->language = language;
     if (in.speed() > 0.0f)
         out->rate = in.speed();
     if (in.pitch() > 0.0f)
