@@ -4,6 +4,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <locale>
+#include <sstream>
 #include <string>
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -1163,14 +1165,22 @@ TEST(rag_retrieval_params_reach_the_retrieve_operator) {
     CHECK(store != params.end());
     CHECK(store->second == "VECTOR_STORE_USEARCH");
     // Values, not just presence: a converter that forwarded the wrong number
-    // would satisfy a presence-only check. Compared against std::to_string so
-    // the assertion tracks the converter's own float formatting.
+    // would satisfy a presence-only check. Floats travel as classic-locale text
+    // that round-trips exactly, which is what the retrieve operator parses.
+    const auto parse_float = [](const std::string& text) {
+        std::istringstream stream(text);
+        stream.imbue(std::locale::classic());
+        float value = -1.0f;
+        stream >> value;
+        return value;
+    };
     const auto bm25_k1 = params.find("bm25_k1");
     CHECK(bm25_k1 != params.end());
-    CHECK(bm25_k1->second == std::to_string(1.5f));
+    CHECK(bm25_k1->second == "1.5");
     const auto bm25_b = params.find("bm25_b");
     CHECK(bm25_b != params.end());
-    CHECK(bm25_b->second == std::to_string(0.6f));
+    CHECK(bm25_b->second.find(',') == std::string::npos);
+    CHECK(parse_float(bm25_b->second) == 0.6f);
     const auto rrf = params.find("rrf_k");
     CHECK(rrf != params.end());
     CHECK(rrf->second == "30");
