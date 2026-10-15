@@ -8513,6 +8513,34 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClientValidat
                              "racConnectClientValidateHostProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClusterStartProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_cluster_start_proto,
+                             "racConnectClusterStartProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClusterJoinProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_cluster_join_proto,
+                             "racConnectClusterJoinProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClusterStopProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_cluster_stop_proto,
+                             "racConnectClusterStopProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClusterValidateActivationProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_cluster_validate_activation_proto,
+                             "racConnectClusterValidateActivationProto");
+}
+
 // =============================================================================
 // TWO-PHASE SDK INIT — rac_sdk_init_phase1_proto /
 // rac_sdk_init_phase2_proto / rac_sdk_retry_http_proto. Mirrors Swift's

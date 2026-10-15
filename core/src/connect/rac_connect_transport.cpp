@@ -4,6 +4,7 @@
  */
 
 #include "rac/connect/rac_connect_transport.h"
+#include "rac/connect/rac_connect.h"
 
 #include <memory>
 #include <mutex>
@@ -173,6 +174,30 @@ rac_result_t rac_connect_transport_close(rac_connect_channel_t channel) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
     return slot->ops.close(slot->user_data, channel);
+}
+
+rac_result_t
+rac_connect_transport_receive_activation(rac_connect_channel_t channel,
+                                         uint32_t expected_dtype,
+                                         rac_proto_buffer_t* out_host_tensor,
+                                         struct rac_connect_decoded_activation* out_metadata) {
+    if (channel == RAC_CONNECT_INVALID_CHANNEL || out_host_tensor == nullptr) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    rac_proto_buffer_init(out_host_tensor);
+
+    rac_proto_buffer_t raw_payload{};
+    rac_proto_buffer_init(&raw_payload);
+    const rac_result_t recv_result = rac_connect_transport_receive(channel, &raw_payload);
+    if (recv_result != RAC_SUCCESS) {
+        rac_proto_buffer_free(&raw_payload);
+        return recv_result;
+    }
+
+    const rac_result_t decode_result = rac_connect_cluster_decode_activation_proto(
+        raw_payload.data, raw_payload.size, expected_dtype, out_host_tensor, out_metadata);
+    rac_proto_buffer_free(&raw_payload);
+    return decode_result;
 }
 
 }  // extern "C"

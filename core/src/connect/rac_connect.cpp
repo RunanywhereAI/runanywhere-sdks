@@ -282,6 +282,15 @@ uint64_t activation_element_size(v1::ClusterActivationDtype dtype) {
     }
 }
 
+inline bool is_big_endian_host() {
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__)
+    return __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__;
+#else
+    const uint16_t test = 0x0102;
+    return *reinterpret_cast<const uint8_t*>(&test) == 0x01;
+#endif
+}
+
 // True when `current` and `incoming` describe the same coordinator layout (order-insensitive).
 bool same_layer_assignments(
     const std::vector<v1::ClusterLayerAssignment>& current,
@@ -1013,6 +1022,120 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
         }
     }
     return serialize_message(validation, out_validation);
+#endif
+}
+
+rac_result_t
+rac_connect_cluster_decode_activation_proto(const uint8_t* activation_bytes,
+                                            size_t activation_size,
+                                            uint32_t expected_dtype,
+                                            rac_proto_buffer_t* out_host_tensor,
+                                            rac_connect_decoded_activation_t* out_metadata) {
+    if (out_host_tensor == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_host_tensor);
+    if (out_metadata != nullptr) {
+        *out_metadata = {};
+    }
+    if (activation_bytes == nullptr || activation_size == 0) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Empty or null activation bytes");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)expected_dtype;
+    rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterActivation activation;
+    const rac_result_t parse_result =
+        parse_message(activation_bytes, activation_size, &activation, out_host_tensor,
+                      "Invalid ClusterActivation protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    const auto dtype = activation.dtype();
+    const uint64_t element_size = activation_element_size(dtype);
+    if (element_size == 0) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_FORMAT,
+                                   "Activation dtype is unspecified or unknown");
+        return RAC_ERROR_INVALID_FORMAT;
+    }
+
+    if (expected_dtype != 0 && static_cast<uint32_t>(dtype) != expected_dtype) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_FORMAT,
+                                   "Activation dtype does not match declared expected format");
+        return RAC_ERROR_INVALID_FORMAT;
+    }
+
+    if (activation.seq_len() == 0 || activation.hidden_size() == 0) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Invalid activation tensor dimensions (seq_len/hidden_size zero)");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const uint64_t elements = static_cast<uint64_t>(activation.seq_len()) * activation.hidden_size();
+    if (elements > UINT64_MAX / element_size) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Activation tensor dimensions overflow expected byte count");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const uint64_t expected_bytes = elements * element_size;
+    if (activation.tensor_data().size() != expected_bytes) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_FORMAT,
+                                   "Activation tensor_data size does not equal seq_len * hidden_size * element size for dtype");
+        return RAC_ERROR_INVALID_FORMAT;
+    }
+
+    const rac_result_t alloc_result =
+        rac_proto_buffer_allocate(out_host_tensor, static_cast<size_t>(expected_bytes));
+    if (alloc_result != RAC_SUCCESS) {
+        return alloc_result;
+    }
+
+    const auto* src = reinterpret_cast<const uint8_t*>(activation.tensor_data().data());
+    uint8_t* dst = out_host_tensor->data;
+
+    // Decode little-endian wire elements into host byte order (swap on big-endian architectures).
+    const bool is_big_endian = is_big_endian_host();
+    if (!is_big_endian) {
+        std::memcpy(dst, src, static_cast<size_t>(expected_bytes));
+    } else {
+        if (element_size == 2) {
+            for (uint64_t i = 0; i < elements; ++i) {
+                uint16_t val;
+                std::memcpy(&val, src + i * 2, 2);
+                val = static_cast<uint16_t>((val >> 8) | (val << 8));
+                std::memcpy(dst + i * 2, &val, 2);
+            }
+        } else if (element_size == 4) {
+            for (uint64_t i = 0; i < elements; ++i) {
+                uint32_t val;
+                std::memcpy(&val, src + i * 4, 4);
+                val = ((val >> 24) & 0x000000FF) |
+                      ((val >> 8)  & 0x0000FF00) |
+                      ((val << 8)  & 0x00FF0000) |
+                      ((val << 24) & 0xFF000000);
+                std::memcpy(dst + i * 4, &val, 4);
+            }
+        }
+    }
+
+    if (out_metadata != nullptr) {
+        out_metadata->dtype = static_cast<uint32_t>(dtype);
+        out_metadata->seq_len = activation.seq_len();
+        out_metadata->hidden_size = activation.hidden_size();
+        out_metadata->element_count = static_cast<size_t>(elements);
+        out_metadata->element_size = static_cast<size_t>(element_size);
+        out_metadata->total_bytes = static_cast<size_t>(expected_bytes);
+    }
+
+    return RAC_SUCCESS;
 #endif
 }
 
