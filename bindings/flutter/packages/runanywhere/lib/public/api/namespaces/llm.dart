@@ -138,7 +138,7 @@ class LlmApi {
         mode: effectiveMode,
         strict: options?.structuredOutput?.strict ?? true,
       ),
-      toolChoice: const ToolChoice.none(),
+      toolChoice: ToolChoice.none,
     );
     final protoOptions = effective.toProto();
     final generation =

@@ -42,8 +42,8 @@ private val NEUTRAL_REPETITION_PENALTY = LLMGenerationOptions.defaults().repeat_
 internal fun LlmOptions?.orDefault(): LlmOptions = this ?: LlmOptions()
 
 /**
- * [structuredOutput] is never populated from a public [LlmOptions] field —
- * only `llm.generateStructured` supplies it, through its own internal call path.
+ * [structuredOutput] is supplied by `llm.generateStructured`, which merges the
+ * caller's [LlmOptions.structuredOutput] overrides with its schema.
  */
 internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLMGenerationOptions =
     LLMGenerationOptions(

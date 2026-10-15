@@ -429,21 +429,4 @@ extension RunAnywhere {
             CppBridge.StructuredOutput.makeParseRequest(text: text, schema: schema)
         )
     }
-
-    /// Build the one retry prompt `generateStructured(mode: .repair)` sends
-    /// when the first pass did not validate against `schema`.
-    internal static func structuredRepairPrompt(
-        original: String,
-        invalidOutput: String,
-        schema: JsonSchema
-    ) -> String {
-        """
-        \(original)
-
-        Your previous answer did not match the required JSON schema. Reply again with ONLY JSON that satisfies this schema.
-
-        Schema: \(schema)
-        Previous invalid answer: \(invalidOutput)
-        """
-    }
 }

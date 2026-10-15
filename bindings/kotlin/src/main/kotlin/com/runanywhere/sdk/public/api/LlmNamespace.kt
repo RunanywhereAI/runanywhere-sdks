@@ -150,7 +150,7 @@ public class LlmNamespace internal constructor() {
             value = parsed.json,
             raw = parsed.raw_text ?: generation.text,
             valid = parsed.validation?.is_valid == true,
-            mode = mode,
+            mode = effectiveMode,
             inputTokens = generation.inputTokens,
             outputTokens = generation.outputTokens,
             timeToFirstTokenMs = generation.timeToFirstTokenMs,
@@ -250,17 +250,6 @@ public class LlmNamespace internal constructor() {
 }
 
 private fun newRequestId(): String = UUID.randomUUID().toString()
-
-/** The one retry prompt `generateStructured(mode = REPAIR)` sends when the first pass did not validate. */
-private fun structuredRepairPrompt(original: String, invalidOutput: String, schema: JsonSchema): String =
-    """
-    $original
-
-    Your previous answer did not match the required JSON schema. Reply again with ONLY JSON that satisfies this schema.
-
-    Schema: ${schema.rawJson}
-    Previous invalid answer: $invalidOutput
-    """.trimIndent()
 
 private fun LlmOptions.usesTools(): Boolean = toolChoice != ToolChoice.None
 

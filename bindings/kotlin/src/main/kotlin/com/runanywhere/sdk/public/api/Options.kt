@@ -95,8 +95,11 @@ public data class LlmOptions(
     val stopSequences: List<String> = emptyList(),
     val systemPrompt: String? = null,
     val reasoning: ReasoningOptions? = null,
-    // No structured-output schema field: `llm.generateStructured` owns
-    // schema configuration through its own `schema`/`mode` parameters.
+    /**
+     * Optional structured-output overrides; `llm.generateStructured` supplies the
+     * schema and uses this field's `mode`/`strict` in preference to its own `mode` argument.
+     */
+    val structuredOutput: StructuredOutput? = null,
     /** Empty uses the tools registered through `llm.tools`. */
     val tools: List<ToolDefinition> = emptyList(),
     val toolChoice: ToolChoice = ToolChoice.Auto,
