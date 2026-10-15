@@ -10,6 +10,7 @@ import {
   RAGSearchRequest,
   RAGStreamEvent,
   RAGStreamEventKind,
+  VectorStore,
 } from '@runanywhere/proto-ts/rag';
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
@@ -95,6 +96,7 @@ function buildQueryOptions(
   options: RagQueryOptions | undefined,
   config: RagConfig | undefined
 ): RAGQueryOptions {
+  const retrievalOverrides = options?.retrieval;
   const topK = options?.retrieval?.topK ?? config?.topK;
   const scoreThreshold =
     options?.retrieval?.similarityThreshold ?? config?.similarityThreshold;
@@ -104,6 +106,12 @@ function buildQueryOptions(
     retrieval: {
       ...(topK !== undefined ? { topK } : {}),
       ...(scoreThreshold !== undefined ? { scoreThreshold } : {}),
+      ...(retrievalOverrides?.bm25K1 !== undefined ? { bm25K1: retrievalOverrides.bm25K1 } : {}),
+      ...(retrievalOverrides?.bm25B !== undefined ? { bm25B: retrievalOverrides.bm25B } : {}),
+      ...(retrievalOverrides?.rrfK !== undefined ? { rrfK: retrievalOverrides.rrfK } : {}),
+      ...(retrievalOverrides?.vectorStore === 'usearch'
+        ? { vectorStore: VectorStore.VECTOR_STORE_USEARCH }
+        : {}),
     },
   });
 }
