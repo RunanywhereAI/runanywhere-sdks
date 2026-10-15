@@ -172,6 +172,10 @@ describe('CrossWasmRAGProvider', () => {
     ).rejects.toThrow(/bm25K1.*native RAG session provider/);
     const stream = provider.ragQueryStream!('anything', { retrieval: { rrfK: 30 } as never });
     await expect(stream[Symbol.asyncIterator]().next()).rejects.toThrow(/rrfK/);
+    // VECTOR_STORE_USEARCH (1): even the only on-device store is a native-session knob.
+    await expect(
+      provider.ragQuery('anything', { retrieval: { vectorStore: 1 } as never }),
+    ).rejects.toThrow(/vectorStore/);
   });
 
   it('supports typed document removal, clear, and statistics', async () => {
