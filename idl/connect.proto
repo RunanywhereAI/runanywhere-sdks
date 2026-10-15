@@ -288,5 +288,7 @@ message ClusterState {
     ConnectModelDescriptor model = 3;
     repeated ClusterLayerAssignment assignments = 4;
     uint32 peer_count = 5;
+    // Capabilities advertised by peers whose join was accepted, in assignment order.
+    repeated ClusterPeerCapability peer_capabilities = 6;
 }
 

@@ -326,6 +326,31 @@ void test_cluster_orchestration() {
     CHECK(call_proto(rac_connect_cluster_start_proto, gap_request, &gap_state) == RAC_ERROR_INVALID_ARGUMENT,
           "Cluster start rejects layer assignment gap");
 
+    // 3b. Cluster start enforces exactly one coordinator (none, then two)
+    v1::ClusterStartRequest no_coordinator_request;
+    no_coordinator_request.set_cluster_id("test-cluster-no-coordinator");
+    no_coordinator_request.mutable_model()->set_model_id("llama-3-70b");
+    no_coordinator_request.mutable_model()->set_display_name("Llama 3 70B");
+    auto* n1 = no_coordinator_request.add_assignments();
+    n1->set_instance_id("peer-1");
+    n1->set_layer_start(0);
+    n1->set_layer_end(16);
+    auto* n2 = no_coordinator_request.add_assignments();
+    n2->set_instance_id("peer-2");
+    n2->set_layer_start(16);
+    n2->set_layer_end(32);
+    v1::ClusterState no_coordinator_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, no_coordinator_request, &no_coordinator_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects an assignment set with no coordinator");
+
+    v1::ClusterStartRequest two_coordinators_request = no_coordinator_request;
+    two_coordinators_request.set_cluster_id("test-cluster-two-coordinators");
+    two_coordinators_request.mutable_assignments(0)->set_is_coordinator(true);
+    two_coordinators_request.mutable_assignments(1)->set_is_coordinator(true);
+    v1::ClusterState two_coordinators_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, two_coordinators_request, &two_coordinators_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects an assignment set with several coordinators");
+
     // 4. Valid cluster start with unordered assignments: [16, 32) then [0, 16)
     v1::ClusterStartRequest valid_request;
     valid_request.set_cluster_id("cluster-alpha");
@@ -384,6 +409,15 @@ void test_cluster_orchestration() {
     CHECK(join_response.accepted(), "Peer join response is accepted");
     CHECK(join_response.peer_capability().available_memory_bytes() == 8589934592ULL,
           "Peer capability is populated in join response");
+
+    // 7a. The accepted peer's capability is retrievable from cluster state
+    v1::ClusterState state_after_join;
+    CHECK(call_proto(rac_connect_cluster_start_proto, valid_request, &state_after_join) == RAC_SUCCESS,
+          "Cluster state is readable after a peer joins");
+    CHECK(state_after_join.peer_capabilities_size() == 1 &&
+              state_after_join.peer_capabilities(0).instance_id() == "android-snapdragon" &&
+              state_after_join.peer_capabilities(0).available_memory_bytes() == 8589934592ULL,
+          "Accepted peer capability is stored in cluster state");
 
     // 7b. Peer advertising less capacity than its assigned span is rejected
     v1::ClusterJoinRequest undersized_join = join_request;

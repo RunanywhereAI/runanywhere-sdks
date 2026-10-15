@@ -208,6 +208,8 @@ struct ClusterRuntime {
     v1::ConnectModelDescriptor model;
     std::vector<v1::ClusterLayerAssignment> assignments;
     std::unordered_map<std::string, v1::ClusterLayerAssignment> peer_assignments;
+    // Capability each peer advertised when its join was accepted, keyed by instance_id.
+    std::unordered_map<std::string, v1::ClusterPeerCapability> peer_capabilities;
 };
 
 ClusterRuntime& cluster_runtime() {
@@ -265,6 +267,19 @@ bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::Clu
             return false;
         }
         expected_start = assignment.layer_end();
+    }
+
+    size_t coordinator_count = 0;
+    for (const auto& assignment : sorted_assignments) {
+        if (assignment.is_coordinator()) {
+            ++coordinator_count;
+        }
+    }
+    if (coordinator_count != 1) {
+        if (out_rejection_reason != nullptr) {
+            *out_rejection_reason = "Cluster must have exactly one coordinator assignment";
+        }
+        return false;
     }
     return true;
 }
@@ -787,6 +802,10 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
             *state.mutable_model() = cluster.model;
             for (const auto& item : cluster.assignments) {
                 *state.add_assignments() = item;
+                const auto capability = cluster.peer_capabilities.find(item.instance_id());
+                if (capability != cluster.peer_capabilities.end()) {
+                    *state.add_peer_capabilities() = capability->second;
+                }
             }
             state.set_peer_count(static_cast<uint32_t>(cluster.assignments.size()));
             return serialize_message(state, out_cluster_state);
@@ -801,6 +820,7 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
     cluster.model = request.model();
     cluster.assignments.clear();
     cluster.peer_assignments.clear();
+    cluster.peer_capabilities.clear();
 
     v1::ClusterState state;
     state.set_is_active(true);
@@ -842,7 +862,7 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
     }
 
     std::lock_guard<std::mutex> lock(runtime_mutex());
-    const ClusterRuntime& cluster = cluster_runtime();
+    ClusterRuntime& cluster = cluster_runtime();
 
     v1::ClusterStartResponse response;
     if (request.cluster_id().empty()) {
@@ -877,6 +897,7 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
             if (response.peer_capability().instance_id().empty()) {
                 response.mutable_peer_capability()->set_instance_id(request.instance_id());
             }
+            cluster.peer_capabilities[request.instance_id()] = response.peer_capability();
         }
     }
 
@@ -927,6 +948,7 @@ rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
     cluster.model.Clear();
     cluster.assignments.clear();
     cluster.peer_assignments.clear();
+    cluster.peer_capabilities.clear();
 
     v1::ClusterState state;
     state.set_is_active(false);
