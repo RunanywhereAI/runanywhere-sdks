@@ -190,6 +190,8 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("solutionFeed", &HybridRunAnywhereCoreSpec::solutionFeed);
       prototype.registerHybridMethod("solutionCloseInput", &HybridRunAnywhereCoreSpec::solutionCloseInput);
       prototype.registerHybridMethod("solutionDestroy", &HybridRunAnywhereCoreSpec::solutionDestroy);
+      prototype.registerHybridMethod("loggerSetMinLevel", &HybridRunAnywhereCoreSpec::loggerSetMinLevel);
+      prototype.registerHybridMethod("loggerGetMinLevel", &HybridRunAnywhereCoreSpec::loggerGetMinLevel);
     });
   }
 

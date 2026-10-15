@@ -16,6 +16,7 @@ import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter.js';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter.js';
 import { ModalityProtoAdapter } from '../Adapters/ModalityProtoAdapter.js';
 import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter.js';
+import { setCommonsLogLevelSink } from '../Foundation/SDKLogger.js';
 
 /**
  * Minimal subset of the Emscripten Module object that this SDK uses.
@@ -858,6 +859,12 @@ export interface EmscriptenRunanywhereModule {
     args: unknown[],
     opts?: { async?: boolean },
   ) => unknown;
+
+  // -----------------------------------------------------------------------------
+  // Logger min-level C ABI
+  // -----------------------------------------------------------------------------
+  _rac_logger_set_min_level?(level: number): void;
+  _rac_logger_get_min_level?(): number;
 }
 
 // ---------------------------------------------------------------------------
@@ -1067,6 +1074,15 @@ export function registerWasmModule(
   // diffusion/rag/lora/voice-agent/structured-output). Push the module into
   // every claimed slot so per-modality `tryDefault()` calls find it.
   ModalityProtoAdapter.registerModuleCapabilities(capabilities, mod);
+
+  // Synchronize the newly registered module with the active commons log level.
+  if (typeof mod._rac_logger_set_min_level === 'function') {
+    try {
+      mod._rac_logger_set_min_level(_currentCommonsMinLogLevel);
+    } catch {
+      // Ignore module errors
+    }
+  }
 }
 
 /** Typed backend metadata for diagnostics and model-owner routing. */
@@ -1212,6 +1228,37 @@ export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
   }
   return Array.from(unique);
 }
+
+let _currentCommonsMinLogLevel = 2; // Default to INFO (2)
+
+/** Set the minimum log level across all registered WASM modules. */
+export function setCommonsMinLogLevel(racLevel: number): void {
+  _currentCommonsMinLogLevel = racLevel;
+  for (const mod of getAllRegisteredModules()) {
+    try {
+      mod._rac_logger_set_min_level?.(racLevel);
+    } catch {
+      // Ignore module errors
+    }
+  }
+}
+
+/** Get the minimum log level from the commons WASM module (or fallback recorded value). */
+export function getCommonsMinLogLevel(): number {
+  const mod = tryRunanywhereModule();
+  if (mod && typeof mod._rac_logger_get_min_level === 'function') {
+    try {
+      return mod._rac_logger_get_min_level();
+    } catch {
+      // Fall through to recorded value
+    }
+  }
+  return _currentCommonsMinLogLevel;
+}
+
+// Wire the sink so changes made to SDKLogger automatically propagate to WASM modules.
+setCommonsLogLevelSink(setCommonsMinLogLevel);
+
 
 /** Clear the entire registry during full SDK shutdown. */
 export function clearRunanywhereModule(): void {

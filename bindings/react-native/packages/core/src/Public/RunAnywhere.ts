@@ -351,6 +351,12 @@ async function initializeCore(options: InitializeOptions): Promise<void> {
           throw SDKException.notInitialized('Native SDK initialization failed');
         }
 
+        try {
+          await native.loggerSetMinLevel(LoggingManager.shared.configuration.minLogLevel);
+        } catch {
+          // Native logger setup failure is non-fatal
+        }
+
         requireCurrentLifecycle(generation, 'initialization');
         initState = markCoreInitialized(initState, initParams);
 
