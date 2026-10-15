@@ -745,7 +745,7 @@ class CrossWasmRAGProvider implements RAGProvider {
       endOffset: chunk.endOffset,
       tokenCount: chunk.tokenCount,
     }));
-    this.chunks.push(...nextChunks);
+    for (const chunk of nextChunks) this.chunks.push(chunk);
     this.documents.set(normalized.id, {
       id: normalized.id,
       name: normalized.name,
@@ -1292,6 +1292,8 @@ interface SplitRAGChunk {
 interface RAGTokenSpan {
   startOffset: number;
   endOffset: number;
+  /** Budget units this token costs: 1 for an ordinary word, its code-point count for a space-free script run. */
+  weight: number;
 }
 
 /**
@@ -1308,41 +1310,41 @@ function countCodePoints(str: string): number {
 /**
  * Splits input text into sliding-window chunks bounded by token count and chunk overlap.
  * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK,
- * Thai, Cyrillic, or long whitespace-free strings exceeding the budget) by Unicode code
- * points without breaking surrogate pairs. Iteratively appends chunks to avoid stack limits.
+ * Thai, or long whitespace-free strings exceeding the budget) by Unicode code
+ * points without breaking surrogate pairs. Ordinary words cost one budget unit; space-free
+ * script runs cost one unit per code point, so a chunk never exceeds `size` code points
+ * however those runs are distributed across lines. Iteratively appends chunks to avoid stack limits.
  */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
   if (matches.length === 0) return [];
   const size = Math.max(1, Math.floor(requestedSize));
   const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
-  const stride = Math.max(1, size - overlap);
 
   // In whitespace-delimited scripts (English, etc.), each non-whitespace sequence
   // is roughly one token. In scripts without spaces (CJK, Thai, Lao, Myanmar, Khmer, Tibetan, etc.)
   // or for oversized runs (long URLs, base64 blobs, or non-spaced words), a single regex
   // match can exceed the chunk size budget. We enforce a character/code-point
-  // limit by splitting any token whose code-point count exceeds `size` when the input is
-  // whitespace-free, or when it represents a space-free script, or is an oversized run (> 40 code points)
+  // limit by splitting any token whose code-point count exceeds `size` when it represents a
+  // space-free script, or is an oversized run (> 40 code points)
   // on Unicode code-point boundaries (preventing surrogate pair corruption). Ordinary spaced words
   // within or slightly exceeding tiny budgets remain atomic tokens, matching the C++ core separator-first behavior.
   const SCRIPT_FREE_SPACE_REGEX =
     /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Tibetan}]/u;
-
-  const isEntirelyWhitespaceFree = !/\s/.test(text);
 
   const tokens: RAGTokenSpan[] = [];
   for (const match of matches) {
     const matchText = match[0];
     const matchStart = match.index ?? 0;
     const cpCount = countCodePoints(matchText);
-    const isOversized =
-      cpCount > size && (isEntirelyWhitespaceFree || SCRIPT_FREE_SPACE_REGEX.test(matchText) || cpCount > 40);
+    const isScriptRun = SCRIPT_FREE_SPACE_REGEX.test(matchText);
+    const isOversized = cpCount > size && (isScriptRun || cpCount > 40);
 
     if (!isOversized) {
       tokens.push({
         startOffset: matchStart,
         endOffset: matchStart + matchText.length,
+        weight: isScriptRun ? cpCount : 1,
       });
     } else {
       let currentOffset = matchStart;
@@ -1350,6 +1352,7 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
         tokens.push({
           startOffset: currentOffset,
           endOffset: currentOffset + char.length,
+          weight: 1,
         });
         currentOffset += char.length;
       }
@@ -1359,11 +1362,16 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   if (tokens.length === 0) return [];
 
   const chunks: SplitRAGChunk[] = [];
-  for (let start = 0; start < tokens.length; start += stride) {
-    const end = Math.min(tokens.length, start + size);
+  let start = 0;
+  while (start < tokens.length) {
+    let end = start;
+    let used = 0;
+    while (end < tokens.length && (end === start || used + tokens[end]!.weight <= size)) {
+      used += tokens[end]!.weight;
+      end++;
+    }
     const startOffset = tokens[start]!.startOffset;
-    const last = tokens[end - 1]!;
-    const endOffset = last.endOffset;
+    const endOffset = tokens[end - 1]!.endOffset;
     chunks.push({
       text: text.slice(startOffset, endOffset),
       startOffset,
@@ -1371,6 +1379,14 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
       tokenCount: end - start,
     });
     if (end === tokens.length) break;
+    // Next window starts at the earliest token whose tail up to `end` fits the overlap budget.
+    let next = end;
+    let tail = 0;
+    while (next > start + 1 && tail + tokens[next - 1]!.weight <= overlap) {
+      tail += tokens[next - 1]!.weight;
+      next--;
+    }
+    start = next;
   }
   return chunks;
 }

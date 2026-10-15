@@ -440,21 +440,11 @@ describe('splitRAGText (#1014)', () => {
     }
   });
 
-  it('splits 21-40 character whitespace-free ASCII and Cyrillic documents exceeding size', () => {
-    const size = 20;
-    const overlap = 0;
-
-    const asciiDoc30 = 'a'.repeat(30);
-    const asciiChunks = __testing__.splitRAGText(asciiDoc30, size, overlap);
-    expect(asciiChunks.length).toBe(2);
-    expect(asciiChunks[0]!.text).toBe('a'.repeat(20));
-    expect(asciiChunks[1]!.text).toBe('a'.repeat(10));
-
-    const cyrDoc30 = 'Ж'.repeat(30);
-    const cyrChunks = __testing__.splitRAGText(cyrDoc30, size, overlap);
-    expect(cyrChunks.length).toBe(2);
-    expect(cyrChunks[0]!.text).toBe('Ж'.repeat(20));
-    expect(cyrChunks[1]!.text).toBe('Ж'.repeat(10));
+  it('keeps 21-40 character spaced-script words atomic, like ordinary words', () => {
+    // Only runs past 40 code points (or space-free scripts) are split; a document
+    // that merely lacks whitespace does not make an ordinary word eligible.
+    expect(__testing__.splitRAGText('a'.repeat(30), 20, 0).map((c) => c.text)).toEqual(['a'.repeat(30)]);
+    expect(__testing__.splitRAGText('Ж'.repeat(30), 20, 0).map((c) => c.text)).toEqual(['Ж'.repeat(30)]);
   });
 
   it('handles 140,000-code-point document without throwing RangeError', () => {
@@ -462,6 +452,20 @@ describe('splitRAGText (#1014)', () => {
     const chunks = __testing__.splitRAGText(largeDoc, 20, 19);
     expect(chunks.length).toBe(139981);
     expect(chunks[0]!.text).toBe('中'.repeat(20));
+  });
+
+  it('keeps a standalone ordinary word atomic whatever the document looks like', () => {
+    expect(__testing__.splitRAGText('hello', 4, 0).map((c) => c.text)).toEqual(['hello']);
+  });
+
+  it('bounds chunks to the code-point budget across many short CJK runs', () => {
+    const doc = `${'中'.repeat(20)}
+${'中'.repeat(20)}`;
+    const chunks = __testing__.splitRAGText(doc, 20, 0);
+    expect(chunks.length).toBe(2);
+    for (const chunk of chunks) {
+      expect([...chunk.text.replace(/\s/g, '')].length).toBeLessThanOrEqual(20);
+    }
   });
 });
 
