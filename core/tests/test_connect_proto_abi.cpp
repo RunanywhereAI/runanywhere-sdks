@@ -278,6 +278,7 @@ void test_cluster_orchestration() {
     // Reset cluster runtime state to ensure clean test isolation
     {
         v1::ClusterStopRequest reset_request;
+        reset_request.set_cluster_id("reset");
         v1::ClusterState reset_state;
         call_proto(rac_connect_cluster_stop_proto, reset_request, &reset_state);
     }
@@ -354,6 +355,14 @@ void test_cluster_orchestration() {
           "Repeated cluster start with same ID is idempotent");
     CHECK(idempotent_state.is_active(), "Idempotent start returns active state");
 
+    // 5b. Repeat start with the same cluster_id but a changed model is rejected, not ignored
+    v1::ClusterStartRequest changed_layout_request = valid_request;
+    changed_layout_request.mutable_model()->set_model_id("different-model");
+    v1::ClusterState changed_layout_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, changed_layout_request, &changed_layout_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat start with a changed model is rejected");
+
     // 6. Conflicting cluster start with different cluster_id while active is rejected
     v1::ClusterStartRequest conflict_request = valid_request;
     conflict_request.set_cluster_id("cluster-beta");
@@ -375,6 +384,14 @@ void test_cluster_orchestration() {
     CHECK(join_response.accepted(), "Peer join response is accepted");
     CHECK(join_response.peer_capability().available_memory_bytes() == 8589934592ULL,
           "Peer capability is populated in join response");
+
+    // 7b. Peer advertising less capacity than its assigned span is rejected
+    v1::ClusterJoinRequest undersized_join = join_request;
+    undersized_join.mutable_peer_capability()->set_max_layers(1);
+    v1::ClusterStartResponse undersized_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, undersized_join, &undersized_response) == RAC_SUCCESS,
+          "Undersized-capacity join returns typed validation response");
+    CHECK(!undersized_response.accepted(), "Peer whose max_layers is below its span is rejected");
 
     // 8. Peer join with unknown instance_id is rejected
     v1::ClusterJoinRequest unknown_peer_join = join_request;
@@ -429,6 +446,12 @@ void test_cluster_orchestration() {
     v1::ClusterState wrong_stop_state;
     CHECK(call_proto(rac_connect_cluster_stop_proto, wrong_stop_request, &wrong_stop_state) == RAC_ERROR_INVALID_ARGUMENT,
           "Stopping with mismatched cluster_id is rejected");
+
+    // 12b. Stop without a cluster_id is rejected rather than tearing the cluster down
+    v1::ClusterStopRequest empty_stop_request;
+    v1::ClusterState empty_stop_state;
+    CHECK(call_proto(rac_connect_cluster_stop_proto, empty_stop_request, &empty_stop_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Stopping without a cluster_id is rejected");
 
     // 13. Stop active cluster cleanly
     v1::ClusterStopRequest stop_request;
