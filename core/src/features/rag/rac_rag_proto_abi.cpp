@@ -331,6 +331,9 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
 // Rejects non-finite or out-of-range BM25 / RRF tuning values at the ABI boundary:
 // b outside [0, 1] or an infinite k1 makes every BM25 score drop out of the
 // `score > 0` filter (negative or NaN), which would silently return no hits.
+// k1 and rrf_k must be strictly positive: 0 is the "unset" sentinel all the way down
+// (QueryOverrides, BM25Index, fuse_rankings), so an explicit 0 would silently become the
+// default (1.2 / 60) instead of doing what it says.
 bool validate_bm25_rrf_params(bool has_k1, float k1, bool has_b, float b, bool has_rrf_k,
                               int32_t rrf_k, const char* owner, std::string* out_message) {
     const auto fail = [&](const char* detail) {
@@ -338,12 +341,12 @@ bool validate_bm25_rrf_params(bool has_k1, float k1, bool has_b, float b, bool h
             *out_message = std::string(owner) + "." + detail;
         return false;
     };
-    if (has_k1 && (!std::isfinite(k1) || k1 < 0.0f))
-        return fail("bm25_k1 must be a finite value >= 0");
+    if (has_k1 && (!std::isfinite(k1) || k1 <= 0.0f))
+        return fail("bm25_k1 must be a finite value > 0");
     if (has_b && (!std::isfinite(b) || b < 0.0f || b > 1.0f))
         return fail("bm25_b must be a finite value in 0.0...1.0");
-    if (has_rrf_k && rrf_k < 0)
-        return fail("rrf_k must be >= 0");
+    if (has_rrf_k && rrf_k <= 0)
+        return fail("rrf_k must be > 0");
     return true;
 }
 

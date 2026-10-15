@@ -94,6 +94,12 @@ const std::string* find_param(const runanywhere::v1::OperatorSpec& spec, const s
     return &it->second;
 }
 
+// True when `key` is present with a non-empty value.
+bool has_param(const runanywhere::v1::OperatorSpec& spec, const std::string& key) {
+    const std::string* value = find_param(spec, key);
+    return value != nullptr && !value->empty();
+}
+
 int param_int_or(const runanywhere::v1::OperatorSpec& spec, const std::string& key, int fallback) {
     const std::string* value = find_param(spec, key);
     if (!value || value->empty())
@@ -791,12 +797,12 @@ class RetrieveNode final : public OperatorNode {
             param_error_ =
                 "retrieve params 'k', 'similarity_threshold', 'bm25_k1', 'bm25_b' and 'rrf_k' "
                 "must be fully-numeric finite values";
-        } else if (bm25_k1_ < 0.0f) {
-            param_error_ = "retrieve param 'bm25_k1' must be >= 0";
+        } else if (has_param(spec, "bm25_k1") && bm25_k1_ <= 0.0f) {
+            param_error_ = "retrieve param 'bm25_k1' must be > 0";
         } else if (bm25_b_ > 1.0f) {
             param_error_ = "retrieve param 'bm25_b' must be in 0.0...1.0";
-        } else if (rrf_k_ < 0) {
-            param_error_ = "retrieve param 'rrf_k' must be >= 0";
+        } else if (has_param(spec, "rrf_k") && rrf_k_ <= 0) {
+            param_error_ = "retrieve param 'rrf_k' must be > 0";
         }
         if (const std::string* p = find_param(spec, "system_prompt"); p) {
             system_prompt_ = *p;

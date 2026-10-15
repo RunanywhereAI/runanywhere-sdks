@@ -1436,6 +1436,8 @@ TEST(retrieve_rejects_malformed_params) {
         {"bm25_k1", "inf", "fully-numeric"},
         {"bm25_b", "100", "0.0...1.0"},
         {"rrf_k", "-5", "rrf_k"},
+        {"rrf_k", "0", "rrf_k"},
+        {"bm25_k1", "0", "bm25_k1"},
         {"vector_store", "PGVECTOR", "unknown vector_store"},
         {"vector_store", "usearch ", "unknown vector_store"},
     };

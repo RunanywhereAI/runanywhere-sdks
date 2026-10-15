@@ -309,11 +309,11 @@ class RagRetrievalOptions:
 
     top_k: Optional[int] = None
     similarity_threshold: Optional[float] = None
-    #: BM25 term-frequency saturation; finite and ``>= 0``. ``None`` uses the session default.
+    #: BM25 term-frequency saturation; finite and ``> 0`` (0 is rejected). ``None`` uses the session default.
     bm25_k1: Optional[float] = None
     #: BM25 document-length normalization in ``0..1``. ``None`` uses the session default.
     bm25_b: Optional[float] = None
-    #: Reciprocal-rank-fusion constant, ``>= 0``. ``None`` uses the session default.
+    #: Reciprocal-rank-fusion constant, ``> 0`` (0 is rejected). ``None`` uses the session default.
     rrf_k: Optional[int] = None
     vector_store: Optional[RagVectorStore] = None
 
