@@ -160,6 +160,20 @@ describe('CrossWasmRAGProvider', () => {
     ]);
   });
 
+  it('rejects native-only BM25/RRF/vector-store knobs on query and queryStream', async () => {
+    installBackendSpies();
+    const provider = __testing__.createCrossWasmRAGProvider();
+    await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    }));
+    await expect(
+      provider.ragQuery('anything', { retrieval: { bm25K1: 1.5 } as never }),
+    ).rejects.toThrow(/bm25K1.*native RAG session provider/);
+    const stream = provider.ragQueryStream!('anything', { retrieval: { rrfK: 30 } as never });
+    await expect(stream[Symbol.asyncIterator]().next()).rejects.toThrow(/rrfK/);
+  });
+
   it('supports typed document removal, clear, and statistics', async () => {
     installBackendSpies();
     vi.spyOn(Embeddings, 'embedBatch').mockImplementation(

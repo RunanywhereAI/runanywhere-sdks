@@ -203,7 +203,12 @@ export interface RagConfig {
 /** Vector store backing RAG retrieval. Only the in-process store is available on-device. */
 export type RagVectorStore = 'usearch';
 
-/** Per-query retrieval overrides of `RagSession.query`/`queryStream`. */
+/**
+ * Per-query retrieval overrides of `RagSession.query`/`queryStream`.
+ *
+ * `bm25K1`, `bm25B`, `rrfK` and `vectorStore` are honored only by the native RAG session
+ * provider; the cross-WASM fallback rejects them with an error rather than ignoring them.
+ */
 export interface RagRetrievalOptions {
   topK?: number;
   similarityThreshold?: number;
