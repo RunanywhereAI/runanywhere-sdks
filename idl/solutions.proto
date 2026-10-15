@@ -92,11 +92,15 @@ message RAGConfig {
     int32  rerank_top = 7;
 
     // BM25 term-saturation and length-normalization parameters.
-    float  bm25_k1 = 8;
-    float  bm25_b  = 9;
+    // `optional` so an explicit YAML value -- including a 0 -- reaches the
+    // retrieve operator, which rejects bm25_k1 <= 0 and accepts bm25_b = 0
+    // (no length normalization); unset keeps the session default.
+    optional float bm25_k1 = 8;
+    optional float bm25_b  = 9;
 
-    // Reciprocal-rank-fusion smoothing constant.
-    int32  rrf_k   = 10;
+    // Reciprocal-rank-fusion smoothing constant; an explicit value <= 0 is
+    // rejected by the retrieve operator, unset keeps the session default.
+    optional int32 rrf_k   = 10;
 
     string prompt_template = 11;
 }

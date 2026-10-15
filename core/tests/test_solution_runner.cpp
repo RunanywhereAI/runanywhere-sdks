@@ -1190,6 +1190,61 @@ TEST(rag_retrieval_params_reach_the_retrieve_operator) {
 }
 
 // ---------------------------------------------------------------------------
+// 10c. An explicit solution-YAML zero reaches the retrieve operator instead of
+//      collapsing into "unset" (issue #1076), and garbage fails at load time.
+// ---------------------------------------------------------------------------
+TEST(rag_yaml_explicit_zero_tuning_reaches_the_retrieve_operator) {
+    ScopedSolutionStandins standins;
+
+    SolutionConfig cfg;
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  llm_model_id: \"qwen3-4b\"\n"
+                                                  "  bm25_k1: 0\n"
+                                                  "  bm25_b: 0\n"
+                                                  "  rrf_k: 0\n",
+                                                  &cfg) == RAC_SUCCESS);
+    CHECK(cfg.rag().has_bm25_k1() && cfg.rag().has_bm25_b() && cfg.rag().has_rrf_k());
+
+    SolutionRunner runner(cfg);
+    CHECK(runner.start() == RAC_SUCCESS);
+    const runanywhere::v1::OperatorSpec* retrieve = nullptr;
+    for (const auto& op : runner.spec().operators()) {
+        if (op.name() == "retrieve")
+            retrieve = &op;
+    }
+    CHECK(retrieve != nullptr);
+    if (retrieve != nullptr) {
+        // Present, so the operator's "> 0" guard sees bm25_k1/rrf_k and rejects them,
+        // and bm25_b = 0 (no length normalization) is honored instead of dropped.
+        const auto& params = retrieve->params();
+        CHECK(params.count("bm25_k1") == 1 && params.at("bm25_k1") == "0");
+        CHECK(params.count("bm25_b") == 1 && params.at("bm25_b") == "0");
+        CHECK(params.count("rrf_k") == 1 && params.at("rrf_k") == "0");
+    }
+    runner.close_input();
+    runner.wait();
+
+    // An unset key still means "session default": nothing is forwarded.
+    SolutionConfig defaults_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  llm_model_id: \"qwen3-4b\"\n",
+                                                  &defaults_cfg) == RAC_SUCCESS);
+    CHECK(!defaults_cfg.rag().has_bm25_k1() && !defaults_cfg.rag().has_rrf_k());
+
+    // Garbage used to become 0 through to_float(); it is a load error now.
+    SolutionConfig garbage_cfg;
+    rac_error_clear_details();
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  bm25_b: \"abc\"\n",
+                                                  &garbage_cfg) == RAC_ERROR_INVALID_FORMAT);
+    const char* details = rac_error_get_details();
+    CHECK(details != nullptr && std::string(details).find("rag.bm25_b") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
 // 11. C ABI end-to-end: proto-bytes path.
 // ---------------------------------------------------------------------------
 TEST(c_abi_proto_bytes_lifecycle) {
@@ -1533,6 +1588,7 @@ int main() {
     run_test_voice_agent_explicit_zero_temperature_reaches_llm_operator();
     run_test_rag_solution_compiles();
     run_test_rag_retrieval_params_reach_the_retrieve_operator();
+    run_test_rag_yaml_explicit_zero_tuning_reaches_the_retrieve_operator();
     run_test_c_abi_proto_bytes_lifecycle();
     run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_c_abi_yaml_solution_lifecycle();

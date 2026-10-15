@@ -14,5 +14,5 @@
 # =============================================================================
 IDL_VERSION=1.6.0
 IDL_PROTO_COUNT=41
-IDL_SCHEMA_SHA256=6ecb51e8eefd962f3269011d8f7039b6b6bbe3da424fd6ba720c19c0337bc15c
+IDL_SCHEMA_SHA256=eab98ac5049f68b6b14029739f8d8b798d2c4e5356be6a01e32332bdc113d6b1
 IDL_PROTOC_VERSION=35.1
