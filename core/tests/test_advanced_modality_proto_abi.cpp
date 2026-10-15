@@ -1080,6 +1080,37 @@ int test_embeddings_options_mapping() {
     return 0;
 }
 
+int test_embeddings_vector_mapping() {
+    runanywhere::v1::EmbeddingVector proto;
+    proto.add_values(1.5f);
+    CHECK(!rac::foundation::rac_embedding_vector_from_proto(proto, nullptr),
+          "null destination rejected for embedding vector adapter");
+
+    runanywhere::v1::EmbeddingVector empty_proto;
+    rac_embedding_vector_t empty_vec{};
+    empty_vec.dimension = 42;
+    CHECK(rac::foundation::rac_embedding_vector_from_proto(empty_proto, &empty_vec),
+          "empty embedding vector maps successfully");
+    CHECK(empty_vec.dimension == 0 && empty_vec.data == nullptr,
+          "empty embedding vector sets zero dimension and null data");
+
+    runanywhere::v1::EmbeddingVector non_empty_proto;
+    non_empty_proto.add_values(0.5f);
+    non_empty_proto.add_values(-1.25f);
+    non_empty_proto.add_values(2.0f);
+    rac_embedding_vector_t vec{};
+    CHECK(rac::foundation::rac_embedding_vector_from_proto(non_empty_proto, &vec),
+          "non-empty embedding vector maps successfully");
+    CHECK(vec.dimension == 3 && vec.data != nullptr,
+          "non-empty embedding vector preserves dimension and allocates data");
+    if (vec.data) {
+        CHECK(vec.data[0] == 0.5f && vec.data[1] == -1.25f && vec.data[2] == 2.0f,
+              "embedding vector values match proto");
+        rac_free(vec.data);
+    }
+    return 0;
+}
+
 struct ProgressCapture {
     std::vector<std::vector<uint8_t>> progress;
 };
@@ -2148,6 +2179,7 @@ int main() {
         test_vlm_companion_resolution();
         test_embeddings_mocked_result();
         test_embeddings_options_mapping();
+        test_embeddings_vector_mapping();
         test_diffusion_progress_cancel_and_unsupported();
         test_rag_ingest_query_mocked_path();
         test_rag_search_retrieval_only();
