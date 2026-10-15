@@ -974,8 +974,8 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
     } else if (request.seq_len() == 0 || request.hidden_size() == 0) {
         validation.set_rejection_reason("Invalid activation tensor dimensions (seq_len/hidden_size zero)");
     } else {
-        // An activation is the handoff out of a real stage, so layer 0 (the first stage's input) is never a
-        // valid source boundary.
+        // An activation is the handoff out of a real stage, so layer 0 (the first stage's input) is
+        // never a valid source boundary.
         bool valid_boundary = false;
         for (const auto& a : cluster.assignments) {
             if (a.layer_start() > 0 && request.from_layer() == a.layer_start()) {
@@ -987,7 +987,11 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
         // element or FP32 at 4 bytes per element; minimum 2 bytes per element).
         const uint64_t min_elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
         const uint64_t min_bytes = min_elements > UINT64_MAX / 2 ? UINT64_MAX : min_elements * 2;
-        if (!valid_boundary) {
+        if (request.from_layer() == 0) {
+            // Layer 0 is a boundary, but it is the first stage's input: no stage produced it.
+            validation.set_rejection_reason(
+                "Activation from_layer 0 is the first stage's input, not an inter-stage handoff");
+        } else if (!valid_boundary) {
             validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
         } else if (request.tensor_data().size() < min_bytes) {
             validation.set_rejection_reason("Activation tensor_data size is smaller than expected tensor bytes (minimum 2 bytes/element)");
