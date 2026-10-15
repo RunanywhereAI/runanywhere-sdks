@@ -102,6 +102,15 @@ bool is_valid_model(const v1::ConnectModelDescriptor& model) {
            is_valid_display_name(model.display_name());
 }
 
+// Field-wise rather than a byte compare: serialized bytes can differ for equal
+// descriptors when a sender carries unknown fields in a different wire order.
+bool same_model_descriptor(const v1::ConnectModelDescriptor& a,
+                           const v1::ConnectModelDescriptor& b) {
+    return a.model_id() == b.model_id() && a.display_name() == b.display_name() &&
+           a.framework() == b.framework() && a.context_window() == b.context_window() &&
+           a.supports_streaming() == b.supports_streaming();
+}
+
 const PlatformRolePolicy* find_platform_policy(v1::ConnectPlatform platform) {
     for (const PlatformRolePolicy& policy : kPlatformRolePolicies) {
         if (policy.platform == platform) {
@@ -773,7 +782,7 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
 
     if (cluster.is_active) {
         if (cluster.cluster_id == request.cluster_id()) {
-            if (cluster.model.SerializeAsString() != request.model().SerializeAsString() ||
+            if (!same_model_descriptor(cluster.model, request.model()) ||
                 !same_layer_assignments(cluster.assignments, request.assignments())) {
                 rac_proto_buffer_set_error(
                     out_cluster_state, RAC_ERROR_INVALID_CONFIGURATION,

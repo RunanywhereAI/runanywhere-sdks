@@ -360,8 +360,8 @@ void test_cluster_orchestration() {
     changed_context_request.mutable_model()->set_context_window(
         valid_request.model().context_window() + 1024);
     v1::ClusterState changed_context_state;
-    CHECK(call_proto(rac_connect_cluster_start_proto, changed_context_request, &changed_context_state) ==
-              RAC_ERROR_INVALID_CONFIGURATION,
+    CHECK(call_proto(rac_connect_cluster_start_proto, changed_context_request,
+                     &changed_context_state) == RAC_ERROR_INVALID_CONFIGURATION,
           "Repeat start with a changed descriptor field (context_window) is rejected");
 
     // 5b. Repeat start with the same cluster_id but a changed model is rejected, not ignored
