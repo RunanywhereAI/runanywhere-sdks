@@ -40,7 +40,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <locale>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -145,16 +147,23 @@ bool param_float_strict(const runanywhere::v1::OperatorSpec& spec, const std::st
     const std::string* value = find_param(spec, key);
     if (!value || value->empty())
         return true;
-    try {
-        size_t pos = 0;
-        const float parsed = std::stof(*value, &pos);
-        if (pos != value->size() || !std::isfinite(parsed))
-            return false;
-        *out = parsed;
-        return true;
-    } catch (...) {
+    // Parse with the classic "C" locale: std::stof follows the process locale, so a
+    // host that set a comma-decimal locale would reject "0.8" and accept "0,8".
+    std::istringstream stream(*value);
+    stream.imbue(std::locale::classic());
+    float parsed = 0.0f;
+    if (!(stream >> parsed) || stream.peek() != std::char_traits<char>::eof() ||
+        !std::isfinite(parsed)) {
         return false;
     }
+    *out = parsed;
+    return true;
+}
+
+// True when `key` is present with a non-empty value.
+bool has_param(const runanywhere::v1::OperatorSpec& spec, const std::string& key) {
+    const std::string* value = find_param(spec, key);
+    return value != nullptr && !value->empty();
 }
 
 // Parse an unsigned 64-bit identifier (e.g. a host-provided session handle)
@@ -791,9 +800,14 @@ class RetrieveNode final : public OperatorNode {
             param_error_ =
                 "retrieve params 'k', 'similarity_threshold', 'bm25_k1', 'bm25_b' and 'rrf_k' "
                 "must be fully-numeric finite values";
+        } else if (has_param(spec, "k") && retrieval_top_k_ < 1) {
+            param_error_ = "retrieve param 'k' must be >= 1";
+        } else if (has_param(spec, "similarity_threshold") &&
+                   (similarity_threshold_ < 0.0f || similarity_threshold_ > 1.0f)) {
+            param_error_ = "retrieve param 'similarity_threshold' must be in 0.0...1.0";
         } else if (bm25_k1_ < 0.0f) {
             param_error_ = "retrieve param 'bm25_k1' must be >= 0";
-        } else if (bm25_b_ > 1.0f) {
+        } else if (has_param(spec, "bm25_b") && (bm25_b_ < 0.0f || bm25_b_ > 1.0f)) {
             param_error_ = "retrieve param 'bm25_b' must be in 0.0...1.0";
         } else if (rrf_k_ < 0) {
             param_error_ = "retrieve param 'rrf_k' must be >= 0";
