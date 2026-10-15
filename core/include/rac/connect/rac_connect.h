@@ -108,8 +108,10 @@ RAC_API rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* reque
 
 /**
  * Start a local AI cluster coordinator session from a serialized
- * runanywhere.v1.ClusterStartRequest. Validates peer assignments and returns
- * the active ClusterState.
+ * runanywhere.v1.ClusterStartRequest. The coordinator is the host side of the
+ * cluster: a `platform` missing from the role policy, or one whose host role is not
+ * ENABLED, is rejected with RAC_ERROR_NOT_SUPPORTED. Validates peer assignments and
+ * returns the active ClusterState.
  */
 RAC_API rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
                                                      size_t request_size,
@@ -117,9 +119,10 @@ RAC_API rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_byte
 
 /**
  * Join a cluster as a peer from a serialized runanywhere.v1.ClusterJoinRequest.
- * Checks the peer appears in the cluster's layer assignments and, when it advertises
- * a non-zero max_layers, that its assigned span fits within it; returns a
- * ClusterStartResponse echoing the peer's capability.
+ * Rejects (typed `accepted = false`) a peer whose advertised platform is unknown or not
+ * client-ENABLED, one missing from the cluster's layer assignments, and one whose
+ * non-zero max_layers is smaller than its assigned span. The returned
+ * ClusterStartResponse echoes the peer's capability only when the join is accepted.
  */
 RAC_API rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
                                                     size_t request_size,

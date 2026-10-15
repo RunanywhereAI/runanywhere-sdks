@@ -771,10 +771,12 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // Same code as every other entry point for "platform not in the role policy", so callers
+    // can tell an unusable platform from a malformed request.
     if (find_platform_policy(request.platform()) == nullptr) {
-        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_NOT_SUPPORTED,
                                    "ClusterStartRequest has an unknown coordinator platform");
-        return RAC_ERROR_INVALID_ARGUMENT;
+        return RAC_ERROR_NOT_SUPPORTED;
     }
     if (!is_host_role_enabled(request.platform())) {
         rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_NOT_SUPPORTED,
