@@ -440,6 +440,24 @@ void test_cluster_orchestration() {
           "Undersized activation tensor returns typed validation");
     CHECK(!undersized_validation.accepted(), "Undersized activation tensor bytes are rejected");
 
+    // 11c. A message over the protocol ceiling is rejected before it is parsed, so its
+    // tensor_data is never allocated. Only the length is consulted first, which lets a
+    // 1-byte buffer stand in for an oversized message without allocating 256 MiB here.
+    {
+        const uint8_t one_byte = 0;
+        rac_proto_buffer_t output;
+        rac_proto_buffer_init(&output);
+        const rac_result_t rc = rac_connect_cluster_validate_activation_proto(
+            &one_byte, static_cast<size_t>(RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES) + 1u, &output);
+        v1::ConnectInvocationValidation oversized_validation;
+        const bool parsed = rc == RAC_SUCCESS && oversized_validation.ParseFromArray(
+                                                     output.data, static_cast<int>(output.size));
+        rac_proto_buffer_free(&output);
+        CHECK(parsed && !oversized_validation.accepted() &&
+                  oversized_validation.rejection_reason().find("ceiling") != std::string::npos,
+              "ClusterActivation over the protocol ceiling is rejected before parsing");
+    }
+
     // 12. Stop cluster with mismatched cluster ID is rejected
     v1::ClusterStopRequest wrong_stop_request;
     wrong_stop_request.set_cluster_id("cluster-different");

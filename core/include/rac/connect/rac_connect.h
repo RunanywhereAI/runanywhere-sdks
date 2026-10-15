@@ -133,9 +133,18 @@ RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes
                                                     rac_proto_buffer_t* out_cluster_state);
 
 /**
+ * Protocol ceiling on one serialized runanywhere.v1.ClusterActivation (256 MiB). A larger
+ * message is rejected before it is parsed, so its tensor_data is never allocated.
+ */
+#define RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES (256u * 1024u * 1024u)
+
+/**
  * Validate an intermediate activation tensor payload between pipeline stages.
  * Accepts ClusterActivation and verifies cluster binding, tensor dimensions,
- * and valid layer boundaries. (Validation only; transport occurs out-of-band).
+ * and valid layer boundaries. A request larger than
+ * RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES returns RAC_SUCCESS with a typed
+ * `accepted = false` validation without being parsed. (Validation only; transport
+ * occurs out-of-band).
  */
 RAC_API rac_result_t
 rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
