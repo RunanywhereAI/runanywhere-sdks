@@ -218,6 +218,14 @@ public actor RagSession {
         if let similarityThreshold = options?.similarityThreshold {
             retrieval.scoreThreshold = similarityThreshold
         }
+        if let bm25K1 = options?.bm25K1 { retrieval.bm25K1 = bm25K1 }
+        if let bm25B = options?.bm25B { retrieval.bm25B = bm25B }
+        if let rrfK = options?.rrfK { retrieval.rrfK = Int32(rrfK) }
+        if let vectorStore = options?.vectorStore {
+            switch vectorStore {
+            case .usearch: retrieval.vectorStore = .usearch
+            }
+        }
         queryOptions.retrieval = retrieval
         if let generation = options?.generation {
             queryOptions.generation = generation.toProto()

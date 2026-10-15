@@ -2,7 +2,7 @@
  * `RunAnywhere.rag` — retrieval-augmented sessions over an ingested corpus.
  */
 
-import { RAGStreamEventKind } from '@runanywhere/proto-ts/rag';
+import { RAGStreamEventKind, VectorStore } from '@runanywhere/proto-ts/rag';
 import type { RAGQueryOverrides } from '../../Extensions/RunAnywhere+RAG.js';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import {
@@ -71,6 +71,11 @@ function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQuery
         topK: options.retrieval?.topK,
         scoreThreshold: options.retrieval?.similarityThreshold,
         enableMultiQuery: false,
+        bm25K1: options.retrieval?.bm25K1,
+        bm25B: options.retrieval?.bm25B,
+        rrfK: options.retrieval?.rrfK,
+        vectorStore:
+          options.retrieval?.vectorStore === 'usearch' ? VectorStore.VECTOR_STORE_USEARCH : undefined,
       },
       generation: options.generation ? toProtoLlmOptions(options.generation) : undefined,
     };

@@ -1419,6 +1419,10 @@ function makeRAGQuery(
       enableMultiQuery: options.retrieval?.enableMultiQuery ?? retrievalDefaults.enableMultiQuery,
       multiQueryCount: options.retrieval?.multiQueryCount ?? retrievalDefaults.multiQueryCount,
       scopePrefix: options.retrieval?.scopePrefix,
+      bm25K1: options.retrieval?.bm25K1,
+      bm25B: options.retrieval?.bm25B,
+      rrfK: options.retrieval?.rrfK,
+      vectorStore: options.retrieval?.vectorStore,
     },
   };
 }

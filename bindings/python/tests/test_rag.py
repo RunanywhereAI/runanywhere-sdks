@@ -32,6 +32,7 @@ from runanywhere import (  # noqa: E402
     RagQueryOptions,
     RagResult,
     RagRetrievalOptions,
+    RagVectorStore,
     RagSession,
     ReasoningMode,
     ReasoningOptions,
@@ -239,6 +240,24 @@ def test_query_accepts_rag_query_options_with_retrieval_overrides(rag_core) -> N
     assert query.retrieval.top_k == 7
     assert query.retrieval.score_threshold == pytest.approx(0.42)
     assert query.generation.max_output_tokens == 64
+
+
+def test_query_threads_bm25_rrf_and_vector_store_into_the_proto(rag_core) -> None:
+    session = _open(rag_core)
+    session.ingest(RagDocument("Paris is the capital of France."))
+    session.query(
+        "Capital of France?",
+        RagQueryOptions(
+            retrieval=RagRetrievalOptions(
+                bm25_k1=1.5, bm25_b=0.8, rrf_k=30, vector_store=RagVectorStore.USEARCH
+            ),
+        ),
+    )
+    retrieval = rag_core.last_query.retrieval
+    assert retrieval.bm25_k1 == pytest.approx(1.5)
+    assert retrieval.bm25_b == pytest.approx(0.8)
+    assert retrieval.rrf_k == 30
+    assert retrieval.vector_store == RagVectorStore.USEARCH
 
 
 def test_query_stream_accepts_rag_query_options(rag_core) -> None:

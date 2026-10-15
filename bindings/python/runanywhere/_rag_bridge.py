@@ -113,6 +113,14 @@ def build_query(
                 query.retrieval.top_k = int(retrieval.top_k)
             if retrieval.similarity_threshold is not None:
                 query.retrieval.score_threshold = retrieval.similarity_threshold
+            if retrieval.bm25_k1 is not None:
+                query.retrieval.bm25_k1 = retrieval.bm25_k1
+            if retrieval.bm25_b is not None:
+                query.retrieval.bm25_b = retrieval.bm25_b
+            if retrieval.rrf_k is not None:
+                query.retrieval.rrf_k = int(retrieval.rrf_k)
+            if retrieval.vector_store is not None:
+                query.retrieval.vector_store = int(retrieval.vector_store)
         generation = options.generation
         if generation is not None:
             query.generation.max_output_tokens = generation.max_output_tokens
