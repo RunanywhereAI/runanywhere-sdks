@@ -95,11 +95,6 @@ public data class LlmOptions(
     val stopSequences: List<String> = emptyList(),
     val systemPrompt: String? = null,
     val reasoning: ReasoningOptions? = null,
-    /**
-     * Optional structured-output overrides; `llm.generateStructured` supplies the
-     * schema and uses this field's `mode`/`strict` in preference to its own `mode` argument.
-     */
-    val structuredOutput: StructuredOutput? = null,
     /** Empty uses the tools registered through `llm.tools`. */
     val tools: List<ToolDefinition> = emptyList(),
     val toolChoice: ToolChoice = ToolChoice.Auto,
@@ -112,6 +107,13 @@ public data class LlmOptions(
      * `llm.generate`/`llm.generateStream` with inline `tools`.
      */
     val autoExecute: Boolean = true,
+    /**
+     * Optional structured-output override for `llm.generateStructured`, which supplies the
+     * schema and uses this field's `mode` in preference to its own `mode` argument.
+     * `strict` is not forwarded: `StructuredOutputOptions` has no strict field on the wire.
+     * Declared last so existing positional arguments and `componentN()` keep their slots.
+     */
+    val structuredOutput: StructuredOutput? = null,
 ) {
     /** Sampling and tool-loop defaults, as annotated in idl/. */
     public companion object {
