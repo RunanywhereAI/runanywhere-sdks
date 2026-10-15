@@ -745,7 +745,7 @@ class CrossWasmRAGProvider implements RAGProvider {
       endOffset: chunk.endOffset,
       tokenCount: chunk.tokenCount,
     }));
-    this.chunks.push(...nextChunks);
+    for (const chunk of nextChunks) this.chunks.push(chunk);
     this.documents.set(normalized.id, {
       id: normalized.id,
       name: normalized.name,
@@ -1310,6 +1310,33 @@ function countCodePoints(str: string): number {
   return count;
 }
 
+/** Scripts written without inter-word spaces, so one whitespace run can hold many words. */
+const SCRIPT_FREE_SPACE_REGEX =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}]/u;
+
+interface RAGWordRun {
+  text: string;
+  /** Offset of `text` inside the whitespace-delimited word it came from. */
+  offset: number;
+  /** True when the run is measured in code points rather than as a single word token. */
+  charBased: boolean;
+}
+
+/**
+ * Splits one whitespace-free word into runs. A word holding a space-free script is cut into
+ * Latin / non-Latin sub-runs so each is judged on its own; any other word stays a single run.
+ */
+function splitWordRuns(word: string): RAGWordRun[] {
+  if (!SCRIPT_FREE_SPACE_REGEX.test(word)) {
+    return [{ text: word, offset: 0, charBased: countCodePoints(word) > 40 }];
+  }
+  return [...word.matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9]+/g)].map((m) => ({
+    text: m[0],
+    offset: m.index ?? 0,
+    charBased: SCRIPT_FREE_SPACE_REGEX.test(m[0]) || countCodePoints(m[0]) > 40,
+  }));
+}
+
 /**
  * Splits input text into sliding-window chunks bounded by token count and chunk overlap.
  * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK text
@@ -1331,32 +1358,24 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   // each non-whitespace sequence is roughly one token. In scripts without spaces
   // (CJK, Thai, Lao, Myanmar, Khmer, etc.) or for oversized runs (long URLs, base64 blobs > 40 chars),
   // a single regex match can exceed the chunk size budget. We enforce a character/code-point
-  // limit by splitting any token whose code-point count exceeds `size` and represents a
+  // limit by splitting any run whose code-point count exceeds `size` and represents a
   // space-free script or an oversized run (> 40 code points) on Unicode code-point boundaries
-  // (preventing surrogate pair corruption). Ordinary spaced words within or slightly exceeding
-  // tiny budgets remain atomic tokens, matching the C++ core separator-first behavior.
-  const SCRIPT_FREE_SPACE_REGEX =
-    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}]/u;
-
+  // (preventing surrogate pair corruption). A whitespace run that mixes scripts is cut into
+  // Latin / non-Latin sub-runs first, so an English word beside CJK text stays intact.
+  // Ordinary spaced words within or slightly exceeding tiny budgets remain atomic tokens,
+  // matching the C++ core separator-first behavior.
   const tokens: RAGTokenSpan[] = [];
   for (const match of matches) {
-    const matchText = match[0];
     const matchStart = match.index ?? 0;
-    const cpCount = countCodePoints(matchText);
-    const isOversized = cpCount > size && (SCRIPT_FREE_SPACE_REGEX.test(matchText) || cpCount > 40);
-
-    if (!isOversized) {
-      tokens.push({
-        startOffset: matchStart,
-        endOffset: matchStart + matchText.length,
-      });
-    } else {
-      let currentOffset = matchStart;
-      for (const char of matchText) {
-        tokens.push({
-          startOffset: currentOffset,
-          endOffset: currentOffset + char.length,
-        });
+    for (const run of splitWordRuns(match[0])) {
+      const runStart = matchStart + run.offset;
+      if (!(run.charBased && countCodePoints(run.text) > size)) {
+        tokens.push({ startOffset: runStart, endOffset: runStart + run.text.length });
+        continue;
+      }
+      let currentOffset = runStart;
+      for (const char of run.text) {
+        tokens.push({ startOffset: currentOffset, endOffset: currentOffset + char.length });
         currentOffset += char.length;
       }
     }
@@ -1393,36 +1412,45 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
   const maxTokens = Math.max(1, Math.floor(requestedMaxTokens));
   const parts: string[] = [];
   let used = 0;
-  const SCRIPT_FREE_SPACE_REGEX =
-    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}]/u;
 
   // `RAGSearchResult.rank` was deleted outright (idl/rag.proto): rank was
   // always just this array's position, so the 1-based index reconstructs it
   // exactly.
   chunks.forEach((chunk, index) => {
-    const available = maxTokens - used;
+    let available = maxTokens - used;
     if (available <= 0) return;
     const words = chunk.text.split(/\s+/).filter(Boolean);
     let text = '';
-    let tokenCount = 0;
 
-    if (words.length === 1 && (SCRIPT_FREE_SPACE_REGEX.test(words[0]!) || [...words[0]!].length > 40)) {
-      const codePoints = [...words[0]!];
-      const selected = codePoints.slice(0, available);
-      text = selected.join('');
-      tokenCount = selected.length;
-    } else if (words.length > 0) {
-      const selectedWords = words.slice(0, available);
-      text = selectedWords.join(' ');
-      tokenCount = selectedWords.length;
-    } else {
+    if (words.length === 0) {
       text = chunk.text;
-      tokenCount = 1;
+      available -= 1;
+    } else {
+      // An ordinary word costs one token; a space-free-script or oversized run costs one per
+      // code point, so a long CJK run inside a multi-word chunk cannot bypass the budget.
+      const kept: string[] = [];
+      for (const word of words) {
+        if (available <= 0) break;
+        let keptWord = '';
+        for (const run of splitWordRuns(word)) {
+          if (available <= 0) break;
+          if (run.charBased) {
+            const slice = [...run.text].slice(0, available);
+            keptWord += slice.join('');
+            available -= slice.length;
+          } else {
+            keptWord += run.text;
+            available -= 1;
+          }
+        }
+        if (keptWord) kept.push(keptWord);
+      }
+      text = kept.join(' ');
     }
 
     if (!text) return;
     parts.push(`[Source ${index + 1}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
-    used += Math.min(tokenCount, available);
+    used = maxTokens - Math.max(available, 0);
   });
   return parts.join('\n\n');
 }

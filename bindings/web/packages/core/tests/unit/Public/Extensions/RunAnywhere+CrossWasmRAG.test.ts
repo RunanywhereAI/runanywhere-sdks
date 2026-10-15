@@ -529,6 +529,19 @@ describe('splitRAGText', () => {
     expect(context).toContain('人工智能机器学习深度');
     expect(context).not.toContain('强化学习');
   });
+
+  it('keeps an English word intact beside a space-free script (#922)', () => {
+    const chunks = __testing__.splitRAGText('Paris人工智能', 4, 0);
+    expect(chunks.map((c) => c.text)).toEqual(['Paris人工智能']);
+    expect(__testing__.boundedRAGContext([{ text: 'Paris人工智能', score: 1 }], 2)).toBe(
+      '[Source 1: Document]\nParis人',
+    );
+  });
+
+  it('charges a long CJK run inside a multi-word chunk against the context budget (#922)', () => {
+    const context = __testing__.boundedRAGContext([{ text: `hello ${'中'.repeat(200)}`, score: 1 }], 2);
+    expect(context).toBe('[Source 1: Document]\nhello 中');
+  });
 });
 
 describe('renderRAGPrompt', () => {
