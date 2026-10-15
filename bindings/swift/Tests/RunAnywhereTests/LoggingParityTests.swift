@@ -14,10 +14,21 @@ import XCTest
 
 final class LoggingParityTests: XCTestCase {
 
+    private var previousConfiguration: RALoggingConfiguration?
+    private var previousCommonsLevel: rac_log_level_t = RAC_LOG_INFO
+
+    override func setUp() {
+        super.setUp()
+        previousConfiguration = Logging.shared.configuration
+        previousCommonsLevel = rac_logger_get_min_level()
+    }
+
     override func tearDown() {
+        if let previousConfiguration {
+            Logging.shared.configure(previousConfiguration)
+        }
+        rac_logger_set_min_level(previousCommonsLevel)
         super.tearDown()
-        // Reset to default info level to avoid side effects across test cases.
-        RunAnywhere.setLogLevel(.info)
     }
 
     // MARK: - Enum Mapping
@@ -29,6 +40,7 @@ final class LoggingParityTests: XCTestCase {
         XCTAssertEqual(RALogLevel.warning.racLogLevel, RAC_LOG_WARNING)
         XCTAssertEqual(RALogLevel.error.racLogLevel, RAC_LOG_ERROR)
         XCTAssertEqual(RALogLevel.fatal.racLogLevel, RAC_LOG_FATAL)
+        XCTAssertEqual(RALogLevel.UNRECOGNIZED(999).racLogLevel, RAC_LOG_INFO)
     }
 
     func testRacLogLevelToRALogLevelMapping() {

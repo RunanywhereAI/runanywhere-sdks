@@ -28,13 +28,13 @@ extension RALogLevel {
     /// Maps the proto `RALogLevel` enum to the C++ commons `rac_log_level_t`.
     public var racLogLevel: rac_log_level_t {
         switch self {
-        case .trace:   return RAC_LOG_TRACE
-        case .debug:   return RAC_LOG_DEBUG
-        case .info:    return RAC_LOG_INFO
-        case .warning: return RAC_LOG_WARNING
-        case .error:   return RAC_LOG_ERROR
-        case .fatal:   return RAC_LOG_FATAL
-        default:       return RAC_LOG_INFO
+        case .trace:        return RAC_LOG_TRACE
+        case .debug:        return RAC_LOG_DEBUG
+        case .info:         return RAC_LOG_INFO
+        case .warning:      return RAC_LOG_WARNING
+        case .error:        return RAC_LOG_ERROR
+        case .fatal:        return RAC_LOG_FATAL
+        case .UNRECOGNIZED: return RAC_LOG_INFO
         }
     }
 }
