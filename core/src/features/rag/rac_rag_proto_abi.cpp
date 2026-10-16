@@ -420,6 +420,14 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     const auto& gen = query_proto.generation();
     const std::string system_prompt = gen.has_system_prompt() ? gen.system_prompt() : std::string();
 
+    // std::clamp passes NaN straight through, so a non-finite top_p has to be
+    // rejected before it reaches the clamp below rather than after.
+    if (gen.has_top_p() && !std::isfinite(gen.top_p())) {
+        if (out_error)
+            *out_error = "RAGQueryOptions.generation.top_p must be a finite number";
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
     // Base off RAC_LLM_OPTIONS_DEFAULT, then apply the embedded generation
     // knobs with the RAG pipeline defaults (max 512 tokens, top_p 0.9) when
     // unset.

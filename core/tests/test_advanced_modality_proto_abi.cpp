@@ -1462,6 +1462,20 @@ int test_rag_ingest_query_mocked_path() {
           "RAG query with a negative top_p succeeds");
     CHECK(g_dummy_llm_last_top_p == 0.0f, "RAG query clamps a negative top_p to 0");
 
+    // std::clamp returns NaN unchanged, so a non-finite top_p is rejected up
+    // front instead of reaching the engine outside the [0, 1] guarantee.
+    for (const float non_finite : {std::numeric_limits<float>::quiet_NaN(),
+                                   std::numeric_limits<float>::infinity()}) {
+        runanywhere::v1::RAGQueryOptions non_finite_top_p_knobs;
+        non_finite_top_p_knobs.set_query("Where does RAG live?");
+        non_finite_top_p_knobs.mutable_generation()->set_top_p(non_finite);
+        reset_answer_captures();
+        CHECK(run_query(session, non_finite_top_p_knobs) == RAC_ERROR_INVALID_ARGUMENT,
+              "RAG query rejects a non-finite top_p");
+        CHECK(g_dummy_llm_last_top_p == -1.0f,
+              "RAG query never calls the engine with a non-finite top_p");
+    }
+
     // The reranker's relevance scorer is an internal call that reuses the
     // query's options. It has to keep scoring with its own settings: a stop
     // sequence the caller set for the answer can cut the "<index>: <score>"
