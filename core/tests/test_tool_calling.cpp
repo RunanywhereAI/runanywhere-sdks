@@ -126,6 +126,7 @@ int test_parse_default_nested_keys_stay_arguments() {
          R"({"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}]}</tool_call>)",
          "get_weather", R"({"city":"Paris"})"},
         // a tool_calls array with no call in it keeps the old reading
+        {R"(<tool_call>{"tool_calls":[]}</tool_call>)", "tool_calls", R"({"input":"[]"})"},
         {R"(<tool_call>{"tool_calls":[{"city":"Paris"}]}</tool_call>)", "tool_calls",
          R"({"input":"[{\"city\":\"Paris\"}]"})"},
         // two calls are not collapsed into the first one
