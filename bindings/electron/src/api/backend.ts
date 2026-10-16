@@ -485,7 +485,7 @@ export interface RaBackend {
   diarize(samples: Float32Array, options: NativeDiarizationOptions): Promise<NativeDiarization>;
   segment(
     image: { data: Uint8Array; width: number; height: number; pixelFormat?: number },
-    options: { includeDiagnosticImage?: boolean }
+    options: { includeDiagnosticImage?: boolean; includeConfidence?: boolean }
   ): Promise<NativeSegmentation>;
 
   // ---- model lifecycle and registry (proto bytes in, proto bytes out) ----

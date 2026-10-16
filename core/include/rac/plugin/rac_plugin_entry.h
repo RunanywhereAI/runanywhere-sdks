@@ -115,8 +115,12 @@ extern "C" {
  *   14u — `rac_decision_options_t` gains grouping, max_length, max_pixels,
  *                 min_pixels and borrowed images. Engines compiled against
  *                 v13 read a shorter struct and are rejected until rebuilt.
+ *   15u — segmentation options/results gained opt-in confidence output.
+ *                 Result fields are trailing, but both structs grow. Engines
+ *                 built against earlier ABIs are rejected until rebuilt.
+ *                 Native C consumers must also rebuild with matching headers.
  */
-#define RAC_PLUGIN_API_VERSION 14u
+#define RAC_PLUGIN_API_VERSION 15u
 
 /* ===========================================================================
  * Plugin entry-point signature
