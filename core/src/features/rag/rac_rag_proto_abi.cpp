@@ -13,6 +13,7 @@
 
 #include "rag_backend.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -432,7 +433,9 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.max_tokens = gen.has_max_output_tokens() ? gen.max_output_tokens() : 512;
     opts.temperature = gen.has_temperature() ? gen.temperature() : opts.temperature;
-    opts.top_p = gen.has_top_p() ? gen.top_p() : 0.9f;
+    // top_p is a probability mass, so an out-of-range caller value is kept
+    // inside [0, 1], as the generate path does for temperature.
+    opts.top_p = gen.has_top_p() ? std::clamp(gen.top_p(), 0.0f, 1.0f) : 0.9f;
     opts.top_k = gen.has_top_k() ? gen.top_k() : opts.top_k;
     opts.repetition_penalty =
         gen.has_repeat_penalty() ? gen.repeat_penalty() : opts.repetition_penalty;
@@ -447,7 +450,12 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     std::vector<const char*> stop_sequences;
     stop_sequences.reserve(static_cast<size_t>(gen.stop_sequences_size()));
     for (const auto& sequence : gen.stop_sequences()) {
-        stop_sequences.push_back(sequence.c_str());
+        // An empty stop matches at offset 0 on an engine that does a plain
+        // substring search and would end the answer on the first token. The
+        // other proto adapters drop empty elements for the same reason.
+        if (!sequence.empty()) {
+            stop_sequences.push_back(sequence.c_str());
+        }
     }
     opts.stop_sequences = stop_sequences.empty() ? nullptr : stop_sequences.data();
     opts.num_stop_sequences = stop_sequences.size();

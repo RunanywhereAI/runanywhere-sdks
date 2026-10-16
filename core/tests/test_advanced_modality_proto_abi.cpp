@@ -1424,6 +1424,44 @@ int test_rag_ingest_query_mocked_path() {
     CHECK((g_dummy_llm_last_stop_sequences == std::vector<std::string>{"END", "###"}),
           "RAG query forwards stop_sequences in order");
 
+    // An empty stop string matches at offset 0 on an engine that does a plain
+    // substring search, so it would end the answer on the first token. The
+    // other proto adapters drop empty elements; the RAG path has to as well.
+    runanywhere::v1::RAGQueryOptions empty_stop_knobs;
+    empty_stop_knobs.set_query("Where does RAG live?");
+    empty_stop_knobs.mutable_generation()->add_stop_sequences("");
+    empty_stop_knobs.mutable_generation()->add_stop_sequences("END");
+    empty_stop_knobs.mutable_generation()->add_stop_sequences("");
+    reset_answer_captures();
+    CHECK(run_query(session, empty_stop_knobs) == RAC_SUCCESS,
+          "RAG query with empty stop sequences succeeds");
+    CHECK((g_dummy_llm_last_stop_sequences == std::vector<std::string>{"END"}),
+          "RAG query drops empty stop sequences and keeps the rest");
+    runanywhere::v1::RAGQueryOptions only_empty_stop_knobs;
+    only_empty_stop_knobs.set_query("Where does RAG live?");
+    only_empty_stop_knobs.mutable_generation()->add_stop_sequences("");
+    reset_answer_captures();
+    CHECK(run_query(session, only_empty_stop_knobs) == RAC_SUCCESS,
+          "RAG query with only an empty stop sequence succeeds");
+    CHECK(g_dummy_llm_last_stop_sequences.empty(),
+          "RAG query passes no stop sequences when every one is empty");
+
+    // top_p is a probability mass, so an out-of-range value stays in [0, 1].
+    runanywhere::v1::RAGQueryOptions high_top_p_knobs;
+    high_top_p_knobs.set_query("Where does RAG live?");
+    high_top_p_knobs.mutable_generation()->set_top_p(1.5f);
+    reset_answer_captures();
+    CHECK(run_query(session, high_top_p_knobs) == RAC_SUCCESS,
+          "RAG query with a high top_p succeeds");
+    CHECK(g_dummy_llm_last_top_p == 1.0f, "RAG query clamps a top_p above 1 to 1");
+    runanywhere::v1::RAGQueryOptions negative_top_p_knobs;
+    negative_top_p_knobs.set_query("Where does RAG live?");
+    negative_top_p_knobs.mutable_generation()->set_top_p(-0.5f);
+    reset_answer_captures();
+    CHECK(run_query(session, negative_top_p_knobs) == RAC_SUCCESS,
+          "RAG query with a negative top_p succeeds");
+    CHECK(g_dummy_llm_last_top_p == 0.0f, "RAG query clamps a negative top_p to 0");
+
     // The reranker's relevance scorer is an internal call that reuses the
     // query's options. It has to keep scoring with its own settings: a stop
     // sequence the caller set for the answer can cut the "<index>: <score>"
