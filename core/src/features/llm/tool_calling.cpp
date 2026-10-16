@@ -1031,10 +1031,18 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
  * 4. Tool name as key: {"calculate": "5 * 100"}
  *
  * An envelope such as {"function": {"name": ..., "arguments": ...}} is unwrapped
- * once; @p in_envelope is set for that inner pass, which only tries 1 and 2.
+ * once, and so is the single call in OpenAI's {"tool_calls": [...]} array.
+ * @p nesting tells the inner passes which of these they are.
  */
-static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** out_tool_name,
-                                                  char** out_args_json, bool in_envelope = false) {
+enum class ToolCallNesting {
+    kTopLevel,
+    kArrayElement,  // inside tool_calls: 1, 2 and the envelope, never 3 or 4
+    kEnvelope,      // inside an envelope: 1 and 2 only
+};
+
+static ToolParseStatus
+extract_tool_name_and_args(const char* json_obj, char** out_tool_name, char** out_args_json,
+                           ToolCallNesting nesting = ToolCallNesting::kTopLevel) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
 
@@ -1073,7 +1081,8 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                         json decoded_args;
                         if (args_kind == JSON_VALUE_OBJECT) {
                             *out_args_json = owned_args_value.release();
-                        } else if (in_envelope && args_kind == JSON_VALUE_STRING &&
+                        } else if (nesting != ToolCallNesting::kTopLevel &&
+                                   args_kind == JSON_VALUE_STRING &&
                                    parse_json_value(owned_args_value.get(), &decoded_args) &&
                                    decoded_args.is_object()) {
                             // OpenAI's function envelope carries arguments as a JSON-encoded
@@ -1188,7 +1197,7 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
         }
     }
 
-    if (in_envelope) {
+    if (nesting == ToolCallNesting::kEnvelope) {
         return ToolParseStatus::kNoMatch;
     }
 
@@ -1209,9 +1218,38 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
             continue;
         }
         const ToolParseStatus envelope_status = extract_tool_name_and_args(
-            owned_envelope.get(), out_tool_name, out_args_json, /*in_envelope=*/true);
+            owned_envelope.get(), out_tool_name, out_args_json, ToolCallNesting::kEnvelope);
         if (envelope_status != ToolParseStatus::kNoMatch) {
             return envelope_status;
+        }
+    }
+
+    if (nesting == ToolCallNesting::kArrayElement) {
+        return ToolParseStatus::kNoMatch;
+    }
+
+    // OpenAI's wire shape: {"tool_calls": [{"type": "function", "function": {...}}]}.
+    // Only a lone call is unwrapped; with several, taking the first would drop
+    // the rest without a trace.
+    {
+        char* value = nullptr;
+        json_value_kind_t kind = JSON_VALUE_STRING;
+        const ToolParseStatus calls_status =
+            extract_json_value(json_obj, "tool_calls", &value, &kind);
+        if (calls_status == ToolParseStatus::kOutOfMemory) {
+            return calls_status;
+        }
+        const std::unique_ptr<char, decltype(&std::free)> owned_calls(value, &std::free);
+        json calls;
+        if (calls_status == ToolParseStatus::kSuccess && kind == JSON_VALUE_ARRAY &&
+            parse_json_value(owned_calls.get(), &calls) && calls.size() == 1 &&
+            calls[0].is_object()) {
+            const std::string call = calls[0].dump();
+            const ToolParseStatus call_status = extract_tool_name_and_args(
+                call.c_str(), out_tool_name, out_args_json, ToolCallNesting::kArrayElement);
+            if (call_status != ToolParseStatus::kNoMatch) {
+                return call_status;
+            }
         }
     }
 
