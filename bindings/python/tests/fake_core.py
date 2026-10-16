@@ -500,14 +500,15 @@ class FakeCore:
         pixel_format: object = None,
         stride_bytes: object = None,
         include_diagnostic_rgba: object = None,
+        include_confidence: object = None,
     ) -> dict:
         self._record(
             "segment", handle, width, height, pixel_format, stride_bytes,
-            include_diagnostic_rgba,
+            include_diagnostic_rgba, include_confidence,
         )
         mask = np.zeros(width * height, dtype=np.uint16)
         mask[: width * height // 2] = 1
-        return {
+        result = {
             "width": width,
             "height": height,
             "class_mask": mask,
@@ -516,6 +517,9 @@ class FakeCore:
                 {"class_id": 1, "pixel_count": width * height // 2, "fraction": 0.5, "label": "fg"},
             ],
         }
+        if include_confidence:
+            result["confidence_mask"] = bytes([192]) * (width * height)
+        return result
 
     def unload_segmentation_model(self, handle: int) -> None:
         self._record("unload_segmentation_model", handle)

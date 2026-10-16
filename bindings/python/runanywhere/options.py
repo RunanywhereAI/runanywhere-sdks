@@ -245,6 +245,7 @@ class SegmentationOptions:
 
     include_diagnostic_image: bool = False
     model: Optional[str] = None
+    include_confidence: bool = False
 
 
 @dataclass
