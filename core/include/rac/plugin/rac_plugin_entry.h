@@ -108,8 +108,14 @@ extern "C" {
  *   12u — added structured LLM chat streaming through
  *                 `rac_llm_service_ops_t::generate_chat_stream`; added cached
  *                 prompt accounting to `rac_llm_token_counts_t`.
+ *   13u — reserved for joint decision scoring on the main branch; this
+ *                 development branch does not include that primitive.
+ *   14u — segmentation options/results gained opt-in confidence output.
+ *                 Result fields are trailing, but both structs grow. Engines
+ *                 built against earlier ABIs are rejected until rebuilt.
+ *                 Native C consumers must also rebuild with matching headers.
  */
-#define RAC_PLUGIN_API_VERSION 12u
+#define RAC_PLUGIN_API_VERSION 14u
 
 /* ===========================================================================
  * Plugin entry-point signature

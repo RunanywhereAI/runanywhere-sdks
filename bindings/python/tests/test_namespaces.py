@@ -335,6 +335,31 @@ def test_segmentation_returns_mask_and_classes(sdk, tmp_path) -> None:
     assert result.width == 8 and result.height == 8
     assert len(result.class_mask) == 8 * 8 * 2  # uint16 LE
     assert [c.label for c in result.classes] == ["bg", "fg"]
+    assert result.confidence_mask is None
+
+
+def test_segmentation_preserves_positional_model(sdk, tmp_path) -> None:
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    options = SegmentationOptions(False, str(model_dir))
+    assert options.model == str(model_dir)
+    assert options.include_confidence is False
+
+    result = ra.segmentation.segment(ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3), options)
+    assert result.width == 2 and result.height == 3
+    assert sdk.args_of("load_segmentation_model")[0] == str(model_dir)
+    assert result.confidence_mask is None
+
+
+def test_segmentation_forwards_confidence_and_preserves_bytes(sdk, tmp_path) -> None:
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    result = ra.segmentation.segment(
+        ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3),
+        SegmentationOptions(False, str(model_dir), include_confidence=True),
+    )
+    assert sdk.args_of("segment")[-1] is True
+    assert result.confidence_mask == bytes([192]) * 6
 
 
 def test_segmentation_requires_raw_rgb(sdk, tmp_path) -> None:

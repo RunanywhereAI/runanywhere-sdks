@@ -244,8 +244,8 @@ class SegmentationOptions:
     """Semantic-segmentation controls."""
 
     include_diagnostic_image: bool = False
-    include_confidence: bool = False
     model: Optional[str] = None
+    include_confidence: bool = False
 
 
 @dataclass
