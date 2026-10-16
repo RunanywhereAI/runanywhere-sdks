@@ -5,6 +5,7 @@
 
 #include <cstdio>
 
+#include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/vlm/rac_vlm_types.h"
 
 namespace {
@@ -31,10 +32,23 @@ int test_default_sampling_guards_against_repetition() {
     return 0;
 }
 
+// The LLM C ABI default must carry the same annotated min_p as the VLM default and
+// every SDK's generated defaults(), not a hardcoded 0.0 that disables min-p sampling.
+int test_llm_default_min_p_matches_idl() {
+    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+
+    EXPECT_TRUE(options.min_p == RAC_DEFAULT_LLM_GENERATION_OPTIONS_MIN_P);
+    EXPECT_TRUE(options.min_p == RAC_VLM_OPTIONS_DEFAULT.min_p);
+    return 0;
+}
+
 }  // namespace
 
 int main() {
     if (test_default_sampling_guards_against_repetition() != 0) {
+        return 1;
+    }
+    if (test_llm_default_min_p_matches_idl() != 0) {
         return 1;
     }
     std::printf("vlm option default tests passed\n");
