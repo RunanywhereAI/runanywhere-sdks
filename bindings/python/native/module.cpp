@@ -2626,7 +2626,9 @@ PYBIND11_MODULE(_core, m) {
           py::arg("height"), py::arg("pixel_format") = py::none(),
           py::arg("stride_bytes") = py::none(), py::arg("include_diagnostic_rgba") = py::none(),
           py::arg("include_confidence") = py::none(),
-          "Segment raw image pixels; returns {width, height, class_mask, classes}.");
+          "Segment raw image pixels; returns {width, height, class_mask, classes}, with optional "
+          "diagnostic_rgba and confidence_mask outputs when requested. confidence_mask contains "
+          "width * height bytes (0..255), one per source pixel, row-major like class_mask.");
     m.def("unload_segmentation_model", &unload_segmentation_model, py::arg("handle"),
           "Unload a segmentation handle.");
 

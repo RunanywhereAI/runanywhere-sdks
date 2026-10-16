@@ -604,7 +604,12 @@ class SegmentationModel:
         include_diagnostic_rgba: bool = False,
         include_confidence: bool = False,
     ) -> dict:
-        """Segment packed RGB/RGBA pixels; returns ``{width, height, class_mask, classes}``."""
+        """Segment packed RGB/RGBA pixels; returns ``{width, height, class_mask, classes}``.
+
+        ``include_diagnostic_rgba`` requests an optional ``diagnostic_rgba`` output.
+        ``include_confidence`` requests an optional ``confidence_mask`` output: one byte
+        per source pixel (0..255), row-major like ``class_mask``, sized ``width * height``.
+        """
         if not hasattr(self._core, "segment"):
             raise _rebuild_gap(
                 "segmentation.segment", "load_segmentation_model / segment"
@@ -616,7 +621,29 @@ class SegmentationModel:
         }
         if include_confidence:
             kwargs["include_confidence"] = True
-        return self._core.segment(self._handle, data, width, height, **kwargs)
+        try:
+            return self._core.segment(self._handle, data, width, height, **kwargs)
+        except TypeError as error:
+            message = str(error)
+            signature, invoked, _ = message.partition("\nInvoked with:")
+            # Python rejects unknown keywords before entering the callable. pybind11
+            # instead lists its accepted signatures; exclude the invocation's kwargs.
+            traceback = error.__traceback__
+            unknown_keyword = (
+                traceback is not None
+                and traceback.tb_next is None
+                and "unexpected keyword argument 'include_confidence'" in message
+            )
+            legacy_pybind = (
+                signature.startswith("segment(): incompatible function arguments.")
+                and bool(invoked)
+                and "include_confidence" not in signature
+            )
+            if include_confidence and (unknown_keyword or legacy_pybind):
+                raise _rebuild_gap(
+                    "segmentation.segment", "segment(include_confidence=...)"
+                ) from error
+            raise
 
     def unload(self) -> None:
         """Release the model. Idempotent."""
