@@ -316,6 +316,12 @@ int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
     int32_t pruned = 0;
     for (const ModelInfo& model : models) {
         if (model.id().empty() || model.local_path().empty() ||
+            model.local_path().rfind("builtin:", 0) == 0) {
+            continue;
+        }
+
+        // Archive and multi-file downloads record a model folder as local_path.
+        if (rac_path_is_non_empty_directory(model.local_path().c_str()) == RAC_TRUE ||
             adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE) {
             continue;
         }
