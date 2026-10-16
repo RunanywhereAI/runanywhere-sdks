@@ -498,7 +498,11 @@ export interface SegmentationResult {
   classes: ClassInfo[];
   /** RGBA overlay, present only when `includeDiagnosticImage` was set. */
   diagnosticImage?: Uint8Array;
-  /** Chosen-class probabilities as 0..255 bytes, when requested. */
+  /**
+   * Chosen-class probabilities as one byte per source pixel (0..255),
+   * row-major like `classMask`, with `width * height` bytes when provided.
+   * Undefined when confidence was not requested.
+   */
   confidenceMask?: Uint8Array;
 }
 

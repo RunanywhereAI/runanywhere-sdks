@@ -259,7 +259,7 @@ export const REASONING_DEFAULTS = {
 /**
  * Spec defaults for {@link SegmentationOptions}. `SegmentationOptions` in
  * `idl/segmentation.proto` carries no `rac_default` annotations, so the proto3
- * zero value is the default and this states it explicitly for the one field the
+ * zero value is the default and this states it explicitly for the fields the
  * public option exposes.
  */
 export const SEGMENTATION_DEFAULTS = {

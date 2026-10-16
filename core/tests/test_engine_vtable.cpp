@@ -127,6 +127,18 @@ struct LegacySegmentationResult {
     char* model_id;
 };
 
+static_assert(offsetof(rac_segmentation_result_t, width) ==
+              offsetof(LegacySegmentationResult, width));
+static_assert(offsetof(rac_segmentation_result_t, height) ==
+              offsetof(LegacySegmentationResult, height));
+static_assert(offsetof(rac_segmentation_result_t, class_mask) ==
+              offsetof(LegacySegmentationResult, class_mask));
+static_assert(offsetof(rac_segmentation_result_t, class_mask_count) ==
+              offsetof(LegacySegmentationResult, class_mask_count));
+static_assert(offsetof(rac_segmentation_result_t, diagnostic_rgba) ==
+              offsetof(LegacySegmentationResult, diagnostic_rgba));
+static_assert(offsetof(rac_segmentation_result_t, diagnostic_rgba_size) ==
+              offsetof(LegacySegmentationResult, diagnostic_rgba_size));
 static_assert(offsetof(rac_segmentation_result_t, class_summaries) ==
               offsetof(LegacySegmentationResult, class_summaries));
 static_assert(offsetof(rac_segmentation_result_t, class_summary_count) ==
