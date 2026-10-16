@@ -117,6 +117,23 @@ int test_parse_default_nested_keys_stay_arguments() {
         {R"(<tool_call>{"type":"function",)"
          R"("function":{"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}</tool_call>)",
          "get_weather", R"({"city":"Paris"})"},
+        // OpenAI's tool_calls array with a single call
+        {R"(<tool_call>{"tool_calls":[{"function":)"
+         R"({"name":"get_weather","arguments":{"city":"Paris"}}}]}</tool_call>)",
+         "get_weather", R"({"city":"Paris"})"},
+        // ...as the API sends it, with id, type and string arguments
+        {R"(<tool_call>{"tool_calls":[{"id":"call_1","type":"function","function":)"
+         R"({"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}]}</tool_call>)",
+         "get_weather", R"({"city":"Paris"})"},
+        // a tool_calls array with no call in it keeps the old reading
+        {R"(<tool_call>{"tool_calls":[{"city":"Paris"}]}</tool_call>)", "tool_calls",
+         R"({"input":"[{\"city\":\"Paris\"}]"})"},
+        // two calls are not collapsed into the first one
+        {R"(<tool_call>{"tool_calls":[{"name":"a"},{"name":"b"}]}</tool_call>)", "tool_calls",
+         R"({"input":"[{\"name\":\"a\"},{\"name\":\"b\"}]"})"},
+        // an array argument of a name-as-key tool is not read as a call
+        {R"(<tool_call>{"search":[{"name":"Alice"}]}</tool_call>)", "search",
+         R"({"input":"[{\"name\":\"Alice\"}]"})"},
         // a string alias names the call; an object under another alias is an argument
         {R"(<tool_call>{"name":"open_ticket","tool":{"function":"inner"}}</tool_call>)",
          "open_ticket", R"({"tool":{"function":"inner"}})"},
