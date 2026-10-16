@@ -699,7 +699,17 @@ static jboolean invokeProtoListener(JNIEnv* env, jobject listener, const uint8_t
                                 reinterpret_cast<const jbyte*>(bytes));
     }
     jclass cls = env->GetObjectClass(listener);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jBytes);
+        return JNI_FALSE;
+    }
     jmethodID method = env->GetMethodID(cls, "onProgress", "([B)Z");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
     env->DeleteLocalRef(cls);
     if (method == nullptr) {
         env->DeleteLocalRef(jBytes);
@@ -1351,9 +1361,37 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
         // entry — class lookup is cheap and the array length is typically
         // small (model-registry rescan_local on a single artifact dir).
         jclass entryClass = env->GetObjectClass(entryObj);
-        jfieldID nameField = env->GetFieldID(entryClass, "name", "Ljava/lang/String;");
-        jfieldID isDirField = env->GetFieldID(entryClass, "isDir", "Z");
-        jfieldID sizeField = env->GetFieldID(entryClass, "sizeBytes", "J");
+        if (entryClass == nullptr) {
+            if (env->ExceptionCheck() == JNI_TRUE) {
+                env->ExceptionClear();
+            }
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            out_entries[i].is_dir = RAC_FALSE;
+            out_entries[i].size_bytes = 0;
+            env->DeleteLocalRef(entryObj);
+            continue;
+        }
+
+        const auto resolve_field = [&](const char* name, const char* sig) -> jfieldID {
+            const jfieldID id = env->GetFieldID(entryClass, name, sig);
+            if (env->ExceptionCheck() == JNI_TRUE) {
+                env->ExceptionClear();
+            }
+            return id;
+        };
+
+        jfieldID nameField = resolve_field("name", "Ljava/lang/String;");
+        jfieldID isDirField = resolve_field("isDir", "Z");
+        jfieldID sizeField = resolve_field("sizeBytes", "J");
+
+        if (nameField == nullptr || isDirField == nullptr || sizeField == nullptr) {
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            out_entries[i].is_dir = RAC_FALSE;
+            out_entries[i].size_bytes = 0;
+            env->DeleteLocalRef(entryClass);
+            env->DeleteLocalRef(entryObj);
+            continue;
+        }
 
         jstring jName = static_cast<jstring>(env->GetObjectField(entryObj, nameField));
         jboolean jIsDir = env->GetBooleanField(entryObj, isDirField);
@@ -7186,10 +7224,19 @@ rac_result_t run_loop_execute_trampoline(const uint8_t* in_tool_call_bytes, size
     }
 
     jclass cls = env->GetObjectClass(ctx->executor);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(inBytes);
+        return RAC_ERROR_INTERNAL;
+    }
     jmethodID method = env->GetMethodID(cls, "executeToolCall", "([B)[B");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
     env->DeleteLocalRef(cls);
     if (method == nullptr) {
-        env->ExceptionClear();
         env->DeleteLocalRef(inBytes);
         return RAC_ERROR_INTERNAL;
     }
@@ -7225,10 +7272,18 @@ void run_loop_handle_published_trampoline(uint64_t run_loop_handle, void* user_d
     }
     JNIEnv* env = ctx->env;
     jclass cls = env->GetObjectClass(ctx->on_handle);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        return;
+    }
     jmethodID method = env->GetMethodID(cls, "onHandlePublished", "(J)V");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
     env->DeleteLocalRef(cls);
     if (method == nullptr) {
-        env->ExceptionClear();
         return;
     }
     env->CallVoidMethod(ctx->on_handle, method, static_cast<jlong>(run_loop_handle));
