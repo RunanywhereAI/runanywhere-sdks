@@ -615,6 +615,7 @@ static ToolParseStatus extract_json_value(const char* json_obj, const char* key,
     size_t len = strlen(json_obj);
     bool in_string = false;
     bool escaped = false;
+    int depth = 0;
 
     for (size_t i = 0; i < len; i++) {
         char ch = json_obj[i];
@@ -629,8 +630,18 @@ static ToolParseStatus extract_json_value(const char* json_obj, const char* key,
             continue;
         }
 
+        if (!in_string) {
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+            }
+        }
+
         if (ch == '"') {
-            if (!in_string) {
+            // Only keys of the outermost object match, as in get_json_keys():
+            // a nested {"arguments": {"name": ...}} is not the call's "name".
+            if (!in_string && depth == 1) {
                 // Start of a key string - extract it
                 size_t key_start = i + 1;
                 char* found_key = nullptr;
@@ -1018,9 +1029,12 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
  * 2. Name/function variant: {"name": "name", "params": {...}}
  * 3. Placeholder key with value being tool name
  * 4. Tool name as key: {"calculate": "5 * 100"}
+ *
+ * An envelope such as {"function": {"name": ..., "arguments": ...}} is unwrapped
+ * once; @p in_envelope is set for that inner pass, which only tries 1 and 2.
  */
 static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** out_tool_name,
-                                                  char** out_args_json) {
+                                                  char** out_args_json, bool in_envelope = false) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
 
@@ -1056,8 +1070,20 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                     if (args_status == ToolParseStatus::kSuccess) {
                         std::unique_ptr<char, decltype(&std::free)> owned_args_value(args_value,
                                                                                     &std::free);
+                        json decoded_args;
                         if (args_kind == JSON_VALUE_OBJECT) {
                             *out_args_json = owned_args_value.release();
+                        } else if (in_envelope && args_kind == JSON_VALUE_STRING &&
+                                   parse_json_value(owned_args_value.get(), &decoded_args) &&
+                                   decoded_args.is_object()) {
+                            // OpenAI's function envelope carries arguments as a JSON-encoded
+                            // string: {"function":{"name":...,"arguments":"{\"city\":...}"}}
+                            *out_args_json = dup_owned_string(decoded_args.dump());
+                            if (!*out_args_json) {
+                                free(*out_tool_name);
+                                *out_tool_name = nullptr;
+                                return ToolParseStatus::kOutOfMemory;
+                            }
                         } else {
                             // Wrap scalar/array/string in {"input": value} - escape the value for
                             // valid JSON
@@ -1159,6 +1185,33 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                 return ToolParseStatus::kSuccess;
             }
             free(value);
+        }
+    }
+
+    if (in_envelope) {
+        return ToolParseStatus::kNoMatch;
+    }
+
+    // An object under a tool-name key may be an envelope. Only try it once no
+    // alias names the call directly, so in {"name": "a", "tool": {...}} the
+    // object stays an argument of "a".
+    for (int i = 0; TOOL_NAME_KEYS[i] != nullptr; i++) {
+        char* value = nullptr;
+        json_value_kind_t kind = JSON_VALUE_STRING;
+        const ToolParseStatus envelope_key_status =
+            extract_json_value(json_obj, TOOL_NAME_KEYS[i], &value, &kind);
+        if (envelope_key_status == ToolParseStatus::kOutOfMemory) {
+            return envelope_key_status;
+        }
+        const std::unique_ptr<char, decltype(&std::free)> owned_envelope(value, &std::free);
+        if (envelope_key_status != ToolParseStatus::kSuccess || kind != JSON_VALUE_OBJECT ||
+            !owned_envelope) {
+            continue;
+        }
+        const ToolParseStatus envelope_status = extract_tool_name_and_args(
+            owned_envelope.get(), out_tool_name, out_args_json, /*in_envelope=*/true);
+        if (envelope_status != ToolParseStatus::kNoMatch) {
+            return envelope_status;
         }
     }
 

@@ -88,6 +88,55 @@ int test_parse_default_structured() {
 }
 
 // ---------------------------------------------------------------------------
+// 1b. parse: an argument that shares a name with a tool-name key
+//     ("name", "tool", "input", ...) must not be taken for the call's own key.
+//     The JSON is re-serialized with sorted keys before extraction, so
+//     "arguments" always precedes "name" / "tool".
+// ---------------------------------------------------------------------------
+int test_parse_default_nested_keys_stay_arguments() {
+    struct Case {
+        const char* input;
+        const char* tool_name;
+        const char* arguments_json;
+    };
+    const Case cases[] = {
+        // Hermes / Qwen native shape, tool with a `name` parameter
+        {R"(<tool_call>{"name":"create_contact","arguments":{"name":"Alice"}}</tool_call>)",
+         "create_contact", R"({"name":"Alice"})"},
+        // the shape the default prompt asks for, tool with a `tool` parameter
+        {R"(<tool_call>{"tool":"run_command","arguments":{"tool":"git"}}</tool_call>)",
+         "run_command", R"({"tool":"git"})"},
+        // flat arguments: a nested `input` is not the argument wrapper
+        {R"(<tool_call>{"tool":"translate","text":"hi","options":{"input":"en"}}</tool_call>)",
+         "translate", R"({"options":{"input":"en"},"text":"hi"})"},
+        // OpenAI-style envelope resolves one level down
+        {R"(<tool_call>{"type":"function",)"
+         R"("function":{"name":"get_weather","arguments":{"city":"Paris"}}}</tool_call>)",
+         "get_weather", R"({"city":"Paris"})"},
+        // ...including its JSON-encoded string arguments
+        {R"(<tool_call>{"type":"function",)"
+         R"("function":{"name":"get_weather","arguments":"{\"city\":\"Paris\"}"}}</tool_call>)",
+         "get_weather", R"({"city":"Paris"})"},
+        // a string alias names the call; an object under another alias is an argument
+        {R"(<tool_call>{"name":"open_ticket","tool":{"function":"inner"}}</tool_call>)",
+         "open_ticket", R"({"tool":{"function":"inner"}})"},
+        // outside the envelope a string argument is still wrapped, not decoded
+        {R"(<tool_call>{"tool":"echo","arguments":"{\"a\":1}"}</tool_call>)", "echo",
+         R"({"input":"{\"a\":1}"})"},
+    };
+    for (const Case& c : cases) {
+        rac_tool_call_t result;
+        rac_result_t rc = rac_tool_call_parse(c.input, &result);
+        ASSERT_EQ_INT(rc, RAC_SUCCESS);
+        ASSERT_EQ_INT(result.has_tool_call, RAC_TRUE);
+        ASSERT_EQ_STR(result.tool_name, c.tool_name);
+        ASSERT_EQ_STR(result.arguments_json, c.arguments_json);
+        rac_tool_call_free(&result);
+    }
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 // 2. parse: LFM2 Pythonic format
 // ---------------------------------------------------------------------------
 int test_parse_lfm2_structured() {
@@ -954,6 +1003,8 @@ int main(int argc, char** argv) {
 
     TestCase cases[] = {
         {.name = "parse_default_structured", .fn = test_parse_default_structured},
+        {.name = "parse_default_nested_keys_stay_arguments",
+         .fn = test_parse_default_nested_keys_stay_arguments},
         {.name = "parse_lfm2_structured", .fn = test_parse_lfm2_structured},
         {.name = "parse_free_form_returns_false", .fn = test_parse_free_form_returns_false},
         {.name = "format_prompt_default_two_tools", .fn = test_format_prompt_default_two_tools},
