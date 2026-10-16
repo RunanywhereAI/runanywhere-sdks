@@ -178,6 +178,34 @@ describe('CrossWasmRAGProvider', () => {
     ).rejects.toThrow(/vectorStore/);
   });
 
+  it('rejects multi-query expansion and scope filtering it cannot honor (#1095)', async () => {
+    installBackendSpies();
+    vi.spyOn(Embeddings, 'embed').mockResolvedValue(
+      embeddingsResult([vector([1, 0], 'anything', 0)]),
+    );
+    const provider = __testing__.createCrossWasmRAGProvider();
+    await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    }));
+    await expect(
+      provider.ragQuery('anything', { retrieval: { enableMultiQuery: true } as never }),
+    ).rejects.toThrow(/enableMultiQuery.*native RAG session provider/);
+    await expect(
+      provider.ragQuery('anything', { retrieval: { multiQueryCount: 3 } as never }),
+    ).rejects.toThrow(/multiQueryCount/);
+    const scoped = provider.ragQueryStream!('anything', {
+      retrieval: { scopePrefix: 'docs/' } as never,
+    });
+    await expect(scoped[Symbol.asyncIterator]().next()).rejects.toThrow(/scopePrefix/);
+
+    // The "off" values -- what the RunAnywhere.rag namespace sends on every query -- still
+    // run: an empty index answers ungrounded instead of tripping the guard.
+    await expect(provider.ragQuery('anything', {
+      retrieval: { enableMultiQuery: false, multiQueryCount: 0, scopePrefix: '' } as never,
+    })).resolves.toMatchObject({ retrievedChunks: [] });
+  });
+
   it('supports typed document removal, clear, and statistics', async () => {
     installBackendSpies();
     vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
