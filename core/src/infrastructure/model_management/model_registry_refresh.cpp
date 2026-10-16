@@ -306,11 +306,17 @@ int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
     if (!adapter || !adapter->file_exists) {
         return 0;
     }
+    const bool can_probe_directories =
+        adapter->is_non_empty_directory || adapter->file_list_directory;
 
     std::vector<ModelInfo> models;
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
-        models = collect_model_snapshots_locked(handle);
+        // Pruning reconciles all registered paths, including platform-hidden models.
+        models.reserve(handle->models.size());
+        for (const auto& [model_id, model_info] : handle->models) {
+            models.push_back(model_snapshot_locked(handle, model_id, model_info));
+        }
     }
 
     int32_t pruned = 0;
@@ -321,8 +327,16 @@ int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
         }
 
         // Archive and multi-file downloads record a model folder as local_path.
+        const bool is_directory_artifact = model.has_archive() || model.has_multi_file();
+        if (is_directory_artifact && !can_probe_directories) {
+            RAC_LOG_WARNING("ModelRegistry",
+                            "Skipping orphan prune for '%s': directory callbacks unavailable",
+                            model.id().c_str());
+            continue;
+        }
         if (rac_path_is_non_empty_directory(model.local_path().c_str()) == RAC_TRUE ||
-            adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE) {
+            (!is_directory_artifact &&
+             adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE)) {
             continue;
         }
 
