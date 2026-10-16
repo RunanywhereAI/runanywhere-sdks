@@ -3,11 +3,15 @@
  * @brief Contract tests for the transport-independent Connect policy and handshake.
  */
 
+#include <cstdint>
 #include <cstdio>
 #include <string>
 
 #include "rac/connect/rac_connect.h"
+#include "rac/connect/rac_connect_transport.h"
 #include "rac/foundation/rac_proto_buffer.h"
+
+#include <cstring>
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "connect.pb.h"
@@ -294,6 +298,422 @@ void test_session_cap_and_cancel_validation() {
     stop_host();
 }
 
+void test_cluster_orchestration() {
+    // Reset cluster runtime state to ensure clean test isolation
+    {
+        v1::ClusterStopRequest reset_request;
+        reset_request.set_cluster_id("reset");
+        v1::ClusterState reset_state;
+        call_proto(rac_connect_cluster_stop_proto, reset_request, &reset_state);
+    }
+
+    // 1. Invalid cluster start (empty cluster id)
+    v1::ClusterStartRequest invalid_request;
+    v1::ClusterState invalid_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, invalid_request, &invalid_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects empty request");
+
+    // 2. Invalid cluster start (duplicate instance_id)
+    v1::ClusterStartRequest dup_request;
+    dup_request.set_cluster_id("test-cluster-dup");
+    dup_request.mutable_model()->set_model_id("llama-3-70b");
+    dup_request.mutable_model()->set_display_name("Llama 3 70B");
+    auto* d1 = dup_request.add_assignments();
+    d1->set_instance_id("peer-1");
+    d1->set_layer_start(0);
+    d1->set_layer_end(16);
+    auto* d2 = dup_request.add_assignments();
+    d2->set_instance_id("peer-1");
+    d2->set_layer_start(16);
+    d2->set_layer_end(32);
+
+    v1::ClusterState dup_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, dup_request, &dup_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects duplicate peer instance_id");
+
+    // 3. Invalid cluster start (layer gap: [0, 10) and [15, 30))
+    v1::ClusterStartRequest gap_request;
+    gap_request.set_cluster_id("test-cluster-gap");
+    gap_request.mutable_model()->set_model_id("llama-3-70b");
+    gap_request.mutable_model()->set_display_name("Llama 3 70B");
+    auto* a1 = gap_request.add_assignments();
+    a1->set_instance_id("mac-coord");
+    a1->set_layer_start(0);
+    a1->set_layer_end(10);
+    a1->set_is_coordinator(true);
+    auto* a2 = gap_request.add_assignments();
+    a2->set_instance_id("android-peer");
+    a2->set_layer_start(15);
+    a2->set_layer_end(30);
+
+    v1::ClusterState gap_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, gap_request, &gap_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Cluster start rejects layer assignment gap");
+
+    // 4. Valid cluster start with unordered assignments: [16, 32) then [0, 16)
+    v1::ClusterStartRequest valid_request;
+    valid_request.set_cluster_id("cluster-alpha");
+    valid_request.mutable_model()->set_model_id("llama-3-70b");
+    valid_request.mutable_model()->set_display_name("Llama 3 70B");
+    auto* v2_assign = valid_request.add_assignments();
+    v2_assign->set_instance_id("android-snapdragon");
+    v2_assign->set_layer_start(16);
+    v2_assign->set_layer_end(32);
+
+    auto* v1_assign = valid_request.add_assignments();
+    v1_assign->set_instance_id("mac-coordinator");
+    v1_assign->set_layer_start(0);
+    v1_assign->set_layer_end(16);
+    v1_assign->set_is_coordinator(true);
+
+    v1::ClusterState active_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, valid_request, &active_state) == RAC_SUCCESS,
+          "Cluster coordinator starts with valid layer sharding");
+    CHECK(active_state.is_active(), "Cluster state is marked active");
+    CHECK(active_state.peer_count() == 2, "Cluster state tracks 2 participating devices");
+    CHECK(active_state.cluster_id() == "cluster-alpha", "Cluster ID matches request");
+
+    // 5. Idempotent cluster start with same cluster_id
+    v1::ClusterState idempotent_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, valid_request, &idempotent_state) == RAC_SUCCESS,
+          "Repeated cluster start with same ID is idempotent");
+    CHECK(idempotent_state.is_active(), "Idempotent start returns active state");
+
+    // 5b. Repeat start with the same cluster_id but a changed model is rejected, not ignored
+    v1::ClusterStartRequest changed_layout_request = valid_request;
+    changed_layout_request.mutable_model()->set_model_id("different-model");
+    v1::ClusterState changed_layout_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, changed_layout_request, &changed_layout_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat start with a changed model is rejected");
+
+    // 6. Conflicting cluster start with different cluster_id while active is rejected
+    v1::ClusterStartRequest conflict_request = valid_request;
+    conflict_request.set_cluster_id("cluster-beta");
+    v1::ClusterState conflict_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, conflict_request, &conflict_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Starting a different cluster while one is active is rejected");
+
+    // 7. Peer joins cluster with ClusterJoinRequest
+    v1::ClusterJoinRequest join_request;
+    join_request.set_cluster_id("cluster-alpha");
+    join_request.set_instance_id("android-snapdragon");
+    join_request.mutable_peer_capability()->set_instance_id("android-snapdragon");
+    join_request.mutable_peer_capability()->set_available_memory_bytes(8589934592ULL);
+    join_request.mutable_peer_capability()->set_acceleration(v1::ACCELERATION_PREFERENCE_NPU);
+
+    v1::ClusterStartResponse join_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, join_request, &join_response) == RAC_SUCCESS,
+          "Peer join request is validated successfully against active cluster");
+    CHECK(join_response.accepted(), "Peer join response is accepted");
+    CHECK(join_response.peer_capability().available_memory_bytes() == 8589934592ULL,
+          "Peer capability is populated in join response");
+
+    // 7b. Peer advertising less capacity than its assigned span is rejected
+    v1::ClusterJoinRequest undersized_join = join_request;
+    undersized_join.mutable_peer_capability()->set_max_layers(1);
+    v1::ClusterStartResponse undersized_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, undersized_join, &undersized_response) == RAC_SUCCESS,
+          "Undersized-capacity join returns typed validation response");
+    CHECK(!undersized_response.accepted(), "Peer whose max_layers is below its span is rejected");
+
+    // 8. Peer join with unknown instance_id is rejected
+    v1::ClusterJoinRequest unknown_peer_join = join_request;
+    unknown_peer_join.set_instance_id("unknown-device");
+    unknown_peer_join.mutable_peer_capability()->set_instance_id("unknown-device");
+    v1::ClusterStartResponse unknown_peer_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, unknown_peer_join, &unknown_peer_response) == RAC_SUCCESS,
+          "Unknown peer join returns typed validation response");
+    CHECK(!unknown_peer_response.accepted(), "Unknown peer instance_id is rejected");
+
+    // 9. Activation validation between pipeline stages
+    v1::ClusterActivation valid_activation;
+    valid_activation.set_cluster_id("cluster-alpha");
+    valid_activation.set_request_id("req-token-101");
+    valid_activation.set_from_layer(16);
+    valid_activation.set_tensor_data(std::string(4096 * 2, 'A'));
+    valid_activation.set_seq_len(1);
+    valid_activation.set_hidden_size(4096);
+    valid_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP16);
+
+    v1::ConnectInvocationValidation activation_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, valid_activation, &activation_validation) == RAC_SUCCESS,
+          "Valid intermediate activation tensor is validated");
+    CHECK(activation_validation.accepted(), "Activation tensor passes validation");
+
+    // 10. Activation validation rejection on mismatched cluster ID
+    v1::ClusterActivation wrong_cluster_activation = valid_activation;
+    wrong_cluster_activation.set_cluster_id("cluster-wrong");
+    v1::ConnectInvocationValidation wrong_cluster_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, wrong_cluster_activation, &wrong_cluster_validation) == RAC_SUCCESS,
+          "Mismatched cluster activation returns typed validation");
+    CHECK(!wrong_cluster_validation.accepted(), "Mismatched cluster ID activation is rejected");
+
+    // 11. Activation validation rejection on invalid layer boundary
+    v1::ClusterActivation invalid_boundary_activation = valid_activation;
+    invalid_boundary_activation.set_from_layer(7); // not a boundary in [0, 16) or [16, 32)
+    v1::ConnectInvocationValidation invalid_boundary_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, invalid_boundary_activation, &invalid_boundary_validation) == RAC_SUCCESS,
+          "Invalid layer boundary activation returns typed validation");
+    CHECK(!invalid_boundary_validation.accepted(), "Invalid layer boundary is rejected");
+
+    // 11b. Activation validation rejection on undersized tensor bytes (e.g. 1 byte/element instead of 2)
+    v1::ClusterActivation undersized_activation = valid_activation;
+    undersized_activation.set_tensor_data(std::string(4096 * 1, 'A')); // 4096 bytes != 4096 * 2 FP16 bytes
+    v1::ConnectInvocationValidation undersized_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, undersized_activation, &undersized_validation) == RAC_SUCCESS,
+          "Undersized activation tensor returns typed validation");
+    CHECK(!undersized_validation.accepted(), "Undersized activation tensor bytes are rejected");
+
+    // 11c. Exact byte count is enforced for the named dtype
+    v1::ClusterActivation oversized_activation = valid_activation;
+    oversized_activation.set_tensor_data(std::string(4096 * 2 + 2, 'A'));
+    v1::ConnectInvocationValidation oversized_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, oversized_activation, &oversized_validation) == RAC_SUCCESS,
+          "Oversized activation tensor returns typed validation");
+    CHECK(!oversized_validation.accepted(), "Activation tensor with extra bytes is rejected");
+
+    v1::ClusterActivation wrong_format_activation = valid_activation;
+    wrong_format_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP32); // payload is FP16-sized
+    v1::ConnectInvocationValidation wrong_format_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, wrong_format_activation, &wrong_format_validation) == RAC_SUCCESS,
+          "Wrong-format activation tensor returns typed validation");
+    CHECK(!wrong_format_validation.accepted(), "FP16-sized payload declared as FP32 is rejected");
+
+    v1::ClusterActivation fp32_activation = valid_activation;
+    fp32_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP32);
+    fp32_activation.set_tensor_data(std::string(4096 * 4, 'A'));
+    v1::ConnectInvocationValidation fp32_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, fp32_activation, &fp32_validation) == RAC_SUCCESS,
+          "FP32 activation tensor returns typed validation");
+    CHECK(fp32_validation.accepted(), "Exact-size FP32 activation tensor is accepted");
+
+    v1::ClusterActivation unspecified_dtype_activation = valid_activation;
+    unspecified_dtype_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_UNSPECIFIED);
+    v1::ConnectInvocationValidation unspecified_dtype_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, unspecified_dtype_activation, &unspecified_dtype_validation) == RAC_SUCCESS,
+          "Activation without dtype returns typed validation");
+    CHECK(!unspecified_dtype_validation.accepted(), "Activation with unspecified dtype is rejected");
+
+    v1::ClusterActivation overflow_activation = valid_activation;
+    overflow_activation.set_seq_len(UINT32_MAX);
+    overflow_activation.set_hidden_size(UINT32_MAX);
+    v1::ConnectInvocationValidation overflow_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, overflow_activation, &overflow_validation) == RAC_SUCCESS,
+          "Overflowing activation dimensions return typed validation");
+    CHECK(!overflow_validation.accepted() &&
+          overflow_validation.rejection_reason() == "Activation tensor dimensions overflow the expected byte count",
+          "Overflowing activation dimensions are rejected with typed overflow reason");
+
+    v1::ClusterActivation out_of_range_dtype_activation = valid_activation;
+    out_of_range_dtype_activation.set_dtype(static_cast<v1::ClusterActivationDtype>(999));
+    v1::ConnectInvocationValidation out_of_range_dtype_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, out_of_range_dtype_activation, &out_of_range_dtype_validation) == RAC_SUCCESS,
+          "Out-of-range dtype activation returns typed validation");
+    CHECK(!out_of_range_dtype_validation.accepted() &&
+          out_of_range_dtype_validation.rejection_reason() == "Activation dtype is unspecified or unknown",
+          "Out-of-range dtype is rejected with unspecified/unknown reason");
+
+    // 12. Stop cluster with mismatched cluster ID is rejected
+    v1::ClusterStopRequest wrong_stop_request;
+    wrong_stop_request.set_cluster_id("cluster-different");
+    v1::ClusterState wrong_stop_state;
+    CHECK(call_proto(rac_connect_cluster_stop_proto, wrong_stop_request, &wrong_stop_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Stopping with mismatched cluster_id is rejected");
+
+    // 12b. Stop without a cluster_id is rejected rather than tearing the cluster down
+    v1::ClusterStopRequest empty_stop_request;
+    v1::ClusterState empty_stop_state;
+    CHECK(call_proto(rac_connect_cluster_stop_proto, empty_stop_request, &empty_stop_state) == RAC_ERROR_INVALID_ARGUMENT,
+          "Stopping without a cluster_id is rejected");
+
+    // 13. Stop active cluster cleanly
+    v1::ClusterStopRequest stop_request;
+    stop_request.set_cluster_id("cluster-alpha");
+    v1::ClusterState stopped_state;
+    CHECK(call_proto(rac_connect_cluster_stop_proto, stop_request, &stopped_state) == RAC_SUCCESS,
+          "Cluster stop terminates active cluster");
+    CHECK(!stopped_state.is_active(), "Cluster state is marked inactive after stop");
+    CHECK(stopped_state.cluster_id() == "cluster-alpha", "Stopped cluster ID is preserved in response");
+
+    // 14. Activation rejected after stop
+    v1::ConnectInvocationValidation stopped_activation_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, valid_activation, &stopped_activation_validation) == RAC_SUCCESS,
+          "Activation check after stop returns typed validation");
+    CHECK(!stopped_activation_validation.accepted(), "Activation tensor is rejected when cluster is inactive");
+}
+
+void test_cluster_activation_decoding_and_transport() {
+    // 1. Construct valid FP16 activation: seq_len = 2, hidden_size = 4, 8 elements = 16 bytes
+    v1::ClusterActivation activation_fp16;
+    activation_fp16.set_cluster_id("cluster-alpha");
+    activation_fp16.set_request_id("req-1");
+    activation_fp16.set_from_layer(0);
+    activation_fp16.set_seq_len(2);
+    activation_fp16.set_hidden_size(4);
+    activation_fp16.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP16);
+
+    // Provide little-endian bytes: 8 16-bit words: 0x0100, 0x0200, ...
+    std::string fp16_bytes;
+    for (uint16_t i = 1; i <= 8; ++i) {
+        const uint8_t le[2] = {static_cast<uint8_t>(i & 0xFF), static_cast<uint8_t>((i >> 8) & 0xFF)};
+        fp16_bytes.append(reinterpret_cast<const char*>(le), 2);
+    }
+    activation_fp16.set_tensor_data(fp16_bytes);
+
+    std::string serialized_fp16;
+    CHECK(activation_fp16.SerializeToString(&serialized_fp16), "Serialize FP16 activation");
+
+    // 2. Decode with expected_dtype = 0 (accept declared)
+    rac_proto_buffer_t host_tensor{};
+    rac_connect_decoded_activation_t meta{};
+    rac_result_t rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_fp16.data()), serialized_fp16.size(),
+        0, &host_tensor, &meta);
+    CHECK(rc == RAC_SUCCESS, "Decode valid FP16 activation succeeds");
+    CHECK(host_tensor.data != nullptr, "Decoded tensor data is non-null");
+    CHECK(host_tensor.size == 16, "Decoded tensor size matches 16 bytes");
+    CHECK(meta.dtype == v1::CLUSTER_ACTIVATION_DTYPE_FP16, "Decoded metadata dtype matches FP16");
+    CHECK(meta.seq_len == 2, "Decoded metadata seq_len matches 2");
+    CHECK(meta.hidden_size == 4, "Decoded metadata hidden_size matches 4");
+    CHECK(meta.element_count == 8, "Decoded metadata element_count matches 8");
+    CHECK(meta.element_size == 2, "Decoded metadata element_size matches 2");
+    CHECK(meta.total_bytes == 16, "Decoded metadata total_bytes matches 16");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 3. Decode with matching expected_dtype
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_fp16.data()), serialized_fp16.size(),
+        v1::CLUSTER_ACTIVATION_DTYPE_FP16, &host_tensor, &meta);
+    CHECK(rc == RAC_SUCCESS, "Decode with matching expected_dtype FP16 succeeds");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 4. Decode with mismatching expected_dtype (receiver expects FP32, sender declared FP16)
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_fp16.data()), serialized_fp16.size(),
+        v1::CLUSTER_ACTIVATION_DTYPE_FP32, &host_tensor, &meta);
+    CHECK(rc == RAC_ERROR_INVALID_FORMAT, "Decode with mismatching expected_dtype FP32 rejected with RAC_ERROR_INVALID_FORMAT");
+    CHECK(host_tensor.data == nullptr, "Host tensor data is null on mismatch rejection");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 5. Decode with declared FP32 but payload sized for FP16 (wrong format payload)
+    v1::ClusterActivation wrong_format_activation = activation_fp16;
+    wrong_format_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP32); // 16 bytes payload, but 8 * 4 = 32 required
+    std::string serialized_wrong_format;
+    wrong_format_activation.SerializeToString(&serialized_wrong_format);
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_wrong_format.data()), serialized_wrong_format.size(),
+        0, &host_tensor, &meta);
+    CHECK(rc == RAC_ERROR_INVALID_FORMAT, "Payload size not matching declared dtype rejected with RAC_ERROR_INVALID_FORMAT");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 6. Decode with UNSPECIFIED dtype
+    v1::ClusterActivation unspec_activation = activation_fp16;
+    unspec_activation.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_UNSPECIFIED);
+    std::string serialized_unspec;
+    unspec_activation.SerializeToString(&serialized_unspec);
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_unspec.data()), serialized_unspec.size(),
+        0, &host_tensor, &meta);
+    CHECK(rc == RAC_ERROR_INVALID_FORMAT, "UNSPECIFIED dtype rejected with RAC_ERROR_INVALID_FORMAT");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 7. Decode with out-of-range dtype
+    v1::ClusterActivation out_of_range_activation = activation_fp16;
+    out_of_range_activation.set_dtype(static_cast<v1::ClusterActivationDtype>(999));
+    std::string serialized_out_of_range;
+    out_of_range_activation.SerializeToString(&serialized_out_of_range);
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_out_of_range.data()), serialized_out_of_range.size(),
+        0, &host_tensor, &meta);
+    CHECK(rc == RAC_ERROR_INVALID_FORMAT, "Out-of-range dtype rejected with RAC_ERROR_INVALID_FORMAT");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 8. Decode with dimension overflow
+    v1::ClusterActivation overflow_act = activation_fp16;
+    overflow_act.set_seq_len(UINT32_MAX);
+    overflow_act.set_hidden_size(UINT32_MAX);
+    std::string serialized_overflow;
+    overflow_act.SerializeToString(&serialized_overflow);
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_overflow.data()), serialized_overflow.size(),
+        0, &host_tensor, &meta);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "Overflowing dimensions rejected with RAC_ERROR_INVALID_ARGUMENT");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 9. Decode with zero dimension
+    v1::ClusterActivation zero_dim_activation = activation_fp16;
+    zero_dim_activation.set_seq_len(0);
+    std::string serialized_zero_dim;
+    zero_dim_activation.SerializeToString(&serialized_zero_dim);
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_zero_dim.data()), serialized_zero_dim.size(),
+        0, &host_tensor, &meta);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "Zero sequence length rejected with RAC_ERROR_INVALID_ARGUMENT");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 10. Null / empty checks
+    CHECK(rac_connect_cluster_decode_activation_proto(nullptr, 0, 0, &host_tensor, &meta) == RAC_ERROR_INVALID_ARGUMENT,
+          "Null activation bytes rejected with RAC_ERROR_INVALID_ARGUMENT");
+    CHECK(rac_connect_cluster_decode_activation_proto(reinterpret_cast<const uint8_t*>(serialized_fp16.data()), serialized_fp16.size(), 0, nullptr, &meta) == RAC_ERROR_NULL_POINTER,
+          "Null output tensor buffer rejected with RAC_ERROR_NULL_POINTER");
+
+    // 11. Decode valid FP32 activation: 4 elements, 16 bytes
+    v1::ClusterActivation activation_fp32;
+    activation_fp32.set_cluster_id("cluster-alpha");
+    activation_fp32.set_request_id("req-2");
+    activation_fp32.set_from_layer(0);
+    activation_fp32.set_seq_len(1);
+    activation_fp32.set_hidden_size(4);
+    activation_fp32.set_dtype(v1::CLUSTER_ACTIVATION_DTYPE_FP32);
+    activation_fp32.set_tensor_data(std::string(16, 'Z'));
+    std::string serialized_fp32;
+    activation_fp32.SerializeToString(&serialized_fp32);
+    rc = rac_connect_cluster_decode_activation_proto(
+        reinterpret_cast<const uint8_t*>(serialized_fp32.data()), serialized_fp32.size(),
+        v1::CLUSTER_ACTIVATION_DTYPE_FP32, &host_tensor, &meta);
+    CHECK(rc == RAC_SUCCESS, "Decode valid FP32 activation succeeds");
+    CHECK(meta.dtype == v1::CLUSTER_ACTIVATION_DTYPE_FP32, "Metadata dtype is FP32");
+    CHECK(meta.element_size == 4, "Metadata element_size is 4");
+    CHECK(meta.total_bytes == 16, "Metadata total_bytes is 16");
+    rac_proto_buffer_free(&host_tensor);
+
+    // 12. Transport integration test via rac_connect_transport_receive_activation
+    static std::string g_mock_receive_bytes;
+    g_mock_receive_bytes = serialized_fp16;
+
+    rac_connect_transport_ops_t mock_ops{};
+    mock_ops.abi_version = RAC_CONNECT_TRANSPORT_ABI_VERSION;
+    mock_ops.struct_size = sizeof(mock_ops);
+    mock_ops.open = [](void*, const rac_connect_endpoint_t*, rac_connect_channel_t* out_ch) -> rac_result_t {
+        *out_ch = 1;
+        return RAC_SUCCESS;
+    };
+    mock_ops.close = [](void*, rac_connect_channel_t) -> rac_result_t { return RAC_SUCCESS; };
+    mock_ops.send = [](void*, rac_connect_channel_t, const uint8_t*, size_t) -> rac_result_t { return RAC_SUCCESS; };
+    mock_ops.receive = [](void*, rac_connect_channel_t, rac_proto_buffer_t* out_buf) -> rac_result_t {
+        rac_proto_buffer_allocate(out_buf, g_mock_receive_bytes.size());
+        std::memcpy(out_buf->data, g_mock_receive_bytes.data(), g_mock_receive_bytes.size());
+        return RAC_SUCCESS;
+    };
+
+    CHECK(rac_connect_transport_register(&mock_ops, nullptr) == RAC_SUCCESS, "Register mock transport for activation test");
+
+    // Receive with expected FP16
+    rc = rac_connect_transport_receive_activation(1, v1::CLUSTER_ACTIVATION_DTYPE_FP16, &host_tensor, &meta);
+    CHECK(rc == RAC_SUCCESS, "rac_connect_transport_receive_activation succeeds with matching dtype");
+    CHECK(meta.dtype == v1::CLUSTER_ACTIVATION_DTYPE_FP16, "Transport received tensor has FP16 dtype");
+    rac_proto_buffer_free(&host_tensor);
+
+    // Receive with expected FP32 (rejects with typed format error)
+    rc = rac_connect_transport_receive_activation(1, v1::CLUSTER_ACTIVATION_DTYPE_FP32, &host_tensor, &meta);
+    CHECK(rc == RAC_ERROR_INVALID_FORMAT, "rac_connect_transport_receive_activation rejects format mismatch with RAC_ERROR_INVALID_FORMAT");
+    rac_proto_buffer_free(&host_tensor);
+
+    // Unregister transport
+    rac_connect_transport_register(nullptr, nullptr);
+}
+
 #endif
 
 }  // namespace
@@ -308,6 +728,8 @@ int main() {
     test_client_admission();
     test_host_handshake_and_reconnect_deduplication();
     test_session_cap_and_cancel_validation();
+    test_cluster_orchestration();
+    test_cluster_activation_decoding_and_transport();
     std::fprintf(stdout, "  %d checks, %d failures\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
 #endif

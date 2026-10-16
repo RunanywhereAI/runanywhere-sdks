@@ -5,11 +5,14 @@
 
 #include "rac/connect/rac_connect.h"
 
+#include <algorithm>
 #include <array>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "rac/core/rac_uuid.h"
 
@@ -206,6 +209,117 @@ rac_result_t reject_handshake(const HostRuntime& host, const char* reason,
         *response.mutable_model() = host.model;
     }
     return serialize_message(response, out_response);
+}
+
+struct ClusterRuntime {
+    bool is_active = false;
+    std::string cluster_id;
+    v1::ConnectModelDescriptor model;
+    std::vector<v1::ClusterLayerAssignment> assignments;
+    std::unordered_map<std::string, v1::ClusterLayerAssignment> peer_assignments;
+};
+
+ClusterRuntime& cluster_runtime() {
+    static ClusterRuntime instance;
+    return instance;
+}
+
+bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
+                                std::string* out_rejection_reason) {
+    if (assignments.empty()) {
+        if (out_rejection_reason != nullptr) {
+            *out_rejection_reason = "Cluster must have at least one layer assignment";
+        }
+        return false;
+    }
+
+    std::unordered_set<std::string> seen_instance_ids;
+    std::vector<v1::ClusterLayerAssignment> sorted_assignments;
+    sorted_assignments.reserve(assignments.size());
+
+    for (int i = 0; i < assignments.size(); ++i) {
+        const v1::ClusterLayerAssignment& assignment = assignments[i];
+        if (assignment.instance_id().empty()) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Peer assignment has empty instance_id";
+            }
+            return false;
+        }
+        if (!seen_instance_ids.insert(assignment.instance_id()).second) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Duplicate instance_id in cluster assignment";
+            }
+            return false;
+        }
+        if (assignment.layer_end() <= assignment.layer_start()) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Invalid layer range: layer_end must be greater than layer_start";
+            }
+            return false;
+        }
+        sorted_assignments.push_back(assignment);
+    }
+
+    std::sort(sorted_assignments.begin(), sorted_assignments.end(),
+              [](const v1::ClusterLayerAssignment& a, const v1::ClusterLayerAssignment& b) {
+                  return a.layer_start() < b.layer_start();
+              });
+
+    uint32_t expected_start = 0;
+    for (const auto& assignment : sorted_assignments) {
+        if (assignment.layer_start() != expected_start) {
+            if (out_rejection_reason != nullptr) {
+                *out_rejection_reason = "Layer range gap or mismatch in cluster assignment";
+            }
+            return false;
+        }
+        expected_start = assignment.layer_end();
+    }
+    return true;
+}
+
+// Bytes per element for a ClusterActivation dtype; 0 for UNSPECIFIED or an unknown value.
+uint64_t activation_element_size(v1::ClusterActivationDtype dtype) {
+    switch (dtype) {
+        case v1::CLUSTER_ACTIVATION_DTYPE_FP16:
+        case v1::CLUSTER_ACTIVATION_DTYPE_BF16:
+            return 2;
+        case v1::CLUSTER_ACTIVATION_DTYPE_FP32:
+            return 4;
+        default:
+            return 0;
+    }
+}
+
+inline bool is_big_endian_host() {
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__)
+    return __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__;
+#else
+    const uint16_t test = 0x0102;
+    return *reinterpret_cast<const uint8_t*>(&test) == 0x01;
+#endif
+}
+
+// True when `current` and `incoming` describe the same coordinator layout (order-insensitive).
+bool same_layer_assignments(
+    const std::vector<v1::ClusterLayerAssignment>& current,
+    const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& incoming) {
+    if (current.size() != static_cast<size_t>(incoming.size())) {
+        return false;
+    }
+    for (const auto& item : incoming) {
+        const auto match = std::find_if(
+            current.begin(), current.end(), [&item](const v1::ClusterLayerAssignment& existing) {
+                return existing.instance_id() == item.instance_id() &&
+                       existing.layer_start() == item.layer_start() &&
+                       existing.layer_end() == item.layer_end() &&
+                       existing.is_coordinator() == item.is_coordinator();
+            });
+        if (match == current.end()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -638,6 +752,401 @@ rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* request_bytes
         validation.set_accepted(true);
     }
     return serialize_message(validation, out_validation);
+#endif
+}
+
+/* ===========================================================================
+ * Cluster Orchestration Implementations (Issue #541)
+ * =========================================================================== */
+
+rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
+                                             size_t request_size,
+                                             rac_proto_buffer_t* out_cluster_state) {
+    if (out_cluster_state == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_cluster_state);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterStartRequest request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_cluster_state,
+                      "Invalid ClusterStartRequest protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    ClusterRuntime& cluster = cluster_runtime();
+
+    if (request.cluster_id().empty()) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   "ClusterStartRequest missing cluster_id");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!is_valid_model(request.model())) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   "ClusterStartRequest missing or invalid model descriptor");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::string rejection;
+    if (!validate_layer_assignments(request.assignments(), &rejection)) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   rejection.c_str());
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (cluster.is_active) {
+        if (cluster.cluster_id == request.cluster_id()) {
+            if (cluster.model.model_id() != request.model().model_id() ||
+                !same_layer_assignments(cluster.assignments, request.assignments())) {
+                rac_proto_buffer_set_error(
+                    out_cluster_state, RAC_ERROR_INVALID_CONFIGURATION,
+                    "Stop the active cluster before changing its model or layer assignments");
+                return RAC_ERROR_INVALID_CONFIGURATION;
+            }
+            // Idempotent start with an identical layout: return existing state
+            v1::ClusterState state;
+            state.set_is_active(true);
+            state.set_cluster_id(cluster.cluster_id);
+            *state.mutable_model() = cluster.model;
+            for (const auto& item : cluster.assignments) {
+                *state.add_assignments() = item;
+            }
+            state.set_peer_count(static_cast<uint32_t>(cluster.assignments.size()));
+            return serialize_message(state, out_cluster_state);
+        }
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Another cluster is already active");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    cluster.is_active = true;
+    cluster.cluster_id = request.cluster_id();
+    cluster.model = request.model();
+    cluster.assignments.clear();
+    cluster.peer_assignments.clear();
+
+    v1::ClusterState state;
+    state.set_is_active(true);
+    state.set_cluster_id(cluster.cluster_id);
+    *state.mutable_model() = cluster.model;
+
+    for (const v1::ClusterLayerAssignment& item : request.assignments()) {
+        cluster.assignments.push_back(item);
+        cluster.peer_assignments[item.instance_id()] = item;
+        *state.add_assignments() = item;
+    }
+    state.set_peer_count(static_cast<uint32_t>(request.assignments_size()));
+
+    return serialize_message(state, out_cluster_state);
+#endif
+}
+
+rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
+                                            size_t request_size,
+                                            rac_proto_buffer_t* out_response) {
+    if (out_response == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_response);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_response, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterJoinRequest request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_response,
+                      "Invalid ClusterJoinRequest protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    const ClusterRuntime& cluster = cluster_runtime();
+
+    v1::ClusterStartResponse response;
+    if (request.cluster_id().empty()) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Cluster ID is empty");
+    } else if (request.instance_id().empty()) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Peer instance_id is empty");
+    } else if (!cluster.is_active) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Cluster is not active");
+    } else if (request.cluster_id() != cluster.cluster_id) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Cluster ID does not match active cluster");
+    } else if (!request.peer_capability().instance_id().empty() &&
+               request.peer_capability().instance_id() != request.instance_id()) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Peer capability instance_id does not match request identity");
+    } else {
+        auto it = cluster.peer_assignments.find(request.instance_id());
+        if (it == cluster.peer_assignments.end()) {
+            response.set_accepted(false);
+            response.set_rejection_reason("Peer instance_id not found in cluster layer assignments");
+        } else if (request.peer_capability().max_layers() > 0 &&
+                   it->second.layer_end() - it->second.layer_start() >
+                       request.peer_capability().max_layers()) {
+            response.set_accepted(false);
+            response.set_rejection_reason("Peer max_layers is smaller than its assigned layer span");
+        } else {
+            response.set_accepted(true);
+            *response.mutable_peer_capability() = request.peer_capability();
+            if (response.peer_capability().instance_id().empty()) {
+                response.mutable_peer_capability()->set_instance_id(request.instance_id());
+            }
+        }
+    }
+
+    return serialize_message(response, out_response);
+#endif
+}
+
+rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
+                                            size_t request_size,
+                                            rac_proto_buffer_t* out_cluster_state) {
+    if (out_cluster_state == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_cluster_state);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterStopRequest request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_cluster_state,
+                      "Invalid ClusterStopRequest protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+    if (request.cluster_id().empty()) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   "ClusterStopRequest missing cluster_id");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    ClusterRuntime& cluster = cluster_runtime();
+
+    if (cluster.is_active && request.cluster_id() != cluster.cluster_id) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+                                   "ClusterStopRequest cluster_id does not match the active cluster");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const std::string stopped_cluster_id = cluster.cluster_id;
+    cluster.is_active = false;
+    cluster.cluster_id.clear();
+    cluster.model.Clear();
+    cluster.assignments.clear();
+    cluster.peer_assignments.clear();
+
+    v1::ClusterState state;
+    state.set_is_active(false);
+    state.set_cluster_id(stopped_cluster_id);
+    state.set_peer_count(0);
+    return serialize_message(state, out_cluster_state);
+#endif
+}
+
+rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
+                                                           size_t request_size,
+                                                           rac_proto_buffer_t* out_validation) {
+    if (out_validation == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_validation);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_validation, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterActivation request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_validation,
+                      "Invalid ClusterActivation protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    v1::ConnectInvocationValidation validation;
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    const ClusterRuntime& cluster = cluster_runtime();
+
+    if (!cluster.is_active) {
+        validation.set_rejection_reason("Cluster is not active");
+    } else if (request.cluster_id() != cluster.cluster_id) {
+        validation.set_rejection_reason("Cluster ID mismatch on activation tensor");
+    } else if (request.request_id().empty()) {
+        validation.set_rejection_reason("Activation request_id is empty");
+    } else if (request.tensor_data().empty()) {
+        validation.set_rejection_reason("Activation tensor_data is empty");
+    } else if (request.seq_len() == 0 || request.hidden_size() == 0) {
+        validation.set_rejection_reason("Invalid activation tensor dimensions (seq_len/hidden_size zero)");
+    } else {
+        bool valid_boundary = (request.from_layer() == 0);
+        for (const auto& a : cluster.assignments) {
+            if (request.from_layer() == a.layer_start()) {
+                valid_boundary = true;
+                break;
+            }
+        }
+        // tensor_data is a packed array of seq_len * hidden_size elements in the format named by
+        // `dtype`, so the exact byte count is known and a mismatch means a truncated, padded or
+        // wrongly-typed payload.
+        const uint64_t element_size = activation_element_size(request.dtype());
+        const uint64_t elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
+        const bool size_overflows = element_size != 0 && elements > UINT64_MAX / element_size;
+        if (!valid_boundary) {
+            validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
+        } else if (element_size == 0) {
+            validation.set_rejection_reason("Activation dtype is unspecified or unknown");
+        } else if (size_overflows) {
+            validation.set_rejection_reason("Activation tensor dimensions overflow the expected byte count");
+        } else if (request.tensor_data().size() != elements * element_size) {
+            validation.set_rejection_reason("Activation tensor_data size does not equal seq_len * hidden_size * element size for dtype");
+        } else {
+            validation.set_accepted(true);
+        }
+    }
+    return serialize_message(validation, out_validation);
+#endif
+}
+
+rac_result_t
+rac_connect_cluster_decode_activation_proto(const uint8_t* activation_bytes,
+                                            size_t activation_size,
+                                            uint32_t expected_dtype,
+                                            rac_proto_buffer_t* out_host_tensor,
+                                            rac_connect_decoded_activation_t* out_metadata) {
+    if (out_host_tensor == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_host_tensor);
+    if (out_metadata != nullptr) {
+        *out_metadata = {};
+    }
+    if (activation_bytes == nullptr || activation_size == 0) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Empty or null activation bytes");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)expected_dtype;
+    rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Cluster orchestration requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ClusterActivation activation;
+    const rac_result_t parse_result =
+        parse_message(activation_bytes, activation_size, &activation, out_host_tensor,
+                      "Invalid ClusterActivation protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    const auto dtype = activation.dtype();
+    const uint64_t element_size = activation_element_size(dtype);
+    if (element_size == 0) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_FORMAT,
+                                   "Activation dtype is unspecified or unknown");
+        return RAC_ERROR_INVALID_FORMAT;
+    }
+
+    if (expected_dtype != 0 && static_cast<uint32_t>(dtype) != expected_dtype) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_FORMAT,
+                                   "Activation dtype does not match declared expected format");
+        return RAC_ERROR_INVALID_FORMAT;
+    }
+
+    if (activation.seq_len() == 0 || activation.hidden_size() == 0) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Invalid activation tensor dimensions (seq_len/hidden_size zero)");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const uint64_t elements = static_cast<uint64_t>(activation.seq_len()) * activation.hidden_size();
+    if (elements > UINT64_MAX / element_size) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Activation tensor dimensions overflow expected byte count");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const uint64_t expected_bytes = elements * element_size;
+    if (activation.tensor_data().size() != expected_bytes) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_INVALID_FORMAT,
+                                   "Activation tensor_data size does not equal seq_len * hidden_size * element size for dtype");
+        return RAC_ERROR_INVALID_FORMAT;
+    }
+
+    const rac_result_t alloc_result =
+        rac_proto_buffer_allocate(out_host_tensor, static_cast<size_t>(expected_bytes));
+    if (alloc_result != RAC_SUCCESS) {
+        return alloc_result;
+    }
+
+    const auto* src = reinterpret_cast<const uint8_t*>(activation.tensor_data().data());
+    uint8_t* dst = out_host_tensor->data;
+
+    // Decode little-endian wire elements into host byte order (swap on big-endian architectures).
+    const bool is_big_endian = is_big_endian_host();
+    if (!is_big_endian) {
+        std::memcpy(dst, src, static_cast<size_t>(expected_bytes));
+    } else {
+        if (element_size == 2) {
+            for (uint64_t i = 0; i < elements; ++i) {
+                uint16_t val;
+                std::memcpy(&val, src + i * 2, 2);
+                val = static_cast<uint16_t>((val >> 8) | (val << 8));
+                std::memcpy(dst + i * 2, &val, 2);
+            }
+        } else if (element_size == 4) {
+            for (uint64_t i = 0; i < elements; ++i) {
+                uint32_t val;
+                std::memcpy(&val, src + i * 4, 4);
+                val = ((val >> 24) & 0x000000FF) |
+                      ((val >> 8)  & 0x0000FF00) |
+                      ((val << 8)  & 0x00FF0000) |
+                      ((val << 24) & 0xFF000000);
+                std::memcpy(dst + i * 4, &val, 4);
+            }
+        }
+    }
+
+    if (out_metadata != nullptr) {
+        out_metadata->dtype = static_cast<uint32_t>(dtype);
+        out_metadata->seq_len = activation.seq_len();
+        out_metadata->hidden_size = activation.hidden_size();
+        out_metadata->element_count = static_cast<size_t>(elements);
+        out_metadata->element_size = static_cast<size_t>(element_size);
+        out_metadata->total_bytes = static_cast<size_t>(expected_bytes);
+    }
+
+    return RAC_SUCCESS;
 #endif
 }
 
