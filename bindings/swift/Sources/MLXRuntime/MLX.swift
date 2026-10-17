@@ -824,7 +824,7 @@ private final class MLXSession: @unchecked Sendable {
         MLXSessionCoordinator.register(self)
     }
 
-    fileprivate var loadedContextLength: Int {
+    var loadedContextLength: Int {
         lock.withLock { $0.contextLength }
     }
 

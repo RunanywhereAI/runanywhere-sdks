@@ -38,6 +38,37 @@ enum MLXTextDecisionKind {
     case gliner
 }
 
+/// The few `config.json` fields that identify a checkpoint. Each field is read
+/// on its own, so a value of an unexpected type drops that field instead of the file.
+private struct MLXCheckpointConfig: Decodable {
+    let modelType: String?
+    let autoModel: String?
+    let encoderMaxPositionEmbeddings: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case modelType = "model_type"
+        case autoMap = "auto_map"
+        case encoderConfig = "encoder_config"
+    }
+
+    private enum AutoMapKeys: String, CodingKey {
+        case autoModel = "AutoModel"
+    }
+
+    private enum EncoderKeys: String, CodingKey {
+        case maxPositionEmbeddings = "max_position_embeddings"
+    }
+
+    init(from decoder: Decoder) throws {
+        let root = try decoder.container(keyedBy: CodingKeys.self)
+        modelType = try? root.decode(String.self, forKey: .modelType)
+        let autoMap = try? root.nestedContainer(keyedBy: AutoMapKeys.self, forKey: .autoMap)
+        autoModel = try? autoMap?.decode(String.self, forKey: .autoModel)
+        let encoder = try? root.nestedContainer(keyedBy: EncoderKeys.self, forKey: .encoderConfig)
+        encoderMaxPositionEmbeddings = try? encoder?.decode(Int.self, forKey: .maxPositionEmbeddings)
+    }
+}
+
 enum MLXTextDecisionCheckpoint {
     static func kind(at directory: URL) -> MLXTextDecisionKind? {
         // Joint checkpoints also carry decision_config.json, so they are checked first.
@@ -47,7 +78,7 @@ enum MLXTextDecisionCheckpoint {
         if Qwen35DeciderModel.isDeciderCheckpoint(at: directory) {
             return .decider
         }
-        guard let modelType = string(json(at: directory.appending(component: "config.json")), key: "model_type") else {
+        guard let config = config(at: directory), let modelType = config.modelType else {
             return nil
         }
         switch modelType {
@@ -56,26 +87,20 @@ enum MLXTextDecisionCheckpoint {
         case "extractor":
             return .gliner
         case "lfm2_vl":
-            let autoMap = json(at: directory.appending(component: "config.json"))?["auto_map"] as? [String: Any]
-            return autoMap?["AutoModel"] as? String == "modeling_d1.D1Model" ? .d1 : nil
+            return config.autoModel == "modeling_d1.D1Model" ? .d1 : nil
         default:
             return nil
         }
     }
 
     static func glinerMaxTokens(at directory: URL) -> Int {
-        let encoder = json(at: directory.appending(component: "config.json"))?["encoder_config"] as? [String: Any]
-        let limit = (encoder?["max_position_embeddings"] as? NSNumber)?.intValue ?? 512
+        let limit = config(at: directory)?.encoderMaxPositionEmbeddings ?? 512
         return max(limit, 1)
     }
 
-    private static func json(at url: URL) -> [String: Any]? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    }
-
-    private static func string(_ object: [String: Any]?, key: String) -> String? {
-        object?[key] as? String
+    private static func config(at directory: URL) -> MLXCheckpointConfig? {
+        guard let data = try? Data(contentsOf: directory.appending(component: "config.json")) else { return nil }
+        return try? JSONDecoder().decode(MLXCheckpointConfig.self, from: data)
     }
 }
 
@@ -109,7 +134,9 @@ enum MLXTextDecisions {
         var inputTokens = 0
         for question in questions {
             let encoded = try D1OmniPrompt.encode(
-                state: request.state, question: question, tokenizer: tokenizer,
+                state: request.state,
+                question: question,
+                tokenizer: tokenizer,
                 maxLength: model.config.maxLength)
             inputTokens += encoded.tokens.count
         }
