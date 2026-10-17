@@ -50,7 +50,9 @@ internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLM
         temperature = temperature,
         top_p = topP,
         top_k = topK ?: 0,
-        min_p = minP ?: 0f,
+        // Left absent when unset: an explicit 0.0 reads as "min-p sampling off",
+        // while absent lets commons apply the IDL default (0.05).
+        min_p = minP,
         frequency_penalty = frequencyPenalty ?: 0f,
         presence_penalty = presencePenalty ?: 0f,
         repeat_penalty = repetitionPenalty ?: NEUTRAL_REPETITION_PENALTY,
