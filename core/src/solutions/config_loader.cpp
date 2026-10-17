@@ -33,7 +33,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstdint>
 #include <cstring>
+#include <locale>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -520,38 +523,97 @@ void populate_voice_agent(const YamlNode& node, runanywhere::v1::VoiceAgentConfi
             to_bool(n->scalar));
 }
 
-runanywhere::v1::VectorStore parse_vector_store(const std::string& s) {
+// Maps the YAML token to its enum. An unrecognised token is an error, not UNSPECIFIED: a typo
+// like `usearchh` would otherwise look exactly like the key being absent.
+bool parse_vector_store(const std::string& s, runanywhere::v1::VectorStore* out) {
     using runanywhere::v1::VectorStore;
-    if (s == "usearch")
-        return VectorStore::VECTOR_STORE_USEARCH;
-    if (s == "pgvector")
-        return VectorStore::VECTOR_STORE_PGVECTOR;
-    return VectorStore::VECTOR_STORE_UNSPECIFIED;
+    if (s == "usearch") {
+        *out = VectorStore::VECTOR_STORE_USEARCH;
+        return true;
+    }
+    if (s == "pgvector") {
+        *out = VectorStore::VECTOR_STORE_PGVECTOR;
+        return true;
+    }
+    return false;
 }
 
-void populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg) {
+// Strict numeric parse for the retrieval tuning keys: the whole scalar must be a finite
+// number in the classic "C" locale. to_float()/to_int() fall back to 0 on garbage, which
+// would now be forwarded as an explicit 0 (and bm25_b = 0 is a legal value).
+bool parse_tuning_float(const std::string& s, float* out) {
+    std::istringstream stream(s);
+    stream.imbue(std::locale::classic());
+    float value = 0.0f;
+    if (!(stream >> value) || stream.peek() != std::char_traits<char>::eof() ||
+        !std::isfinite(value)) {
+        return false;
+    }
+    *out = value;
+    return true;
+}
+
+bool parse_tuning_int(const std::string& s, int32_t* out) {
+    std::istringstream stream(s);
+    stream.imbue(std::locale::classic());
+    int32_t value = 0;
+    if (!(stream >> value) || stream.peek() != std::char_traits<char>::eof()) {
+        return false;
+    }
+    *out = value;
+    return true;
+}
+
+rac_result_t reject_tuning_value(const char* key, const std::string& scalar) {
+    rac_error_set_details(
+        ("rag." + std::string(key) + " must be a number, got '" + scalar + "'").c_str());
+    return RAC_ERROR_INVALID_FORMAT;
+}
+
+rac_result_t populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg) {
     if (auto n = node.find("embed_model_id"))
         cfg->set_embed_model_id(n->scalar);
     if (auto n = node.find("rerank_model_id"))
         cfg->set_rerank_model_id(n->scalar);
     if (auto n = node.find("llm_model_id"))
         cfg->set_llm_model_id(n->scalar);
-    if (auto n = node.find("vector_store"))
-        cfg->set_vector_store(parse_vector_store(n->scalar));
+    if (auto n = node.find("vector_store")) {
+        runanywhere::v1::VectorStore store = runanywhere::v1::VECTOR_STORE_UNSPECIFIED;
+        if (!parse_vector_store(n->scalar, &store)) {
+            rac_error_set_details(("rag.vector_store must be one of: usearch, pgvector, got '" +
+                                   n->scalar + "'")
+                                      .c_str());
+            return RAC_ERROR_INVALID_FORMAT;
+        }
+        cfg->set_vector_store(store);
+    }
     if (auto n = node.find("vector_store_path"))
         cfg->set_vector_store_path(n->scalar);
     if (auto n = node.find("retrieve_k"))
         cfg->set_retrieve_k(to_int(n->scalar));
     if (auto n = node.find("rerank_top"))
         cfg->set_rerank_top(to_int(n->scalar));
-    if (auto n = node.find("bm25_k1"))
-        cfg->set_bm25_k1(to_float(n->scalar));
-    if (auto n = node.find("bm25_b"))
-        cfg->set_bm25_b(to_float(n->scalar));
-    if (auto n = node.find("rrf_k"))
-        cfg->set_rrf_k(to_int(n->scalar));
+    if (auto n = node.find("bm25_k1")) {
+        float value = 0.0f;
+        if (!parse_tuning_float(n->scalar, &value))
+            return reject_tuning_value("bm25_k1", n->scalar);
+        cfg->set_bm25_k1(value);
+    }
+    if (auto n = node.find("bm25_b")) {
+        float value = 0.0f;
+        if (!parse_tuning_float(n->scalar, &value))
+            return reject_tuning_value("bm25_b", n->scalar);
+        cfg->set_bm25_b(value);
+    }
+    if (auto n = node.find("rrf_k")) {
+        int32_t value = 0;
+        if (!parse_tuning_int(n->scalar, &value))
+            return reject_tuning_value("rrf_k", n->scalar);
+        cfg->set_rrf_k(value);
+    }
     if (auto n = node.find("prompt_template"))
         cfg->set_prompt_template(n->scalar);
+    return RAC_SUCCESS;
 }
 
 rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionConfig* cfg) {
@@ -564,8 +626,7 @@ rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionCo
         return RAC_SUCCESS;
     }
     if (auto n = root.find("rag"); n && n->kind == YamlNode::Kind::Mapping) {
-        populate_rag(*n, cfg->mutable_rag());
-        return RAC_SUCCESS;
+        return populate_rag(*n, cfg->mutable_rag());
     }
     rac_error_set_details("SolutionConfig YAML must declare one of: voice_agent, rag");
     return RAC_ERROR_INVALID_FORMAT;
