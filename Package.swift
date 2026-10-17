@@ -579,22 +579,22 @@ func binaryTargets() -> [Target] {
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/cpp-desktop-v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
                 checksum: "8d5800a174b22bb935b43e8b40f61f1122c7f23bd3d0998be9102d7347a19725"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/cpp-desktop-v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
                 checksum: "1ba5faea89ab48a96e621b8dfd77d500e668b83cb42cfc6527e6812dd5e1a613"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/cpp-desktop-v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
                 checksum: "cc21a1747c5481e37e5088fc1d766d83b75f98d55ce769b60be472d3a840ed30"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/cpp-desktop-v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
                 checksum: "6d075ae36515ed667e0056493a7201a5b5c5531e8f1f1698d66976c5cffd0ffd"
             ),
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
@@ -604,12 +604,12 @@ func binaryTargets() -> [Target] {
             // tagging (release choreography), exactly like the peers above.
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/cpp-desktop-v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
                 checksum: "9b3ae711b3272e3ea80d42f4f0518d4bc8a5cb4c9bf62e04e7baea32542bd05a"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/cpp-desktop-v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
                 checksum: "fce58cf954aa97d71960e18ef4f1d8ac8276dfdcce800e584f95f5f65926aa0f"
             ),
         ]
