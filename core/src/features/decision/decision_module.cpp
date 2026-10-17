@@ -37,6 +37,8 @@ constexpr const char* kLogCategory = "Decision.Component";
 // matches the cloud contract (labels A to Z).
 constexpr size_t kMaxQuestions = 128;
 constexpr size_t kMaxOptionsPerQuestion = 26;
+// Matches the cloud contract's per-request image limit.
+constexpr size_t kMaxImages = 8;
 
 struct rac_decision_component {
     rac_handle_t lifecycle = nullptr;
@@ -197,16 +199,18 @@ std::string normalize_option_key(const std::string& key);
 // control/line-break characters the contract forbids.
 bool key_is_valid(const std::string& key);
 
-// Flatten the parsed request into C structs. The option views borrow from the
-// still-alive parsed request's strings; the question views borrow from
-// `out_questions`, which the caller owns for the duration of the decide call.
+// Flatten the parsed request into C structs. The option and image views borrow
+// from the still-alive parsed request; the question and image arrays live in
+// `out_questions` / `out_images`, which the caller owns for the decide call.
 rac_result_t validate_request(const runanywhere::v1::DecisionRequest& request,
                               std::vector<rac_decision_question_t>* out_questions,
+                              std::vector<rac_decision_image_t>* out_images,
                               rac_decision_options_t* out_options) {
-    if (!out_questions || !out_options) {
+    if (!out_questions || !out_images || !out_options) {
         return RAC_ERROR_NULL_POINTER;
     }
     out_questions->clear();
+    out_images->clear();
     *out_options = RAC_DECISION_OPTIONS_DEFAULT;
     if (static_cast<size_t>(request.questions_size()) == 0 ||
         static_cast<size_t>(request.questions_size()) > kMaxQuestions) {
@@ -322,9 +326,49 @@ rac_result_t validate_request(const runanywhere::v1::DecisionRequest& request,
         out_questions->push_back(view);
     }
     if (request.has_options()) {
-        out_options->temperature = request.options().temperature();
-        out_options->prompt_format_version = request.options().prompt_format_version();
+        const auto& options = request.options();
+        out_options->temperature = options.temperature();
+        out_options->prompt_format_version = options.prompt_format_version();
+        switch (options.grouping()) {
+            case runanywhere::v1::DECISION_GROUPING_UNSPECIFIED:
+                out_options->grouping = RAC_DECISION_GROUPING_UNSPECIFIED;
+                break;
+            case runanywhere::v1::DECISION_GROUPING_JOINT:
+                out_options->grouping = RAC_DECISION_GROUPING_JOINT;
+                break;
+            case runanywhere::v1::DECISION_GROUPING_PER_QUESTION:
+                out_options->grouping = RAC_DECISION_GROUPING_PER_QUESTION;
+                break;
+            default:
+                return fail(RAC_ERROR_INVALID_PARAMETER);
+        }
+        if (options.min_pixels() != 0u && options.max_pixels() != 0u &&
+            options.min_pixels() > options.max_pixels()) {
+            return fail(RAC_ERROR_INVALID_PARAMETER);
+        }
+        out_options->max_length = options.max_length();
+        out_options->max_pixels = options.max_pixels();
+        out_options->min_pixels = options.min_pixels();
     }
+    if (static_cast<size_t>(request.images_size()) > kMaxImages) {
+        return fail(RAC_ERROR_INVALID_PARAMETER);
+    }
+    try {
+        out_images->reserve(static_cast<size_t>(request.images_size()));
+    } catch (...) {
+        return fail(RAC_ERROR_OUT_OF_MEMORY);
+    }
+    for (const auto& image : request.images()) {
+        if (image.data().empty()) {
+            out_images->clear();
+            return fail(RAC_ERROR_INVALID_PARAMETER);
+        }
+        out_images->push_back(rac_decision_image_t{
+            reinterpret_cast<const uint8_t*>(image.data().data()), image.data().size(),
+            image.mime_type().empty() ? nullptr : image.mime_type().c_str()});
+    }
+    out_options->images = out_images->empty() ? nullptr : out_images->data();
+    out_options->image_count = out_images->size();
     return RAC_SUCCESS;
 }
 
@@ -458,21 +502,29 @@ rac_result_t decide_with_service(rac_handle_t service, const char* model_id,
     }
 
     std::vector<rac_decision_question_t> questions;
+    std::vector<rac_decision_image_t> images;
     rac_decision_options_t options = RAC_DECISION_OPTIONS_DEFAULT;
-    rac_result_t rc = validate_request(request, &questions, &options);
+    rac_result_t rc = validate_request(request, &questions, &images, &options);
     if (rc != RAC_SUCCESS) {
         free_question_views(&questions);
         return rac_proto_buffer_set_error(out_result, rc, "invalid decision request");
     }
 
     rac_decision_result_t raw = {};
+    // Engines say why they refused through the thread-local detail; clear it so
+    // a stale one from an earlier call is never reported as this call's reason.
+    rac_error_clear_details();
     rc = rac_decision_decide(service, request.state().c_str(),
                              questions.empty() ? nullptr : questions.data(), questions.size(),
                              &options, &raw);
     if (rc != RAC_SUCCESS) {
+        // Copied before any further RAC call, which may replace the detail.
+        const char* details = rac_error_get_details();
+        const std::string message =
+            (details != nullptr && details[0] != '\0') ? details : rac_error_message(rc);
         free_question_views(&questions);
         rac_decision_result_free(&raw);
-        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+        return rac_proto_buffer_set_error(out_result, rc, message.c_str());
     }
 
     // The question views own the option arrays that result_to_proto reads the
