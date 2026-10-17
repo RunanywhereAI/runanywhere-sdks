@@ -1,3 +1,9 @@
+## [0.20.38] - 2026-10-05
+
+### Changed
+
+- Local decision models score on-device; coding harnesses report the loaded context.
+
 ## [0.20.37] - 2026-09-22
 
 - Version bump to keep the backend package in lockstep with the SDK release.

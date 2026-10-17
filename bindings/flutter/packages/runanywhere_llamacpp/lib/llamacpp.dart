@@ -48,7 +48,7 @@ class LlamaCpp {
   static const String version = '2.0.0';
 
   /// LlamaCPP library version (underlying C++ library)
-  static const String llamaCppVersion = 'runanywhere-b10453.6';
+  static const String llamaCppVersion = 'runanywhere-b10453.7';
 
   // ============================================================================
   // Registration State

@@ -14,7 +14,7 @@
 # =============================================================================
 
 # Project version (read from VERSION file, but also defined here for scripts)
-PROJECT_VERSION=0.20.37
+PROJECT_VERSION=0.20.38
 
 # =============================================================================
 # Platform Deployment Targets
@@ -225,13 +225,13 @@ SHERPA_ONNX_COMMIT_MACOS=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 # publishing, and the downloaders verify both archive checksums and embedded
 # provenance before making them available to CMake.
 SHERPA_ONNX_REPO_DESKTOP=RunanywhereAI/sherpa-onnx
-SHERPA_ONNX_RELEASE_TAG_DESKTOP=v1.13.5-rac-desktop.5
-SHERPA_ONNX_COMMIT_DESKTOP=0fedaeff7f06463f5e036e5737d4ac52b7b575fd
+SHERPA_ONNX_RELEASE_TAG_DESKTOP=v1.13.5-rac-desktop.6
+SHERPA_ONNX_COMMIT_DESKTOP=40611a5dda5fcd60bb778977fb9fcd527032715b
 SHERPA_ONNX_VERSION_LINUX=1.13.5
-SHERPA_ONNX_LINUX_X64_SHA256=b2d51f8c9afae542751d46c820d57aeba27caa165bf7359dd5013604b7879cc1
-SHERPA_ONNX_LINUX_AARCH64_SHA256=2324f7d939d66b006a76e8c2db6a2dfb49eb8c1ade39f2ce64b566813bc458da
+SHERPA_ONNX_LINUX_X64_SHA256=7b1de07fe598c683c7e077946312d34a774fe3b0e3173000c848654bdda4db2c
+SHERPA_ONNX_LINUX_AARCH64_SHA256=28d2385fee3d97916f5c922c0f213f1c82c4898e561fc4e88da4c37f05b42e28
 SHERPA_ONNX_VERSION_WINDOWS=1.13.5
-SHERPA_ONNX_WINDOWS_X64_SHA256=5d97fc2b9a340d7f2271bd296cd0db1550b224bbe6c1e4264651278cbe7dc596
+SHERPA_ONNX_WINDOWS_X64_SHA256=1ea4b5be28f0c7755f50214d0af9fee5c6c3a248af8d65b8701a3e9dac7c2a0f
 
 # Web/WASM matched set with ONNX_VERSION_WEB. Do not reuse Android/iOS
 # prebuilts for this target; the Web vendor scripts validate provenance.
@@ -249,7 +249,7 @@ SHERPA_ONNX_COMMIT_WEB=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 # Maple is CPU-only until its ternary expert mul_mm_id kernels exist on GPU;
 # the engine enforces that after reading general.architecture from the GGUF.
 # See the fork's RUNANYWHERE.md before rebasing.
-LLAMACPP_VERSION=runanywhere-b10453.6
+LLAMACPP_VERSION=runanywhere-b10453.7
 # Repository the llama.cpp FetchContent clones. Consumed by
 # engines/llamacpp/CMakeLists.txt via LoadVersions (RAC_LLAMACPP_GIT_REPOSITORY).
 LLAMACPP_GIT_REPOSITORY=https://github.com/RunanywhereAI/llama.cpp.git
