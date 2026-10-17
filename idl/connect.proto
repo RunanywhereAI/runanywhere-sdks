@@ -268,10 +268,11 @@ message ClusterStartResponse {
     ClusterPeerCapability peer_capability = 3;
 }
 
-// Intermediate activation tensor passed between pipeline stages. A serialized
-// ClusterActivation must not exceed 256 MiB (268435456 bytes,
-// RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES); larger messages are rejected before
-// parsing, so tensor_data is bounded by that ceiling.
+// Intermediate activation tensor passed between pipeline stages. The activation
+// validator (rac_connect_cluster_validate_activation_proto) rejects a serialized
+// ClusterActivation above 256 MiB (268435456 bytes,
+// RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES) before parsing it. Parsers that do not go
+// through that validator are bounded only by the protobuf-level limit.
 message ClusterActivation {
     string cluster_id = 1;
     string request_id = 2;
