@@ -25,6 +25,7 @@
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/common/special_token_filter.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -154,10 +155,15 @@ extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char*
             }
         }
 
+        const size_t dir_len = strlen(model_dir);
+        const bool has_trailing_sep =
+            dir_len > 0 && (model_dir[dir_len - 1] == '/' || model_dir[dir_len - 1] == '\\');
+        const char* const fmt = has_trailing_sep ? "%s%s" : "%s/%s";
+
         if (is_mmproj && out_mmproj_path[0] == '\0') {
-            snprintf(out_mmproj_path, mmproj_path_size, "%s/%s", model_dir, name);
+            snprintf(out_mmproj_path, mmproj_path_size, fmt, model_dir, name);
         } else if (!is_mmproj && out_model_path[0] == '\0') {
-            snprintf(out_model_path, model_path_size, "%s/%s", model_dir, name);
+            snprintf(out_model_path, model_path_size, fmt, model_dir, name);
         }
 
         // Stop once both are found
@@ -349,6 +355,17 @@ extern "C" rac_result_t rac_vlm_component_cleanup(rac_handle_t handle) {
     return rac_lifecycle_reset(component->lifecycle);
 }
 
+/**
+ * @brief Loads a vision-language model into the component by registry model identifier.
+ *
+ * Resolves the model from the global registry, derives its folder location, and initializes
+ * the underlying inference engine. Preserves the root path separator when local_path resides
+ * directly in the filesystem root.
+ *
+ * @param handle VLM component handle.
+ * @param model_id Unique identifier of the model to load.
+ * @return RAC_SUCCESS on successful loading, or an error code.
+ */
 extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
                                                            const char* model_id) {
     if (!handle)
@@ -375,9 +392,17 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
         } else {
             // It's a file path — use parent directory
             strncpy(model_folder, model_info->local_path, sizeof(model_folder) - 1);
-            char* last_sep = strrchr(model_folder, '/');
+            char* last_sep = rac::path::find_last_path_separator(model_folder);
             if (last_sep) {
-                *last_sep = '\0';
+                if (last_sep == model_folder) {
+                    // Root-level path like "/model.gguf" or "\model.gguf": preserve the root separator
+                    *(last_sep + 1) = '\0';
+                } else if (last_sep == model_folder + 2 && model_folder[1] == ':') {
+                    // Windows drive root like "C:\model.gguf": preserve the drive root "C:\"
+                    *(last_sep + 1) = '\0';
+                } else {
+                    *last_sep = '\0';
+                }
             }
         }
     } else {
@@ -1007,8 +1032,12 @@ rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t r
     // of the options message, so the adapter no longer produces it.
     *out_prompt = out_request->prompt().c_str();
 
-    if (!rac::foundation::rac_vlm_image_from_proto(out_request->images(0), out_image) ||
-        !rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options)) {
+    const rac_result_t image_rc = rac::foundation::rac_vlm_image_from_proto(
+        out_request->images(0), out_image, out_error);
+    if (image_rc != RAC_SUCCESS) {
+        return image_rc;
+    }
+    if (!rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options)) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
                                           "failed to convert VLMGenerationRequest");
     }
@@ -1381,6 +1410,12 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {
+        GeneratedStreamCtx error_ctx;
+        error_ctx.callback = callback;
+        error_ctx.user_data = user_data;
+        dispatch_vlm_terminal_once(&error_ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_ERROR,
+                                   nullptr, "no lifecycle VLM model loaded",
+                                   static_cast<int32_t>(rc));
         publish_failure(rc, "vlm.stream", "no lifecycle VLM model loaded");
         return rc;
     }
@@ -1397,6 +1432,13 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         rc = check_lifecycle_model(request, ref, &error_buffer);
     }
     if (rc != RAC_SUCCESS) {
+        GeneratedStreamCtx error_ctx;
+        error_ctx.callback = callback;
+        error_ctx.user_data = user_data;
+        error_ctx.request_id = request.request_id();
+        dispatch_vlm_terminal_once(&error_ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_ERROR,
+                                   nullptr, error_buffer.error_message,
+                                   static_cast<int32_t>(rc));
         publish_failure(rc, "vlm.stream", error_buffer.error_message);
         rac_proto_buffer_free(&error_buffer);
         free_vlm_image(&image);
@@ -1409,6 +1451,13 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     }
     rac_proto_buffer_free(&error_buffer);
     if (!ref.ops || !ref.ops->process_stream) {
+        GeneratedStreamCtx error_ctx;
+        error_ctx.callback = callback;
+        error_ctx.user_data = user_data;
+        error_ctx.request_id = request.request_id();
+        dispatch_vlm_terminal_once(&error_ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_ERROR,
+                                   nullptr, "VLM streaming is not supported",
+                                   static_cast<int32_t>(RAC_ERROR_NOT_SUPPORTED));
         free_vlm_image(&image);
         // `prompt` points into `request.prompt()` (owned by the request
         // message, which outlives this scope) -- not a heap allocation, so

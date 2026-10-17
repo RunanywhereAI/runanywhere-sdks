@@ -85,7 +85,7 @@ typedef struct rac_llm_llamacpp_config {
 static const rac_llm_llamacpp_config_t RAC_LLM_LLAMACPP_CONFIG_DEFAULT = {
     .context_size = 0,  // Auto-detect
     .num_threads = 0,   // Auto-detect
-    .gpu_layers = -1,   // All layers on GPU
+    .gpu_layers = RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO,   // Auto-fit
     .batch_size = 512};
 
 // =============================================================================

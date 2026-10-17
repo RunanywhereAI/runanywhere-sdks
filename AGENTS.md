@@ -233,7 +233,7 @@ improvising the steps: **sdk-release** (version bump through published GitHub Re
 **sdk-publish** (registry publishing + the `runanywhere-swift` dist repo cut), and
 **sdk-test-starters** (post-release device/app smoke tests).
 
-### Release pipeline lessons (v0.20.29 through v0.20.31 — read before cutting a release by hand)
+### Release pipeline lessons (v0.20.29 through v0.20.33 — read before cutting a release by hand)
 
 - **`native_ios` and `native_android` always rebuild fresh archives on every `release.yml`
   run — there is no reuse/skip mechanism for either job** (unlike `native_web`'s
@@ -277,6 +277,37 @@ improvising the steps: **sdk-release** (version bump through published GitHub Re
   inference rather than just building. `bindings/electron/scripts/bundle-native.ts` already
   had the correct pattern (copy `dsp/win-arm64/` flat, no extension filter); the overlay
   script just never matched it. Fixed in #804.
+- **A new NeuRT archive must be added in FOUR places, and three of them only fail in a build
+  configuration your Mac never produces.** v0.20.33 added `libneurt_rac_tts_ops.a` and took two
+  wasted release candidates to land, because each site fails somewhere different and late:
+  `engines/neurt/CMakeLists.txt` (probe list + imported target + `_neurt_extra_links`),
+  `build-core-xcframework.sh` (pre-flight guard AND `_NEURT_ROUTABLE_ARCHIVES` — two lists in one
+  file), `package-private-engine-overlay.sh`, and the `#if RAC_NEURT_ROUTABLE` guard around the
+  vtable entry in `rac_plugin_entry_neurt.cpp`. Miss the force-load lists and every native job goes
+  green while `validate_consumer_flutter` dies an hour later on `Undefined symbol:
+  _g_neurt_tts_ops` — the engine registers, all CMake targets compile, and only a CONSUMER's link
+  fails. Miss the vtable guard and the routable build is fine while every PR job WITHOUT
+  `NEURUN_TOKEN` fails, because a non-routable shell still references a symbol nothing defines.
+  A dev machine with the payload staged is routable, so it reproduces neither. `libneurt_rac_*.a`
+  archives now fail packaging by name if they are not in the list
+  (`neurt_assert_no_unlisted_archives`); the vtable guard has no such mechanism — audit all ten
+  slots when adding one. Reproduce a non-routable build by moving `core/third_party/neurt` aside.
+- **`reuse_native_web_run_id` is SAME-VERSION-ONLY, whatever the diff looks like.** `racommons.wasm`
+  embeds `RAC_VERSION_STRING` and `validate_public_packages.py` asserts it against the version being
+  packaged, so reusing ANY prior release's run fails `sdk_web` with *"does not embed
+  RAC_VERSION_STRING"*. Worse than a red job: `native_web` is skipped, so that candidate never
+  uploads a web artifact and can never serve as `publish_from_run_id`. Only a re-dispatch at the
+  same version qualifies.
+- **Verify checksums by NAME as well as by URL — the manifests use two different shapes.** The root
+  `Package.swift` interpolates `\(sdkVersion)` into each URL; the Flutter manifests bind a checksum
+  to a `name:` through a helper with no URL at the call site at all. A URL-only cross-check silently
+  validates 9 of 15 sites and reports success. Re-hash every site against the zip it names, and
+  remember `RAC_CHECKSUM_SKIP` hides `RunAnywhereMLXRuntime` from `publish` entirely, so the Flutter
+  MLX podspec is verifiable only by hand.
+- **A green `rcli backends --json` proves nothing against the OSS kit.** NeuRT ships as a separate
+  private pack, so the public bottle lists no `neurt` at all — a routability check there passes
+  cleanly and means nothing. Apply the private overlay
+  (`cpp-desktop-macos-arm64-neurt-private` workflow artifact) before believing the result.
 - **General pattern across all four of the above**: each one was invisible to the checks that
   existed (a version-coherence check, a checksum-skip escape hatch, a "the model loaded"
   smoke test, a "the build succeeded" CI job) because none of those checks actually ran the
