@@ -523,13 +523,19 @@ void populate_voice_agent(const YamlNode& node, runanywhere::v1::VoiceAgentConfi
             to_bool(n->scalar));
 }
 
-runanywhere::v1::VectorStore parse_vector_store(const std::string& s) {
+// Maps the YAML token to its enum. An unrecognised token is an error, not UNSPECIFIED: a typo
+// like `usearchh` would otherwise look exactly like the key being absent.
+bool parse_vector_store(const std::string& s, runanywhere::v1::VectorStore* out) {
     using runanywhere::v1::VectorStore;
-    if (s == "usearch")
-        return VectorStore::VECTOR_STORE_USEARCH;
-    if (s == "pgvector")
-        return VectorStore::VECTOR_STORE_PGVECTOR;
-    return VectorStore::VECTOR_STORE_UNSPECIFIED;
+    if (s == "usearch") {
+        *out = VectorStore::VECTOR_STORE_USEARCH;
+        return true;
+    }
+    if (s == "pgvector") {
+        *out = VectorStore::VECTOR_STORE_PGVECTOR;
+        return true;
+    }
+    return false;
 }
 
 // Strict numeric parse for the retrieval tuning keys: the whole scalar must be a finite
@@ -571,8 +577,16 @@ rac_result_t populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg)
         cfg->set_rerank_model_id(n->scalar);
     if (auto n = node.find("llm_model_id"))
         cfg->set_llm_model_id(n->scalar);
-    if (auto n = node.find("vector_store"))
-        cfg->set_vector_store(parse_vector_store(n->scalar));
+    if (auto n = node.find("vector_store")) {
+        runanywhere::v1::VectorStore store = runanywhere::v1::VECTOR_STORE_UNSPECIFIED;
+        if (!parse_vector_store(n->scalar, &store)) {
+            rac_error_set_details(("rag.vector_store must be one of: usearch, pgvector, got '" +
+                                   n->scalar + "'")
+                                      .c_str());
+            return RAC_ERROR_INVALID_FORMAT;
+        }
+        cfg->set_vector_store(store);
+    }
     if (auto n = node.find("vector_store_path"))
         cfg->set_vector_store_path(n->scalar);
     if (auto n = node.find("retrieve_k"))
