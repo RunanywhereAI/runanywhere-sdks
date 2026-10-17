@@ -247,7 +247,7 @@ private struct GLiNERTextTokenizerLoader: TokenizerLoader {
     }
 }
 
-private struct TransformersTokenizerLoader: TokenizerLoader {
+struct TransformersTokenizerLoader: TokenizerLoader {
     func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
         // Non-strict: unknown tokenizer_class names (e.g. Qwen3_5Tokenizer,
         // which is plain byte-level BPE described fully by tokenizer.json)
@@ -782,6 +782,9 @@ private final class MLXSession: @unchecked Sendable {
         /// PPLX-style decider checkpoints: Qwen3.5 backbone with a 255-way
         /// readout instead of a joint head. Routed by `decision_config.json`.
         var deciderModel: Qwen35DeciderModel?
+        /// pplx-decider v1.2: joint inline-readout protocol, text and images.
+        /// Routed by `joint_config.json`.
+        var jointDeciderModel: Qwen35JointDecider?
         var d1Model: D1Model?
         var d1OmniModel: D1Omni?
         var d1OmniTokenizer: (any MLXLMCommon.Tokenizer)?
@@ -862,47 +865,7 @@ private final class MLXSession: @unchecked Sendable {
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
         case .decision:
-            modelLock.withLock { models in
-                models.decisionModel = nil
-                models.deciderModel = nil
-                models.d1Model = nil
-                models.d1OmniModel = nil
-                models.d1OmniTokenizer = nil
-                models.glinerModel = nil
-                models.glinerPositionWindow = nil
-            }
-            switch MLXTextDecisionCheckpoint.kind(at: directory) {
-            case .decider:
-                let decider = try await Qwen35DeciderModel.load(
-                    from: directory,
-                    using: tokenizerLoader
-                )
-                modelLock.withLock { $0.deciderModel = decider }
-            case .d1:
-                let model = try await D1Model.load(from: directory, using: tokenizerLoader)
-                modelLock.withLockUnchecked { $0.d1Model = model }
-            case .omni:
-                let model = try await VLMModelFactory.shared.loadD1Omni(from: directory)
-                let tokenizer = try await tokenizerLoader.load(from: directory)
-                modelLock.withLockUnchecked {
-                    $0.d1OmniModel = model
-                    $0.d1OmniTokenizer = tokenizer
-                }
-            case .gliner:
-                let model = try await GLiNERClassifier.load(
-                    from: directory, using: GLiNERTextTokenizerLoader())
-                let limit = MLXTextDecisionCheckpoint.glinerMaxTokens(at: directory)
-                modelLock.withLockUnchecked {
-                    $0.glinerModel = model
-                    $0.glinerPositionWindow = limit
-                }
-            case nil:
-                let decisionModel = try await ClefDecisionModel.load(
-                    from: directory,
-                    using: tokenizerLoader
-                )
-                modelLock.withLock { $0.decisionModel = decisionModel }
-            }
+            try await loadDecisionModel(from: directory, using: tokenizerLoader)
         }
         let modelContextLength = MLXModelConfig.contextLength(inDirectory: directory)
         lock.withLock {
@@ -914,6 +877,62 @@ private final class MLXSession: @unchecked Sendable {
             $0.contextLength = modelContextLength
         }
         #endif
+    }
+
+    /// Resets every decision slot, then loads whichever runtime the
+    /// checkpoint declares. Exactly one slot is set afterwards.
+    private func loadDecisionModel(
+        from directory: URL,
+        using tokenizerLoader: any TokenizerLoader
+    ) async throws {
+        modelLock.withLock { models in
+            models.decisionModel = nil
+            models.deciderModel = nil
+            models.jointDeciderModel = nil
+            models.d1Model = nil
+            models.d1OmniModel = nil
+            models.d1OmniTokenizer = nil
+            models.glinerModel = nil
+            models.glinerPositionWindow = nil
+        }
+        switch MLXTextDecisionCheckpoint.kind(at: directory) {
+        case .jointDecider:
+            let decider = try await Qwen35JointDecider.load(
+                from: directory,
+                using: tokenizerLoader
+            )
+            modelLock.withLockUnchecked { $0.jointDeciderModel = decider }
+        case .decider:
+            let decider = try await Qwen35DeciderModel.load(
+                from: directory,
+                using: tokenizerLoader
+            )
+            modelLock.withLock { $0.deciderModel = decider }
+        case .d1:
+            let model = try await D1Model.load(from: directory, using: tokenizerLoader)
+            modelLock.withLockUnchecked { $0.d1Model = model }
+        case .omni:
+            let model = try await VLMModelFactory.shared.loadD1Omni(from: directory)
+            let tokenizer = try await tokenizerLoader.load(from: directory)
+            modelLock.withLockUnchecked {
+                $0.d1OmniModel = model
+                $0.d1OmniTokenizer = tokenizer
+            }
+        case .gliner:
+            let model = try await GLiNERClassifier.load(
+                from: directory, using: GLiNERTextTokenizerLoader())
+            let limit = MLXTextDecisionCheckpoint.glinerMaxTokens(at: directory)
+            modelLock.withLockUnchecked {
+                $0.glinerModel = model
+                $0.glinerPositionWindow = limit
+            }
+        case nil:
+            let decisionModel = try await ClefDecisionModel.load(
+                from: directory,
+                using: tokenizerLoader
+            )
+            modelLock.withLock { $0.decisionModel = decisionModel }
+        }
     }
 
     func generate(prompt: String, options: MLXLLMOptionsSnapshot) async throws
@@ -1099,6 +1118,7 @@ private final class MLXSession: @unchecked Sendable {
             models.embedderContainer = nil
             models.decisionModel = nil
             models.deciderModel = nil
+            models.jointDeciderModel = nil
             models.d1Model = nil
             models.d1OmniModel = nil
             models.d1OmniTokenizer = nil
@@ -1510,12 +1530,19 @@ private final class MLXSession: @unchecked Sendable {
     func decide(
         state: String,
         questions: [ClefDecisionQuestion],
-        temperature: Float?
+        controls: MLXDecisionControls
     ) async throws -> (MLXDecisionPass, Int) {
         if isCancelled { throw CancellationError() }
         let request = ClefDecisionRequest(state: state, questions: questions)
-        // These checkpoints carry their own calibration. An explicit
-        // temperature override would break it, so only Clef applies one.
+        let temperature = controls.temperature
+        // The joint decider honours every control. The other checkpoints carry
+        // their own calibration and fixed layouts: only Clef applies a
+        // temperature override, and none takes the extended controls.
+        if let decider = modelLock.withLockUnchecked({ $0.jointDeciderModel }) {
+            let pass = try MLXTextDecisions.scoreJoint(decider, request: request, controls: controls)
+            return (pass, pass.inputTokens)
+        }
+        try controls.requireBasic()
         if let decider = modelLock.withLock({ $0.deciderModel }) {
             let pass = MLXDecisionPass(try decider.decide(request))
             return (pass, pass.inputTokens)
@@ -2763,9 +2790,8 @@ private let mlxDecision: rac_mlx_decision_fn = { handle, statePtr, questionsPtr,
             ))
         requestKeys.append(keys)
     }
-    let temperature: Float? = optionsPtr.flatMap {
-        $0.pointee.temperature > 0 ? $0.pointee.temperature : nil
-    }
+    // Copies the borrowed image bytes; the pointers die with this callback.
+    let controls = MLXDecisionControls(optionsPtr?.pointee)
     // Immutable snapshots for the Sendable closure below.
     let questions = requestQuestions
     let keysByQuestion = requestKeys
@@ -2773,7 +2799,7 @@ private let mlxDecision: rac_mlx_decision_fn = { handle, statePtr, questionsPtr,
 
     switch syncWait({
         try await session.decide(
-            state: capturedState, questions: questions, temperature: temperature)
+            state: capturedState, questions: questions, controls: controls)
     }) {
     case .success(let output):
         return fillDecisionResult(
@@ -2783,6 +2809,24 @@ private let mlxDecision: rac_mlx_decision_fn = { handle, statePtr, questionsPtr,
             return RAC_ERROR_CANCELLED
         }
         recordMLXFailure("MLX decision scoring", error: error)
+        // Commons copies this into the caller's error message; it is
+        // thread-local and this callback runs on the decide caller's thread.
+        rac_error_set_details((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+        return decisionResultCode(for: error)
+    }
+}
+
+/// A refused control is the caller's to fix, so it is not reported as an
+/// inference failure.
+func decisionResultCode(for error: Error) -> rac_result_t {
+    switch error {
+    case is MLXDecisionUnsupported:
+        return RAC_ERROR_NOT_SUPPORTED
+    case DecisionError.unsupportedCheckpoint:
+        return RAC_ERROR_NOT_SUPPORTED
+    case DecisionError.invalidRequest, DecisionError.tooLong, is MLXDecisionControls.ImageError:
+        return RAC_ERROR_INVALID_PARAMETER
+    default:
         return RAC_ERROR_INFERENCE_FAILED
     }
 }

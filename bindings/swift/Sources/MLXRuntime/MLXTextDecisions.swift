@@ -1,7 +1,9 @@
 // Text-only routing for the D1, D1 Omni, and GLiNER decision checkpoints.
 // Image inputs stay out of this path.
 
+import CoreImage
 import Foundation
+import MLXBackend
 import MLXLLM
 import MLXLMCommon
 import MLXVLM
@@ -29,6 +31,7 @@ struct MLXDecisionPass {
 }
 
 enum MLXTextDecisionKind {
+    case jointDecider
     case decider
     case d1
     case omni
@@ -37,6 +40,10 @@ enum MLXTextDecisionKind {
 
 enum MLXTextDecisionCheckpoint {
     static func kind(at directory: URL) -> MLXTextDecisionKind? {
+        // Joint checkpoints also carry decision_config.json, so they are checked first.
+        if Qwen35JointDeciderCheckpoint.isCheckpoint(at: directory) {
+            return .jointDecider
+        }
         if Qwen35DeciderModel.isDeciderCheckpoint(at: directory) {
             return .decider
         }
@@ -140,6 +147,49 @@ enum MLXTextDecisions {
         return MLXDecisionPass(answers: answers, inputTokens: 0)
     }
 
+    /// Joint inline-readout deciders (pplx-decider v1.2). Every control
+    /// applies; unset ones fall back to what the checkpoint declares.
+    static func scoreJoint(
+        _ model: Qwen35JointDecider, request: ClefDecisionRequest, controls: MLXDecisionControls
+    ) throws -> MLXDecisionPass {
+        guard !request.questions.isEmpty else {
+            throw MLXTextDecisionError("a decision needs at least one question")
+        }
+        let images = try controls.images.map { image in
+            UserInput.Image.ciImage(try image.decoded())
+        }
+        let jointRequest = DecisionRequest(
+            state: request.state,
+            questions: request.questions.map(jointQuestion),
+            images: images
+        )
+        let response = try model.decide(jointRequest, options: controls.jointOptions)
+        let answers = try zip(request.questions, response.answers).map { question, answer in
+            let values = answer.probabilities.map(Float.init)
+            // The joint runtime orders a yes/no answer false then true.
+            let ordered = question.kind == .noul ? values.reversed() : values
+            return MLXDecisionPass.Answer(
+                optionIds: question.options.map(\.key),
+                probabilities: try keyed(question, values: ordered, trueFirst: question.kind == .noul))
+        }
+        return MLXDecisionPass(answers: answers, inputTokens: response.usage.inputTokens)
+    }
+
+    private static func jointQuestion(_ question: ClefDecisionQuestion) -> DecisionQuestion {
+        let criteria: DecisionCriteria
+        switch question.kind {
+        case .noul:
+            criteria = .noul(
+                whenTrue: description(question, keys: ["true", "yes"]),
+                whenFalse: description(question, keys: ["false", "no"]))
+        case .choice:
+            criteria = .choice(question.options.map { DecisionOption($0.key, description: $0.description) })
+        case .score:
+            criteria = .score(levels: question.options.map(levelText))
+        }
+        return DecisionQuestion(id: question.id, instructions: question.instructions, criteria: criteria)
+    }
+
     private static func d1Question(_ question: ClefDecisionQuestion) throws -> D1Question {
         let instructions = question.instructions ?? question.id
         switch question.kind {
@@ -239,5 +289,90 @@ struct MLXTextDecisionError: Error, LocalizedError {
         self.message = message
     }
 
+    var errorDescription: String? { message }
+}
+
+/// The caller's per-request controls, copied out of the borrowed
+/// `rac_decision_options_t` so they outlive the C callback.
+struct MLXDecisionControls: Sendable {
+    struct Image: Sendable {
+        let data: Data
+        let mimeType: String?
+
+        func decoded() throws -> CIImage {
+            guard let image = CIImage(data: data) else {
+                throw ImageError("image \(mimeType ?? "of unknown type") could not be decoded")
+            }
+            return image
+        }
+    }
+
+    struct ImageError: Error, LocalizedError {
+        let message: String
+        init(_ message: String) { self.message = message }
+        var errorDescription: String? { message }
+    }
+
+    /// `nil` = the model's calibrated value.
+    var temperature: Float?
+    var grouping: rac_decision_grouping_t = RAC_DECISION_GROUPING_UNSPECIFIED
+    var maxLength: Int?
+    var maxPixels: Int?
+    var minPixels: Int?
+    var images: [Image] = []
+
+    init(_ options: rac_decision_options_t?) {
+        guard let options else { return }
+        temperature = options.temperature > 0 ? options.temperature : nil
+        grouping = options.grouping
+        maxLength = options.max_length > 0 ? Int(options.max_length) : nil
+        maxPixels = options.max_pixels > 0 ? Int(options.max_pixels) : nil
+        minPixels = options.min_pixels > 0 ? Int(options.min_pixels) : nil
+        if let pointer = options.images {
+            images = (0 ..< options.image_count).map { index in
+                let image = pointer[index]
+                return Image(
+                    data: image.data.map { Data(bytes: $0, count: image.size) } ?? Data(),
+                    mimeType: image.mime_type.map { String(cString: $0) })
+            }
+        }
+    }
+
+    /// Settings for the joint decider; unset values defer to the checkpoint.
+    var jointOptions: Qwen35JointDeciderOptions {
+        var options = Qwen35JointDeciderOptions(
+            temperature: temperature.map(Double.init),
+            maxLength: maxLength,
+            maxPixels: maxPixels,
+            minPixels: minPixels
+        )
+        switch grouping {
+        case RAC_DECISION_GROUPING_JOINT: options.grouping = .joint
+        case RAC_DECISION_GROUPING_PER_QUESTION: options.grouping = .perQuestion
+        default: break
+        }
+        return options
+    }
+
+    /// Checkpoints with one fixed layout and no image input accept only the
+    /// temperature and prompt version. Anything else is refused by name.
+    func requireBasic() throws {
+        var asked: [String] = []
+        if grouping != RAC_DECISION_GROUPING_UNSPECIFIED { asked.append("grouping") }
+        if maxLength != nil { asked.append("max_length") }
+        if maxPixels != nil { asked.append("max_pixels") }
+        if minPixels != nil { asked.append("min_pixels") }
+        if !images.isEmpty { asked.append("images") }
+        guard asked.isEmpty else {
+            throw MLXDecisionUnsupported(
+                "this decision model does not take \(asked.joined(separator: ", "))")
+        }
+    }
+}
+
+/// A control the loaded decision model cannot honour.
+struct MLXDecisionUnsupported: Error, LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
     var errorDescription: String? { message }
 }
