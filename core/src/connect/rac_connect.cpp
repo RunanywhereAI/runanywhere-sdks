@@ -165,6 +165,21 @@ rac_result_t parse_message(const uint8_t* bytes, size_t size, Message* out_messa
     return RAC_SUCCESS;
 }
 
+// Cluster start/join/stop share one size ceiling, checked before ParseFromArray: a crafted
+// request claiming a huge layer list or tensor would otherwise be allocated in full before any
+// validation runs. The activation validator applies the same ceiling itself (its rejection is a
+// typed validation, not an error code).
+template <typename Message>
+rac_result_t parse_cluster_message(const uint8_t* bytes, size_t size, Message* out_message,
+                                   rac_proto_buffer_t* out_buffer, const char* error_context) {
+    if (size > RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES) {
+        rac_proto_buffer_set_error(out_buffer, RAC_ERROR_INVALID_ARGUMENT,
+                                   "Cluster request exceeds the 256 MiB protocol ceiling");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    return parse_message(bytes, size, out_message, out_buffer, error_context);
+}
+
 rac_result_t generate_ephemeral_id(std::string* out_id, rac_proto_buffer_t* out_buffer) {
     if (out_id == nullptr || out_buffer == nullptr) {
         return RAC_ERROR_NULL_POINTER;
@@ -743,8 +758,8 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
 #else
     v1::ClusterStartRequest request;
     const rac_result_t parse_result =
-        parse_message(request_bytes, request_size, &request, out_cluster_state,
-                      "Invalid ClusterStartRequest protobuf payload");
+        parse_cluster_message(request_bytes, request_size, &request, out_cluster_state,
+                              "Invalid ClusterStartRequest protobuf payload");
     if (parse_result != RAC_SUCCESS) {
         return parse_result;
     }
@@ -835,8 +850,8 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
 #else
     v1::ClusterJoinRequest request;
     const rac_result_t parse_result =
-        parse_message(request_bytes, request_size, &request, out_response,
-                      "Invalid ClusterJoinRequest protobuf payload");
+        parse_cluster_message(request_bytes, request_size, &request, out_response,
+                              "Invalid ClusterJoinRequest protobuf payload");
     if (parse_result != RAC_SUCCESS) {
         return parse_result;
     }
@@ -901,8 +916,8 @@ rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
 #else
     v1::ClusterStopRequest request;
     const rac_result_t parse_result =
-        parse_message(request_bytes, request_size, &request, out_cluster_state,
-                      "Invalid ClusterStopRequest protobuf payload");
+        parse_cluster_message(request_bytes, request_size, &request, out_cluster_state,
+                              "Invalid ClusterStopRequest protobuf payload");
     if (parse_result != RAC_SUCCESS) {
         return parse_result;
     }

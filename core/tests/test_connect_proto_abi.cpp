@@ -458,6 +458,30 @@ void test_cluster_orchestration() {
               "ClusterActivation over the protocol ceiling is rejected before parsing");
     }
 
+    // 11d. start / join / stop share the ceiling. Each gets a request one byte over it with a
+    // 1-byte buffer behind it, so a check that runs after ParseFromArray would read out of bounds
+    // and fail here instead of returning INVALID_ARGUMENT.
+    {
+        const uint8_t one_byte = 0;
+        const size_t over_ceiling =
+            static_cast<size_t>(RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES) + 1u;
+        using EntryPoint = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
+        const EntryPoint entry_points[] = {rac_connect_cluster_start_proto,
+                                           rac_connect_cluster_join_proto,
+                                           rac_connect_cluster_stop_proto};
+        const char* names[] = {"start", "join", "stop"};
+        for (size_t i = 0; i < 3; ++i) {
+            rac_proto_buffer_t output;
+            rac_proto_buffer_init(&output);
+            const rac_result_t rc = entry_points[i](&one_byte, over_ceiling, &output);
+            rac_proto_buffer_free(&output);
+            CHECK(rc == RAC_ERROR_INVALID_ARGUMENT,
+                  (std::string("cluster ") + names[i] +
+                   " rejects an over-ceiling request before parsing it")
+                      .c_str());
+        }
+    }
+
     // 12. Stop cluster with mismatched cluster ID is rejected
     v1::ClusterStopRequest wrong_stop_request;
     wrong_stop_request.set_cluster_id("cluster-different");
