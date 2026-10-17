@@ -633,12 +633,11 @@ extension RunAnywhere {
                     name: "generateStructured.constrained",
                     reason: "Grammar-constrained decoding is enforced only by the llama.cpp engine; other backends generate unconstrained, so use .validationOnly or .repair where that matters"
                 ),
-                .init(name: "loadOptions.contextLength", reason: "Not carried by the native load ABI yet"),
                 .init(name: "loadOptions.threads", reason: "Not carried by the native load ABI yet"),
-                .init(name: "loadOptions.accelerator", reason: "Not carried by the native load ABI yet"),
+                .init(name: "loadOptions.accelerator", reason: "Not forwarded by this Swift binding"),
                 .init(
-                    name: "loadOptions.backendPreferences.fallback",
-                    reason: "Only the first backend preference reaches commons; ordered fallback is not carried"
+                    name: "loadOptions.backendPreferences.required",
+                    reason: "The required flag cannot be carried by the framework-only preference list"
                 )
             ]
         )
