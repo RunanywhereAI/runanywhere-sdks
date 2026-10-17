@@ -45,6 +45,23 @@ typedef struct rac_decision_question {
     size_t option_count;
 } rac_decision_question_t;
 
+/** Mirrors `runanywhere.v1.DecisionGrouping`. */
+typedef enum rac_decision_grouping {
+    RAC_DECISION_GROUPING_UNSPECIFIED = 0,
+    /** Every question shares one sequence (split only when over length). */
+    RAC_DECISION_GROUPING_JOINT = 1,
+    /** Each question runs in its own sequence with the full state and images. */
+    RAC_DECISION_GROUPING_PER_QUESTION = 2,
+} rac_decision_grouping_t;
+
+/** One encoded image (PNG, JPEG, WebP or HEIC). Borrowed, never owned. */
+typedef struct rac_decision_image {
+    const uint8_t* data;
+    size_t size;
+    /** MIME type such as "image/png"; NULL or empty = sniffed from the bytes. */
+    const char* mime_type;
+} rac_decision_image_t;
+
 typedef struct rac_decision_options {
     /** Per-request temperature override; 0 = the model's own per-type value. */
     float temperature;
@@ -54,12 +71,48 @@ typedef struct rac_decision_options {
      * (RAC_ERROR_NOT_SUPPORTED) rather than scoring with unknown wording.
      */
     uint32_t prompt_format_version;
+    /**
+     * How the questions share forward passes; UNSPECIFIED = the model's
+     * default. A model with one fixed layout refuses any other value
+     * (RAC_ERROR_NOT_SUPPORTED).
+     */
+    rac_decision_grouping_t grouping;
+    /** Token cap per sequence; 0 = the model's limit. Unsupported non-zero is refused. */
+    uint32_t max_length;
+    /** Image pixel budget per image; 0 = the model's own. Unsupported non-zero is refused. */
+    uint32_t max_pixels;
+    /** Lower image pixel bound; 0 = the model's own. Unsupported non-zero is refused. */
+    uint32_t min_pixels;
+    /**
+     * Images shared by every question, borrowed for the duration of the call.
+     * A model without image input refuses a non-empty list.
+     */
+    const rac_decision_image_t* images;
+    size_t image_count;
 } rac_decision_options_t;
 
 static const rac_decision_options_t RAC_DECISION_OPTIONS_DEFAULT = {
     .temperature = 0.0f,
     .prompt_format_version = 0u,
+    .grouping = RAC_DECISION_GROUPING_UNSPECIFIED,
+    .max_length = 0u,
+    .max_pixels = 0u,
+    .min_pixels = 0u,
+    .images = NULL,
+    .image_count = 0u,
 };
+
+/**
+ * Whether `options` asks for anything beyond temperature and prompt version.
+ * Engines that only honour those two refuse such a request.
+ */
+static inline rac_bool_t rac_decision_options_has_extended(const rac_decision_options_t* options) {
+    return (options != NULL &&
+            (options->grouping != RAC_DECISION_GROUPING_UNSPECIFIED || options->max_length != 0u ||
+             options->max_pixels != 0u || options->min_pixels != 0u || options->image_count != 0u))
+               ? RAC_TRUE
+               : RAC_FALSE;
+}
 
 typedef struct rac_decision_answer {
     /** malloc-owned copy of the question id. */

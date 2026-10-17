@@ -205,7 +205,8 @@
         },
         {
             "name": "cpp-desktop-windows-arm64",
-            "displayName": "C++ desktop kit — Windows arm64 OSS (no QHexRT)",
+            "displayName": "C++ desktop kit — Windows arm64 OSS (llama.cpp, no QHexRT)",
+            "description": "Native ARM64 MSVC. llama.cpp ON since ggml's MSVC-ARM probe landed (upstream #28362, carried by the fork): the decision model's engine. ONNX stays OFF — cmake/FetchONNXRuntime.cmake still selects its Windows archive by pointer size, and no arm64 URL is wired; it is STT/TTS/embedding, not decisions. Sherpa stays OFF — no win-arm64 prebuilt exists.",
             "inherits": "base-release",
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake",
@@ -215,7 +216,7 @@
                 "RAC_PACKAGE_CPP_DESKTOP": "ON",
                 "RAC_DESKTOP_ADAPTER": "ON",
                 "RAC_BUILD_BACKENDS": "ON",
-                "RAC_BACKEND_LLAMACPP": "OFF",
+                "RAC_BACKEND_LLAMACPP": "ON",
                 "RAC_BACKEND_SHERPA": "OFF",
                 "RAC_BACKEND_ONNX": "OFF",
                 "RAC_BACKEND_MLX": "OFF",

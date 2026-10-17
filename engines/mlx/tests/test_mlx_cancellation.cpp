@@ -106,6 +106,14 @@ rac_result_t fake_initialize(rac_handle_t, const char*, void*) {
     return RAC_SUCCESS;
 }
 
+rac_result_t fake_context_length(rac_handle_t, int32_t* out_context_length, void*) {
+    if (!out_context_length) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_context_length = 32768;
+    return RAC_SUCCESS;
+}
+
 rac_result_t fake_llm_generate(rac_handle_t handle, const char*, const rac_llm_options_t*,
                                rac_llm_result_t* out_result, void*) {
     auto* session = static_cast<FakeSession*>(handle);
@@ -271,6 +279,7 @@ rac_mlx_callbacks_t make_callbacks() {
     callbacks.cancel = fake_cancel;
     callbacks.cleanup = fake_cleanup;
     callbacks.destroy = fake_destroy;
+    callbacks.context_length = fake_context_length;
     return callbacks;
 }
 
@@ -297,6 +306,9 @@ void test_llm_cancel_during_blocked_inference() {
     void* impl = nullptr;
     check(ops->create("mlx-test-llm", nullptr, &impl) == RAC_SUCCESS, "LLM session creates");
     check(ops->initialize(impl, "/tmp/mlx-test-llm") == RAC_SUCCESS, "LLM session initializes");
+    rac_llm_info_t info = {};
+    check(ops->get_info(impl, &info) == RAC_SUCCESS && info.context_length == 32768,
+          "LLM info reports Swift model context");
 
     rac_llm_result_t result = {};
     auto generation = std::async(std::launch::async,

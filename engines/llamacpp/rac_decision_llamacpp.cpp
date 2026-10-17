@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 
 #include "decision_prompt.h"
+#include "d1_decision.h"
 #include "llamacpp_logging.h"
 
 #include "rac/backends/rac_llm_llamacpp.h"
@@ -73,6 +74,7 @@ struct LlamaCppDecisionHandle {
     // request pinning a different version is refused rather than scored with
     // wording the caller did not expect.
     uint32_t prompt_format_version = 0;
+    rac_llamacpp_d1_kind d1_kind = rac_llamacpp_d1_kind::none;
 };
 
 struct LlamaBatchGuard {
@@ -124,6 +126,7 @@ void release_model(LlamaCppDecisionHandle* handle) {
     }
     handle->temperatures.clear();
     handle->prompt_format_version = 0;
+    handle->d1_kind = rac_llamacpp_d1_kind::none;
     handle->model_path.clear();
 }
 
@@ -267,6 +270,7 @@ float score_confidence(const std::vector<float>& probs) {
     return std::max(0.0f, static_cast<float>(1.0 - dist / dist_uniform));
 }
 
+#if defined(RAC_LLAMACPP_HAS_CLEF_SPAN)
 rac_result_t encode_tagged(LlamaCppDecisionHandle* handle,
                            const runanywhere::decision_prompt::TaggedPrompt& prompt,
                            int32_t* out_tokens) {
@@ -309,6 +313,7 @@ rac_result_t encode_tagged(LlamaCppDecisionHandle* handle,
     *out_tokens = batch.n_tokens;
     return RAC_SUCCESS;
 }
+#endif
 
 rac_result_t llamacpp_decision_initialize(void* implementation, const char* model_path) {
     if (implementation == nullptr || model_path == nullptr) {
@@ -366,6 +371,7 @@ rac_result_t llamacpp_decision_initialize(void* implementation, const char* mode
         release_model(handle);
         return version_rc;
     }
+    handle->d1_kind = rac_llamacpp_d1_kind_of(handle->model);
 
     const int32_t training_context = llama_model_n_ctx_train(handle->model);
     handle->max_tokens =
@@ -374,10 +380,15 @@ rac_result_t llamacpp_decision_initialize(void* implementation, const char* mode
     context_params.n_ctx = static_cast<uint32_t>(handle->max_tokens);
     context_params.n_batch = static_cast<uint32_t>(handle->max_tokens);
     context_params.n_ubatch = static_cast<uint32_t>(handle->max_tokens);
+    if (handle->d1_kind == rac_llamacpp_d1_kind::omni ||
+        handle->d1_kind == rac_llamacpp_d1_kind::gliner) {
+        context_params.n_batch = 512;
+        context_params.n_ubatch = 512;
+    }
     context_params.n_seq_max = 1;
     context_params.n_threads = handle->default_threads;
     context_params.n_threads_batch = handle->default_threads;
-    context_params.embeddings = true;
+    context_params.embeddings = handle->d1_kind != rac_llamacpp_d1_kind::lfm2;
     context_params.pooling_type = LLAMA_POOLING_TYPE_NONE;
     context_params.no_perf = true;
 
@@ -412,6 +423,19 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
         return RAC_SUCCESS;
     }
 
+    // This engine scores every checkpoint one way and takes no images, so the
+    // grouping, length, pixel and image controls are refused, never ignored.
+    if (rac_decision_options_has_extended(options) == RAC_TRUE) {
+        RAC_LOG_ERROR(kLogCategory,
+                      "llama.cpp decisions take no grouping, max_length, pixel bounds or "
+                      "images (grouping=%d max_length=%u max_pixels=%u min_pixels=%u images=%zu)",
+                      static_cast<int>(options->grouping), options->max_length,
+                      options->max_pixels, options->min_pixels, options->image_count);
+        rac_error_set_details(
+            "this decision model takes no grouping, max_length, pixel bounds or images");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
     // A pinned request must match the wording this checkpoint serves. Both the
     // wording and the probabilities derived from it are model-versioned, so a
     // silent mismatch would hand back scores the caller cannot interpret.
@@ -424,6 +448,21 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
     }
 
     const auto started = std::chrono::steady_clock::now();
+#if defined(RAC_LLAMACPP_HAS_D1)
+    if (handle->d1_kind != rac_llamacpp_d1_kind::none) {
+        const rac_result_t rc = rac_llamacpp_d1_decide(
+            handle->model, handle->context, handle->d1_kind, state, questions, question_count,
+            options, output, handle->model_id.c_str());
+        if (rc == RAC_SUCCESS) {
+            output->prompt_format_version = handle->prompt_format_version;
+        }
+        return rc;
+    }
+#endif
+#if !defined(RAC_LLAMACPP_HAS_CLEF_SPAN)
+    (void)started;
+    return RAC_ERROR_NOT_SUPPORTED;
+#else
     const llama_vocab* vocab = llama_model_get_vocab(handle->model);
     llama_set_n_threads(handle->context, handle->default_threads, handle->default_threads);
 
@@ -568,6 +607,7 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     return RAC_SUCCESS;
+#endif
 }
 
 rac_result_t llamacpp_decision_cleanup(void* implementation) {
