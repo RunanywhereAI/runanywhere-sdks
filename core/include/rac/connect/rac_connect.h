@@ -102,6 +102,50 @@ RAC_API rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* reque
                                                             size_t request_size,
                                                             rac_proto_buffer_t* out_validation);
 
+/* ===========================================================================
+ * Cluster Orchestration (Issue #541: Local AI Cluster / Pipeline Sharding)
+ * =========================================================================== */
+
+/**
+ * Start a local AI cluster coordinator session from a serialized
+ * runanywhere.v1.ClusterStartRequest. Validates peer assignments and returns
+ * the active ClusterState.
+ */
+RAC_API rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
+                                                     size_t request_size,
+                                                     rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Join a cluster as a peer from a serialized runanywhere.v1.ClusterJoinRequest.
+ * Checks the peer appears in the cluster's layer assignments and, when it advertises
+ * a non-zero max_layers, that its assigned span fits within it; returns a
+ * ClusterStartResponse echoing the peer's capability.
+ */
+RAC_API rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_response);
+
+/**
+ * Stop an active cluster coordinator session and clear peer states.
+ */
+RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Validate an intermediate activation tensor payload between pipeline stages.
+ * Accepts ClusterActivation and verifies cluster binding, non-zero tensor dimensions,
+ * and a valid layer boundary. `dtype` must name FP16, BF16 or FP32 (UNSPECIFIED or an
+ * unknown value is rejected), and `tensor_data` must hold exactly
+ * `seq_len * hidden_size * element_size(dtype)` bytes: a packed, little-endian, row-major
+ * `[seq_len][hidden_size]` array (hidden_size contiguous). (Validation only; transport
+ * occurs out-of-band).
+ */
+RAC_API rac_result_t
+rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
+                                              size_t request_size,
+                                              rac_proto_buffer_t* out_validation);
+
 #ifdef __cplusplus
 }
 #endif
