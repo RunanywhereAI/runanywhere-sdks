@@ -631,7 +631,7 @@ extension RunAnywhere {
                 .init(name: "agents", reason: "RunAnywhere.agents is explicitly absent from the public API"),
                 .init(
                     name: "generateStructured.constrained",
-                    reason: "Engine-constrained decoding is not wired in yet; use .validationOnly or .repair"
+                    reason: "Grammar-constrained decoding is enforced only by the llama.cpp engine; other backends generate unconstrained, so use .validationOnly or .repair where that matters"
                 ),
                 .init(name: "loadOptions.contextLength", reason: "Not carried by the native load ABI yet"),
                 .init(name: "loadOptions.threads", reason: "Not carried by the native load ABI yet"),

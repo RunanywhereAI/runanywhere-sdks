@@ -115,7 +115,7 @@ class LlmApi {
   /// Generate a completion constrained to [schema].
   ///
   /// [mode] picks how the schema is enforced:
-  /// - [StructuredOutputMode.constrained] (default): engine-constrained decoding (GBNF grammar sampling).
+  /// - [StructuredOutputMode.constrained] (default): engine-constrained decoding (GBNF grammar sampling, enforced by the llama.cpp engine only; other backends generate unconstrained).
   /// - [StructuredOutputMode.validationOnly]: generate freely, then validate against the schema.
   /// - [StructuredOutputMode.repair]: validate, then retry once with a repair instruction if invalid.
   ///

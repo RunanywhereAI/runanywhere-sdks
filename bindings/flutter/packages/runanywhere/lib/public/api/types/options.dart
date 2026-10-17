@@ -906,7 +906,7 @@ class LoadOptions {
 
 /// Enforcement level `llm.generateStructured` applies to its schema.
 enum StructuredOutputMode {
-  /// Engine-constrained decoding (GBNF grammar sampling).
+  /// Engine-constrained decoding (GBNF grammar sampling, enforced by the llama.cpp engine only; other backends generate unconstrained).
   constrained,
 
   /// Generate freely, then validate against the schema.

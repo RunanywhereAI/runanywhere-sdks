@@ -77,7 +77,7 @@ public extension RunAnywhere {
         /// Generate output that satisfies `schema`.
         ///
         /// `mode` picks how the schema is enforced:
-        /// - `.constrained` (default): engine-constrained decoding (GBNF grammar sampling).
+        /// - `.constrained` (default): engine-constrained decoding (GBNF grammar sampling, enforced by the llama.cpp engine only; other backends generate unconstrained).
         /// - `.validationOnly`: generate freely, then validate against the schema.
         /// - `.repair`: validate, then retry once with a repair instruction if invalid.
         ///
