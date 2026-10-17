@@ -32,6 +32,7 @@ from runanywhere import (  # noqa: E402
     RagQueryOptions,
     RagResult,
     RagRetrievalOptions,
+    RagVectorStore,
     RagSession,
     ReasoningMode,
     ReasoningOptions,
@@ -239,6 +240,53 @@ def test_query_accepts_rag_query_options_with_retrieval_overrides(rag_core) -> N
     assert query.retrieval.top_k == 7
     assert query.retrieval.score_threshold == pytest.approx(0.42)
     assert query.generation.max_output_tokens == 64
+
+
+def test_query_threads_bm25_rrf_and_vector_store_into_the_proto(rag_core) -> None:
+    session = _open(rag_core)
+    session.ingest(RagDocument("Paris is the capital of France."))
+    session.query(
+        "Capital of France?",
+        RagQueryOptions(
+            retrieval=RagRetrievalOptions(
+                bm25_k1=1.5, bm25_b=0.8, rrf_k=30, vector_store=RagVectorStore.USEARCH
+            ),
+        ),
+    )
+    retrieval = rag_core.last_query.retrieval
+    assert retrieval.bm25_k1 == pytest.approx(1.5)
+    assert retrieval.bm25_b == pytest.approx(0.8)
+    assert retrieval.rrf_k == 30
+    assert retrieval.vector_store == RagVectorStore.USEARCH
+
+
+@pytest.mark.parametrize(
+    ("retrieval", "named"),
+    [
+        # Fractional / non-finite: int() would have laundered these into 0, 2 or a bare
+        # ValueError; the error names the value the caller actually passed.
+        (RagRetrievalOptions(rrf_k=-0.5), r"rrf_k.*-0\.5"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(rrf_k=2.5), r"rrf_k.*2\.5"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(rrf_k=float("nan")), r"rrf_k.*nan"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(rrf_k=2**31), r"rrf_k.*int32"),
+        (RagRetrievalOptions(vector_store=7), r"vector_store"),  # type: ignore[arg-type]
+    ],
+)
+def test_query_rejects_malformed_retrieval_knobs_before_serializing(
+    rag_core, retrieval, named
+) -> None:
+    session = _open(rag_core)
+    with pytest.raises(SDKException, match=named):
+        session.query("Capital of France?", RagQueryOptions(retrieval=retrieval))
+    assert rag_core.last_query is None
+
+
+def test_query_accepts_numpy_integer_rrf_k(rag_core) -> None:
+    np = pytest.importorskip("numpy")
+    session = _open(rag_core)
+    session.ingest(RagDocument("Paris is the capital of France."))
+    session.query("Capital?", RagQueryOptions(retrieval=RagRetrievalOptions(rrf_k=np.int64(30))))
+    assert rag_core.last_query.retrieval.rrf_k == 30
 
 
 def test_query_forwards_every_rag_generation_knob(rag_core) -> None:
