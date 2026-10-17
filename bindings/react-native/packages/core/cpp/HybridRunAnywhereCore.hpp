@@ -594,6 +594,13 @@ public:
   std::shared_ptr<Promise<bool>> solutionCloseInput(double handle) override;
   std::shared_ptr<Promise<void>> solutionDestroy(double handle) override;
 
+  // ============================================================================
+  // Logging
+  // ============================================================================
+
+  std::shared_ptr<Promise<void>> loggerSetMinLevel(double level) override;
+  std::shared_ptr<Promise<double>> loggerGetMinLevel() override;
+
 private:
   // Thread safety
   std::mutex initMutex_;
