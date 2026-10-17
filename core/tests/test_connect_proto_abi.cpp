@@ -201,6 +201,26 @@ void test_host_handshake_and_reconnect_deduplication() {
     CHECK(refreshed_state.active_client_count() == 1,
           "Reconnect does not inflate connected-device count");
 
+    // A repeat start that changes any descriptor field -- not only model_id -- is rejected
+    // instead of answering success with the stored descriptor.
+    v1::ConnectHostStartRequest changed_context = mac_host;
+    changed_context.mutable_model()->set_context_window(8192);
+    v1::ConnectHostState changed_context_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_context, &changed_context_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed context_window is rejected");
+    v1::ConnectHostStartRequest changed_streaming = mac_host;
+    changed_streaming.mutable_model()->set_supports_streaming(false);
+    v1::ConnectHostState changed_streaming_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_streaming, &changed_streaming_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed supports_streaming is rejected");
+    v1::ConnectHostState unchanged_retry_state;
+    CHECK(call_proto(rac_connect_host_start_proto, mac_host, &unchanged_retry_state) ==
+                  RAC_SUCCESS &&
+              unchanged_retry_state.active_client_count() == 1,
+          "An unchanged repeat host start still returns the live host state");
+
     v1::ConnectSessionCloseRequest close_request;
     close_request.set_session_id(reconnect_response.session_id());
     v1::ConnectHostState closed_state;
