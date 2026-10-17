@@ -578,6 +578,9 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         g_in.max_context_tokens = config_.max_context_tokens;
         g_in.prompt_template = config_.prompt_template;
         g_in.rerank = config_.rerank;
+        g_in.bm25_k1 = config_.bm25_k1;
+        g_in.bm25_b = config_.bm25_b;
+        g_in.rrf_k = config_.rrf_k;
     }
 
     // Per-query overrides from RAGQueryOptions (idl/rag.proto). Zero/unset
@@ -596,6 +599,15 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
             g_in.multi_query_count = static_cast<size_t>(overrides->multi_query_count);
         }
         g_in.scope_prefix = overrides->scope_prefix;
+        if (overrides->bm25_k1 > 0.0f) {
+            g_in.bm25_k1 = overrides->bm25_k1;
+        }
+        if (overrides->bm25_b >= 0.0f) {
+            g_in.bm25_b = overrides->bm25_b;
+        }
+        if (overrides->rrf_k > 0) {
+            g_in.rrf_k = overrides->rrf_k;
+        }
     }
 
     g_in.question = question;
@@ -703,6 +715,9 @@ rac_result_t RAGBackend::retrieve(const std::string& question,
         g_in.max_context_tokens = config_.max_context_tokens;
         g_in.prompt_template = config_.prompt_template;
         g_in.rerank = config_.rerank;
+        g_in.bm25_k1 = config_.bm25_k1;
+        g_in.bm25_b = config_.bm25_b;
+        g_in.rrf_k = config_.rrf_k;
         wants_llm_features = config_.rerank;
     }
 
@@ -718,6 +733,15 @@ rac_result_t RAGBackend::retrieve(const std::string& question,
             g_in.multi_query_count = static_cast<size_t>(overrides->multi_query_count);
         }
         g_in.scope_prefix = overrides->scope_prefix;
+        if (overrides->bm25_k1 > 0.0f) {
+            g_in.bm25_k1 = overrides->bm25_k1;
+        }
+        if (overrides->bm25_b >= 0.0f) {
+            g_in.bm25_b = overrides->bm25_b;
+        }
+        if (overrides->rrf_k > 0) {
+            g_in.rrf_k = overrides->rrf_k;
+        }
         wants_llm_features = wants_llm_features || overrides->enable_multi_query;
     }
 
