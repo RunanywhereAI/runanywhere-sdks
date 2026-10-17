@@ -171,6 +171,24 @@ describe('CrossWasmRAGProvider', () => {
     ]);
   });
 
+  it('rejects native-only BM25/RRF/vector-store knobs on query and queryStream', async () => {
+    installBackendSpies();
+    const provider = __testing__.createCrossWasmRAGProvider();
+    await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    }));
+    await expect(
+      provider.ragQuery('anything', { retrieval: { bm25K1: 1.5 } as never }),
+    ).rejects.toThrow(/bm25K1.*native RAG session provider/);
+    const stream = provider.ragQueryStream!('anything', { retrieval: { rrfK: 30 } as never });
+    await expect(stream[Symbol.asyncIterator]().next()).rejects.toThrow(/rrfK/);
+    // VECTOR_STORE_USEARCH (1): even the only on-device store is a native-session knob.
+    await expect(
+      provider.ragQuery('anything', { retrieval: { vectorStore: 1 } as never }),
+    ).rejects.toThrow(/vectorStore/);
+  });
+
   it('ingests a 140,000-code-point document through ragIngest without RangeError (#1014)', async () => {
     // splitRAGText alone never reaches the provider's append into its chunk index,
     // which is where a spread of ~140k chunks used to throw.
