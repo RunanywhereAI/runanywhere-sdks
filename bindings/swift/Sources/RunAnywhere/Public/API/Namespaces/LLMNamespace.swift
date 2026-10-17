@@ -77,44 +77,24 @@ public extension RunAnywhere {
         /// Generate output that satisfies `schema`.
         ///
         /// `mode` picks how the schema is enforced:
-        /// - `.validationOnly` (default): generate freely, then validate.
+        /// - `.constrained` (default): engine-constrained decoding (GBNF grammar sampling, enforced by the llama.cpp engine only; other backends generate unconstrained).
+        /// - `.validationOnly`: generate freely, then validate against the schema.
         /// - `.repair`: validate, then retry once with a repair instruction if invalid.
-        /// - `.constrained`: engine-constrained decoding — fails preflight
-        ///   until a constrained-decoding engine is wired in.
         ///
         /// - Throws: `SDKException` when no model can be loaded, `mode` cannot
         ///   be honored, generation fails, or the output cannot be parsed.
         public func generateStructured(
             prompt: String,
             schema: JsonSchema,
-            mode: StructuredEnforcementMode = .validationOnly,
+            mode: StructuredEnforcementMode = .constrained,
             options: LlmOptions? = nil
         ) async throws -> StructuredResult {
-            guard mode != .constrained else {
-                throw SDKException(
-                    code: .notSupported,
-                    message: "generateStructured(mode: .constrained) needs engine-level constrained decoding, " +
-                        "which is not wired in yet; use .validationOnly or .repair",
-                    category: .validation
-                )
-            }
-
             var effective = options ?? LlmOptions()
-            effective.structuredOutput = StructuredOutput(schema: schema)
+            effective.structuredOutput = StructuredOutput(schema: schema, strict: effective.structuredOutput?.strict ?? true, mode: mode)
+            effective.toolChoice = .none
 
-            var generation = try await generate(prompt: prompt, history: [], options: effective)
-            var parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
-
-            let isValid = parsed.hasValidation ? parsed.validation.isValid : false
-            if mode == .repair, !isValid {
-                let repairPrompt = RunAnywhere.structuredRepairPrompt(
-                    original: prompt,
-                    invalidOutput: generation.text,
-                    schema: schema
-                )
-                generation = try await generate(prompt: repairPrompt, history: [], options: effective)
-                parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
-            }
+            let generation = try await generate(prompt: prompt, history: [], options: effective)
+            let parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
 
             return StructuredResult(proto: parsed, generation: generation, mode: mode)
         }
@@ -448,22 +428,5 @@ extension RunAnywhere {
         try CppBridge.StructuredOutput.parse(
             CppBridge.StructuredOutput.makeParseRequest(text: text, schema: schema)
         )
-    }
-
-    /// Build the one retry prompt `generateStructured(mode: .repair)` sends
-    /// when the first pass did not validate against `schema`.
-    internal static func structuredRepairPrompt(
-        original: String,
-        invalidOutput: String,
-        schema: JsonSchema
-    ) -> String {
-        """
-        \(original)
-
-        Your previous answer did not match the required JSON schema. Reply again with ONLY JSON that satisfies this schema.
-
-        Schema: \(schema)
-        Previous invalid answer: \(invalidOutput)
-        """
     }
 }
