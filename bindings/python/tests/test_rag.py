@@ -289,6 +289,41 @@ def test_query_accepts_numpy_integer_rrf_k(rag_core) -> None:
     assert rag_core.last_query.retrieval.rrf_k == 30
 
 
+def test_query_forwards_every_rag_generation_knob(rag_core) -> None:
+    session = _open(rag_core)
+    session.ingest(RagDocument("Paris is the capital of France."))
+    session.query(
+        "Capital of France?",
+        RagQueryOptions(
+            generation=LlmOptions(
+                min_p=0.1,
+                frequency_penalty=0.2,
+                presence_penalty=0.3,
+                repetition_penalty=1.2,
+                seed=42,
+                stop_sequences=["</s>", "###"],
+            )
+        ),
+    )
+    generation = rag_core.last_query.generation
+    assert generation.HasField("min_p") and generation.min_p == pytest.approx(0.1)
+    assert generation.frequency_penalty == pytest.approx(0.2)
+    assert generation.presence_penalty == pytest.approx(0.3)
+    assert generation.repeat_penalty == pytest.approx(1.2)
+    assert generation.seed == 42
+    assert list(generation.stop_sequences) == ["</s>", "###"]
+
+
+def test_query_leaves_unset_generation_knobs_absent(rag_core) -> None:
+    session = _open(rag_core)
+    session.ingest(RagDocument("Paris is the capital of France."))
+    session.query("Capital of France?", RagQueryOptions(generation=LlmOptions()))
+    generation = rag_core.last_query.generation
+    for name in ("min_p", "frequency_penalty", "presence_penalty", "repeat_penalty", "seed"):
+        assert not generation.HasField(name), name
+    assert list(generation.stop_sequences) == []
+
+
 def test_query_stream_accepts_rag_query_options(rag_core) -> None:
     session = _open(rag_core)
     session.ingest(RagDocument("Paris is the capital of France."))
