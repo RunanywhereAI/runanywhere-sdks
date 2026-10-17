@@ -117,7 +117,8 @@ typedef struct rac_llm_options {
     /** OpenAI-style presence penalty (idl/llm_options.proto:101). 0.0 = disabled. */
     float presence_penalty;
 
-    /** Minimum-probability sampling (idl/llm_options.proto:107). 0.0 = disabled. */
+    /** Minimum-probability sampling (idl/llm_options.proto `min_p`). 0.0 = disabled;
+     *  RAC_LLM_OPTIONS_DEFAULT uses the IDL's annotated default (0.05). */
     float min_p;
 
     /** Deterministic sampling seed (idl/llm_options.proto:97). 0 = backend default. */
@@ -159,9 +160,12 @@ typedef struct rac_llm_options {
  * the five platform SDKs, which generate their own defaults() from the same
  * annotations — change idl/llm_options.proto instead.
  *
- * Fields with no annotation default to the proto's documented "unset /
- * disabled" sentinels: frequency/presence/min_p=0.0, seed=0, no grammar,
- * n_threads=0. Engines apply each only when its non-disabled value is present.
+ * min_p is annotated too (0.05, on by default like top_k and repeat_penalty to
+ * match llama.cpp/Ollama), so it uses the generated macro the same way
+ * RAC_VLM_OPTIONS_DEFAULT does. Fields with no annotation default to the proto's
+ * documented "unset / disabled" sentinels: frequency/presence=0.0, seed=0, no
+ * grammar, n_threads=0. Engines apply each only when its non-disabled value is
+ * present.
  */
 static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
     .max_tokens = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MAX_OUTPUT_TOKENS,
@@ -175,7 +179,7 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
     .repetition_penalty = RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPEAT_PENALTY,
     .frequency_penalty = 0.0f,
     .presence_penalty = 0.0f,
-    .min_p = 0.0f,
+    .min_p = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MIN_P,
     .seed = 0,
     .grammar = RAC_NULL,
     .n_threads = 0,
