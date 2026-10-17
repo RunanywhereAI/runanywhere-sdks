@@ -29,7 +29,7 @@ import type {
   StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
 import type { LLMStreamingResult } from '../../types/index.js';
-import { AsyncQueue } from '../../Foundation/AsyncQueue.js';
+import { AsyncQueue } from '@runanywhere/proto-ts/streams/push';
 import { SDKException } from '../../Foundation/SDKException.js';
 import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
 import {
@@ -147,6 +147,7 @@ function streamingResultFromEvents(
   // backend supports streamed tool-call deltas (libprotobuf-enabled builds);
   // on WASM the field is currently always absent (see syn-010 evidence).
   const accumulatedToolCalls: ToolCall[] = [];
+  let startProducer = (): void => {};
   const result = new Promise<LLMGenerationResult>((resolve, reject) => {
     const start = (): void => {
       if (started) return;
@@ -187,13 +188,16 @@ function streamingResultFromEvents(
       })();
     };
 
-    const originalIterator = queue[Symbol.asyncIterator].bind(queue);
-    queue[Symbol.asyncIterator] = () => {
-      start();
-      return originalIterator();
-    };
+    startProducer = start;
     start();
   });
+
+  const stream: AsyncIterable<string> = {
+    [Symbol.asyncIterator]() {
+      startProducer();
+      return queue[Symbol.asyncIterator]();
+    },
+  };
   // A mid-stream failure already throws from `stream`/`events`, so a caller
   // that leaves its `for await` through that throw may never await `result`.
   // Mark it handled; `await result` still rejects for callers that do.
@@ -201,7 +205,7 @@ function streamingResultFromEvents(
 
   return {
     events: eventQueue,
-    stream: queue,
+    stream,
     result,
     cancel() {
       if (cancelled) return;
@@ -362,10 +366,9 @@ export async function* generateStructuredStream(
     yield { kind: 'completed', result };
   } catch (error) {
     // Producer self-terminated (stream/result/parse failure) — never fire
-    // the native cancel for it. Swallow the duplicate rejection carried by
-    // the terminal result promise before rethrowing the original error.
+    // the native cancel for it. `generateStream` already marks `result`
+    // handled, so its duplicate rejection needs no guard here.
     nativeStreamDone = true;
-    void streaming.result.catch(() => undefined);
     throw error;
   } finally {
     if (!nativeStreamDone) streaming.cancel();
