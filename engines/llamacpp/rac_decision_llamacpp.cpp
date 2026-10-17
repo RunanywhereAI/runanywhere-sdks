@@ -423,6 +423,19 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
         return RAC_SUCCESS;
     }
 
+    // This engine scores every checkpoint one way and takes no images, so the
+    // grouping, length, pixel and image controls are refused, never ignored.
+    if (rac_decision_options_has_extended(options) == RAC_TRUE) {
+        RAC_LOG_ERROR(kLogCategory,
+                      "llama.cpp decisions take no grouping, max_length, pixel bounds or "
+                      "images (grouping=%d max_length=%u max_pixels=%u min_pixels=%u images=%zu)",
+                      static_cast<int>(options->grouping), options->max_length,
+                      options->max_pixels, options->min_pixels, options->image_count);
+        rac_error_set_details(
+            "this decision model takes no grouping, max_length, pixel bounds or images");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
     // A pinned request must match the wording this checkpoint serves. Both the
     // wording and the probabilities derived from it are model-versioned, so a
     // silent mismatch would hand back scores the caller cannot interpret.
