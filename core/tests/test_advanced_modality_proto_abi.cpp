@@ -106,7 +106,23 @@ std::atomic<bool> g_dummy_embeddings_release{false};
 float g_dummy_llm_last_temperature = -1.0f;
 int32_t g_dummy_llm_last_max_tokens = 0;
 int32_t g_dummy_llm_last_top_k = -1;
+float g_dummy_llm_last_top_p = -1.0f;
+float g_dummy_llm_last_repetition_penalty = -1.0f;
+float g_dummy_llm_last_frequency_penalty = -1.0f;
+float g_dummy_llm_last_presence_penalty = -1.0f;
+float g_dummy_llm_last_min_p = -1.0f;
+int64_t g_dummy_llm_last_seed = -1;
+std::vector<std::string> g_dummy_llm_last_stop_sequences;
 rac_bool_t g_dummy_llm_last_disable_thinking = RAC_FALSE;
+// The non-streaming op is what the RAG reranker's relevance scorer calls, as
+// opposed to the streaming op above, which produces the answer.
+int g_dummy_llm_generate_calls = 0;
+size_t g_dummy_llm_generate_last_num_stop_sequences = 0;
+float g_dummy_llm_generate_last_repetition_penalty = -1.0f;
+float g_dummy_llm_generate_last_frequency_penalty = -1.0f;
+float g_dummy_llm_generate_last_presence_penalty = -1.0f;
+float g_dummy_llm_generate_last_min_p = -1.0f;
+int64_t g_dummy_llm_generate_last_seed = -1;
 std::string g_dummy_llm_stream_response;
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
@@ -487,8 +503,17 @@ rac_result_t dummy_llm_initialize(void*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t dummy_llm_generate(void*, const char*, const rac_llm_options_t*,
+rac_result_t dummy_llm_generate(void*, const char*, const rac_llm_options_t* options,
                                 rac_llm_result_t* out_result) {
+    ++g_dummy_llm_generate_calls;
+    if (options) {
+        g_dummy_llm_generate_last_num_stop_sequences = options->num_stop_sequences;
+        g_dummy_llm_generate_last_repetition_penalty = options->repetition_penalty;
+        g_dummy_llm_generate_last_frequency_penalty = options->frequency_penalty;
+        g_dummy_llm_generate_last_presence_penalty = options->presence_penalty;
+        g_dummy_llm_generate_last_min_p = options->min_p;
+        g_dummy_llm_generate_last_seed = options->seed;
+    }
     out_result->text = rac_strdup("mock answer");
     out_result->completion_tokens = 2;
     out_result->total_tokens = 2;
@@ -505,6 +530,17 @@ rac_result_t dummy_llm_stream(void* impl, const char*, const rac_llm_options_t* 
         g_dummy_llm_last_temperature = options->temperature;
         g_dummy_llm_last_max_tokens = options->max_tokens;
         g_dummy_llm_last_top_k = options->top_k;
+        g_dummy_llm_last_top_p = options->top_p;
+        g_dummy_llm_last_repetition_penalty = options->repetition_penalty;
+        g_dummy_llm_last_frequency_penalty = options->frequency_penalty;
+        g_dummy_llm_last_presence_penalty = options->presence_penalty;
+        g_dummy_llm_last_min_p = options->min_p;
+        g_dummy_llm_last_seed = options->seed;
+        // Copy the strings: the pointers are only valid for the duration of the call.
+        g_dummy_llm_last_stop_sequences.clear();
+        for (size_t i = 0; i < options->num_stop_sequences; ++i) {
+            g_dummy_llm_last_stop_sequences.emplace_back(options->stop_sequences[i]);
+        }
         g_dummy_llm_last_disable_thinking = options->disable_thinking;
     }
     if (g_dummy_llm_block_stream.load(std::memory_order_acquire)) {
@@ -1300,6 +1336,211 @@ int test_rag_ingest_query_mocked_path() {
     CHECK(g_dummy_llm_last_top_k == 0, "RAG query honours an explicit top_k of 0");
     rac_proto_buffer_free(&out);
     rac_sdk_event_clear_queue();
+
+    // The rest of the generation knobs are `optional` in llm_options.proto too,
+    // so the same contract holds for each of them: ABSENT keeps the default
+    // (RAG's own 512 tokens and top_p 0.9 where it has them) and any value the
+    // caller sets, including 0, is honoured verbatim.
+    //
+    // Runs one RAG query over `target` and drops the result; the mocked LLM
+    // records the options it was called with in the g_dummy_llm_* globals.
+    auto run_query = [](rac_handle_t target, const runanywhere::v1::RAGQueryOptions& options) {
+        std::vector<uint8_t> bytes;
+        if (!serialize(options, &bytes))
+            return RAC_ERROR_INVALID_ARGUMENT;
+        rac_proto_buffer_t buffer;
+        rac_proto_buffer_init(&buffer);
+        const rac_result_t status =
+            rac_rag_query_proto(target, bytes.data(), bytes.size(), &buffer);
+        rac_proto_buffer_free(&buffer);
+        rac_sdk_event_clear_queue();
+        return status;
+    };
+    auto reset_answer_captures = [] {
+        g_dummy_llm_last_max_tokens = -1;
+        g_dummy_llm_last_top_p = -1.0f;
+        g_dummy_llm_last_repetition_penalty = -1.0f;
+        g_dummy_llm_last_frequency_penalty = -1.0f;
+        g_dummy_llm_last_presence_penalty = -1.0f;
+        g_dummy_llm_last_min_p = -1.0f;
+        g_dummy_llm_last_seed = -1;
+        g_dummy_llm_last_stop_sequences.assign(1, "not-captured");
+    };
+
+    // A generation submessage that sets only a temperature makes the message
+    // present while leaving every other knob absent.
+    runanywhere::v1::RAGQueryOptions unset_knobs;
+    unset_knobs.set_query("Where does RAG live?");
+    unset_knobs.mutable_generation()->set_temperature(0.2f);
+    reset_answer_captures();
+    CHECK(run_query(session, unset_knobs) == RAC_SUCCESS,
+          "RAG query with only a temperature succeeds");
+    CHECK(g_dummy_llm_last_max_tokens == 512,
+          "RAG query falls back to 512 tokens when max_output_tokens is unset");
+    CHECK(g_dummy_llm_last_top_p == 0.9f, "RAG query falls back to top_p 0.9 when it is unset");
+    CHECK(g_dummy_llm_last_repetition_penalty == RAC_LLM_OPTIONS_DEFAULT.repetition_penalty,
+          "RAG query keeps the default repeat_penalty when it is unset");
+    CHECK(g_dummy_llm_last_frequency_penalty == RAC_LLM_OPTIONS_DEFAULT.frequency_penalty,
+          "RAG query keeps the default frequency_penalty when it is unset");
+    CHECK(g_dummy_llm_last_presence_penalty == RAC_LLM_OPTIONS_DEFAULT.presence_penalty,
+          "RAG query keeps the default presence_penalty when it is unset");
+    CHECK(g_dummy_llm_last_min_p == RAC_LLM_OPTIONS_DEFAULT.min_p,
+          "RAG query keeps the default min_p when it is unset");
+    CHECK(g_dummy_llm_last_seed == RAC_LLM_OPTIONS_DEFAULT.seed,
+          "RAG query keeps the default seed when it is unset");
+    CHECK(g_dummy_llm_last_stop_sequences.empty(), "RAG query invents no stop sequences");
+
+    // 0 is a legal explicit value for both of these, so a value-based sentinel
+    // (`> 0`) that rewrote it to the RAG default would satisfy the unset case
+    // above while discarding the caller's request.
+    runanywhere::v1::RAGQueryOptions explicit_zero_knobs;
+    explicit_zero_knobs.set_query("Where does RAG live?");
+    explicit_zero_knobs.mutable_generation()->set_max_output_tokens(0);
+    explicit_zero_knobs.mutable_generation()->set_top_p(0.0f);
+    reset_answer_captures();
+    CHECK(run_query(session, explicit_zero_knobs) == RAC_SUCCESS,
+          "RAG query with explicit zero knobs succeeds");
+    CHECK(g_dummy_llm_last_max_tokens == 0, "RAG query honours an explicit max_output_tokens of 0");
+    CHECK(g_dummy_llm_last_top_p == 0.0f, "RAG query honours an explicit top_p of 0");
+
+    // Knobs that had no route into the RAG answer call now reach it.
+    runanywhere::v1::RAGQueryOptions forwarded_knobs;
+    forwarded_knobs.set_query("Where does RAG live?");
+    forwarded_knobs.mutable_generation()->set_repeat_penalty(1.3f);
+    forwarded_knobs.mutable_generation()->set_frequency_penalty(0.4f);
+    forwarded_knobs.mutable_generation()->set_presence_penalty(0.2f);
+    forwarded_knobs.mutable_generation()->set_min_p(0.1f);
+    forwarded_knobs.mutable_generation()->set_seed(1234);
+    forwarded_knobs.mutable_generation()->add_stop_sequences("END");
+    forwarded_knobs.mutable_generation()->add_stop_sequences("###");
+    reset_answer_captures();
+    CHECK(run_query(session, forwarded_knobs) == RAC_SUCCESS,
+          "RAG query with extra knobs succeeds");
+    CHECK(g_dummy_llm_last_repetition_penalty == 1.3f, "RAG query forwards repeat_penalty");
+    CHECK(g_dummy_llm_last_frequency_penalty == 0.4f, "RAG query forwards frequency_penalty");
+    CHECK(g_dummy_llm_last_presence_penalty == 0.2f, "RAG query forwards presence_penalty");
+    CHECK(g_dummy_llm_last_min_p == 0.1f, "RAG query forwards min_p");
+    CHECK(g_dummy_llm_last_seed == 1234, "RAG query forwards seed");
+    CHECK((g_dummy_llm_last_stop_sequences == std::vector<std::string>{"END", "###"}),
+          "RAG query forwards stop_sequences in order");
+
+    // An empty stop string matches at offset 0 on an engine that does a plain
+    // substring search, so it would end the answer on the first token. The
+    // other proto adapters drop empty elements; the RAG path has to as well.
+    runanywhere::v1::RAGQueryOptions empty_stop_knobs;
+    empty_stop_knobs.set_query("Where does RAG live?");
+    empty_stop_knobs.mutable_generation()->add_stop_sequences("");
+    empty_stop_knobs.mutable_generation()->add_stop_sequences("END");
+    empty_stop_knobs.mutable_generation()->add_stop_sequences("");
+    reset_answer_captures();
+    CHECK(run_query(session, empty_stop_knobs) == RAC_SUCCESS,
+          "RAG query with empty stop sequences succeeds");
+    CHECK((g_dummy_llm_last_stop_sequences == std::vector<std::string>{"END"}),
+          "RAG query drops empty stop sequences and keeps the rest");
+    runanywhere::v1::RAGQueryOptions only_empty_stop_knobs;
+    only_empty_stop_knobs.set_query("Where does RAG live?");
+    only_empty_stop_knobs.mutable_generation()->add_stop_sequences("");
+    reset_answer_captures();
+    CHECK(run_query(session, only_empty_stop_knobs) == RAC_SUCCESS,
+          "RAG query with only an empty stop sequence succeeds");
+    CHECK(g_dummy_llm_last_stop_sequences.empty(),
+          "RAG query passes no stop sequences when every one is empty");
+
+    // top_p is a probability mass, so an out-of-range value stays in [0, 1].
+    runanywhere::v1::RAGQueryOptions high_top_p_knobs;
+    high_top_p_knobs.set_query("Where does RAG live?");
+    high_top_p_knobs.mutable_generation()->set_top_p(1.5f);
+    reset_answer_captures();
+    CHECK(run_query(session, high_top_p_knobs) == RAC_SUCCESS,
+          "RAG query with a high top_p succeeds");
+    CHECK(g_dummy_llm_last_top_p == 1.0f, "RAG query clamps a top_p above 1 to 1");
+    runanywhere::v1::RAGQueryOptions negative_top_p_knobs;
+    negative_top_p_knobs.set_query("Where does RAG live?");
+    negative_top_p_knobs.mutable_generation()->set_top_p(-0.5f);
+    reset_answer_captures();
+    CHECK(run_query(session, negative_top_p_knobs) == RAC_SUCCESS,
+          "RAG query with a negative top_p succeeds");
+    CHECK(g_dummy_llm_last_top_p == 0.0f, "RAG query clamps a negative top_p to 0");
+
+    // std::clamp returns NaN unchanged, so a non-finite top_p is rejected up
+    // front instead of reaching the engine outside the [0, 1] guarantee.
+    for (const float non_finite : {std::numeric_limits<float>::quiet_NaN(),
+                                   std::numeric_limits<float>::infinity()}) {
+        runanywhere::v1::RAGQueryOptions non_finite_top_p_knobs;
+        non_finite_top_p_knobs.set_query("Where does RAG live?");
+        non_finite_top_p_knobs.mutable_generation()->set_top_p(non_finite);
+        reset_answer_captures();
+        CHECK(run_query(session, non_finite_top_p_knobs) == RAC_ERROR_INVALID_ARGUMENT,
+              "RAG query rejects a non-finite top_p");
+        CHECK(g_dummy_llm_last_top_p == -1.0f,
+              "RAG query never calls the engine with a non-finite top_p");
+    }
+
+    // The reranker's relevance scorer is an internal call that reuses the
+    // query's options. It has to keep scoring with its own settings: a stop
+    // sequence the caller set for the answer can cut the "<index>: <score>"
+    // lines short, and a penalty skews the digits.
+    runanywhere::v1::RAGConfiguration rerank_config = config;
+    rerank_config.set_top_k(2);
+    rerank_config.set_rerank_results(true);
+    std::vector<uint8_t> rerank_config_bytes;
+    CHECK(serialize(rerank_config, &rerank_config_bytes), "reranking RAGConfiguration serializes");
+    rac_handle_t rerank_session = nullptr;
+    CHECK(rac_rag_session_create_proto(rerank_config_bytes.data(), rerank_config_bytes.size(),
+                                       &rerank_session) == RAC_SUCCESS &&
+              rerank_session != nullptr,
+          "reranking RAG session creates from proto");
+    for (const char* doc_id : {"rerank-doc-1", "rerank-doc-2"}) {
+        runanywhere::v1::RAGDocument rerank_document;
+        rerank_document.set_id(doc_id);
+        rerank_document.set_text(std::string("Document ") + doc_id + " describes RAG in C++.");
+        std::vector<uint8_t> rerank_document_bytes;
+        CHECK(serialize(rerank_document, &rerank_document_bytes),
+              "reranking RAGDocument serializes");
+        rac_proto_buffer_init(&out);
+        CHECK(rac_rag_ingest_proto(rerank_session, rerank_document_bytes.data(),
+                                   rerank_document_bytes.size(), &out) == RAC_SUCCESS,
+              "reranking RAG session ingests a document");
+        rac_proto_buffer_free(&out);
+    }
+    rac_sdk_event_clear_queue();
+
+    runanywhere::v1::RAGQueryOptions rerank_query;
+    rerank_query.set_query("Where does RAG live?");
+    rerank_query.mutable_generation()->set_repeat_penalty(1.3f);
+    rerank_query.mutable_generation()->set_frequency_penalty(0.4f);
+    rerank_query.mutable_generation()->set_presence_penalty(0.2f);
+    rerank_query.mutable_generation()->set_min_p(0.1f);
+    rerank_query.mutable_generation()->set_seed(99);
+    rerank_query.mutable_generation()->add_stop_sequences("END");
+    g_dummy_llm_generate_calls = 0;
+    g_dummy_llm_generate_last_num_stop_sequences = 99;
+    g_dummy_llm_generate_last_repetition_penalty = -1.0f;
+    g_dummy_llm_generate_last_frequency_penalty = -1.0f;
+    g_dummy_llm_generate_last_presence_penalty = -1.0f;
+    g_dummy_llm_generate_last_min_p = -1.0f;
+    g_dummy_llm_generate_last_seed = -1;
+    reset_answer_captures();
+    CHECK(run_query(rerank_session, rerank_query) == RAC_SUCCESS, "reranking RAG query succeeds");
+    CHECK(g_dummy_llm_generate_calls >= 1,
+          "the reranker scores the retrieved chunks through the LLM");
+    CHECK(g_dummy_llm_generate_last_num_stop_sequences == 0,
+          "the reranker's scorer does not inherit the answer's stop sequences");
+    CHECK(g_dummy_llm_generate_last_repetition_penalty ==
+              RAC_LLM_OPTIONS_DEFAULT.repetition_penalty,
+          "the reranker's scorer does not inherit the answer's repeat_penalty");
+    CHECK(g_dummy_llm_generate_last_frequency_penalty == RAC_LLM_OPTIONS_DEFAULT.frequency_penalty,
+          "the reranker's scorer does not inherit the answer's frequency_penalty");
+    CHECK(g_dummy_llm_generate_last_presence_penalty == RAC_LLM_OPTIONS_DEFAULT.presence_penalty,
+          "the reranker's scorer does not inherit the answer's presence_penalty");
+    CHECK(g_dummy_llm_generate_last_min_p == RAC_LLM_OPTIONS_DEFAULT.min_p,
+          "the reranker's scorer does not inherit the answer's min_p");
+    CHECK(g_dummy_llm_generate_last_seed == RAC_LLM_OPTIONS_DEFAULT.seed,
+          "the reranker's scorer does not inherit the answer's seed");
+    CHECK((g_dummy_llm_last_stop_sequences == std::vector<std::string>{"END"}),
+          "the answer call still receives the caller's stop sequences");
+    CHECK(g_dummy_llm_last_seed == 99, "the answer call still receives the caller's seed");
+    rac_rag_session_destroy_proto(rerank_session);
 
     // A token-limited thinking phase may omit its closing tag. The RAG result
     // must keep that private content out of answer while retaining typed

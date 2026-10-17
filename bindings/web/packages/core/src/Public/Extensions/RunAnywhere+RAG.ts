@@ -1281,7 +1281,6 @@ function normalizeCrossWasmDocument(document: RAGDocument): NormalizedCrossWasmD
   };
 }
 
-/** Represents a bounded chunk produced by splitRAGText. */
 interface SplitRAGChunk {
   text: string;
   startOffset: number;
@@ -1289,17 +1288,19 @@ interface SplitRAGChunk {
   tokenCount: number;
 }
 
-/** Represents the start and end byte/char offset of a token in the original text. */
 interface RAGTokenSpan {
   startOffset: number;
   endOffset: number;
+  /** Budget units this token costs: 1 for an ordinary word, its code-point count for a space-free script run. */
+  weight: number;
 }
+
+/** Scripts written without inter-word spaces, so one whitespace run can hold many words. */
+const SCRIPT_FREE_SPACE_REGEX =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Tibetan}]/u;
 
 /**
  * Counts the number of Unicode code points in a string, correctly counting surrogate pairs as one code point.
- *
- * @param str - Input string to measure.
- * @returns Total count of Unicode code points.
  */
 function countCodePoints(str: string): number {
   let count = 0;
@@ -1309,73 +1310,62 @@ function countCodePoints(str: string): number {
   return count;
 }
 
-/** Scripts written without inter-word spaces, so one whitespace run can hold many words. */
-const SCRIPT_FREE_SPACE_REGEX =
-  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}]/u;
-
-interface RAGWordRun {
-  text: string;
-  /** Offset of `text` inside the whitespace-delimited word it came from. */
-  offset: number;
-  /** True when the run is measured in code points rather than as a single word token. */
-  charBased: boolean;
-}
-
-/**
- * Splits one whitespace-free word into runs. A word holding a space-free script is cut into
- * Latin / non-Latin sub-runs so each is judged on its own; any other word stays a single run.
- */
-function splitWordRuns(word: string): RAGWordRun[] {
-  if (!SCRIPT_FREE_SPACE_REGEX.test(word)) {
-    return [{ text: word, offset: 0, charBased: countCodePoints(word) > 40 }];
-  }
-  return [...word.matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9]+/g)].map((m) => ({
-    text: m[0],
-    offset: m.index ?? 0,
-    charBased: SCRIPT_FREE_SPACE_REGEX.test(m[0]) || countCodePoints(m[0]) > 40,
-  }));
-}
-
 /**
  * Splits input text into sliding-window chunks bounded by token count and chunk overlap.
- * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK text
- * or long non-whitespace strings) by Unicode code points without breaking surrogate pairs.
- *
- * @param text - The raw input text to chunk.
- * @param requestedSize - The desired maximum chunk size in tokens.
- * @param requestedOverlap - The number of tokens that should overlap between consecutive chunks.
- * @returns An array of chunks containing text slices, offsets, and token counts.
+ * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK,
+ * Thai, or long whitespace-free strings exceeding the budget) by Unicode code
+ * points without breaking surrogate pairs. Ordinary words cost one budget unit; space-free
+ * script runs cost one unit per code point, so a chunk never exceeds `size` code points
+ * however those runs are distributed across lines. Iteratively appends chunks to avoid stack limits.
  */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
   if (matches.length === 0) return [];
   const size = Math.max(1, Math.floor(requestedSize));
   const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
-  const stride = Math.max(1, size - overlap);
 
-  // Build the list of token spans. In whitespace-delimited scripts (English, etc.),
-  // each non-whitespace sequence is roughly one token. In scripts without spaces
-  // (CJK, Thai, Lao, Myanmar, Khmer, etc.) or for oversized runs (long URLs, base64 blobs > 40 chars),
-  // a single regex match can exceed the chunk size budget. We enforce a character/code-point
-  // limit by splitting any run whose code-point count exceeds `size` and represents a
-  // space-free script or an oversized run (> 40 code points) on Unicode code-point boundaries
-  // (preventing surrogate pair corruption). A whitespace run that mixes scripts is cut into
-  // Latin / non-Latin sub-runs first, so an English word beside CJK text stays intact.
-  // Ordinary spaced words within or slightly exceeding tiny budgets remain atomic tokens,
-  // matching the C++ core separator-first behavior.
+  // In whitespace-delimited scripts (English, etc.), each non-whitespace sequence
+  // is roughly one token. In scripts without spaces (CJK, Thai, Lao, Myanmar, Khmer, Tibetan, etc.)
+  // or for oversized runs (long URLs, base64 blobs, or non-spaced words), a single regex
+  // match can exceed the chunk size budget. We enforce a character/code-point
+  // limit by splitting any token whose code-point count exceeds `size` when it represents a
+  // space-free script, or is an oversized run (> 40 code points)
+  // on Unicode code-point boundaries (preventing surrogate pair corruption). Ordinary spaced words
+  // within or slightly exceeding tiny budgets remain atomic tokens, matching the C++ core separator-first behavior.
   const tokens: RAGTokenSpan[] = [];
   for (const match of matches) {
     const matchStart = match.index ?? 0;
-    for (const run of splitWordRuns(match[0])) {
-      const runStart = matchStart + run.offset;
-      if (!(run.charBased && countCodePoints(run.text) > size)) {
-        tokens.push({ startOffset: runStart, endOffset: runStart + run.text.length });
-        continue;
-      }
-      let currentOffset = runStart;
-      for (const char of run.text) {
-        tokens.push({ startOffset: currentOffset, endOffset: currentOffset + char.length });
-        currentOffset += char.length;
+    // A whitespace-free word that mixes Latin text with a space-free script is cut into Latin
+    // and non-Latin pieces first, so an English word beside CJK text is never clipped (#922).
+    const pieces = SCRIPT_FREE_SPACE_REGEX.test(match[0])
+      ? [...match[0].matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9]+/g)].map((m) => ({
+          text: m[0],
+          offset: m.index ?? 0,
+        }))
+      : [{ text: match[0], offset: 0 }];
+    for (const piece of pieces) {
+      const pieceText = piece.text;
+      const pieceStart = matchStart + piece.offset;
+      const cpCount = countCodePoints(pieceText);
+      const isScriptRun = SCRIPT_FREE_SPACE_REGEX.test(pieceText);
+      const isOversized = cpCount > size && (isScriptRun || cpCount > 40);
+
+      if (!isOversized) {
+        tokens.push({
+          startOffset: pieceStart,
+          endOffset: pieceStart + pieceText.length,
+          weight: isScriptRun ? cpCount : 1,
+        });
+      } else {
+        let currentOffset = pieceStart;
+        for (const char of pieceText) {
+          tokens.push({
+            startOffset: currentOffset,
+            endOffset: currentOffset + char.length,
+            weight: 1,
+          });
+          currentOffset += char.length;
+        }
       }
     }
   }
@@ -1383,11 +1373,16 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   if (tokens.length === 0) return [];
 
   const chunks: SplitRAGChunk[] = [];
-  for (let start = 0; start < tokens.length; start += stride) {
-    const end = Math.min(tokens.length, start + size);
+  let start = 0;
+  while (start < tokens.length) {
+    let end = start;
+    let used = 0;
+    while (end < tokens.length && (end === start || used + tokens[end]!.weight <= size)) {
+      used += tokens[end]!.weight;
+      end++;
+    }
     const startOffset = tokens[start]!.startOffset;
-    const last = tokens[end - 1]!;
-    const endOffset = last.endOffset;
+    const endOffset = tokens[end - 1]!.endOffset;
     chunks.push({
       text: text.slice(startOffset, endOffset),
       startOffset,
@@ -1395,23 +1390,22 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
       tokenCount: end - start,
     });
     if (end === tokens.length) break;
+    // Next window starts at the earliest token whose tail up to `end` fits the overlap budget.
+    let next = end;
+    let tail = 0;
+    while (next > start + 1 && tail + tokens[next - 1]!.weight <= overlap) {
+      tail += tokens[next - 1]!.weight;
+      next--;
+    }
+    start = next;
   }
   return chunks;
 }
 
-/**
- * Truncates and formats retrieved RAG search result chunks into a single context string,
- * adhering to a maximum token budget using word/token-aware context bounding.
- *
- * @param chunks - Retrieved RAG search result chunks to format.
- * @param requestedMaxTokens - Maximum allowable token budget for the formatted context.
- * @returns Formatted context string with source attributions.
- */
 function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number): string {
   const maxTokens = Math.max(1, Math.floor(requestedMaxTokens));
   const parts: string[] = [];
   let used = 0;
-
   // `RAGSearchResult.rank` was deleted outright (idl/rag.proto): rank was
   // always just this array's position, so the 1-based index reconstructs it
   // exactly.
@@ -1419,34 +1413,31 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
     let available = maxTokens - used;
     if (available <= 0) return;
     const words = chunk.text.split(/\s+/).filter(Boolean);
-    let text = '';
-
-    if (words.length === 0) {
-      text = chunk.text;
-      available -= 1;
-    } else {
-      // An ordinary word costs one token; a space-free-script or oversized run costs one per
-      // code point, so a long CJK run inside a multi-word chunk cannot bypass the budget.
-      const kept: string[] = [];
-      for (const word of words) {
+    const kept: string[] = [];
+    // A script-free run costs one budget unit per code point, so a long CJK run inside a
+    // multi-word chunk cannot bypass the budget (#922); ordinary words cost one unit each.
+    for (const word of words) {
+      if (available <= 0) break;
+      // Same piece split as the chunker: a word mixing Latin with a script-free run is costed
+      // piece by piece, so the English part is kept whole and the CJK part is charged per code point.
+      const pieces = SCRIPT_FREE_SPACE_REGEX.test(word)
+        ? [...word.matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9]+/g)].map((m) => m[0])
+        : [word];
+      let keptWord = '';
+      for (const piece of pieces) {
         if (available <= 0) break;
-        let keptWord = '';
-        for (const run of splitWordRuns(word)) {
-          if (available <= 0) break;
-          if (run.charBased) {
-            const slice = [...run.text].slice(0, available);
-            keptWord += slice.join('');
-            available -= slice.length;
-          } else {
-            keptWord += run.text;
-            available -= 1;
-          }
+        if (SCRIPT_FREE_SPACE_REGEX.test(piece)) {
+          const slice = [...piece].slice(0, available);
+          keptWord += slice.join('');
+          available -= slice.length;
+        } else {
+          keptWord += piece;
+          available -= 1;
         }
-        if (keptWord) kept.push(keptWord);
       }
-      text = kept.join(' ');
+      if (keptWord) kept.push(keptWord);
     }
-
+    const text = kept.join(' ');
     if (!text) return;
     parts.push(`[Source ${index + 1}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
     used = maxTokens - Math.max(available, 0);
@@ -2086,9 +2077,9 @@ export const __testing__ = {
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
+  renderRAGPrompt,
   splitRAGText,
   boundedRAGContext,
-  renderRAGPrompt,
 };
 
 /**
