@@ -20,6 +20,7 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_proto_adapters.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -1109,6 +1110,80 @@ int test_voice_agent_d7_component_create_destroy_proto() {
     return 0;
 }
 
+int test_stt_proto_adapters_mapping() {
+    // 1. rac_stt_word_from_proto
+    runanywhere::v1::WordTimestamp word_proto;
+    word_proto.set_word("hello");
+    word_proto.set_start_ms(100);
+    word_proto.set_end_ms(250);
+    word_proto.set_confidence(0.95f);
+
+    CHECK(!rac::foundation::rac_stt_word_from_proto(word_proto, nullptr),
+          "stt word adapter rejects null destination");
+
+    rac_stt_word_t word{};
+    CHECK(rac::foundation::rac_stt_word_from_proto(word_proto, &word),
+          "stt word adapter maps valid proto");
+    CHECK(word.text != nullptr && std::strcmp(word.text, "hello") == 0,
+          "stt word text matches");
+    CHECK(word.start_ms == 100 && word.end_ms == 250 && word.confidence == 0.95f,
+          "stt word timings and confidence match");
+    rac_free(word.text);
+
+    // Empty word still allocates valid non-null empty C-string
+    runanywhere::v1::WordTimestamp empty_word_proto;
+    word = {};
+    CHECK(rac::foundation::rac_stt_word_from_proto(empty_word_proto, &word),
+          "stt word adapter maps empty word proto");
+    CHECK(word.text != nullptr && word.text[0] == '\0',
+          "stt word adapter provides non-null empty string");
+    rac_free(word.text);
+
+    // 2. rac_transcription_metadata_from_proto
+    runanywhere::v1::TranscriptionMetadata meta_proto;
+    meta_proto.set_model_id("whisper-base");
+    meta_proto.set_processing_time_ms(120);
+
+    CHECK(!rac::foundation::rac_transcription_metadata_from_proto(meta_proto, nullptr),
+          "transcription metadata adapter rejects null destination");
+
+    rac_transcription_metadata_t meta{};
+    CHECK(rac::foundation::rac_transcription_metadata_from_proto(meta_proto, &meta),
+          "transcription metadata adapter maps valid proto");
+    CHECK(meta.model_id != nullptr && std::strcmp(meta.model_id, "whisper-base") == 0,
+          "transcription metadata model_id matches");
+    CHECK(meta.processing_time_ms == 120 && meta.audio_length_ms == 0,
+          "transcription metadata processing_time_ms matches and audio_length_ms is 0");
+    rac_free(meta.model_id);
+
+    // Empty model_id leaves model_id as nullptr
+    runanywhere::v1::TranscriptionMetadata empty_meta_proto;
+    meta = {};
+    CHECK(rac::foundation::rac_transcription_metadata_from_proto(empty_meta_proto, &meta),
+          "transcription metadata adapter maps empty model_id proto");
+    CHECK(meta.model_id == nullptr,
+          "transcription metadata empty model_id maps to nullptr");
+
+    // 3. rac_transcription_alternative_from_proto
+    runanywhere::v1::TranscriptionAlternative alt_proto;
+    alt_proto.set_text("alternative text");
+    alt_proto.set_confidence(0.88f);
+
+    CHECK(!rac::foundation::rac_transcription_alternative_from_proto(alt_proto, nullptr),
+          "transcription alternative adapter rejects null destination");
+
+    rac_transcription_alternative_t alt{};
+    CHECK(rac::foundation::rac_transcription_alternative_from_proto(alt_proto, &alt),
+          "transcription alternative adapter maps valid proto");
+    CHECK(alt.text != nullptr && std::strcmp(alt.text, "alternative text") == 0,
+          "transcription alternative text matches");
+    CHECK(alt.confidence == 0.88f,
+          "transcription alternative confidence matches");
+    rac_free(alt.text);
+
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -1134,6 +1209,7 @@ int main() {
         test_voice_agent_d7_transcribe_proto();
         test_voice_agent_d7_synthesize_speech_proto();
         test_voice_agent_d7_component_create_destroy_proto();
+        test_stt_proto_adapters_mapping();
         rac_plugin_unregister("llamacpp");
         rac_plugin_unregister("onnx");
         std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -638,6 +639,30 @@ int test_invalid_request_publishes_typed_storage_error() {
     return 0;
 }
 
+int test_model_storage_metrics_proto_adapter() {
+    runanywhere::v1::ModelStorageMetrics proto;
+    proto.set_model_id("model-xyz");
+    proto.set_size_on_disk_bytes(1048576);
+
+    ASSERT_TRUE(!rac::foundation::rac_model_storage_metrics_from_proto(proto, nullptr));
+
+    rac_model_storage_metrics_t metrics{};
+    ASSERT_TRUE(rac::foundation::rac_model_storage_metrics_from_proto(proto, &metrics));
+    ASSERT_TRUE(metrics.model_id != nullptr);
+    ASSERT_STREQ(metrics.model_id, "model-xyz");
+    ASSERT_EQ(metrics.size_on_disk, 1048576);
+    rac_free(metrics.model_id);
+
+    runanywhere::v1::ModelStorageMetrics empty_proto;
+    empty_proto.set_size_on_disk_bytes(4096);
+    metrics = {};
+    ASSERT_TRUE(rac::foundation::rac_model_storage_metrics_from_proto(empty_proto, &metrics));
+    ASSERT_TRUE(metrics.model_id == nullptr);
+    ASSERT_EQ(metrics.size_on_disk, 4096);
+
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -670,6 +695,7 @@ int main() {
         RUN(test_delete_dry_run_vs_execute);
         RUN(test_empty_storage_info);
         RUN(test_invalid_request_publishes_typed_storage_error);
+        RUN(test_model_storage_metrics_proto_adapter);
 
         std::printf("\n%d test(s) failed\n", failures);
         return failures == 0 ? 0 : 1;
