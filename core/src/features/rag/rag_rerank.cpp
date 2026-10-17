@@ -200,6 +200,22 @@ void rerank_llm_pointwise(rac_handle_t llm_handle, const std::string& question,
     opts.temperature = 0.0f;
     opts.max_tokens = static_cast<int32_t>(n * 8 + 16);
     opts.system_prompt = nullptr;
+    // The scorer is an internal call whose output must stay "<index>: <score>"
+    // lines. Knobs the caller set to shape the final answer -- stop sequences,
+    // penalties, a seed, a minimum probability -- have no business here: a stop
+    // sequence can cut the scores off and a penalty skews the digits, which
+    // parse_rerank_scores would then read as "no parseable scores".
+    const rac_llm_options_t defaults = RAC_LLM_OPTIONS_DEFAULT;
+    opts.stop_sequences = defaults.stop_sequences;
+    opts.num_stop_sequences = defaults.num_stop_sequences;
+    opts.repetition_penalty = defaults.repetition_penalty;
+    opts.frequency_penalty = defaults.frequency_penalty;
+    opts.presence_penalty = defaults.presence_penalty;
+    opts.min_p = defaults.min_p;
+    opts.seed = defaults.seed;
+    opts.grammar = defaults.grammar;
+    opts.history = defaults.history;
+    opts.n_history = defaults.n_history;
 
     rac_llm_result_t out = {};
     rac_result_t rc = rac_llm_generate(llm_handle, prompt.c_str(), &opts, &out);
