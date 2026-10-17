@@ -31,6 +31,7 @@ __all__ = [
     "RagConfig",
     "RagQueryOptions",
     "RagRetrievalOptions",
+    "RagVectorStore",
     "ReasoningMode",
     "ReasoningOptions",
     "SegmentationOptions",
@@ -296,12 +297,25 @@ class RagConfig:
     persist_path: Optional[str] = None
 
 
+class RagVectorStore(IntEnum):
+    """Vector store backing RAG retrieval; only the in-process store exists on-device."""
+
+    USEARCH = 1
+
+
 @dataclass
 class RagRetrievalOptions:
     """Per-query retrieval overrides for ``RagSession.query``/``query_stream``."""
 
     top_k: Optional[int] = None
     similarity_threshold: Optional[float] = None
+    #: BM25 term-frequency saturation; finite and ``>= 0``. ``None`` uses the session default.
+    bm25_k1: Optional[float] = None
+    #: BM25 document-length normalization in ``0..1``. ``None`` uses the session default.
+    bm25_b: Optional[float] = None
+    #: Reciprocal-rank-fusion constant, ``>= 0``. ``None`` uses the session default.
+    rrf_k: Optional[int] = None
+    vector_store: Optional[RagVectorStore] = None
 
 
 @dataclass
