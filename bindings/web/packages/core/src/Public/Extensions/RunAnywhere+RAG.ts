@@ -985,10 +985,9 @@ class CrossWasmRAGProvider implements RAGProvider {
       nativeStreamDone = true;
     } catch (error) {
       // Producer self-terminated — the native stream is already over, so
-      // cancelling it would be a lie. Swallow the duplicate rejection the
-      // result promise carries before rethrowing the original error.
+      // cancelling it would be a lie. `generateStream` already marks the
+      // result promise handled, so its duplicate rejection needs no guard.
       nativeStreamDone = true;
-      void streaming.result.catch(() => undefined);
       throw error;
     } finally {
       // Only reachable with the stream still live when the consumer abandoned
