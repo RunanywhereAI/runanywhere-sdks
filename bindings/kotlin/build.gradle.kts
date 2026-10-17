@@ -1,5 +1,7 @@
 import org.gradle.api.artifacts.dsl.LockMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.net.HttpURLConnection
+import java.net.URI
 import java.security.MessageDigest
 import java.time.Duration
 
@@ -550,6 +552,23 @@ tasks.register("downloadJniLibs") {
         outputDir.mkdirs()
         tempDir.mkdirs()
 
+        // Ant's <get> has no connect/read timeout (only maxtime, which does not interrupt a
+        // stalled read), so a hung server would block the build forever.
+        fun downloadWithTimeouts(url: String, dest: File) {
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 60_000
+            connection.instanceFollowRedirects = true
+            try {
+                if (connection.responseCode != 200) {
+                    throw GradleException("HTTP ${connection.responseCode} for $url")
+                }
+                connection.inputStream.use { input -> dest.outputStream().use { input.copyTo(it) } }
+            } finally {
+                connection.disconnect()
+            }
+        }
+
         var totalDownloaded = 0
         val downloadFailures = mutableListOf<String>()
 
@@ -562,9 +581,7 @@ tasks.register("downloadJniLibs") {
             val tempZip = file("$tempDir/$packageName")
 
             try {
-                ant.withGroovyBuilder {
-                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-                }
+                downloadWithTimeouts(zipUrl, tempZip)
 
                 // VERIFY BEFORE EXTRACT. This path had no integrity check at all: it
                 // fetched a .zip over the network and unzipped it straight into jniLibs.
@@ -575,9 +592,7 @@ tasks.register("downloadJniLibs") {
                 // filename assertion, so a sidecar for a DIFFERENT asset cannot satisfy
                 // this one.
                 val sidecar = file("$tempDir/$packageName.sha256")
-                ant.withGroovyBuilder {
-                    "get"("src" to "$zipUrl.sha256", "dest" to sidecar, "verbose" to false)
-                }
+                downloadWithTimeouts("$zipUrl.sha256", sidecar)
                 val sidecarMatch =
                     Regex("""^([0-9a-fA-F]{64})\s+\*?(.+)$""")
                         .find(sidecar.readText().trim())
