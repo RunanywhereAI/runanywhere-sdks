@@ -608,6 +608,63 @@ bump_all_on_line "${REPO_ROOT}/README.md" \
     "(version line, currently \*\*)[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
     "\\1${NEW_VERSION}"
 
+# The per-SDK READMEs (and the core docs) repeat the same install pins, in more
+# shapes than the root README: pip extras (runanywhere[rag]==), the plain
+# "Current release" line, and a few prose sentences. Same rule as above, match the
+# shape rather than CURRENT_VERSION so a stale pin heals. Each file has to carry at
+# least one pin, so a reworded README aborts the bump instead of silently dropping
+# out of the sync. Keep this list and shape set identical to the gate's.
+README_PIN_SHAPES=(
+    'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+    'runanywhere[a-z_]*: \^?' \
+    '@runanywhere/[a-z-]+@' \
+    'runanywhere(\[[a-z,]+\])?==' \
+    'Current release:\*\* `' \
+    'currently \*\*' \
+    'Pin to \*\*' \
+    'Use `'
+)
+for readme in \
+    "${REPO_ROOT}/bindings/python/README.md" \
+    "${REPO_ROOT}/bindings/web/README.md" \
+    "${REPO_ROOT}/bindings/web/packages/core/README.md" \
+    "${REPO_ROOT}/bindings/web/packages/llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/web/packages/onnx/README.md" \
+    "${REPO_ROOT}/bindings/react-native/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/core/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/mlx/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/onnx/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/qhexrt/README.md" \
+    "${REPO_ROOT}/bindings/kotlin/README.md" \
+    "${REPO_ROOT}/bindings/kotlin/docs/Documentation.md" \
+    "${REPO_ROOT}/bindings/kotlin/docs/KOTLIN_MAVEN_CENTRAL_PUBLISHING.md" \
+    "${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-onnx/README.md" \
+    "${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-qhexrt/README.md" \
+    "${REPO_ROOT}/bindings/flutter/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_mlx/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_onnx/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_qhexrt/README.md" \
+    "${REPO_ROOT}/core/README.md" \
+    "${REPO_ROOT}/core/docs/DEVELOPMENT.md"; do
+    readme_pinned=0
+    for readme_pin in "${README_PIN_SHAPES[@]}"; do
+        if grep -Eq "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+" "$readme"; then
+            readme_pinned=1
+            bump_all_on_line "$readme" \
+                "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9.-]+)?" \
+                "\1${NEW_VERSION}"
+        fi
+    done
+    if [ "$readme_pinned" -eq 0 ]; then
+        echo "ERROR: no version pin found (sync-versions configuration is stale): $readme" >&2
+        exit 1
+    fi
+done
+
 # Every anchor above validated. Only now does anything on disk change, so a
 # stale pattern aborts with the working tree untouched rather than half-bumped.
 flush_pending_edits
