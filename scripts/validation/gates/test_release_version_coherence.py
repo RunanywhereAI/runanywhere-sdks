@@ -216,6 +216,56 @@ def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
     assert "no version pin matches 'runanywhere=='" in result.stderr
 
 
+def _mutate_file(tmp_path, relative, old, new):
+    sandbox = _mirror(tmp_path, writable={relative})
+    path = sandbox / relative
+    text = path.read_text(encoding="utf-8")
+    assert text.count(old) >= 1, old
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+    return _run(sandbox)
+
+
+def test_stale_pip_extras_pin_in_the_python_readme_is_rejected(tmp_path):
+    # runanywhere[extras]== is not one of the root README's shapes; the per-SDK
+    # READMEs are the only place it appears.
+    version = _core_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/python/README.md",
+        f"runanywhere[rag]=={version}",
+        "runanywhere[rag]==0.0.1",
+    )
+    assert result.returncode == 1
+    assert (
+        f"bindings/python/README.md: expected {version}, found 'runanywhere[rag]==0.0.1'"
+        in result.stderr
+    )
+
+
+def test_stale_pin_in_a_kotlin_module_readme_is_rejected(tmp_path):
+    version = _core_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/kotlin/modules/runanywhere-core-onnx/README.md",
+        f"runanywhere-onnx:{version}",
+        "runanywhere-onnx:0.0.1",
+    )
+    assert result.returncode == 1
+    assert "runanywhere-core-onnx/README.md: expected" in result.stderr
+
+
+def test_per_sdk_readme_with_no_pin_is_rejected(tmp_path):
+    # A reworded README that no shape matches would silently drop out of the gate.
+    result = _mutate_file(
+        tmp_path,
+        "bindings/web/packages/core/README.md",
+        "npm install @runanywhere/web@",
+        "npm install @runanywhere/web ",
+    )
+    assert result.returncode == 1
+    assert "bindings/web/packages/core/README.md: no version pin matches" in result.stderr
+
+
 if __name__ == "__main__":
     tests = sorted(
         (name, value)
