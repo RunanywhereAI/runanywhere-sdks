@@ -306,8 +306,8 @@ Then transfer the staging repository with the same manual upload command as the
 core artifacts. Consumers depend on:
 
 ```kotlin
-implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
-implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.37")
+implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.37")
 ```
 
 ---
@@ -323,16 +323,16 @@ repositories {
 // build.gradle.kts
 dependencies {
     // Required: core SDK
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.37")
 
     // Optional: LLM + VLM (add only if you need text/vision generation)
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.37")
 
     // Optional: STT/TTS/VAD (add only if you need speech features)
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.37")
 
     // Optional: Snapdragon Hexagon NPU (arm64-v8a only)
-    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.37")
 }
 ```
 
