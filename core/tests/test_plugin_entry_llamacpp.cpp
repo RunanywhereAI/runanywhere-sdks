@@ -85,13 +85,24 @@ int main() {
         std::fprintf(stderr, "rac_engine_vtable_slot did not resolve rerank_ops\n");
         return 1;
     }
+    // Joint decision scoring (RAC_PRIMITIVE_DECIDE, ABI v13) is served only when
+    // the fetched llama.cpp carries the clef head + span API; the manifest entry
+    // is conditional, so the expected shape is computed rather than hardcoded.
+    const size_t expected_primitives = 4 + (vt->decision_ops != nullptr ? 1u : 0u);
     const rac_engine_manifest_t* manifest = rac_engine_manifest_find("llamacpp");
     if (manifest == nullptr || manifest->availability != RAC_ENGINE_AVAILABILITY_PUBLIC ||
-        manifest->primitives_count != 4 || manifest->primitives[0] != RAC_PRIMITIVE_GENERATE_TEXT ||
+        manifest->primitives_count != expected_primitives ||
+        manifest->primitives[0] != RAC_PRIMITIVE_GENERATE_TEXT ||
         manifest->primitives[1] != RAC_PRIMITIVE_EMBED ||
         manifest->primitives[2] != RAC_PRIMITIVE_VLM ||
-        manifest->primitives[3] != RAC_PRIMITIVE_RERANK) {
+        manifest->primitives[3] != RAC_PRIMITIVE_RERANK ||
+        (vt->decision_ops != nullptr && manifest->primitives[4] != RAC_PRIMITIVE_DECIDE)) {
         std::fprintf(stderr, "llama.cpp manifest was not published correctly\n");
+        return 1;
+    }
+    if (vt->decision_ops != nullptr &&
+        rac_engine_vtable_slot(vt, RAC_PRIMITIVE_DECIDE) != vt->decision_ops) {
+        std::fprintf(stderr, "rac_engine_vtable_slot did not resolve decision_ops\n");
         return 1;
     }
 
