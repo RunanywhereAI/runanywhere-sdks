@@ -174,6 +174,14 @@ def test_readme_pin_with_an_attached_prerelease_suffix_is_rejected(tmp_path):
     assert f"found 'runanywhere=={version}rc1'" in result.stderr
 
 
+def test_readme_pin_followed_by_a_full_stop_passes(tmp_path):
+    # Sentence punctuation after a pin is not part of the version; reading it as
+    # a suffix fails the gate and makes the sync delete the full stop.
+    version = _core_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}.")
+    assert result.returncode == 0, result.stderr
+
+
 def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
     # A shape with no match means the README was reworded under the gate, which
     # would otherwise stop checking that install command without saying so.
