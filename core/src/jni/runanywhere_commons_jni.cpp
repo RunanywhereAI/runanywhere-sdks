@@ -1726,8 +1726,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 
+    jobject adapterRef = env->NewGlobalRef(adapter);
+    if (adapterRef == nullptr) {
+        LOGe("racSetPlatformAdapter: failed to create a global reference for the adapter");
+        env->DeleteLocalRef(adapterClass);
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
+
     // Every required id resolved, so commit.
-    g_platform_adapter = env->NewGlobalRef(adapter);
+    g_platform_adapter = adapterRef;
     g_method_log = m_log;
     g_method_file_exists = m_file_exists;
     g_method_file_read = m_file_read;
