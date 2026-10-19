@@ -10,11 +10,10 @@ import XCTest
 
 final class WorkflowFileStoreTests: XCTestCase {
 
-    private var base: URL!
+    private let base = FileManager.default.temporaryDirectory
+        .appendingPathComponent("workflow-store-\(UUID().uuidString)", isDirectory: true)
 
     override func setUpWithError() throws {
-        base = FileManager.default.temporaryDirectory
-            .appendingPathComponent("workflow-store-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         try CppBridge.ModelPaths.setBaseDirectory(base)
     }
