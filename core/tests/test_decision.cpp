@@ -4,7 +4,7 @@
  *
  * Backend-neutral: registers a small in-test fake decision engine (no model
  * file, no llama.cpp) and asserts:
- *   - RAC_PLUGIN_API_VERSION == 13 and the primitive/vtable-slot wiring.
+ *   - RAC_PLUGIN_API_VERSION == 14 and the primitive/vtable-slot wiring.
  *   - A registered decision engine routes via rac_plugin_find(RAC_PRIMITIVE_DECIDE)
  *     and rac_engine_vtable_slot() resolves decision_ops.
  *   - Full DecisionRequest → DecisionResult proto round-trip through the
@@ -57,6 +57,18 @@ struct FakeDecisionImpl {
 // be asserted (the engine itself does not enforce it; real engines do).
 uint32_t g_last_prompt_format_pin = 0;
 
+// The extended controls the fake engine last received, copied out of the
+// borrowed options so the proto -> C mapping can be asserted after the call.
+struct ReceivedControls {
+    rac_decision_grouping_t grouping = RAC_DECISION_GROUPING_UNSPECIFIED;
+    uint32_t max_length = 0;
+    uint32_t max_pixels = 0;
+    uint32_t min_pixels = 0;
+    std::vector<std::string> images;
+    std::vector<std::string> mime_types;
+};
+ReceivedControls g_last_controls;
+
 rac_result_t fake_create(const char* model_id, const char* /*config*/, void** out_impl) {
     if (!model_id || !out_impl) {
         return RAC_ERROR_NULL_POINTER;
@@ -80,6 +92,24 @@ rac_result_t fake_decide(void* impl, const char* state, const rac_decision_quest
         return RAC_ERROR_NULL_POINTER;
     }
     g_last_prompt_format_pin = options != nullptr ? options->prompt_format_version : 0;
+    g_last_controls = {};
+    // A sentinel for the refusal path: the engine names its reason, and commons
+    // must hand that reason back instead of the generic code text.
+    if (options != nullptr && options->max_length == 7u) {
+        rac_error_set_details("fake engine refuses max_length 7");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (options != nullptr) {
+        g_last_controls.grouping = options->grouping;
+        g_last_controls.max_length = options->max_length;
+        g_last_controls.max_pixels = options->max_pixels;
+        g_last_controls.min_pixels = options->min_pixels;
+        for (size_t i = 0; i < options->image_count; ++i) {
+            const rac_decision_image_t& image = options->images[i];
+            g_last_controls.images.emplace_back(reinterpret_cast<const char*>(image.data), image.size);
+            g_last_controls.mime_types.emplace_back(image.mime_type ? image.mime_type : "");
+        }
+    }
     *out_result = {};
     out_result->processing_time_ms = 1;
     const auto* fake = static_cast<const FakeDecisionImpl*>(impl);
@@ -214,7 +244,7 @@ int main() {
     // (1) ABI + primitive naming. The version pin is an exact tripwire: bumping
     // it is only correct once the wire value below has been re-verified, because
     // a promotion that shifted wire 14 would reroute every decision call.
-    check(RAC_PLUGIN_API_VERSION == 13u, "RAC_PLUGIN_API_VERSION must be 13");
+    check(RAC_PLUGIN_API_VERSION == 14u, "RAC_PLUGIN_API_VERSION must be 14");
     check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_DECIDE), "decide") == 0,
           "rac_primitive_name(RAC_PRIMITIVE_DECIDE) == \"decide\"");
     check(static_cast<int>(RAC_PRIMITIVE_DECIDE) == 14, "RAC_PRIMITIVE_DECIDE wire value is 14");
@@ -407,6 +437,101 @@ int main() {
         expect_rejected(std::move(unknown_type), "unspecified question type is rejected");
     }
 
+    // Grouping, length, pixel bounds and images reach the engine unchanged;
+    // malformed ones are refused before any engine sees them.
+    {
+        auto with_controls = [](runanywhere::v1::DecisionRequest& request) {
+            request.set_state("Screenshot of the error page.");
+            auto* q = request.add_questions();
+            q->set_id("team");
+            q->set_type(runanywhere::v1::DECISION_QUESTION_TYPE_CHOICE);
+            q->set_instructions("Which team?");
+            q->add_options()->set_key("support");
+            q->add_options()->set_key("billing");
+        };
+
+        runanywhere::v1::DecisionRequest request;
+        with_controls(request);
+        auto* options = request.mutable_options();
+        options->set_grouping(runanywhere::v1::DECISION_GROUPING_PER_QUESTION);
+        options->set_max_length(4096);
+        options->set_max_pixels(1638400);
+        options->set_min_pixels(65536);
+        auto* png = request.add_images();
+        png->set_data(std::string("\x89PNG\0bytes", 10));
+        png->set_mime_type("image/png");
+        request.add_images()->set_data("jpeg-bytes");
+        const std::string bytes = request.SerializeAsString();
+        rac_proto_buffer_t out = {};
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_decision_component_decide_proto(
+            component, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &out);
+        check(rc == RAC_SUCCESS, "decide with every control succeeds against the fake engine");
+        check(g_last_controls.grouping == RAC_DECISION_GROUPING_PER_QUESTION,
+              "grouping reaches the engine");
+        check(g_last_controls.max_length == 4096 && g_last_controls.max_pixels == 1638400 &&
+                  g_last_controls.min_pixels == 65536,
+              "length and pixel bounds reach the engine");
+        check(g_last_controls.images.size() == 2 &&
+                  g_last_controls.images[0] == std::string("\x89PNG\0bytes", 10) &&
+                  g_last_controls.images[1] == "jpeg-bytes",
+              "image bytes reach the engine intact, embedded NULs included");
+        check(g_last_controls.mime_types.size() == 2 && g_last_controls.mime_types[0] == "image/png" &&
+                  g_last_controls.mime_types[1].empty(),
+              "an empty MIME type reaches the engine as NULL");
+        rac_proto_buffer_free(&out);
+
+        auto expect_refused = [&](runanywhere::v1::DecisionRequest bad, const char* what) {
+            const std::string bad_bytes = bad.SerializeAsString();
+            rac_proto_buffer_t bad_out = {};
+            rac_proto_buffer_init(&bad_out);
+            check(rac_decision_component_decide_proto(
+                      component, reinterpret_cast<const uint8_t*>(bad_bytes.data()),
+                      bad_bytes.size(), &bad_out) == RAC_ERROR_INVALID_PARAMETER,
+                  what);
+            rac_proto_buffer_free(&bad_out);
+        };
+
+        runanywhere::v1::DecisionRequest refused;
+        with_controls(refused);
+        refused.mutable_options()->set_max_length(7);
+        const std::string refused_bytes = refused.SerializeAsString();
+        rac_proto_buffer_t refused_out = {};
+        rac_proto_buffer_init(&refused_out);
+        check(rac_decision_component_decide_proto(
+                  component, reinterpret_cast<const uint8_t*>(refused_bytes.data()),
+                  refused_bytes.size(), &refused_out) == RAC_ERROR_NOT_SUPPORTED,
+              "an engine refusal keeps its result code");
+        check(refused_out.error_message != nullptr &&
+                  std::string(refused_out.error_message) == "fake engine refuses max_length 7",
+              "an engine's refusal reason reaches the caller's error message");
+        rac_proto_buffer_free(&refused_out);
+
+        runanywhere::v1::DecisionRequest unknown_grouping;
+        with_controls(unknown_grouping);
+        unknown_grouping.mutable_options()->set_grouping(
+            static_cast<runanywhere::v1::DecisionGrouping>(7));
+        expect_refused(std::move(unknown_grouping), "an unknown grouping value is refused");
+
+        runanywhere::v1::DecisionRequest inverted;
+        with_controls(inverted);
+        inverted.mutable_options()->set_min_pixels(4096);
+        inverted.mutable_options()->set_max_pixels(1024);
+        expect_refused(std::move(inverted), "min_pixels above max_pixels is refused");
+
+        runanywhere::v1::DecisionRequest empty_image;
+        with_controls(empty_image);
+        empty_image.add_images()->set_mime_type("image/png");
+        expect_refused(std::move(empty_image), "an image with no bytes is refused");
+
+        runanywhere::v1::DecisionRequest too_many;
+        with_controls(too_many);
+        for (int i = 0; i < 9; ++i) {
+            too_many.add_images()->set_data("x");
+        }
+        expect_refused(std::move(too_many), "more than eight images are refused");
+    }
+
     // NOUL is normalized to the reserved true/false pair regardless of the
     // caller's wording, so every engine reads the same shape and p(true) is
     // unambiguous.
@@ -439,6 +564,31 @@ int main() {
     }
 
     rac_decision_component_destroy(component);
+
+    // Engines that only honour temperature and prompt version use this to
+    // refuse the rest; each control on its own must trip it.
+    {
+        rac_decision_options_t options = RAC_DECISION_OPTIONS_DEFAULT;
+        options.temperature = 1.5f;
+        options.prompt_format_version = 3;
+        check(rac_decision_options_has_extended(&options) == RAC_FALSE,
+              "temperature and prompt version alone are not extended controls");
+        check(rac_decision_options_has_extended(nullptr) == RAC_FALSE, "NULL options are default");
+        const rac_decision_image_t image = {reinterpret_cast<const uint8_t*>("x"), 1, nullptr};
+        rac_decision_options_t each[5] = {RAC_DECISION_OPTIONS_DEFAULT, RAC_DECISION_OPTIONS_DEFAULT,
+                                          RAC_DECISION_OPTIONS_DEFAULT, RAC_DECISION_OPTIONS_DEFAULT,
+                                          RAC_DECISION_OPTIONS_DEFAULT};
+        each[0].grouping = RAC_DECISION_GROUPING_JOINT;
+        each[1].max_length = 1;
+        each[2].max_pixels = 1;
+        each[3].min_pixels = 1;
+        each[4].images = &image;
+        each[4].image_count = 1;
+        for (const auto& extended : each) {
+            check(rac_decision_options_has_extended(&extended) == RAC_TRUE,
+                  "each extended control is detected on its own");
+        }
+    }
 
     // (5) Standalone request/result proto round-trip (no backend involved).
     {

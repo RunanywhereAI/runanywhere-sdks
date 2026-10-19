@@ -84,6 +84,38 @@ message DecisionOptions {
     // not serve, so a caller pinning it is told when the wording -- and so the
     // probabilities -- change.
     uint32 prompt_format_version = 2 [(runanywhere.v1.rac_default) = "0"];
+
+    // How the questions share forward passes. UNSPECIFIED = the model's own
+    // default. A model that has one fixed layout refuses any other value.
+    DecisionGrouping grouping = 3;
+
+    // Token cap per sequence; a longer request splits its questions across
+    // sequences. 0 = the model's limit. A model without a cap refuses non-zero.
+    uint32 max_length = 4 [(runanywhere.v1.rac_default) = "0"];
+
+    // Image pixel budget per image. 0 = the model's own budget. A model
+    // without image input refuses non-zero.
+    uint32 max_pixels = 5 [(runanywhere.v1.rac_default) = "0"];
+
+    // Lower image pixel bound. 0 = the model's own floor.
+    uint32 min_pixels = 6 [(runanywhere.v1.rac_default) = "0"];
+}
+
+enum DecisionGrouping {
+    DECISION_GROUPING_UNSPECIFIED  = 0;
+    // Every question shares one sequence (split only when over length).
+    DECISION_GROUPING_JOINT        = 1;
+    // Each question runs in its own sequence with the full state and images.
+    DECISION_GROUPING_PER_QUESTION = 2;
+}
+
+// One image every question is asked about.
+message DecisionImage {
+    // Encoded image bytes: PNG, JPEG, WebP or HEIC.
+    bytes data = 1 [(runanywhere.v1.rac_required) = true];
+
+    // MIME type of `data`, e.g. "image/png". Empty = sniffed from the bytes.
+    string mime_type = 2;
 }
 
 message DecisionRequest {
@@ -99,6 +131,10 @@ message DecisionRequest {
     // Registry id of the decision model to score with. Unset = whatever model is
     // already resident under the decision component.
     optional string model_id = 4;
+
+    // Images shared by every question. A model without image input refuses a
+    // request that carries any.
+    repeated DecisionImage images = 5;
 }
 
 message DecisionAnswer {
