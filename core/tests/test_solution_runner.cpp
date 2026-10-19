@@ -1347,6 +1347,36 @@ TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
     const std::string apos_kept = apos_cfg.voice_agent().generation().system_prompt();
     std::printf("[yaml] quoted + apostrophe comment = %s\n", apos_kept.c_str());
     CHECK(apos_kept == "has # inside");
+
+    const char* escaped_sq =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: 'Don''t use # markdown'  # keep replies short\n";
+    runanywhere::v1::SolutionConfig escaped_sq_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(escaped_sq, &escaped_sq_cfg) == RAC_SUCCESS);
+    const std::string escaped_sq_prompt = escaped_sq_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] escaped single-quote system_prompt = %s\n", escaped_sq_prompt.c_str());
+    CHECK(escaped_sq_prompt.ends_with("t use # markdown"));
+
+    const char* escaped_dq =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: \"say \\\"hi\\\" # inside\"  # real comment\n";
+    runanywhere::v1::SolutionConfig escaped_dq_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(escaped_dq, &escaped_dq_cfg) == RAC_SUCCESS);
+    const std::string escaped_dq_prompt = escaped_dq_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] escaped double-quote system_prompt = %s\n", escaped_dq_prompt.c_str());
+    CHECK(escaped_dq_prompt.ends_with("\" # inside"));
+
+    const char* plain_hash =
+        "voice_agent:\n"
+        "  llm_model_id: qwen3-4b\n"
+        "  system_prompt: Don't use # markdown  # keep replies short\n";
+    runanywhere::v1::SolutionConfig plain_hash_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml(plain_hash, &plain_hash_cfg) == RAC_SUCCESS);
+    const std::string plain_hash_prompt = plain_hash_cfg.voice_agent().generation().system_prompt();
+    std::printf("[yaml] plain scalar with ' #' system_prompt = %s\n", plain_hash_prompt.c_str());
+    CHECK(plain_hash_prompt == "Don't use");
 }
 
 // ---------------------------------------------------------------------------

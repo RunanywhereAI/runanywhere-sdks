@@ -118,6 +118,12 @@ class YamlParser {
                 const char prev = i == 0 ? '\0' : line[i - 1];
                 const bool can_open =
                     i == 0 || prev == ' ' || prev == '\t' || prev == ':' || prev == '-';
+                if ((in_sq && c == '\'' && i + 1 < line.size() && line[i + 1] == '\'') ||
+                    (in_dq && c == '\\' && i + 1 < line.size())) {
+                    clean.push_back(c);
+                    clean.push_back(line[++i]);
+                    continue;
+                }
                 if (!in_dq && c == '\'') {
                     if (in_sq || can_open)
                         in_sq = !in_sq;
