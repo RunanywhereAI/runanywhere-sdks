@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cstring>
 #include <memory>
 #include <sstream>
@@ -176,12 +177,71 @@ class YamlParser {
         return s.substr(a, b - a);
     }
 
-    static std::string unquote(const std::string& s) {
-        if (s.size() >= 2 &&
-            ((s.front() == '"' && s.back() == '"') || (s.front() == '\'' && s.back() == '\''))) {
-            return s.substr(1, s.size() - 2);
+    static void append_utf8(std::string& out, uint32_t cp) {
+        if (cp < 0x80) {
+            out.push_back(static_cast<char>(cp));
+        } else if (cp < 0x800) {
+            out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        } else if (cp < 0x10000) {
+            out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        } else {
+            out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
         }
-        return s;
+    }
+
+    static std::string unquote(const std::string& s) {
+        if (s.size() < 2 || s.front() != s.back() || (s.front() != '"' && s.front() != '\'')) {
+            return s;
+        }
+        const std::string_view body(s.data() + 1, s.size() - 2);
+        std::string out;
+        out.reserve(body.size());
+        if (s.front() == '\'') {
+            for (size_t i = 0; i < body.size(); ++i) {
+                out.push_back(body[i]);
+                if (body[i] == '\'' && i + 1 < body.size() && body[i + 1] == '\'')
+                    ++i;
+            }
+            return out;
+        }
+        constexpr std::string_view kEscapes = "0abt\tnvfre \"/\\";
+        constexpr std::string_view kDecoded("\0\a\b\t\t\n\v\f\r\x1b \"/\\", kEscapes.size());
+        constexpr std::string_view kNamed = "N_LP";
+        constexpr uint32_t kNamedCodePoints[] = {0x85, 0xA0, 0x2028, 0x2029};
+        for (size_t i = 0; i < body.size(); ++i) {
+            if (body[i] != '\\' || i + 1 == body.size()) {
+                out.push_back(body[i]);
+                continue;
+            }
+            const char e = body[++i];
+            if (const size_t k = kEscapes.find(e); k != std::string_view::npos) {
+                out.push_back(kDecoded[k]);
+                continue;
+            }
+            if (const size_t k = kNamed.find(e); k != std::string_view::npos) {
+                append_utf8(out, kNamedCodePoints[k]);
+                continue;
+            }
+            const size_t digits = e == 'x' ? 2 : (e == 'u' ? 4 : (e == 'U' ? 8 : 0));
+            uint32_t cp = 0;
+            const char* first = body.data() + i + 1;
+            if (digits != 0 && i + digits < body.size() &&
+                std::from_chars(first, first + digits, cp, 16).ptr == first + digits &&
+                cp <= 0x10FFFF && (cp < 0xD800 || cp > 0xDFFF)) {
+                append_utf8(out, cp);
+                i += digits;
+                continue;
+            }
+            out.push_back('\\');
+            out.push_back(e);
+        }
+        return out;
     }
 
     /// Parse the block starting at `idx` whose first line has indent
