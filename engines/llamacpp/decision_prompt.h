@@ -35,7 +35,9 @@
 
 #include "rac/features/decision/rac_decision_types.h"
 
-#if !defined(RAC_LLAMACPP_HAS_CLEF_SPAN)
+#if defined(RAC_LLAMACPP_CLEF_SPAN_EXT)
+#include "llama-ext.h"
+#elif !defined(RAC_LLAMACPP_HAS_CLEF_SPAN)
 enum {
     LLAMA_DECISION_ORDER_NONE = 0,
     LLAMA_DECISION_ORDER_QUESTION_NOUL = 1,
@@ -239,7 +241,8 @@ inline TaggedPrompt build(const std::string& template_src, const llama_vocab* vo
 
     common_chat_template tmpl(template_src, "", "");
     jinja::context ctx(tmpl.source());
-    jinja::global_from_json(ctx, inp, false);
+    // The jinja runtime takes llama.cpp's own JSON type from runanywhere-b10453.8 on.
+    jinja::global_from_json(ctx, common_json::parse(inp.dump()), false);
     jinja::runtime runtime(ctx);
     const jinja::value results = runtime.execute(tmpl.prog);
     const std::string prompt = jinja::runtime::gather_string_parts(results)->as_string().str();
