@@ -227,12 +227,33 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
 
         // Reading `allTasks` is what actually reconnects this process to the
         // daemon's tasks; the returned list is a by-product.
-        let liveModelIDs = Set(await session.allTasks.compactMap { decode($0.taskDescription)?.modelID })
+        let adopted = await session.allTasks
+        var liveModelIDs: Set<String> = []
+        var restarted = 0
+        for task in adopted {
+            guard let payload = decode(task.taskDescription) else { continue }
+            liveModelIDs.insert(payload.modelID)
+
+            // A task the daemon held from a previous run can still be sitting
+            // suspended: it was created and then the process died before, or
+            // during, `resume()`. Nothing else will ever start it, while
+            // `inFlightDestinations` counts a suspended task as live — so the
+            // next attempt skips that file as already covered and the transfer
+            // hangs forever with no bytes moving and no error to show. Adoption
+            // has to mean running, or it is worse than not adopting at all.
+            if task.state == .suspended {
+                task.resume()
+                restarted += 1
+            }
+        }
         for modelID in liveModelIDs {
             _ = adoptedTransfer(modelID: modelID)
         }
         if !liveModelIDs.isEmpty {
-            logger.info("Adopted \(liveModelIDs.count) background download(s) still in flight")
+            logger.info(
+                "Adopted \(liveModelIDs.count) background download(s) still in flight"
+                    + (restarted > 0 ? "; resumed \(restarted) that were left suspended" : "")
+            )
         }
 
         for modelID in store.interruptedModelIDs() where !liveModelIDs.contains(modelID) {

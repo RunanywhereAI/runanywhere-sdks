@@ -1,0 +1,6 @@
+#ifndef RAC_SWIFT_RAC_TOOL_PROGRESS_FORWARDER_H
+#define RAC_SWIFT_RAC_TOOL_PROGRESS_FORWARDER_H
+
+#include "rac/plugin/rac_tool_progress.h"
+
+#endif  // RAC_SWIFT_RAC_TOOL_PROGRESS_FORWARDER_H

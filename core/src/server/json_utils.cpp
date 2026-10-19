@@ -95,7 +95,13 @@ Json serializeStreamChunk(const rac_openai_stream_chunk_t& chunk) {
         choiceJson["index"] = choice.index;
 
         // Delta
-        Json delta;
+        //
+        // An object even when empty. The terminal chunk carries no role and no
+        // content, and a default-constructed Json is null, which serialises to
+        // `"delta": null`. OpenAI's format says an object there, and strict
+        // clients enforce it — JetBrains AI Assistant aborts the whole stream on
+        // the last chunk, after having rendered the answer.
+        Json delta = Json::object();
         if (choice.delta.role) {
             delta["role"] = choice.delta.role;
         }

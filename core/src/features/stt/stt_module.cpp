@@ -913,10 +913,14 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         model_id = rac_lifecycle_get_model_id(component->lifecycle);
         model_name = rac_lifecycle_get_model_name(component->lifecycle);
         framework = component->actual_framework;
-        sample_rate = component->config.sample_rate;
-
         // Copy effective options to local so we can release the lock
         local_options = options ? *options : component->default_options;
+
+        // The engine decodes at the per-call rate, so telemetry must report that one.
+        sample_rate = local_options.sample_rate > 0
+                          ? local_options.sample_rate
+                          : (component->config.sample_rate > 0 ? component->config.sample_rate
+                                                               : RAC_STT_DEFAULT_SAMPLE_RATE);
 
         rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
         if (result != RAC_SUCCESS) {
@@ -1124,8 +1128,12 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     // Calculate audio length in ms. Via the shared helper so a zero sample rate
     // falls back to the default instead of dividing by zero. Guarded for the
     // same reason as the batch path above.
-    const int64_t audio_length_ms =
-        estimate_audio_length_ms(audio_size, component->config.sample_rate);
+    const int32_t effective_sample_rate =
+        effective_options->sample_rate > 0
+            ? effective_options->sample_rate
+            : (component->config.sample_rate > 0 ? component->config.sample_rate
+                                                 : RAC_STT_DEFAULT_SAMPLE_RATE);
+    const int64_t audio_length_ms = estimate_audio_length_ms(audio_size, effective_sample_rate);
 #endif
 
     // Generate transcription ID for tracking
@@ -1145,7 +1153,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         if (effective_options->language)
             voice.set_language(effective_options->language);
         voice.set_is_streaming(true);  // Streaming mode!
-        voice.set_sample_rate(component->config.sample_rate);
+        voice.set_sample_rate(effective_sample_rate);
         voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
             rac::events::framework_to_proto_int(component->actual_framework)));
         // PUBLIC only: this fires once per streamed CHUNK (the live path calls
@@ -1205,7 +1213,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         voice.set_is_streaming(true);  // Streaming mode!
         voice.set_duration_ms(static_cast<int64_t>(duration_ms));
         // word_count not available for streaming - text is delivered via callbacks
-        voice.set_sample_rate(component->config.sample_rate);
+        voice.set_sample_rate(effective_sample_rate);
         voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
             rac::events::framework_to_proto_int(component->actual_framework)));
         // PUBLIC only: per-chunk completion (see the STARTED emit above). The

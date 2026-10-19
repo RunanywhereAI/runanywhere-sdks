@@ -18,6 +18,13 @@
 #include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+
+namespace {
+constexpr const char* LOG_CAT = "Sherpa.VAD";
+// sherpa-onnx SileroVadModelConfig::Validate() rejects threshold < 0.01.
+constexpr float kSileroMinThreshold = 0.01f;
+}  // namespace
 
 struct rac_sherpa_vad_handle_impl {
     std::unique_ptr<runanywhere::SherpaBackend> backend;
@@ -142,6 +149,12 @@ rac_result_t rac_vad_sherpa_set_threshold(rac_handle_t handle, float threshold) 
     auto* h = static_cast<rac_sherpa_vad_handle_impl*>(handle);
     if (!h->vad) {
         return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    if (!(threshold >= kSileroMinThreshold)) {
+        RAC_LOG_ERROR(LOG_CAT, "Silero VAD threshold %f is below the minimum of %.2f", threshold,
+                      kSileroMinThreshold);
+        return RAC_ERROR_INVALID_PARAMETER;
     }
 
     auto config = h->vad->get_vad_config();

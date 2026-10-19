@@ -151,6 +151,17 @@ elseif(RAC_PLATFORM_LINUX)
     set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
     set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
     set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+    # Kits must run on any x86-64, not just the build host: GGML_NATIVE would
+    # bake -march=native (AVX-512 on current CI runners) into every binary,
+    # SIGILLing older CPUs at load. Pin the AVX-512 family off explicitly so
+    # a future runner change cannot reintroduce it.
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    set(GGML_AVX512 OFF CACHE BOOL "" FORCE)
+    set(GGML_AVX512_VBMI OFF CACHE BOOL "" FORCE)
+    set(GGML_AVX512_VNNI OFF CACHE BOOL "" FORCE)
+    set(GGML_AMX_TILE OFF CACHE BOOL "" FORCE)
+    set(GGML_AMX_INT8 OFF CACHE BOOL "" FORCE)
+    set(GGML_AMX_BF16 OFF CACHE BOOL "" FORCE)
 
     # Enable ARM NEON for aarch64 (Raspberry Pi 5)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")

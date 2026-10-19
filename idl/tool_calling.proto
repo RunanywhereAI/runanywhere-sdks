@@ -400,3 +400,67 @@ message ToolCallingSessionStepWithResultRequest {
     string result_json = 3;
     optional string error = 4;
 }
+
+
+// ---------------------------------------------------------------------------
+// Progress emitted by a tool while it runs.
+//
+// A tool provider that does real work — several searches, a generation pass
+// between them — has nothing to say until `execute` returns, and by then the
+// UI has shown a spinner for twenty seconds. ToolProgress is the channel it
+// reports through as it goes.
+//
+// Stages are provider-defined strings, not an enum. Commons must not know
+// that the web research provider has four steps, because the next provider
+// will have three or nine and adding it must not touch this file. That is the
+// difference between a plugin and a feature with a plugin-shaped wrapper.
+// ---------------------------------------------------------------------------
+enum ToolProgressStatus {
+    TOOL_PROGRESS_STATUS_UNSPECIFIED = 0;
+    TOOL_PROGRESS_STATUS_STARTED     = 1;
+    TOOL_PROGRESS_STATUS_COMPLETED   = 2;
+    TOOL_PROGRESS_STATUS_FAILED      = 3;
+}
+
+message ToolProgress {
+    // Tool that emitted this, matching ToolDefinition.name, so a UI can
+    // attribute a stage when more than one tool is in flight.
+    string tool_name = 1;
+
+    // Provider-defined stage identifier, e.g. "generating_questions". Stable
+    // across runs so a UI can key off it; never parsed by commons.
+    string stage_id = 2;
+
+    // Human-readable stage name, e.g. "Generating questions". The provider
+    // writes this because the provider is what knows the wording.
+    string label = 3;
+
+    ToolProgressStatus status = 4;
+
+    // Optional free text: the questions actually generated, the URL being
+    // fetched, the reason a stage failed.
+    optional string detail = 5;
+
+    // Monotonic within one execute call, starting at 0. A UI orders by this
+    // rather than by arrival, since the sink may hop threads.
+    uint64 sequence = 6;
+
+    // The run loop handle this tool is executing under, as published to the
+    // host by rac_tool_calling_handle_published_callback_fn. Zero when the
+    // tool ran outside a run loop. Lets a host with two concurrent loops
+    // route each event to the right transcript.
+    uint64 run_loop_handle = 7;
+
+    // Wall-clock emit time, ms since epoch. Diagnostic only — ordering is
+    // `sequence`, never this.
+    int64 emitted_at_ms = 8;
+
+    // Distinct per execute() call, and stable for every event that call emits.
+    //
+    // `sequence` restarts at 0 for each execution, so with
+    // ToolCallingOptions.parallel_tool_calls two providers running under one
+    // run_loop_handle emit colliding (handle, sequence) pairs. A consumer
+    // keying rows off that pair loses events; pair this with `sequence`
+    // instead.
+    uint64 execution_id = 9;
+}

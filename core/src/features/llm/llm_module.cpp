@@ -1532,10 +1532,25 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
     if (out_close_tag) {
         out_close_tag->clear();
     }
+    // MLX renders the chat template in-process, and the Qwen family's opens
+    // `<think>\n` in the prompt itself once enable_thinking is set. The
+    // generated text therefore arrives already inside the reasoning span and
+    // carries only the closing tag, so a splitter looking for a matched pair
+    // finds none and hands the whole chain-of-thought back as the answer.
+    //
+    // Held in a local because the registry fallback at the bottom of this
+    // function assigns its own answer unconditionally: setting the flag here
+    // and letting that run overwrote this with the registry's `false`, which
+    // is how a reasoning turn kept arriving as one 7,800-character reply.
+    const bool mlx_template_prefills =
+        ref.framework == RAC_FRAMEWORK_MLX && request.has_options() &&
+        request.options().has_reasoning() &&
+        request.options().reasoning().mode() == runanywhere::v1::REASONING_MODE_ON;
+
     if (out_template_prefills_open_tag) {
-        // Default to the loaded model's stamped prefill signal; a per-call
-        // ReasoningOptions.pattern may override below when the optional is set.
-        *out_template_prefills_open_tag = ref.template_prefills_open_tag;
+        // The loaded model's stamped signal, or what the template is known to
+        // do; a per-call ReasoningOptions.pattern may override below.
+        *out_template_prefills_open_tag = ref.template_prefills_open_tag || mlx_template_prefills;
     }
     if (request.has_options() && request.options().has_reasoning() &&
         request.options().reasoning().has_pattern()) {
@@ -1560,6 +1575,7 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
         // prefill override above). Prefer the registry stamp when the lifecycle
         // ref has not already carried it (e.g. stale load before enrichment).
         if (out_template_prefills_open_tag && !ref.template_prefills_open_tag &&
+            !mlx_template_prefills &&
             !(request.has_options() && request.options().has_reasoning() &&
               request.options().reasoning().has_pattern() &&
               request.options().reasoning().pattern().has_template_prefills_open_tag())) {
@@ -1599,10 +1615,10 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
         options.max_tokens = opts.max_output_tokens();
     }
 
-    // temperature: when the canonical LLMGenerationOptions is set, pass its value through
-    // unconditionally so the documented greedy-decoding sentinel (0.0) reaches the engine
-    // (idl/llm_options.proto:49).
-    if (has_options) {
+    // temperature, top_k and min_p are `optional` in idl/llm_options.proto: presence, not
+    // value, means "set". An explicit 0 (greedy / top-k disabled) reaches the engine; an
+    // absent field keeps the RAC_LLM_OPTIONS_DEFAULT value.
+    if (has_options && opts.has_temperature()) {
         options.temperature = std::clamp(opts.temperature(), 0.0f, 2.0f);
     }
 
@@ -1621,14 +1637,18 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     // struct default. repeat_penalty uses 1.0 = "no penalty"; proto3 zero
     // means unset, so only override when positive (mirrors Swift's
     // RALLMTypes+CppBridge defaults, which carry repeatPenalty=1.0).
-    options.top_k = has_options ? opts.top_k() : 0;
+    if (has_options && opts.has_top_k()) {
+        options.top_k = opts.top_k();
+    }
     const float repeat_penalty = has_options ? opts.repeat_penalty() : 0.0f;
     if (repeat_penalty > 0.0f) {
         options.repetition_penalty = repeat_penalty;
     }
     options.frequency_penalty = has_options ? opts.frequency_penalty() : 0.0f;
     options.presence_penalty = has_options ? opts.presence_penalty() : 0.0f;
-    options.min_p = has_options ? opts.min_p() : 0.0f;
+    if (has_options && opts.has_min_p()) {
+        options.min_p = opts.min_p();
+    }
     options.seed = has_options ? opts.seed() : 0;
     // n_threads was deleted from LLMGenerationOptions (idl/llm_options.proto):
     // thread count is now a load-time-only decision the engine makes when it
@@ -1889,6 +1909,12 @@ struct ProtoStreamContext {
     std::string producer_finish_reason;
     bool producer_final_seen = false;
 
+    // Set when the splitter was told the opening tag was already in the prompt.
+    // The terminal result is recomputed from raw text, which cannot see a tag
+    // the template emitted rather than the model, so the recomputation needs to
+    // be told as well.
+    bool started_inside_reasoning = false;
+
     // The incremental reasoning/content splitter. Owns the partial-delimiter
     // tail, so a `</think>` straddling two engine deltas is still recognised.
     rac::llm::ThinkingStreamSplitter splitter;
@@ -2125,8 +2151,17 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     size_t split_answer_len = 0;
     const char* split_reasoning = nullptr;
     size_t split_reasoning_len = 0;
+    // A prefilled opening tag never appears in the generated text, so the
+    // pair-based extractor finds no region and hands the whole chain of thought
+    // back as the answer — undoing the split the stream already got right.
+    // Restoring the tag the template emitted lets it see the region that
+    // actually existed.
+    const std::string raw_for_split =
+        ctx->started_inside_reasoning && !ctx->thinking_open_tag.empty()
+            ? ctx->thinking_open_tag + ctx->raw_text
+            : ctx->raw_text;
     (void)rac_llm_extract_thinking_with_tags(
-        ctx->raw_text.c_str(),
+        raw_for_split.c_str(),
         ctx->thinking_open_tag.empty() ? nullptr : ctx->thinking_open_tag.c_str(),
         ctx->thinking_close_tag.empty() ? nullptr : ctx->thinking_close_tag.c_str(), &split_answer,
         &split_answer_len, &split_reasoning, &split_reasoning_len);
@@ -2624,6 +2659,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         if (options.disable_thinking == RAC_FALSE) {
             if (template_prefills_open_tag) {
                 ctx.splitter.start_inside_reasoning();
+                ctx.started_inside_reasoning = true;
             } else {
                 ctx.splitter.set_hold_ambiguous_prefix(true);
             }

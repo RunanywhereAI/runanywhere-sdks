@@ -133,27 +133,46 @@ public extension RunAnywhere {
             )
 
             let registered = await ToolRegistry.shared.getAll()
-            let activeTools = effective.tools.isEmpty ? registered : effective.tools
+            // Whether the tools were asked for or merely lying around. A caller
+            // who named tools meant them, and a failure there is theirs to see.
+            // A caller who named none is being handed the registry's, and must
+            // not be broken by a tool they never mentioned.
+            let ambient = effective.tools.isEmpty
+            let activeTools = ambient ? registered : effective.tools
             if !activeTools.isEmpty, !LLM.isToolChoiceNone(effective.toolChoice) {
                 // idl/tool_calling.proto deleted RAToolCallingResult's
                 // conversation-id-bearing predecessor outright; the result
                 // carries no correlation id at all now, so mint one locally
                 // purely for GenerationResult's requestId field.
                 let requestId = UUID().uuidString
-                let loop = try await RunAnywhere.generateWithTools(
-                    prompt: prompt,
-                    options: effective.toProto(),
-                    toolOptions: effective.toolCallingProto(),
-                    history: history.map(\.content)
-                )
-                if loop.hasErrorMessage {
-                    throw SDKException(
-                        code: RAErrorCode(rawValue: Int(loop.errorCode)) ?? .unspecified,
-                        message: loop.errorMessage,
-                        category: .component
+                do {
+                    let loop = try await RunAnywhere.generateWithTools(
+                        prompt: prompt,
+                        options: effective.toProto(),
+                        toolOptions: effective.toolCallingProto(),
+                        history: history.map(\.content)
+                    )
+                    if loop.hasErrorMessage {
+                        throw SDKException(
+                            code: RAErrorCode(rawValue: Int(loop.errorCode)) ?? .unspecified,
+                            message: loop.errorMessage,
+                            category: .component
+                        )
+                    }
+                    return GenerationResult(proto: loop, requestId: requestId, model: model)
+                } catch {
+                    // A tool the caller never asked for must not be able to
+                    // fail their generation. Registering one tool anywhere in
+                    // an app otherwise turned every plain `generate` into a run
+                    // through the tool loop, and a model that could not drive
+                    // that loop answered nothing at all. Asked-for tools still
+                    // throw: that failure is about the request.
+                    guard ambient else { throw error }
+                    SDKLogger(category: "LLM").warning(
+                        "tool loop failed for a request that asked for no tools; "
+                            + "answering without them: \(error)"
                     )
                 }
-                return GenerationResult(proto: loop, requestId: requestId, model: model)
             }
 
             var request = RALLMGenerateRequest()

@@ -1,0 +1,843 @@
+/**
+ * @file web_research_provider.cpp
+ * @brief The `web_research` tool: plan questions, search them, compose an answer.
+ *
+ * Runs its own small loop over the LLM commons already owns. That is safe
+ * because the tool-calling run loop releases its lifecycle ref before
+ * executing a tool, so a generation started here is sequential rather than
+ * nested. It is NOT interruptible by the loop's cancel, though: while a tool
+ * runs, the loop has no active generation to cancel. Hence the small
+ * per-stage token budgets and the cancel poll between every stage.
+ */
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
+
+#include "features/llm/llm_thinking_directive_internal.h"
+#include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "plugin/web_research_internal.h"
+#include "plugin/web_search_client.h"
+#include "rac/core/rac_logger.h"
+#include "rac/features/llm/rac_llm_types.h"
+#include "rac/plugin/rac_tool_provider.h"
+#include "rac/plugin/rac_web_research.h"
+
+namespace {
+
+using nlohmann::json;
+using rac::tools::web::SearchResult;
+
+constexpr const char* kTag = "WebResearch";
+constexpr const char* kToolName = "web_research";
+
+constexpr size_t kResultsPerSearch = 6;
+constexpr size_t kSnippetBudget = 400;
+// How many of the ranked results get read in full. Each is an HTTP round trip
+// and this runs on phones, so the cap is deliberately small: the top few carry
+// most of the answer, and a cancel is only noticed between stages.
+constexpr size_t kPagesToRead = 4;
+constexpr size_t kPageFetchBytes = 400 * 1024;
+constexpr size_t kPageTextBudget = 2000;
+// Floor for "this page yielded content". A consent wall or a JS shell strips
+// to a few dozen characters; a short wire item is a few hundred and is worth
+// reading. This was 200, which silently discarded real articles — a dropped
+// source is invisible in the answer and reads as the model inventing.
+constexpr size_t kMinReadableChars = 120;
+// A query is a few words; this only has to cover them plus any preamble.
+constexpr int32_t kQueryTokens = 64;
+constexpr int32_t kPageTimeoutMs = 10000;
+constexpr int32_t kSearchTimeoutMs = 15000;
+
+// A cancel arriving mid-tool is only observed at the next stage boundary, so
+// this budget is also the worst case for how long a cancel waits. 640 kept that
+// wait short but cut composed answers mid-sentence, which reads as the model
+// failing rather than as a budget; the longer wait is the better trade.
+constexpr int32_t kComposeTokens = 1536;
+
+// Directive rather than descriptive: under AUTO tool choice this text is the
+// only thing deciding whether the model calls the tool at all.
+constexpr const char* kDescription =
+    "Searches the live web and answers from what it finds, with sources. Use it for anything "
+    "current or time-sensitive: news, today's events, prices, scores, schedules, releases, or "
+    "any question about what is happening now or recently. It is the only way to reach "
+    "information newer than your training data, so reach for it rather than saying you cannot "
+    "know.";
+
+// One property, and deliberately NOT marked required. Three advertised parameters made a small
+// model emit malformed JSON often enough to lose the call outright
+// (`{"clarification": "",question":...,max_questions:6}`), and MLX has no
+// grammar constraint to catch it, so bad JSON is simply a dropped tool call.
+// Anything else a model passes is ignored rather than rejected.
+//
+// `required` is omitted because commons validates it before the tool ever
+// runs, and a small model that omits the argument then gets its call REJECTED
+// and the whole turn thrown away with "Missing required argument: question" —
+// the user sees "tools unavailable" and an answer from memory. Handled here
+// instead, a missing argument is a tool result the model can read and correct
+// on the next iteration, which is what a recoverable tool error is for.
+constexpr const char* kParameters = R"({
+  "type": "object",
+  "properties": {
+    "question": {
+      "type": "string",
+      "description": "The question to research, in full. Not keywords."
+    }
+  }
+})";
+const char* const kPublishedKeys[] = {"summary", "source_url", nullptr};
+
+// --- small helpers ---------------------------------------------------------
+
+std::string trim(const std::string& in) {
+    const auto begin = in.find_first_not_of(" \t\r\n");
+    if (begin == std::string::npos) {
+        return {};
+    }
+    const auto end = in.find_last_not_of(" \t\r\n");
+    return in.substr(begin, end - begin + 1);
+}
+
+std::string truncate(const std::string& in, size_t limit) {
+    if (in.size() <= limit) {
+        return in;
+    }
+    // Cut on a space so the model is not handed a severed word.
+    size_t cut = in.rfind(' ', limit);
+    if (cut == std::string::npos || cut + 40 < limit) {
+        cut = limit;
+    }
+    return in.substr(0, cut) + "...";
+}
+
+/**
+ * Read a string field without trusting its type.
+ *
+ * These arguments are written by a model, so a number or an object where a
+ * string belongs is ordinary rather than exceptional, and nlohmann's value()
+ * throws on a type mismatch.
+ */
+std::string string_field(const json& args, const char* key) {
+    const auto it = args.find(key);
+    if (it == args.end() || !it->is_string()) {
+        return {};
+    }
+    return it->get<std::string>();
+}
+
+char* dup_c(const std::string& text) {
+    auto* out = static_cast<char*>(std::malloc(text.size() + 1));
+    if (out != nullptr) {
+        std::memcpy(out, text.c_str(), text.size() + 1);
+    }
+    return out;
+}
+
+// --- one generation --------------------------------------------------------
+
+/**
+ * Run a single completion on the currently-loaded LLM.
+ *
+ * Mirrors run_generate_once without the tool-loop plumbing: acquire, generate,
+ * release. Thinking is suppressed and temperature pinned low because every
+ * call here wants a short, literal answer rather than prose.
+ */
+bool generate(const std::string& system_prompt, const std::string& prompt, int32_t max_tokens,
+              std::string* out_text, const char* const* history = nullptr, int32_t n_history = 0) {
+    rac::llm::LifecycleLlmRef ref;
+    if (rac::llm::acquire_lifecycle_llm(&ref) != RAC_SUCCESS) {
+        return false;
+    }
+    if (ref.ops == nullptr || ref.ops->generate == nullptr) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return false;
+    }
+
+    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+    options.max_tokens = max_tokens;
+    options.temperature = 0.0F;
+    options.top_p = 1.0F;
+    options.streaming_enabled = RAC_FALSE;
+    options.disable_thinking = RAC_TRUE;
+    options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
+    // NULL history is a single-turn generation. Passing none is what keeps a
+    // summarising call from seeing the conversation, which is the difference
+    // between writing up the sources and answering from what was said earlier.
+    options.history = n_history > 0 ? history : nullptr;
+    options.n_history = n_history > 0 ? n_history : 0;
+
+    rac::llm::clear_lifecycle_llm_cancel(&ref);
+
+    // Setting options.disable_thinking is not enough on its own: commons
+    // suppresses reasoning at the *prompt* level, and without the directive a
+    // thinking model spends the entire token budget inside an unterminated
+    // <think> block and returns nothing usable. run_generate_once does exactly
+    // this before calling generate; so must anything else that drives the LLM.
+    const std::string effective_prompt = rac::llm::apply_no_think_directive(
+        prompt, options.disable_thinking, ref.framework, ref.supports_thinking);
+
+    rac_llm_result_t raw{};
+    const rac_result_t rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
+    const bool ok = rc == RAC_SUCCESS && raw.text != nullptr;
+    if (ok) {
+        *out_text = trim(raw.text);
+    }
+    rac_llm_result_free(&raw);
+    rac::llm::release_lifecycle_llm(&ref);
+    return ok;
+}
+
+// --- stages ----------------------------------------------------------------
+
+/**
+ * Turn the request into a search query, using the conversation for context.
+ *
+ * History matters here and only here: "what does that news say?" is not a
+ * searchable string without the turn before it. Compose deliberately gets none
+ * — the conversation is context for working out what to look up, and
+ * contamination when writing up what was found.
+ *
+ * Guarded, because this step is where a small model once put a fabricated
+ * iPhone into the search string: asked for a query it answered the question
+ * instead, and the answer became what we searched for. Anything that reads as
+ * an answer rather than a query is discarded for the user's own words, which
+ * are always usable and cannot be invented.
+ */
+std::string plan_query(const std::string& question, const char* const* history, int32_t n_history) {
+    std::string reply;
+    const bool ok = generate(
+        "You write web search queries. Given the conversation and the latest request, "
+        "reply with the search query alone: a few words, not a sentence, not an answer, "
+        "no explanation. Use the conversation to resolve what the user is referring to.",
+        "Request: " + question + "\n\nSearch query:", kQueryTokens, &reply, history, n_history);
+    if (!ok) {
+        return question;
+    }
+
+    reply = rac::tools::web::strip_reasoning_block(reply);
+    size_t start = 0;
+    while (start <= reply.size()) {
+        const size_t nl = reply.find('\n', start);
+        const std::string line = rac::tools::web::normalize_query_line(
+            reply.substr(start, nl == std::string::npos ? std::string::npos : nl - start));
+        if (rac::tools::web::looks_like_query_not_answer(line)) {
+            return line;
+        }
+        if (nl == std::string::npos) {
+            break;
+        }
+        start = nl + 1;
+    }
+    return question;
+}
+std::string compose(const std::string& question, const std::vector<SearchResult>& sources) {
+    const std::string evidence = rac::tools::web::build_evidence(sources);
+    // The one number that separates "the model was not given the material"
+    // from "the model was given it and answered from memory anyway". Without
+    // it, a fabricated answer and an empty evidence block look identical.
+    size_t read_sources = 0;
+    for (const auto& source : sources) {
+        read_sources += source.body.empty() ? 0 : 1;
+    }
+    RAC_LOG_INFO(kTag, "composing from %zu source(s), %zu read, %zu chars of evidence",
+                 sources.size(), read_sources, evidence.size());
+
+    std::string answer;
+    const bool ok = generate(
+        "You answer only from the sources below. Every fact in your answer must appear in "
+        "them, and you cite the source you took it from as [1], [2] and so on. You do not add "
+        "anything you know from elsewhere, you do not guess, and you do not fill a gap with "
+        "something plausible. If the sources do not answer the question, say exactly what "
+        "they do and do not cover.",
+        "Question: " + question + "\n\nSources:\n" + evidence + "\nAnswer, citing sources:",
+        kComposeTokens, &answer);
+    if (!ok) {
+        return {};
+    }
+
+    // An answer with no citation, or one pointing at a source that was never
+    // supplied, was not built from the evidence. That is the compose step's
+    // one detectable failure and it is worth saying out loud rather than
+    // returning prose that reads exactly like a researched answer.
+    size_t cited = 0;
+    if (!rac::tools::web::citations_resolve(answer, sources.size(), &cited)) {
+        RAC_LOG_WARNING(kTag,
+                        "composed answer is not grounded: %zu valid citation(s) across %zu "
+                        "source(s)",
+                        cited, sources.size());
+    }
+
+    // Citations resolving only proves the answer points at a real source, not
+    // that it says what the source says. A real run cited a page for a HomePod
+    // "Ghost Touch" interface the page never mentions. Removing the sentence is
+    // better than flagging it: a labelled fabrication is still a fabrication
+    // sitting in front of the reader.
+    size_t dropped = 0;
+    const std::string checked = rac::tools::web::drop_unsupported_claims(answer, sources, &dropped);
+    if (dropped > 0) {
+        RAC_LOG_WARNING(kTag, "dropped %zu claim(s) absent from the source they cited", dropped);
+    }
+    // Everything unsupported means there is no answer here, only invention.
+    // Returning nothing lets the caller fall back to the sources themselves.
+    return checked;
+}
+
+// --- the provider ----------------------------------------------------------
+
+json error_payload(const std::string& message) {
+    json payload;
+    payload["error"] = message;
+    return payload;
+}
+
+// Carries a `recall` so the model can correct itself rather than reporting the
+// error to the reader, which is what it does when handed prose alone.
+json missing_question_payload() {
+    json payload = error_payload("No question was supplied.");
+    payload["recall"] = {{"tool", kToolName},
+                         {"arguments", {{"question", ""}}},
+                         {"why", "call again with the user's question in \"question\""}};
+    return payload;
+}
+
+rac_result_t web_research_execute(const char* args_json, const rac_tool_context_t* ctx,
+                                  char** out_result_json, void* user_data) {
+    (void)user_data;
+
+    json args;
+    try {
+        args = json::parse(args_json != nullptr ? args_json : "{}");
+    } catch (const json::exception&) {
+        *out_result_json = dup_c(error_payload("could not parse tool arguments").dump());
+        return RAC_SUCCESS;
+    }
+
+    if (!args.is_object()) {
+        *out_result_json = dup_c(error_payload("tool arguments must be an object").dump());
+        return RAC_SUCCESS;
+    }
+
+    // The model is meant to pass the question, and small ones routinely call
+    // with no arguments at all. The question is already known here, so fall
+    // back to it rather than asking the model to try again — telling it to
+    // retry does not work, it reports the error as its answer instead.
+    std::string question = trim(string_field(args, "question"));
+    if (question.empty() && ctx->user_prompt != nullptr) {
+        question = trim(ctx->user_prompt);
+    }
+    if (question.empty()) {
+        *out_result_json = dup_c(missing_question_payload().dump());
+        return RAC_SUCCESS;
+    }
+
+    json payload;
+    payload["question"] = question;
+
+    // Stage 1 — turn the request into a search query.
+    if (!ctx->emit(ctx, "understanding", "Understanding the question", RAC_TOOL_PROGRESS_STARTED,
+                   nullptr)) {
+        return RAC_ERROR_CANCELLED;
+    }
+    const std::string query = plan_query(question, ctx->history, ctx->n_history);
+    payload["query"] = query;
+    if (!ctx->emit(ctx, "understanding", "Understanding the question", RAC_TOOL_PROGRESS_COMPLETED,
+                   query.c_str())) {
+        return RAC_ERROR_CANCELLED;
+    }
+
+    // Stage 2 — search it.
+    const std::string search_label = "Searching: " + query;
+    if (!ctx->emit(ctx, "gathering", search_label.c_str(), RAC_TOOL_PROGRESS_STARTED, nullptr)) {
+        return RAC_ERROR_CANCELLED;
+    }
+    const auto outcome = rac::tools::web::search(query, kResultsPerSearch, kSearchTimeoutMs);
+    if (!outcome.ok || outcome.results.empty()) {
+        const std::string message = outcome.ok ? "no search results found" : outcome.error;
+        ctx->emit(ctx, "gathering", search_label.c_str(), RAC_TOOL_PROGRESS_FAILED,
+                  message.c_str());
+        payload["error"] = message;
+        payload["summary"] = "The web search returned nothing for this question.";
+        payload["source_url"] = rac::tools::web::results_page_url(query);
+        *out_result_json = dup_c(payload.dump());
+        return RAC_SUCCESS;
+    }
+    std::vector<SearchResult> sources = outcome.results;
+    const std::string found = std::to_string(sources.size()) + " result(s)";
+    if (!ctx->emit(ctx, "gathering", search_label.c_str(), RAC_TOOL_PROGRESS_COMPLETED,
+                   found.c_str())) {
+        return RAC_ERROR_CANCELLED;
+    }
+
+    // Stage 3 — read the pages behind the results.
+    if (!ctx->emit(ctx, "reading", "Reading the sources", RAC_TOOL_PROGRESS_STARTED, nullptr)) {
+        return RAC_ERROR_CANCELLED;
+    }
+    size_t read_count = 0;
+    for (size_t i = 0; i < sources.size() && read_count < kPagesToRead; ++i) {
+        if (ctx->is_cancelled(ctx) != RAC_FALSE) {
+            return RAC_ERROR_CANCELLED;
+        }
+        const std::string label = "Reading: " + sources[i].title;
+        const std::string body =
+            rac::tools::web::fetch_page_text(sources[i].url, kPageFetchBytes, kPageTimeoutMs);
+        // A page that will not load, or yields almost nothing, is skipped
+        // rather than fatal: its snippet still stands and the others carry the
+        // answer. A very short body is nearly always a consent wall or a JS
+        // shell rather than an article.
+        if (body.size() < kMinReadableChars) {
+            ctx->emit(ctx, "reading", label.c_str(), RAC_TOOL_PROGRESS_FAILED,
+                      "could not read this page");
+            continue;
+        }
+        sources[i].body = body;
+        ++read_count;
+        const std::string detail = std::to_string(body.size()) + " characters";
+        if (!ctx->emit(ctx, "reading", label.c_str(), RAC_TOOL_PROGRESS_COMPLETED,
+                       detail.c_str())) {
+            return RAC_ERROR_CANCELLED;
+        }
+    }
+    if (read_count == 0) {
+        ctx->emit(ctx, "reading", "Reading the sources", RAC_TOOL_PROGRESS_FAILED,
+                  "no page could be read; answering from search snippets");
+    }
+
+    json source_list = json::array();
+    for (const auto& source : sources) {
+        source_list.push_back({{"title", source.title},
+                               {"url", source.url},
+                               {"snippet", truncate(source.snippet, kSnippetBudget)},
+                               {"read", !source.body.empty()}});
+    }
+    payload["sources"] = source_list;
+    payload["source_url"] = sources.front().url;
+
+    // Stage 4 — answer from what was read.
+    if (!ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_STARTED, nullptr)) {
+        return RAC_ERROR_CANCELLED;
+    }
+    const std::string summary = compose(question, sources);
+    if (summary.empty()) {
+        // Falling back to the strongest snippet keeps the turn useful when the
+        // compose pass fails; the model still sees every source below it.
+        payload["summary"] = truncate(sources.front().snippet, kSnippetBudget);
+        ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_FAILED,
+                  "could not summarize; returning sources");
+    } else {
+        payload["summary"] = summary;
+        // Published so the turn that speaks to the user knows whether this
+        // summary actually rests on the sources beneath it.
+        size_t cited = 0;
+        const bool grounded = rac::tools::web::citations_resolve(summary, sources.size(), &cited);
+        payload["grounded"] = grounded;
+        payload["citations"] = cited;
+        if (grounded) {
+            ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_COMPLETED,
+                      nullptr);
+        } else {
+            ctx->emit(ctx, "composing", "Composing the answer", RAC_TOOL_PROGRESS_FAILED,
+                      "the answer does not cite the sources it was given");
+        }
+    }
+
+    RAC_LOG_INFO(kTag, "researched '%s' as '%s': %zu source(s), %zu read", question.c_str(),
+                 query.c_str(), sources.size(), read_count);
+    *out_result_json = dup_c(payload.dump());
+    return RAC_SUCCESS;
+}
+
+const rac_tool_provider_t kProvider = {
+    /* abi_version */ RAC_TOOL_PROVIDER_ABI_VERSION,
+    /* name */ kToolName,
+    /* description */ kDescription,
+    /* category */ "Web",
+    /* parameters_json */ kParameters,
+    /* execute */ web_research_execute,
+    /* published_keys */ kPublishedKeys,
+    /* single_use */ 1,
+    /* grounds_answer */ 1,
+    /* user_data */ nullptr,
+    /* reserved */ {0, 0, 0, 0, 0, 0},
+};
+
+}  // namespace
+
+namespace rac::tools::web {
+
+namespace {
+
+// Case-insensitive substring search. A source writes "HomePod" where an answer
+// may write "homepod", and a case difference is not a fabrication.
+bool contains_ignoring_case(const std::string& haystack, const std::string& needle) {
+    if (needle.empty() || needle.size() > haystack.size()) {
+        return false;
+    }
+    const auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(),
+                                [](char a, char b) {
+                                    return std::tolower(static_cast<unsigned char>(a)) ==
+                                           std::tolower(static_cast<unsigned char>(b));
+                                });
+    return it != haystack.end();
+}
+
+}  // namespace
+
+std::vector<std::string> quoted_spans(const std::string& sentence) {
+    std::vector<std::string> spans;
+    for (size_t at = 0; at < sentence.size(); ++at) {
+        const char c = sentence[at];
+        // Double quotes only. An apostrophe opens no span: in "Apple's outlook
+        // improved and the company's revenue rose" the first one would pair
+        // with the second and offer "s outlook improved and the company" as a
+        // distinctive term to check a source for.
+        if (c != '"') {
+            continue;
+        }
+        const size_t close = sentence.find(c, at + 1);
+        if (close == std::string::npos || close - at < 3) {
+            continue;
+        }
+        spans.push_back(sentence.substr(at + 1, close - at - 1));
+        at = close;
+    }
+    return spans;
+}
+
+std::vector<std::string> distinctive_terms(const std::string& sentence) {
+    std::vector<std::string> terms = quoted_spans(sentence);
+
+    // Numbers, keeping digits and separators so "94.9" and "164.39" survive.
+    std::string number;
+    for (const char c : sentence) {
+        if ((std::isdigit(static_cast<unsigned char>(c)) != 0) || (!number.empty() && c == '.')) {
+            number.push_back(c);
+            continue;
+        }
+        if (number.size() >= 2) {
+            while (!number.empty() && number.back() == '.') {
+                number.pop_back();
+            }
+            terms.push_back(number);
+        }
+        number.clear();
+    }
+    if (number.size() >= 2) {
+        terms.push_back(number);
+    }
+
+    // Capitalised words that are not the first of the sentence. A crude proper
+    // noun test, and crude is fine: a false negative just means one fewer
+    // thing checked, never a dropped sentence.
+    bool first_word = true;
+    std::string word;
+    for (size_t at = 0; at <= sentence.size(); ++at) {
+        const char c = at < sentence.size() ? sentence[at] : ' ';
+        if ((std::isalnum(static_cast<unsigned char>(c)) != 0) || c == '-') {
+            word.push_back(c);
+            continue;
+        }
+        if (!word.empty()) {
+            const bool capitalised = std::isupper(static_cast<unsigned char>(word[0])) != 0;
+            if (capitalised && !first_word && word.size() > 2) {
+                terms.push_back(word);
+            }
+            first_word = false;
+            word.clear();
+        }
+    }
+    return terms;
+}
+
+bool claim_supported(const std::string& sentence, const std::string& source_text) {
+    // Quoted phrases are judged strictly and all together. A fabrication wraps
+    // an invented detail around real entities — "the HomePod now uses a
+    // 'Ghost Touch' interface" names a real product, so requiring merely one
+    // matching term passes it. What gives it away is the quoted phrase the
+    // source never contains, and a model quoting something it did not read is
+    // the clearest fabrication signal available.
+    for (const auto& quoted : quoted_spans(sentence)) {
+        if (!contains_ignoring_case(source_text, quoted)) {
+            return false;
+        }
+    }
+
+    const auto terms = distinctive_terms(sentence);
+    if (terms.empty()) {
+        // Nothing specific enough to check. Paraphrase is legitimate.
+        return true;
+    }
+    for (const auto& term : terms) {
+        if (contains_ignoring_case(source_text, term)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// The next sentence-ending punctuation at or after @p from, skipping a full
+/// stop between two digits. Splitting on that turned "revenue of 94.9 billion"
+/// into "revenue of 94." plus a fragment, and the fragment carried neither the
+/// figure nor the citation the grounding check needs.
+size_t sentence_end(const std::string& text, size_t from) {
+    for (size_t at = from; at < text.size(); ++at) {
+        const char c = text[at];
+        if (c != '.' && c != '!' && c != '?') {
+            continue;
+        }
+        const bool between_digits =
+            c == '.' && at > 0 && at + 1 < text.size() &&
+            std::isdigit(static_cast<unsigned char>(text[at - 1])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(text[at + 1])) != 0;
+        if (!between_digits) {
+            return at;
+        }
+    }
+    return std::string::npos;
+}
+
+std::string drop_unsupported_claims(const std::string& answer,
+                                    const std::vector<SearchResult>& sources, size_t* out_dropped) {
+    std::string kept;
+    size_t dropped = 0;
+    size_t start = 0;
+
+    while (start < answer.size()) {
+        size_t end = sentence_end(answer, start);
+        end = end == std::string::npos ? answer.size() : end + 1;
+        const std::string sentence = answer.substr(start, end - start);
+        start = end;
+
+        const std::string trimmed = trim(sentence);
+        if (trimmed.empty()) {
+            continue;
+        }
+
+        // Only a sentence that names its source can be checked against one.
+        size_t cited_index = 0;
+        for (size_t at = 0; at + 1 < trimmed.size(); ++at) {
+            if (trimmed[at] != '[') {
+                continue;
+            }
+            const size_t close = trimmed.find(']', at + 1);
+            if (close == std::string::npos || close - at > 4) {
+                continue;
+            }
+            size_t value = 0;
+            bool numeric = close > at + 1;
+            for (size_t d = at + 1; d < close; ++d) {
+                if (std::isdigit(static_cast<unsigned char>(trimmed[d])) == 0) {
+                    numeric = false;
+                    break;
+                }
+                value = value * 10 + static_cast<size_t>(trimmed[d] - '0');
+            }
+            if (numeric && value >= 1 && value <= sources.size()) {
+                cited_index = value;
+            }
+        }
+
+        if (cited_index == 0) {
+            kept += sentence;
+            continue;
+        }
+
+        const SearchResult& source = sources[cited_index - 1];
+        const std::string& text = source.body.empty() ? source.snippet : source.body;
+        if (claim_supported(trimmed, text + " " + source.title)) {
+            kept += sentence;
+        } else {
+            ++dropped;
+        }
+    }
+
+    if (out_dropped != nullptr) {
+        *out_dropped = dropped;
+    }
+    return trim(kept);
+}
+
+bool looks_like_query_not_answer(const std::string& line) {
+    if (!query_is_usable(line)) {
+        return false;
+    }
+    // An answer is a sentence and ends like one; a query does not.
+    if (line.back() == '.' || line.back() == '!') {
+        return false;
+    }
+    size_t words = 1;
+    for (const char c : line) {
+        if (c == ' ') {
+            ++words;
+        }
+    }
+    // Generous for a search query, and well short of the nineteen-word
+    // sentence that caused this.
+    return words <= 12;
+}
+
+bool citations_resolve(const std::string& answer, size_t source_count, size_t* out_cited) {
+    std::vector<bool> seen(source_count, false);
+    size_t valid = 0;
+    bool any_out_of_range = false;
+
+    for (size_t at = 0; at + 1 < answer.size(); ++at) {
+        if (answer[at] != '[') {
+            continue;
+        }
+        const size_t close = answer.find(']', at + 1);
+        if (close == std::string::npos || close == at + 1 || close - at > 5) {
+            continue;
+        }
+        size_t index = 0;
+        bool numeric = true;
+        for (size_t d = at + 1; d < close; ++d) {
+            if (std::isdigit(static_cast<unsigned char>(answer[d])) == 0) {
+                numeric = false;
+                break;
+            }
+            index = index * 10 + static_cast<size_t>(answer[d] - '0');
+        }
+        if (!numeric) {
+            continue;
+        }
+        // 1-based, matching how build_evidence numbers them.
+        if (index == 0 || index > source_count) {
+            any_out_of_range = true;
+            continue;
+        }
+        if (!seen[index - 1]) {
+            seen[index - 1] = true;
+            ++valid;
+        }
+    }
+
+    if (out_cited != nullptr) {
+        *out_cited = valid;
+    }
+    return !any_out_of_range && valid > 0;
+}
+
+std::string build_evidence(const std::vector<SearchResult>& sources) {
+    std::string evidence;
+    for (size_t i = 0; i < sources.size(); ++i) {
+        // The page text when the source was read, the search snippet when it
+        // was not. A snippet is a ranking signal; the page is the material.
+        const std::string& body = sources[i].body.empty() ? sources[i].snippet : sources[i].body;
+        const size_t budget = sources[i].body.empty() ? kSnippetBudget : kPageTextBudget;
+        evidence += "[" + std::to_string(i + 1) + "] " + sources[i].title + "\n" +
+                    truncate(body, budget) + "\n\n";
+    }
+    return evidence;
+}
+
+/**
+ * Drop a reasoning block the model emitted anyway.
+ *
+ * `disable_thinking` is set on every call here, and models still open a
+ * `<think>` block. Parsing the raw reply means every line of reasoning is a
+ * candidate query; an unterminated block means the reply is *all* reasoning
+ * and there is nothing to take from it.
+ */
+std::string strip_reasoning_block(const std::string& text) {
+    static const char* kOpen[] = {"<think>", "<thinking>", "<reasoning>"};
+    static const char* kClose[] = {"</think>", "</thinking>", "</reasoning>"};
+    std::string out = text;
+    for (size_t tag = 0; tag < 3; ++tag) {
+        size_t at = 0;
+        while ((at = out.find(kOpen[tag], at)) != std::string::npos) {
+            const size_t end = out.find(kClose[tag], at);
+            if (end == std::string::npos) {
+                out.erase(at);
+                break;
+            }
+            out.erase(at, end + std::strlen(kClose[tag]) - at);
+        }
+    }
+    return trim(out);
+}
+
+/** Strip "1.", "-", "*", "Q:" and surrounding quotes from a listed line. */
+std::string normalize_query_line(const std::string& line) {
+    std::string out = trim(line);
+    size_t at = 0;
+    while (at < out.size() && (std::isdigit(static_cast<unsigned char>(out[at])) != 0)) {
+        ++at;
+    }
+    if (at > 0 && at < out.size() && (out[at] == '.' || out[at] == ')')) {
+        out = trim(out.substr(at + 1));
+    } else if (!out.empty() && (out[0] == '-' || out[0] == '*')) {
+        out = trim(out.substr(1));
+    } else if (out.rfind("\xE2\x80\xA2", 0) == 0) {
+        // U+2022 as the three bytes it actually arrives as. Comparing a char
+        // against 0x2022 never matched, so a bulleted query kept its bullet.
+        out = trim(out.substr(3));
+    }
+    if (out.size() > 2 && (out.rfind("Q:", 0) == 0 || out.rfind("q:", 0) == 0)) {
+        out = trim(out.substr(2));
+    }
+    if (out.size() > 1 && out.front() == '"' && out.back() == '"') {
+        out = out.substr(1, out.size() - 2);
+    }
+    // Models bold their queries as often as not; the asterisks would otherwise
+    // travel into the search string.
+    if (out.size() > 4 && out.rfind("**", 0) == 0 && out.compare(out.size() - 2, 2, "**") == 0) {
+        out = trim(out.substr(2, out.size() - 4));
+    }
+    return out;
+}
+
+/**
+ * Whether a line the model produced is actually a search query.
+ *
+ * Asking for "one query per line and nothing else" does not stop a reasoning
+ * model prefacing the list with its own commentary, and every such line was
+ * being searched verbatim — real runs searched "Thinking Process:" and
+ * "**Analyze the Request:**", which is where the junk results came from.
+ */
+bool query_is_usable(const std::string& line) {
+    if (line.size() < 8) {
+        return false;
+    }
+    // A heading or a lead-in, not a question. Models write "Thinking Process:",
+    // "Task:", "Queries:" before the list they were asked for.
+    if (line.back() == ':') {
+        return false;
+    }
+    // Markdown emphasis and headings only ever appear in commentary here.
+    if (line.front() == '#' || line.front() == '*' || line.front() == '`') {
+        return false;
+    }
+    // A label on the first word ("Task:", "Note:", "Step 1:") marks a lead-in
+    // rather than a query, and unlike a heading it can still end in a full
+    // stop: "Task: Write 4 different search queries." reads as a sentence.
+    const size_t first_space = line.find(' ');
+    if (first_space != std::string::npos && first_space > 0 && line[first_space - 1] == ':') {
+        return false;
+    }
+    size_t words = 1;
+    for (const char c : line) {
+        if (c == ' ') {
+            ++words;
+        }
+    }
+    // Two words is the floor for something worth a request; past about twenty
+    // it is prose the model wrote about the task rather than a query.
+    return words >= 2 && words <= 20;
+}
+
+}  // namespace rac::tools::web
+
+extern "C" {
+
+rac_result_t rac_tool_web_research_register(void) {
+    return rac_tool_provider_register(&kProvider);
+}
+
+rac_result_t rac_tool_web_research_unregister(void) {
+    return rac_tool_provider_unregister(kToolName);
+}
+
+}  // extern "C"

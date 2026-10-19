@@ -23,6 +23,7 @@
  * a synchronous single-call ABI instead of an outer-driven event stream.
  */
 
+#include <set>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -38,9 +39,11 @@
 #include "features/llm/tool_calling_grammar.h"
 #include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
+#include "features/llm/tool_provider_dispatch.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/plugin/rac_tool_provider.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
@@ -162,8 +165,7 @@ bool apply_explicit_tool_choice(LoopContext* ctx, std::string* out_error) {
     // contradictory request up front rather than emit a "you must call a tool" prompt that
     // deterministically fails downstream (SPECIFIC with no tools is caught below by the
     // target-not-present check).
-    if (ctx->has_tool_choice &&
-        ctx->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED &&
+    if (ctx->has_tool_choice && ctx->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED &&
         ctx->tool_options.tools_size() == 0 && ctx->forced_tool_name.empty()) {
         if (out_error) {
             *out_error = "tool_choice=REQUIRED requires at least one tool";
@@ -279,13 +281,12 @@ std::string format_prompt_proto(const LoopContext& ctx,
     // Grammar backends (QHexRT) build the tool prompt in the bare-Pythonic `[name(args)]`
     // format the toolcall_opt grammar enforces; every other engine keeps its declared
     // format (byte-for-byte unchanged). RUN-80.
-    rac_result_t rc = ctx.grammar_backend
-                          ? rac_tool_call_format_prompt_grammar_proto(
-                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
-                                &out)
-                          : rac_tool_call_format_prompt_proto(
-                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
-                                &out);
+    rac_result_t rc =
+        ctx.grammar_backend
+            ? rac_tool_call_format_prompt_grammar_proto(
+                  req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out)
+            : rac_tool_call_format_prompt_proto(req_bytes.empty() ? nullptr : req_bytes.data(),
+                                                req_bytes.size(), &out);
     std::string formatted;
     if (rc == RAC_SUCCESS && out.data && out.size > 0) {
         runanywhere::v1::ToolPromptFormatResult result;
@@ -558,6 +559,41 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     for (const auto& tool : req_options.tools()) {
         *ctx.tool_options.add_tools() = tool;
     }
+
+    // Offer every tool registered in commons alongside the host's own. Without
+    // this a provider is dispatchable but invisible: the model is never told it
+    // exists, so it never calls it and picks whichever host tool looks closest.
+    // Doing it here rather than in each binding is the whole point of the
+    // provider registry — Kotlin and Web get the same tools with no tool code.
+    // A host tool of the same name wins, so an app can still override.
+    // Names the host claimed before commons offered anything. `provider_owns`
+    // answers "is a provider registered under this name", which is true for
+    // these too, so without this set the commons tool would run for a call the
+    // host was meant to own and the override above would decide nothing.
+    std::set<std::string> host_owned_tools;
+    for (const auto& tool : ctx.tool_options.tools()) {
+        host_owned_tools.insert(tool.name());
+    }
+
+    for (size_t i = 0; i < rac_tool_provider_count(); ++i) {
+        const rac_tool_provider_t* provider = rac_tool_provider_at(i);
+        if (provider == nullptr || provider->name == nullptr) {
+            continue;
+        }
+        const std::string name = provider->name;
+        if (host_owned_tools.count(name) > 0) {
+            continue;
+        }
+        auto* offered = ctx.tool_options.add_tools();
+        offered->set_name(name);
+        offered->set_description(provider->description != nullptr ? provider->description : "");
+        offered->set_parameters(provider->parameters_json != nullptr ? provider->parameters_json
+                                                                     : "{}");
+        if (provider->category != nullptr) {
+            offered->set_category(provider->category);
+        }
+    }
+
     std::string tool_choice_error;
     if (!apply_explicit_tool_choice(&ctx, &tool_choice_error)) {
         emit_failure(out_result, RAC_ERROR_INVALID_ARGUMENT, tool_choice_error);
@@ -583,8 +619,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
 
     runanywhere::v1::ToolCallingResult final_result;
     // Last producer/commons terminal reason. Never inferred from tool_calls.size().
-    runanywhere::v1::FinishReason last_finish_reason =
-        runanywhere::v1::FINISH_REASON_UNSPECIFIED;
+    runanywhere::v1::FinishReason last_finish_reason = runanywhere::v1::FINISH_REASON_UNSPECIFIED;
     std::string current_prompt = format_prompt_proto(ctx, /*tool_results=*/{});
     if (current_prompt.empty()) {
         current_prompt = ctx.user_prompt;
@@ -649,9 +684,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         // answers general-knowledge asks directly instead of always emitting a call.
         // Skipped when the caller forces a call (REQUIRED/SPECIFIC).
         const bool force_a_call =
-            ctx.has_tool_choice &&
-            (ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED ||
-             ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+            ctx.has_tool_choice && (ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED ||
+                                    ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
         if (rac::llm::tool_calling::tool_decision_hint_this_turn(tools_live_this_turn,
                                                                  force_a_call)) {
             rac::llm::tool_calling::append_tool_decision_hint(&step_generation.system_prompt);
@@ -807,10 +841,49 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                 return RAC_ERROR_INTERNAL;
             }
 
+            runanywhere::v1::ToolResult tool_result;
+            std::string executor_error;
+
+            // A tool registered in commons is answered here, so the host
+            // callback is only reached for tools the app itself registered.
+            //
+            // The admission guard is held only for the decision to start, not
+            // across the run. A provider may work for tens of seconds (several
+            // searches with a generation pass between them), and
+            // rac_tool_calling_run_loop_cancel_proto takes this same mutex to
+            // latch the flag, so holding it for the whole call would make a
+            // cancel wait for the tool it is trying to cancel. Once admitted,
+            // the provider polls cancellation itself through the context it is
+            // handed.
+            bool provider_admitted = false;
+            if (host_owned_tools.count(parsed_call.name()) == 0 &&
+                rac::llm::tool_calling::provider_owns(parsed_call.name())) {
+                std::lock_guard<std::recursive_mutex> admission_guard(
+                    cancel_state->side_effect_admission_mu);
+                if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
+                    return finish_cancelled();
+                }
+                provider_admitted = true;
+            }
+
+            bool handled_by_provider = false;
+            if (provider_admitted) {
+                handled_by_provider = rac::llm::tool_calling::execute_via_provider(
+                    parsed_call, handle,
+                    [cancel_state]() {
+                        return cancel_state->cancel_requested.load(std::memory_order_acquire);
+                    },
+                    ctx.generation.history, ctx.user_prompt, &tool_result);
+            }
+            if (provider_admitted &&
+                cancel_state->cancel_requested.load(std::memory_order_acquire)) {
+                return finish_cancelled();
+            }
+
             rac_proto_buffer_t exec_out;
             rac_proto_buffer_init(&exec_out);
             rac_result_t exec_rc = RAC_SUCCESS;
-            {
+            if (!handled_by_provider) {
                 std::lock_guard<std::recursive_mutex> admission_guard(
                     cancel_state->side_effect_admission_mu);
                 if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
@@ -820,9 +893,10 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                                      call_bytes.size(), &exec_out, on_execute_user_data);
             }
 
-            runanywhere::v1::ToolResult tool_result;
-            std::string executor_error;
-            if (exec_rc == RAC_SUCCESS && exec_out.status != RAC_SUCCESS) {
+            if (handled_by_provider) {
+                // Nothing to validate: the result was built here, not returned
+                // across the host boundary.
+            } else if (exec_rc == RAC_SUCCESS && exec_out.status != RAC_SUCCESS) {
                 exec_rc = exec_out.status;
                 executor_error = exec_out.error_message ? exec_out.error_message
                                                         : "tool executor returned an error buffer";
