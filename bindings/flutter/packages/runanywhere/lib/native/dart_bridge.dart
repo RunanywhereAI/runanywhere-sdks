@@ -586,4 +586,21 @@ class DartBridge {
     }
   }
 
+  /// Set the minimum log level in RACommons logger (`rac_logger_set_min_level`).
+  static void setCommonsMinLogLevel(int racLevel) {
+    try {
+      NativeFunctions.loggerSetMinLevel(racLevel);
+    } catch (_) {
+      // Native library not loaded or symbol unavailable
+    }
+  }
+
+  /// Get the minimum log level from RACommons logger (`rac_logger_get_min_level`).
+  static int getCommonsMinLogLevel() {
+    try {
+      return NativeFunctions.loggerGetMinLevel();
+    } catch (_) {
+      return RacLogLevel.info;
+    }
+  }
 }

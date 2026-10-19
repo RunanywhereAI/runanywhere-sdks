@@ -284,6 +284,8 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_is_initialized"
     "_rac_get_version"
     "_rac_configure_logging"
+    "_rac_logger_set_min_level"
+    "_rac_logger_get_min_level"
 
     # Platform adapter
     "_rac_set_platform_adapter"

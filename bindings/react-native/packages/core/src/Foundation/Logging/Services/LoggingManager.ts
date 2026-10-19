@@ -14,6 +14,10 @@ import {
   getConfigurationForEnvironment,
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
+import {
+  isNativeModuleAvailable,
+  requireNativeModule,
+} from '../../../native/NativeRunAnywhereCore';
 
 export interface LogEntry {
   level: LogLevel;
@@ -97,6 +101,7 @@ export class LoggingManager {
     } else if (!this.destinations.has(this.consoleDestination.identifier)) {
       this.addDestination(this.consoleDestination);
     }
+    this.syncCommonsLogLevel(this.config.minLogLevel);
   }
 
   public applyEnvironmentConfiguration(environment: SDKEnvironment): void {
@@ -114,6 +119,18 @@ export class LoggingManager {
 
   public setMinLogLevel(level: LogLevel): void {
     this.config.minLogLevel = level;
+    this.syncCommonsLogLevel(level);
+  }
+
+  private syncCommonsLogLevel(level: LogLevel): void {
+    if (isNativeModuleAvailable()) {
+      try {
+        const nativeModule = requireNativeModule();
+        void nativeModule.loggerSetMinLevel(level);
+      } catch {
+        // Native module not initialized or call failed
+      }
+    }
   }
 
   public addDestination(destination: LogDestination): void {

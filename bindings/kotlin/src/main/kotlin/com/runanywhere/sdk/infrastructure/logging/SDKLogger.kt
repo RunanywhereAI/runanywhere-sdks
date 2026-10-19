@@ -6,10 +6,39 @@ import ai.runanywhere.proto.v1.LogLevel
 import ai.runanywhere.proto.v1.LoggingConfiguration
 import com.runanywhere.sdk.foundation.bridge.extensions.wireString
 import com.runanywhere.sdk.kotlin.BuildConfig
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+
+/**
+ * Maps proto LogLevel to RACommons rac_log_level_t integer.
+ */
+fun LogLevel.toRacLogLevel(): Int =
+    when (this) {
+        LogLevel.LOG_LEVEL_TRACE -> 0
+        LogLevel.LOG_LEVEL_DEBUG -> 1
+        LogLevel.LOG_LEVEL_INFO -> 2
+        LogLevel.LOG_LEVEL_WARNING -> 3
+        LogLevel.LOG_LEVEL_ERROR -> 4
+        LogLevel.LOG_LEVEL_FATAL -> 5
+        else -> 2
+    }
+
+/**
+ * Maps RACommons rac_log_level_t integer to proto LogLevel.
+ */
+fun racLogLevelToProto(level: Int): LogLevel =
+    when (level) {
+        0 -> LogLevel.LOG_LEVEL_TRACE
+        1 -> LogLevel.LOG_LEVEL_DEBUG
+        2 -> LogLevel.LOG_LEVEL_INFO
+        3 -> LogLevel.LOG_LEVEL_WARNING
+        4 -> LogLevel.LOG_LEVEL_ERROR
+        5 -> LogLevel.LOG_LEVEL_FATAL
+        else -> LogLevel.LOG_LEVEL_INFO
+    }
 
 // LOG LEVEL / LOG ENTRY / LOGGING CONFIGURATION (proto-canonical)
 //
@@ -121,6 +150,7 @@ object Logging {
      */
     fun configure(config: LoggingConfiguration) {
         _configuration = config
+        syncCommonsLogLevel(config.min_log_level)
     }
 
     /**
@@ -142,6 +172,16 @@ object Logging {
      */
     fun setMinLogLevel(level: LogLevel) {
         _configuration = _configuration.copy(min_log_level = level)
+        syncCommonsLogLevel(level)
+    }
+
+    internal fun syncCommonsLogLevel(level: LogLevel = _configuration.min_log_level) {
+        if (RunAnywhereBridge.isNativeLibraryLoaded()) {
+            try {
+                RunAnywhereBridge.racLoggerSetMinLevel(level.toRacLogLevel())
+            } catch (_: UnsatisfiedLinkError) {
+            }
+        }
     }
 
     /**

@@ -1786,6 +1786,22 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     rac_log(static_cast<rac_log_level_t>(level), tagStr.c_str(), msgStr.c_str());
 }
 
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoggerSetMinLevel(
+    JNIEnv* env, jclass clazz, jint level) {
+    (void)env;
+    (void)clazz;
+    rac_logger_set_min_level(static_cast<rac_log_level_t>(level));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoggerGetMinLevel(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_logger_get_min_level());
+}
+
 // Delegates the metadata-redaction policy to the commons C ABI so Kotlin
 // SDKLogger and the C++ logger apply the same sensitive-substring list.
 JNIEXPORT jboolean JNICALL
