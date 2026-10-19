@@ -242,8 +242,17 @@ file(READ "${llamacpp_SOURCE_DIR}/include/llama.h" _rac_llama_public_header)
 file(READ "${llamacpp_SOURCE_DIR}/common/common.h" _rac_llama_common_header)
 set(RAC_LLAMACPP_HAS_CLEF_SPAN OFF)
 set(RAC_LLAMACPP_HAS_D1 OFF)
+set(RAC_LLAMACPP_CLEF_SPAN_EXT OFF)
 if(_rac_llama_public_header MATCHES "llama_batch_set_decision_order")
     set(RAC_LLAMACPP_HAS_CLEF_SPAN ON)
+elseif(EXISTS "${llamacpp_SOURCE_DIR}/src/llama-ext.h")
+    # From runanywhere-b10453.8 the span API lives on llama_batch_ext, declared
+    # in the staging header src/llama-ext.h.
+    file(READ "${llamacpp_SOURCE_DIR}/src/llama-ext.h" _rac_llama_ext_header)
+    if(_rac_llama_ext_header MATCHES "llama_batch_ext_set_decision_order")
+        set(RAC_LLAMACPP_HAS_CLEF_SPAN ON)
+        set(RAC_LLAMACPP_CLEF_SPAN_EXT ON)
+    endif()
 endif()
 if(_rac_llama_common_header MATCHES "common_get_decision_type")
     set(RAC_LLAMACPP_HAS_D1 ON)
@@ -414,6 +423,7 @@ rac_add_engine_plugin(llamacpp
     COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
                         $<$<BOOL:${RAC_LLAMACPP_HAS_DECISION}>:RAC_LLAMACPP_HAS_DECISION=1>
                         $<$<BOOL:${RAC_LLAMACPP_HAS_CLEF_SPAN}>:RAC_LLAMACPP_HAS_CLEF_SPAN=1>
+                        $<$<BOOL:${RAC_LLAMACPP_CLEF_SPAN_EXT}>:RAC_LLAMACPP_CLEF_SPAN_EXT=1>
                         $<$<BOOL:${RAC_LLAMACPP_HAS_D1}>:RAC_LLAMACPP_HAS_D1=1>
     AVAILABILITY        PUBLIC
     PACKAGE_OWNER       runanywhere
