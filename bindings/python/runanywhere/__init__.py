@@ -100,6 +100,7 @@ from .options import (
     Interruption,
     LlmOptions,
     LoadOptions,
+    ModelRefreshOptions,
     PoolingMode,
     RagConfig,
     RagQueryOptions,
@@ -158,7 +159,7 @@ from .results import (
     Word,
 )
 
-__version__ = "0.20.36"
+__version__ = "0.20.37"
 
 
 def initialize(
@@ -439,6 +440,7 @@ __all__ = [
     "Interruption",
     "LlmOptions",
     "LoadOptions",
+    "ModelRefreshOptions",
     "PoolingMode",
     "RagConfig",
     "RagQueryOptions",

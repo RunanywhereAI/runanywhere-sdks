@@ -912,6 +912,8 @@ export type WasmModuleReadiness = 'registering' | 'ready' | 'unregistered';
 export interface WasmModuleRecord {
   readonly module: EmscriptenRunanywhereModule;
   readonly capabilities: readonly WasmCapability[];
+  /** Last registration generation for each capability claimed by this module. */
+  readonly capabilityGenerations: ReadonlyMap<WasmCapability, number>;
   readonly frameworks: readonly string[];
   readonly backend: WasmBackendKind;
   readonly acceleration: string | null;
@@ -1005,14 +1007,22 @@ export function registerWasmModule(
     ...(prior?.frameworks ?? []),
     ...frameworks.filter(Boolean).map((framework) => framework.toLowerCase()),
   ]);
+  const generation = ++_registrationGeneration;
+  const capabilityGenerations = new Map<WasmCapability, number>(
+    prior?.capabilityGenerations,
+  );
+  for (const capability of capabilities) {
+    capabilityGenerations.set(capability, generation);
+  }
   const record: WasmModuleRecord = {
     module: mod,
     capabilities: [...mergedCapabilities],
+    capabilityGenerations,
     frameworks: [...mergedFrameworks],
     backend: registration.backend ?? prior?.backend ?? 'custom',
     acceleration: registration.acceleration ?? prior?.acceleration ?? null,
     readiness: registration.readiness ?? 'ready',
-    generation: ++_registrationGeneration,
+    generation,
     lifecycleGeneration: prior?.lifecycleGeneration ?? 0,
   };
   _recordByModule.set(mod, record);
@@ -1110,7 +1120,8 @@ export function recordModelLifecycle(
  * Drop a single module from the registry. All capability slots that
  * point at this module are removed, and downstream adapters are cleared
  * if they were tracking it. Use this on backend teardown / acceleration
- * switch — it lets siblings keep their slots intact.
+ * switch — any sibling that still claims a released capability regains
+ * ownership of that slot.
  */
 export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
   for (const [fw, current] of Array.from(_moduleByFramework.entries())) {
@@ -1124,6 +1135,30 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
     }
   }
   _recordByModule.delete(mod);
+
+  // Re-elect a surviving owner for every released capability. Registration
+  // is last-writer-wins, so among the modules still registered the one that
+  // claimed this capability most recently (highest per-capability generation)
+  // regains the slot. This is what lets siblings keep their slots intact across
+  // a single-backend teardown / acceleration switch.
+  const restoredByModule = new Map<EmscriptenRunanywhereModule, WasmCapability[]>();
+  for (const cap of releasedCapabilities) {
+    let survivor: WasmModuleRecord | null = null;
+    let survivorGeneration = -1;
+    for (const record of _recordByModule.values()) {
+      const capabilityGeneration = record.capabilityGenerations.get(cap);
+      if (capabilityGeneration !== undefined && capabilityGeneration > survivorGeneration) {
+        survivor = record;
+        survivorGeneration = capabilityGeneration;
+      }
+    }
+    if (survivor) {
+      _recordByCapability.set(cap, survivor);
+      const restored = restoredByModule.get(survivor.module) ?? [];
+      restored.push(cap);
+      restoredByModule.set(survivor.module, restored);
+    }
+  }
   for (const [modelId, owner] of Array.from(_moduleByModelId.entries())) {
     if (owner === mod) _moduleByModelId.delete(modelId);
   }
@@ -1139,6 +1174,12 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
     SDKEventStreamAdapter.clearDefaultModule();
   }
   ModalityProtoAdapter.unregisterModuleCapabilities(releasedCapabilities, mod);
+  // Restore the modality dispatch slots for re-elected survivors so
+  // per-modality routing and the aggregate `defaultModule` keep pointing at a
+  // live module rather than going null.
+  for (const [module, restoredCapabilities] of restoredByModule) {
+    ModalityProtoAdapter.registerModuleCapabilities(restoredCapabilities, module);
+  }
   reelectLifecycleAndRegistryPrimary();
 }
 

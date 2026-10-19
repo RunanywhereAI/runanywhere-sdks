@@ -47,6 +47,18 @@ public final class SolutionHandle: @unchecked Sendable {
         }
     }
 
+    /// Attach an open RAG session to every retrieve operator in this solution.
+    ///
+    /// The solution borrows the session; callers must keep `session` open for
+    /// as long as this solution can execute retrieval. Call this before
+    /// `start()`, because native operator nodes are materialized at start time.
+    public func attachRagSession(_ session: RagSession) async throws {
+        let sessionRef = try await session.nativeHandleForSolution()
+        try withHandle { solutionHandle in
+            rac_solution_attach_rag_session(solutionHandle, sessionRef.handle)
+        }
+    }
+
     /// Start the underlying scheduler. Non-blocking.
     public func start() throws {
         try withHandle { rac_solution_start($0) }

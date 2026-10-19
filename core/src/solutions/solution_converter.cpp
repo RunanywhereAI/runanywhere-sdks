@@ -65,10 +65,36 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSp
     if (cfg.max_context_tokens() > 0) {
         (*llm->mutable_params())["max_context_tokens"] = std::to_string(cfg.max_context_tokens());
     }
-    if (cfg.has_generation() && cfg.generation().temperature() != 0.0f) {
+    // Presence, not value: llm_options.proto documents "0.0 = greedy decoding, and
+    // is honoured as an explicit request", so a caller asking for 0.0 must reach the
+    // operator rather than look identical to a caller who set nothing.
+    if (cfg.has_generation() && cfg.generation().has_temperature()) {
         (*llm->mutable_params())["temperature"] = std::to_string(cfg.generation().temperature());
     }
     (*tts->mutable_params())["emit_partials"] = cfg.emit_partials() ? "true" : "false";
+    // Barge-in parameters (enable_barge_in, barge_in_threshold_ms) are forwarded
+    // to the VAD operator params to preserve configuration across conversion.
+    // Note: in the solutions graph pipeline, DetectVoiceNode acts solely as a speech
+    // gate and has no visibility into TTS playback state; full echo-margin barge-in
+    // interruption is handled by the canonical rac_voice_agent feed pipeline
+    // (voice_agent_feed_abi.cpp). These keys are currently inert in graph execution
+    // and omitted from the public solution YAML surface.
+    if (cfg.has_enable_barge_in()) {
+        (*vad->mutable_params())["enable_barge_in"] = cfg.enable_barge_in() ? "true" : "false";
+    }
+    if (cfg.barge_in_threshold_ms() > 0) {
+        (*vad->mutable_params())["barge_in_threshold_ms"] =
+            std::to_string(cfg.barge_in_threshold_ms());
+    }
+    // `emit_thoughts` in the YAML lands on generation.reasoning.include_in_output
+    // (config_loader.cpp), and only system_prompt and temperature were being
+    // read back off `generation`, so it stopped at the proto like the barge-in
+    // pair. Guarded on has_reasoning() rather than the bool, which is a plain
+    // proto3 field with no presence of its own.
+    if (cfg.has_generation() && cfg.generation().has_reasoning()) {
+        (*llm->mutable_params())["emit_thoughts"] =
+            cfg.generation().reasoning().include_in_output() ? "true" : "false";
+    }
 
     add_edge(out, "vad.out", "stt.in");
     add_edge(out, "stt.final", "llm.in");
@@ -107,6 +133,24 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
     }
     if (!cfg.rerank_model_id().empty()) {
         (*retrieve->mutable_params())["rerank_model_id"] = cfg.rerank_model_id();
+    }
+    // vector_store selects the backend that vector_store_path points into, so
+    // forwarding the path while dropping the type left the two halves of one
+    // setting split. Retrieval tuning goes the same way: config_loader.cpp
+    // parses bm25_k1/bm25_b/rrf_k out of the solution YAML, and without these
+    // they stop at the proto.
+    if (cfg.vector_store() != runanywhere::v1::VECTOR_STORE_UNSPECIFIED) {
+        (*retrieve->mutable_params())["vector_store"] =
+            runanywhere::v1::VectorStore_Name(cfg.vector_store());
+    }
+    if (cfg.bm25_k1() > 0.0f) {
+        (*retrieve->mutable_params())["bm25_k1"] = std::to_string(cfg.bm25_k1());
+    }
+    if (cfg.bm25_b() > 0.0f) {
+        (*retrieve->mutable_params())["bm25_b"] = std::to_string(cfg.bm25_b());
+    }
+    if (cfg.rrf_k() > 0) {
+        (*retrieve->mutable_params())["rrf_k"] = std::to_string(cfg.rrf_k());
     }
     (void)llm;
 

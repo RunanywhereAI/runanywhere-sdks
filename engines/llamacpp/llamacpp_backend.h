@@ -43,9 +43,9 @@ struct TextGenerationRequest {
     float frequency_penalty = 0.0f;
     float presence_penalty = 0.0f;
     float min_p = 0.0f;
-    int64_t seed = 0;        // 0 = LLAMA_DEFAULT_SEED
-    int n_threads = 0;       // 0 = backend default (model-load thread count)
-    std::string grammar;     // GBNF rule text; empty = unconstrained
+    int64_t seed = 0;     // 0 = LLAMA_DEFAULT_SEED
+    int n_threads = 0;    // 0 = backend default (model-load thread count)
+    std::string grammar;  // GBNF rule text; empty = unconstrained
     std::vector<std::string> stop_sequences;
 };
 
@@ -53,9 +53,10 @@ struct TextGenerationResult {
     std::string text;
     int tokens_generated = 0;
     int prompt_tokens = 0;
+    int cached_prompt_tokens = 0;
     double inference_time_ms = 0.0;
     double prompt_eval_time_ms = 0.0;  // prefill (prompt decode) wall-clock
-    std::string finish_reason;  // "stop", "length", "cancelled"
+    std::string finish_reason;         // "stop", "length", "cancelled"
 };
 
 // Verify request struct size — allocated per generate() call.
@@ -153,6 +154,7 @@ class LlamaCppTextGeneration {
      * @param request           Generation request.
      * @param callback          Streaming callback; return false to cancel.
      * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
+     * @param out_cached_prompt_tokens Optional: prompt tokens reused from KV (may be NULL).
      * @param out_prompt_eval_ms Optional: prefill (prompt decode) time in ms (may be NULL).
      * @param out_tokens_generated Optional: authoritative decoded-token count from
      *        the decode loop (may be NULL). Prefer this over counting streaming
@@ -160,8 +162,8 @@ class LlamaCppTextGeneration {
      *        call per token, so callback counts under-report generated tokens.
      */
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
-                         int* out_prompt_tokens = nullptr, double* out_prompt_eval_ms = nullptr,
-                         int* out_tokens_generated = nullptr);
+                         int* out_prompt_tokens = nullptr, int* out_cached_prompt_tokens = nullptr,
+                         double* out_prompt_eval_ms = nullptr, int* out_tokens_generated = nullptr);
 
     void cancel();
 
@@ -209,6 +211,7 @@ class LlamaCppTextGeneration {
     bool unload_model_internal();
     bool recreate_context();
     bool apply_lora_adapters();
+    void clear_prompt_cache();
     std::string build_prompt(const TextGenerationRequest& request);
     std::string
     apply_chat_template(const std::vector<std::pair<std::string, std::string>>& messages,
@@ -276,6 +279,7 @@ class LlamaCppTextGeneration {
     int batch_size_ = 0;
 
     std::vector<LoraAdapterEntry> lora_adapters_;
+    std::vector<llama_token> cached_prompt_tokens_;
 
     mutable std::mutex mutex_;
 };

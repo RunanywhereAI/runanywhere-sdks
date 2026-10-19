@@ -8,7 +8,9 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -350,7 +352,7 @@ rac_result_t rac_diffusion_model_registry_unregister(const char* name) {
 }
 
 rac_result_t rac_diffusion_model_registry_get(const char* model_id,
-                                              rac_diffusion_model_def_t* out_def) {
+                                              rac_diffusion_model_def_t* out_def) try {
     if (!model_id || !out_def) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -367,19 +369,35 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
                 if (result == RAC_SUCCESS) {
                     return RAC_SUCCESS;
                 }
+                // Preserve genuine strategy failures (allocation, init,
+                // backend) instead of masking them as "model not found".
+                // Only RAC_ERROR_NOT_FOUND falls through to the next strategy.
+                if (result != RAC_ERROR_NOT_FOUND) {
+                    RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to resolve model '%s' (result %d)",
+                                    strategy.name, model_id, static_cast<int>(result));
+                    return result;
+                }
             }
         }
     }
 
     RAC_LOG_WARNING(LOG_CAT, "Model not found: %s", model_id);
     return RAC_ERROR_NOT_FOUND;
+} catch (const std::bad_alloc&) {
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    RAC_LOG_ERROR(LOG_CAT, "Strategy callback threw while resolving model '%s'",
+                  model_id ? model_id : "(null)");
+    return RAC_ERROR_INTERNAL;
 }
 
 rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
-                                               size_t* out_count) {
+                                               size_t* out_count) try {
     if (!out_models || !out_count) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_models = nullptr;
+    *out_count = 0;
 
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
@@ -387,24 +405,51 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
     // Collect all models from all strategies
     std::vector<rac_diffusion_model_def_t> all_models;
 
-    for (const auto& strategy : state.strategies) {
-        if (strategy.list_models) {
-            rac_diffusion_model_def_t* models = nullptr;
-            size_t count = 0;
+    try {
+        for (const auto& strategy : state.strategies) {
+            if (strategy.list_models) {
+                rac_diffusion_model_def_t* models = nullptr;
+                size_t count = 0;
 
-            if (strategy.list_models(&models, &count, strategy.user_data) == RAC_SUCCESS &&
-                models) {
-                for (size_t i = 0; i < count; i++) {
-                    all_models.push_back(models[i]);
+                rac_result_t list_result;
+                try {
+                    list_result = strategy.list_models(&models, &count, strategy.user_data);
+                } catch (const std::bad_alloc&) {
+                    std::free(models);
+                    return RAC_ERROR_OUT_OF_MEMORY;
+                } catch (...) {
+                    std::free(models);
+                    RAC_LOG_ERROR(LOG_CAT, "Strategy '%s' threw while listing models",
+                                  strategy.name);
+                    return RAC_ERROR_INTERNAL;
                 }
-                std::free(models);
+                std::unique_ptr<rac_diffusion_model_def_t[], decltype(&std::free)> models_owner(
+                    models, &std::free);
+
+                if (list_result == RAC_SUCCESS && models_owner) {
+                    for (size_t i = 0; i < count; i++) {
+                        all_models.push_back(models_owner[i]);
+                    }
+                }
+
+                if (list_result != RAC_SUCCESS && list_result != RAC_ERROR_NOT_FOUND) {
+                    // Preserve genuine strategy failures (allocation, init,
+                    // backend) instead of reporting a successful empty/partial
+                    // list. Only RAC_ERROR_NOT_FOUND falls through.
+                    RAC_LOG_WARNING(LOG_CAT, "Strategy '%s' failed to list models (result %d)",
+                                    strategy.name, static_cast<int>(list_result));
+                    return list_result;
+                }
             }
         }
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        RAC_LOG_ERROR(LOG_CAT, "Unexpected exception while aggregating model definitions");
+        return RAC_ERROR_INTERNAL;
     }
 
     if (all_models.empty()) {
-        *out_models = nullptr;
-        *out_count = 0;
         return RAC_SUCCESS;
     }
 
@@ -425,14 +470,33 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
     *out_models = result;
     *out_count = all_models.size();
     return RAC_SUCCESS;
+} catch (const std::bad_alloc&) {
+    if (out_models) {
+        *out_models = nullptr;
+    }
+    if (out_count) {
+        *out_count = 0;
+    }
+    return RAC_ERROR_OUT_OF_MEMORY;
+} catch (...) {
+    if (out_models) {
+        *out_models = nullptr;
+    }
+    if (out_count) {
+        *out_count = 0;
+    }
+    RAC_LOG_ERROR(LOG_CAT, "Unexpected exception while listing model definitions");
+    return RAC_ERROR_INTERNAL;
 }
 
-rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {
+rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) try {
     rac_diffusion_model_def_t model_def;
 
-    if (rac_diffusion_model_registry_get(model_id, &model_def) != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using CoreML (Apple only)",
-                      model_id ? model_id : "(null)");
+    rac_result_t result = rac_diffusion_model_registry_get(model_id, &model_def);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_DEBUG(LOG_CAT,
+                      "Model lookup failed for '%s' (result %d), using CoreML (Apple only)",
+                      model_id ? model_id : "(null)", static_cast<int>(result));
         return RAC_DIFFUSION_BACKEND_COREML;
     }
 
@@ -454,6 +518,18 @@ rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* 
 
     // Return model's preferred backend
     return model_def.backend;
+} catch (const std::bad_alloc&) {
+    RAC_LOG_ERROR(LOG_CAT,
+                  "Strategy callback threw while selecting a backend for '%s' (result %d), using "
+                  "CoreML (Apple only)",
+                  model_id ? model_id : "(null)", static_cast<int>(RAC_ERROR_OUT_OF_MEMORY));
+    return RAC_DIFFUSION_BACKEND_COREML;
+} catch (...) {
+    RAC_LOG_ERROR(LOG_CAT,
+                  "Strategy callback threw while selecting a backend for '%s' (result %d), using "
+                  "CoreML (Apple only)",
+                  model_id ? model_id : "(null)", static_cast<int>(RAC_ERROR_INTERNAL));
+    return RAC_DIFFUSION_BACKEND_COREML;
 }
 
 rac_bool_t rac_diffusion_model_registry_is_available(const char* model_id) {
@@ -476,7 +552,11 @@ rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_de
     size_t count = 0;
 
     rac_result_t result = rac_diffusion_model_registry_list(&models, &count);
-    if (result != RAC_SUCCESS || !models || count == 0) {
+    if (result != RAC_SUCCESS) {
+        std::free(models);
+        return result;
+    }
+    if (!models || count == 0) {
         std::free(models);
         return RAC_ERROR_NOT_FOUND;
     }

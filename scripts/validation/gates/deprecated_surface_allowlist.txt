@@ -8,7 +8,6 @@
 # Kotlin typed JSON adapters and external cloud-provider payloads.
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/CloudSttProvider.kt|kotlin:org-json-usage
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/Cloud.kt|kotlin:org-json-usage
-bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt|kotlin:json-serialisation
 # Web-search tool parses the external DuckDuckGo JSON response (not an SDK DTO);
 # mirrors the already-allowlisted Swift RunAnywhere+WebSearchTool.swift.
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereWebSearchTool.kt|kotlin:json-serialisation
@@ -20,6 +19,8 @@ bindings/swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.
 bindings/swift/Sources/MLXRuntime/MLX.swift|swift:json-bridge
 # Typed reader for the external Hugging Face model config.json boundary.
 bindings/swift/Sources/MLXRuntime/MLXVLMResolutionPolicy.swift|swift:json-bridge
+# Reads Hugging Face config.json to route D1, D1 Omni, and GLiNER checkpoints.
+bindings/swift/Sources/MLXRuntime/MLXTextDecisions.swift|swift:json-bridge
 bindings/swift/Sources/MLXRuntime/Nemotron.swift|swift:json-bridge
 bindings/swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+WebSearchTool.swift|swift:json-bridge
 bindings/swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:json-bridge
@@ -56,8 +57,12 @@ core/include/rac/cloud/rac_cloud_stt_provider.h|cpp:public-json-api
 core/include/rac/infrastructure/telemetry/rac_telemetry_manager.h|cpp:public-json-api
 core/include/rac/backends/rac_llm_llamacpp.h|cpp:json-param-in-public-api
 core/include/rac/backends/rac_vlm_llamacpp.h|cpp:json-param-in-public-api
+# Restored desktop-server create_with_config forwards the existing plugin-owned
+# load JSON contract (context/thread/placement), as shipped in the 0.20.37 kit.
+# This is the same backend construction boundary as the vtable create entry;
+# platform SDK generation and lifecycle APIs continue to use generated protos.
+core/include/rac/features/llm/rac_llm_service.h|cpp:public-json-api
 core/include/rac/features/llm/rac_llm_service.h|cpp:json-param-in-public-api
-core/include/rac/features/llm/rac_llm_structured_output.h|cpp:json-param-in-public-api
 core/include/rac/features/embeddings/rac_embeddings_service.h|cpp:json-param-in-public-api
 core/include/rac/features/diffusion/rac_diffusion_service.h|cpp:json-param-in-public-api
 core/include/rac/features/vlm/rac_vlm_service.h|cpp:json-param-in-public-api
@@ -74,6 +79,7 @@ core/include/rac/features/rerank/rac_rerank_service.h|cpp:json-param-in-public-a
 # would make one slot's creator incompatible with the plugin factory that constructs all of them.
 core/include/rac/features/embeddings/rac_image_embedding_service.h|cpp:json-param-in-public-api
 core/include/rac/features/ocr/rac_ocr_service.h|cpp:json-param-in-public-api
+core/include/rac/features/decision/rac_decision_service.h|cpp:json-param-in-public-api
 core/include/rac/plugin/rac_onnxrt_runtime_ep.h|cpp:json-param-in-public-api
 core/include/rac/plugin/rac_plugin_entry.h|cpp:json-param-in-public-api
 core/include/rac/cloud/rac_cloud_stt_provider.h|cpp:json-param-in-public-api

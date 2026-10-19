@@ -68,7 +68,8 @@ typedef struct rac_server_config {
      * Number of GPU layers to offload. Defaults to
      * RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO, which leaves placement to
      * llama.cpp's own fitting pass; -1 offloads every layer and 0 pins the
-     * model to the CPU.
+     * model to the CPU. Other values are rejected: the generic backend load
+     * contract exposes placement policy rather than an exact layer count.
      */
     int32_t gpu_layers;
 
@@ -97,7 +98,8 @@ static const rac_server_config_t RAC_SERVER_CONFIG_DEFAULT = {.host = "127.0.0.1
                                                               .model_id = RAC_NULL,
                                                               .context_size = 8192,
                                                               .threads = 4,
-                                                              .gpu_layers = RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO,
+                                                              .gpu_layers =
+                                                                  RAC_LLM_LLAMACPP_GPU_LAYERS_AUTO,
                                                               .enable_cors = RAC_TRUE,
                                                               .cors_origins = "*",
                                                               .request_timeout_seconds = 300,
@@ -183,6 +185,19 @@ RAC_API rac_bool_t rac_server_is_running(void);
  * @return RAC_SUCCESS on success
  */
 RAC_API rac_result_t rac_server_get_status(rac_server_status_t* status);
+
+/**
+ * @brief Get the context length of the loaded model
+ *
+ * Returns the context length reported by the loaded backend. This value may
+ * differ from rac_server_config_t.context_size and may not reflect device
+ * fitting.
+ *
+ * @param context_length Output context length in tokens (must not be NULL)
+ * @return RAC_SUCCESS on success, RAC_ERROR_SERVER_NOT_RUNNING when stopped,
+ *         or RAC_ERROR_BACKEND_UNAVAILABLE when the backend cannot report it
+ */
+RAC_API rac_result_t rac_server_get_context_length(int32_t* context_length);
 
 /**
  * @brief Block until the server stops

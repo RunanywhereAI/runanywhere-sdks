@@ -18,23 +18,93 @@
 namespace runanywhere {
 namespace rag {
 
-namespace {
-
-constexpr size_t kMaxChunkChars = 360;
-
+/**
+ * @brief Flatten whitespace and truncate text to at most `max_chars` bytes,
+ *        backing off to a valid UTF-8 character boundary.
+ *
+ * @param text Input text to format and truncate.
+ * @param max_chars Maximum byte budget for the output.
+ * @return Formatted string guaranteed to end on a complete UTF-8 code point.
+ */
 std::string flatten_and_truncate(const std::string& text, size_t max_chars) {
+    if (max_chars == 0 || text.empty()) {
+        return "";
+    }
     std::string out;
     out.reserve(std::min(text.size(), max_chars));
-    for (char c : text) {
-        if (out.size() >= max_chars)
+
+    size_t i = 0;
+    while (i < text.size()) {
+        const unsigned char lead = static_cast<unsigned char>(text[i]);
+        size_t cp_len = 1;
+        if (lead < 0x80) {
+            cp_len = 1;
+        } else if (lead >= 0xC2 && lead <= 0xDF) {
+            cp_len = 2;
+        } else if (lead >= 0xE0 && lead <= 0xEF) {
+            cp_len = 3;
+        } else if (lead >= 0xF0 && lead <= 0xF4) {
+            cp_len = 4;
+        } else {
+            // Lone continuation byte (0x80..0xBF), overlong 2-byte lead (0xC0, 0xC1),
+            // or invalid lead (> 0xF4). Skip this malformed byte.
+            ++i;
+            continue;
+        }
+
+        if (i + cp_len > text.size()) {
             break;
-        out.push_back((c == '\n' || c == '\r' || c == '\t') ? ' ' : c);
+        }
+
+        bool valid = true;
+        for (size_t k = 1; k < cp_len; ++k) {
+            if ((static_cast<unsigned char>(text[i + k]) & 0xC0) != 0x80) {
+                valid = false;
+                break;
+            }
+        }
+        if (valid && cp_len > 1) {
+            const unsigned char second = static_cast<unsigned char>(text[i + 1]);
+            // RFC 3629 / Unicode standard bounds:
+            // 0xE0: 0xA0..0xBF (reject overlong 0xE0 0x80..0x9F)
+            // 0xED: 0x80..0x9F (reject UTF-16 surrogates U+D800..U+DFFF -> 0xED 0xA0..0xBF)
+            // 0xF0: 0x90..0xBF (reject overlong 0xF0 0x80..0x8F)
+            // 0xF4: 0x80..0x8F (reject out-of-range > U+10FFFF -> 0xF4 0x90..0xBF)
+            valid = !(lead == 0xE0 && second < 0xA0) &&
+                    !(lead == 0xED && second > 0x9F) &&
+                    !(lead == 0xF0 && second < 0x90) &&
+                    !(lead == 0xF4 && second > 0x8F);
+        }
+        if (!valid) {
+            ++i;
+            continue;
+        }
+
+        if (out.size() + cp_len > max_chars) {
+            break;
+        }
+
+        if (lead == '\n' || lead == '\r' || lead == '\t') {
+            out.push_back(' ');
+        } else if (cp_len == 1) {
+            out.push_back(text[i]);
+        } else {
+            out.append(text, i, cp_len);
+        }
+        i += cp_len;
     }
+
     return out;
 }
 
-}  // namespace
-
+/**
+ * @brief Parse LLM scorer output into per-candidate scores.
+ *
+ * @param text The raw output string from the LLM.
+ * @param n Number of candidates.
+ * @param scores Output vector to populate with scores.
+ * @return Number of distinct candidates that received a score.
+ */
 size_t parse_rerank_scores(const std::string& text, size_t n, std::vector<int>& scores) {
     scores.assign(n, 0);
     size_t parsed = 0;
@@ -77,6 +147,12 @@ size_t parse_rerank_scores(const std::string& text, size_t n, std::vector<int>& 
     return parsed;
 }
 
+/**
+ * @brief Stable-reorder `results` by descending score.
+ *
+ * @param results Vector of search results to reorder.
+ * @param scores Corresponding score vector matching results in size.
+ */
 void reorder_by_scores(std::vector<SearchResult>& results, const std::vector<int>& scores) {
     if (scores.size() != results.size())
         return;
@@ -93,6 +169,14 @@ void reorder_by_scores(std::vector<SearchResult>& results, const std::vector<int
     results = std::move(reranked);
 }
 
+/**
+ * @brief Score `results` with the LLM and reorder in place.
+ *
+ * @param llm_handle Native handle to the loaded LLM instance.
+ * @param question The user question/query string.
+ * @param base_options LLM options to use as baseline.
+ * @param results Candidates to score and reorder.
+ */
 void rerank_llm_pointwise(rac_handle_t llm_handle, const std::string& question,
                           const rac_llm_options_t& base_options,
                           std::vector<SearchResult>& results) {
@@ -116,6 +200,22 @@ void rerank_llm_pointwise(rac_handle_t llm_handle, const std::string& question,
     opts.temperature = 0.0f;
     opts.max_tokens = static_cast<int32_t>(n * 8 + 16);
     opts.system_prompt = nullptr;
+    // The scorer is an internal call whose output must stay "<index>: <score>"
+    // lines. Knobs the caller set to shape the final answer -- stop sequences,
+    // penalties, a seed, a minimum probability -- have no business here: a stop
+    // sequence can cut the scores off and a penalty skews the digits, which
+    // parse_rerank_scores would then read as "no parseable scores".
+    const rac_llm_options_t defaults = RAC_LLM_OPTIONS_DEFAULT;
+    opts.stop_sequences = defaults.stop_sequences;
+    opts.num_stop_sequences = defaults.num_stop_sequences;
+    opts.repetition_penalty = defaults.repetition_penalty;
+    opts.frequency_penalty = defaults.frequency_penalty;
+    opts.presence_penalty = defaults.presence_penalty;
+    opts.min_p = defaults.min_p;
+    opts.seed = defaults.seed;
+    opts.grammar = defaults.grammar;
+    opts.history = defaults.history;
+    opts.n_history = defaults.n_history;
 
     rac_llm_result_t out = {};
     rac_result_t rc = rac_llm_generate(llm_handle, prompt.c_str(), &opts, &out);

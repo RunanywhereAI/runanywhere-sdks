@@ -233,11 +233,12 @@ public extension RunAnywhere {
 
         /// Load a model now instead of waiting for the first generation call.
         ///
-        /// Only `LoadOptions.backendPreferences.first` (equivalently the
-        /// deprecated `framework`) reaches commons today. `contextLength`,
-        /// `threads`, `accelerator`, and additional ordered `backendPreferences`
-        /// are not yet carried by the native load ABI, so passing them throws
-        /// rather than being silently dropped.
+        /// `contextLength` and the ordered `backendPreferences` list are
+        /// forwarded on `ModelLoadRequest`; a `required` backend preference is
+        /// rejected because `backend_preferences` carries framework enums only.
+        /// `threads` (retired) and `accelerator` still fail preflight.
+        /// Context length is advisory at the engine boundary; engines may use
+        /// their defaults. Native load warnings are exposed as `fallbackReason`.
         ///
         /// - Throws: `SDKException` when the model cannot be loaded, or when
         ///   `options` sets a placement knob the load ABI cannot honor yet.
@@ -479,27 +480,14 @@ extension RunAnywhere {
         return modelId
     }
 
+    /// Load the validated request shared by explicit and automatic loading.
     @discardableResult
     internal static func loadResolved(
         model: ModelInfo,
         category: ModelCategory,
         options: LoadOptions?
     ) async throws -> RAModelLoadResult {
-        if let options {
-            try options.requireCarriableByLoadABI()
-        }
-
-        var request = RAModelLoadRequest()
-        request.modelID = model.id
-        request.category = category == .unspecified ? category.defaultLoadCategory : category
-        request.forceReload = options?.forceReload ?? false
-        if let backend = options?.backendPreferences.first?.backend, backend != .unspecified {
-            request.framework = backend
-        } else if model.framework != .unspecified {
-            request.framework = model.framework
-        }
-        request.validateAvailability = true
-
+        let request = try modelLoadRequest(model: model, category: category, options: options)
         let result = await performLoad(request)
         guard !result.hasError else {
             throw SDKException(
@@ -510,25 +498,72 @@ extension RunAnywhere {
         }
         return result
     }
+
+    /// Build the exact protobuf request used by `models.load` before native work.
+    internal static func modelLoadRequest(
+        model: ModelInfo,
+        category: ModelCategory,
+        options: LoadOptions?
+    ) throws -> RAModelLoadRequest {
+        if let options {
+            try options.requireCarriableByLoadABI()
+        }
+
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = category == .unspecified ? category.defaultLoadCategory : category
+        request.forceReload = options?.forceReload ?? false
+        // A lone unspecified choice leaves native catalog preference resolution
+        // intact. In a longer list, preserve it ahead of later caller choices.
+        if let backend = options?.backendPreferences.first?.backend {
+            if backend != .unspecified || (options?.backendPreferences.count ?? 0) > 1 {
+                request.framework = backend
+            }
+        } else if model.framework != .unspecified {
+            request.framework = model.framework
+        }
+        if let contextLength = options?.contextLength {
+            guard contextLength >= 0, let wireContextLength = Int32(exactly: contextLength) else {
+                throw SDKException.invalidConfiguration(
+                    "LoadOptions.contextLength must be non-negative and fit ModelLoadRequest.context_length (int32)"
+                )
+            }
+            request.contextLength = wireContextLength
+        }
+        // The full ordered list rides `backend_preferences`; `.framework` above
+        // pins its first entry except for a lone unspecified preference.
+        request.backendPreferences = options?.backendPreferences.map(\.backend) ?? []
+        request.validateAvailability = true
+
+        return request
+    }
 }
 
 private extension LoadOptions {
-    /// `backendPreferences.first` reaches commons through the same
-    /// `RAModelLoadRequest.framework` field the deprecated `framework:`
-    /// property already uses. Everything else the native load ABI cannot
-    /// carry yet — honoring it silently would violate the "every accepted
-    /// field is implemented end to end or fails preflight" contract.
+    /// `contextLength` and the ordered `backendPreferences` list reach commons
+    /// through `RAModelLoadRequest.context_length`/`.backend_preferences`;
+    /// `backendPreferences.first` also pins the legacy `.framework` field,
+    /// except when a lone unspecified preference defers to catalog routing.
+    /// `threads` was retired from the load ABI (reserved tag 7) and
+    /// `accelerator` is not wired through this bridge, so both still fail
+    /// preflight. `required` cannot ride `backend_preferences` because that
+    /// field carries framework enums only — honoring it silently would violate
+    /// the "every accepted field is implemented end to end or fails preflight"
+    /// contract.
     func requireCarriableByLoadABI() throws {
+        if backendPreferences.contains(where: { $0.required }) {
+            throw SDKException.invalidConfiguration(
+                "LoadOptions.backendPreferences.required cannot be carried by ModelLoadRequest "
+                    + "because backend_preferences contains framework enums only. "
+                    + "Remove required or pass one preferred backend."
+            )
+        }
         var unsupported: [String] = []
-        if contextLength != nil { unsupported.append("contextLength") }
         if threads != nil { unsupported.append("threads") }
         if accelerator != nil { unsupported.append("accelerator") }
-        if backendPreferences.count > 1 {
-            unsupported.append("backendPreferences (only the first preference reaches commons; ordered fallback is not carried)")
-        }
         guard unsupported.isEmpty else {
             throw SDKException.invalidConfiguration(
-                "LoadOptions.\(unsupported.joined(separator: ", ")) cannot be carried by the native load ABI yet"
+                "LoadOptions.\(unsupported.joined(separator: ", ")) is not supported by this Swift binding"
             )
         }
     }

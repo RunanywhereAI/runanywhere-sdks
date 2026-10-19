@@ -26,6 +26,8 @@
 namespace rac {
 namespace server {
 
+class OpenAIHandler;
+
 /**
  * @brief HTTP Server implementation
  *
@@ -65,6 +67,11 @@ class HttpServer {
      * @param status Output status structure
      */
     void getStatus(rac_server_status_t& status) const;
+
+    /**
+     * @brief Get the context length allocated by the loaded backend
+     */
+    rac_result_t getContextLength(int32_t& contextLength) const;
 
     /**
      * @brief Block until the server stops
@@ -120,6 +127,7 @@ class HttpServer {
 
     // Server state
     std::unique_ptr<httplib::Server> server_;
+    std::shared_ptr<OpenAIHandler> handler_;
     std::thread serverThread_;
     std::atomic<bool> running_{false};
     std::atomic<bool> shouldStop_{false};
