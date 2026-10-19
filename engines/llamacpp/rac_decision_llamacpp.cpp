@@ -385,6 +385,9 @@ rac_result_t llamacpp_decision_initialize(void* implementation, const char* mode
         context_params.n_batch = 512;
         context_params.n_ubatch = 512;
     }
+    if (handle->d1_kind == rac_llamacpp_d1_kind::pplx_joint) {
+        context_params.n_outputs_max = kRacLlamacppPplxMaxMarkers;
+    }
     context_params.n_seq_max = 1;
     context_params.n_threads = handle->default_threads;
     context_params.n_threads_batch = handle->default_threads;

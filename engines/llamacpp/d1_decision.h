@@ -11,6 +11,10 @@
 // sequence unless joint grouping is asked for. None of them use Clef spans.
 enum class rac_llamacpp_d1_kind { none, lfm2, omni, gliner, pplx_joint };
 
+// pplx-decider-joint reads one row of logits per question marker. The context
+// reserves full-vocab logits for this many outputs, not for every token.
+constexpr uint32_t kRacLlamacppPplxMaxMarkers = 256;
+
 #if defined(RAC_LLAMACPP_HAS_D1)
 
 #include <string>

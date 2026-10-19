@@ -618,7 +618,7 @@ std::vector<std::vector<float>> score_pplx(llama_model* model, llama_context* ct
         std::vector<size_t> group = std::move(groups.back());
         groups.pop_back();
         PplxSequence sequence = joint.encode(state, questions, group);
-        if (sequence.tokens.size() <= n_ctx) {
+        if (sequence.tokens.size() <= n_ctx && group.size() <= kRacLlamacppPplxMaxMarkers) {
             sequences.push_back(std::move(sequence));
             continue;
         }
