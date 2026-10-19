@@ -376,6 +376,28 @@ if(RAC_BUILD_TESTS)
         target_compile_features(test_plugin_entry_llamacpp PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_llamacpp_tests COMMAND test_plugin_entry_llamacpp)
     endif()
+    # pplx-decider-joint: escaping and metadata lists always; real decisions
+    # when RAC_TEST_PPLX_DECIDER_MODEL names a v1.2 GGUF.
+    get_property(_rac_llamacpp_has_d1 GLOBAL PROPERTY RAC_LLAMACPP_HAS_D1)
+    if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp AND _rac_llamacpp_has_d1 AND
+       NOT TARGET test_decision_pplx_llamacpp)
+        add_executable(test_decision_pplx_llamacpp engines/llamacpp/tests/test_decision_pplx.cpp)
+        target_include_directories(test_decision_pplx_llamacpp PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/llamacpp
+        )
+        target_compile_definitions(test_decision_pplx_llamacpp PRIVATE RAC_LLAMACPP_HAS_D1=1)
+        target_link_libraries(test_decision_pplx_llamacpp PRIVATE
+            rac_commons
+            rac_backend_llamacpp
+            llama
+        )
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_decision_pplx_llamacpp)
+        endif()
+        target_compile_features(test_decision_pplx_llamacpp PRIVATE cxx_std_17)
+        add_test(NAME decision_pplx_llamacpp_tests COMMAND test_decision_pplx_llamacpp)
+    endif()
     # Reranking primitive (RAC_PRIMITIVE_RERANK, ABI v8) contract test. Backend-
     # neutral: it registers an in-test fake rerank engine, so it needs only
     # rac_commons + the protobuf runtime (no llama.cpp / ONNX linkage).

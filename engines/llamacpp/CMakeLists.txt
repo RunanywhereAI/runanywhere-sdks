@@ -248,6 +248,9 @@ endif()
 if(_rac_llama_common_header MATCHES "common_get_decision_type")
     set(RAC_LLAMACPP_HAS_D1 ON)
 endif()
+# The root CMakeLists wires the engine tests after this directory, so it reads
+# the probe result from a global property.
+set_property(GLOBAL PROPERTY RAC_LLAMACPP_HAS_D1 ${RAC_LLAMACPP_HAS_D1})
 if(RAC_LLAMACPP_HAS_CLEF_SPAN OR RAC_LLAMACPP_HAS_D1)
     set(RAC_LLAMACPP_HAS_DECISION ON)
 else()

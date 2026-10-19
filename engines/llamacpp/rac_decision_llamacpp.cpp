@@ -388,7 +388,10 @@ rac_result_t llamacpp_decision_initialize(void* implementation, const char* mode
     context_params.n_seq_max = 1;
     context_params.n_threads = handle->default_threads;
     context_params.n_threads_batch = handle->default_threads;
-    context_params.embeddings = handle->d1_kind != rac_llamacpp_d1_kind::lfm2;
+    // pplx-decider-joint attends both ways in its full-attention layers, so a
+    // sequence must fit one ubatch: n_ubatch stays at the context size.
+    context_params.embeddings = handle->d1_kind != rac_llamacpp_d1_kind::lfm2 &&
+                                handle->d1_kind != rac_llamacpp_d1_kind::pplx_joint;
     context_params.pooling_type = LLAMA_POOLING_TYPE_NONE;
     context_params.no_perf = true;
 
@@ -423,16 +426,23 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
         return RAC_SUCCESS;
     }
 
-    // This engine scores every checkpoint one way and takes no images, so the
-    // grouping, length, pixel and image controls are refused, never ignored.
-    if (rac_decision_options_has_extended(options) == RAC_TRUE) {
+    // Only pplx-decider-joint takes grouping; the length, pixel and image
+    // controls, and grouping for any other checkpoint, are refused, never
+    // ignored.
+    rac_decision_options_t controls = options != nullptr ? *options : RAC_DECISION_OPTIONS_DEFAULT;
+    if (handle->d1_kind == rac_llamacpp_d1_kind::pplx_joint) {
+        controls.grouping = RAC_DECISION_GROUPING_UNSPECIFIED;
+    }
+    if (rac_decision_options_has_extended(&controls) == RAC_TRUE) {
         RAC_LOG_ERROR(kLogCategory,
                       "llama.cpp decisions take no grouping, max_length, pixel bounds or "
                       "images (grouping=%d max_length=%u max_pixels=%u min_pixels=%u images=%zu)",
                       static_cast<int>(options->grouping), options->max_length,
                       options->max_pixels, options->min_pixels, options->image_count);
         rac_error_set_details(
-            "this decision model takes no grouping, max_length, pixel bounds or images");
+            handle->d1_kind == rac_llamacpp_d1_kind::pplx_joint
+                ? "this decision model takes no max_length, pixel bounds or images"
+                : "this decision model takes no grouping, max_length, pixel bounds or images");
         return RAC_ERROR_NOT_SUPPORTED;
     }
 

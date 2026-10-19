@@ -10,9 +10,11 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_error.h"
 #include "rac/features/decision/rac_decision_service.h"
 
 namespace {
@@ -384,7 +386,313 @@ std::vector<float> score_gliner(llama_model* model, llama_context* ctx, const ll
     return softmax(scores, temperature);
 }
 
+// A list the converter stores as a JSON string, since llama.cpp leaves array
+// keys out of the model metadata. Empty when the key is missing or malformed.
+std::vector<std::string> meta_str_list(const llama_model* model, const std::string& key) {
+    const int32_t n = llama_model_meta_val_str(model, key.c_str(), nullptr, 0);
+    if (n < 0) {
+        return {};
+    }
+    std::string value(static_cast<size_t>(n) + 1, '\0');
+    llama_model_meta_val_str(model, key.c_str(), value.data(), value.size());
+    value.resize(static_cast<size_t>(n));
+    return rac_llamacpp_pplx_parse_string_list(value);
+}
+
+// One sequence of a pplx-decider-joint request: the questions it carries, in
+// request order, and their tokens.
+struct PplxSequence {
+    std::vector<size_t> questions;
+    std::vector<llama_token> tokens;
+    std::vector<int32_t> markers;
+};
+
+class PplxJoint {
+public:
+    PplxJoint(llama_model* model, const llama_vocab* vocab) : model_(model), vocab_(vocab) {
+        const std::string arch = meta_str(model, "general.architecture");
+        marker_text_ = meta_str(model, arch + ".decision.marker");
+        codes_ = meta_str_list(model, arch + ".decision.codes");
+        escapes_ = meta_str_list(model, arch + ".decision.escapes");
+        const std::vector<llama_token> marker = common_tokenize(vocab, marker_text_, false, true);
+        if (marker_text_.empty() || marker.size() != 1) {
+            throw std::runtime_error("pplx-decider marker is not one token");
+        }
+        marker_ = marker[0];
+        if (codes_.empty() || codes_.size() > 255) {
+            throw std::runtime_error("pplx-decider needs 1 to 255 answer codes");
+        }
+        for (const std::string& code : codes_) {
+            const std::vector<llama_token> ids = common_tokenize(vocab, code, false, false);
+            if (ids.size() != 1) {
+                throw std::runtime_error("pplx-decider answer code is not one token: " + code);
+            }
+            code_ids_.push_back(ids[0]);
+        }
+    }
+
+    size_t max_options() const { return codes_.size(); }
+
+    std::string escaped(const std::string& text) const {
+        return rac_llamacpp_pplx_escape(text, escapes_);
+    }
+
+    // Option texts in prompt order, and the request option index of each, as
+    // the reference lists them: choices in request order as "key: description",
+    // score levels in order, and yes/no as false then true.
+    void option_rows(const rac_decision_question_t& question, std::vector<std::string>* texts,
+                     std::vector<size_t>* order) const {
+        texts->clear();
+        order->clear();
+        if (question.type == RAC_DECISION_QUESTION_NOUL) {
+            for (const int polarity : {0, 1}) {
+                for (size_t i = 0; i < question.option_count; ++i) {
+                    if (noul_polarity(question.options[i].key) != polarity) {
+                        continue;
+                    }
+                    const char* description = question.options[i].description;
+                    const bool described = description != nullptr && description[0] != '\0';
+                    texts->push_back(described         ? description
+                                     : polarity == 1   ? "Yes / true"
+                                                       : "No / false");
+                    order->push_back(i);
+                }
+            }
+            return;
+        }
+        for (size_t i = 0; i < question.option_count; ++i) {
+            const rac_decision_option_t& option = question.options[i];
+            const std::string key = option.key != nullptr ? option.key : "";
+            if (question.type == RAC_DECISION_QUESTION_CHOICE) {
+                texts->push_back(option.description != nullptr ? key + ": " + option.description : key);
+            } else {
+                texts->push_back(option.description != nullptr ? option.description : "");
+            }
+            order->push_back(i);
+        }
+    }
+
+    PplxSequence encode(const char* state, const rac_decision_question_t* questions,
+                        const std::vector<size_t>& indices) const {
+        common_json rows = common_json::array();
+        for (const size_t index : indices) {
+            const rac_decision_question_t& question = questions[index];
+            std::vector<std::string> texts;
+            std::vector<size_t> order;
+            option_rows(question, &texts, &order);
+            common_json options = common_json::array();
+            for (size_t slot = 0; slot < texts.size(); ++slot) {
+                common_json option = common_json::object();
+                option["label"] = codes_[slot];
+                option["description"] = escaped(texts[slot]);
+                options.push_back(option);
+            }
+            common_json row = common_json::object();
+            row["instructions"] =
+                question.instructions != nullptr ? common_json(escaped(question.instructions)) : common_json();
+            row["options"] = std::move(options);
+            rows.push_back(std::move(row));
+        }
+        common_json input = common_json::object();
+        input["state"] = escaped(state != nullptr ? state : "");
+        input["questions"] = std::move(rows);
+
+        PplxSequence sequence;
+        sequence.questions = indices;
+        sequence.tokens = common_tokenize(vocab_, render_template(model_, input), false, true);
+        for (size_t i = 0; i < sequence.tokens.size(); ++i) {
+            if (sequence.tokens[i] == marker_) {
+                sequence.markers.push_back(static_cast<int32_t>(i));
+            }
+        }
+        if (sequence.markers.size() != indices.size()) {
+            throw std::runtime_error("pplx-decider markers do not match the questions");
+        }
+        return sequence;
+    }
+
+    // Raw code logits at each marker, one row per question of the sequence.
+    std::vector<std::vector<float>> logits(llama_context* ctx, const PplxSequence& sequence) const {
+        llama_batch batch = llama_batch_init(static_cast<int32_t>(sequence.tokens.size()), 0, 1);
+        struct Free {
+            llama_batch& b;
+            ~Free() { llama_batch_free(b); }
+        } guard{batch};
+        batch.n_tokens = static_cast<int32_t>(sequence.tokens.size());
+        for (int32_t i = 0; i < batch.n_tokens; ++i) {
+            batch.token[i] = sequence.tokens[static_cast<size_t>(i)];
+            batch.pos[i] = i;
+            batch.n_seq_id[i] = 1;
+            batch.seq_id[i][0] = 0;
+            batch.logits[i] = 0;
+        }
+        for (const int32_t marker : sequence.markers) {
+            batch.logits[marker] = 1;
+        }
+        llama_memory_clear(llama_get_memory(ctx), true);
+        if (llama_decode(ctx, batch) != 0) {
+            throw std::runtime_error("llama_decode failed");
+        }
+        std::vector<std::vector<float>> rows;
+        for (const int32_t marker : sequence.markers) {
+            const float* row = llama_get_logits_ith(ctx, marker);
+            if (row == nullptr) {
+                throw std::runtime_error("no logits at the pplx-decider marker");
+            }
+            std::vector<float> codes;
+            for (const llama_token id : code_ids_) {
+                if (!std::isfinite(row[id])) {
+                    throw std::runtime_error("pplx-decider logit is not finite");
+                }
+                codes.push_back(row[id]);
+            }
+            rows.push_back(std::move(codes));
+        }
+        return rows;
+    }
+
+private:
+    llama_model* model_;
+    const llama_vocab* vocab_;
+    std::string marker_text_;
+    llama_token marker_ = LLAMA_TOKEN_NULL;
+    std::vector<std::string> codes_;
+    std::vector<llama_token> code_ids_;
+    std::vector<std::string> escapes_;
+};
+
+void validate_pplx(const rac_decision_question_t* questions, size_t question_count, size_t max_options) {
+    std::vector<std::string> ids;
+    for (size_t i = 0; i < question_count; ++i) {
+        const rac_decision_question_t& question = questions[i];
+        const std::string id = question.id != nullptr ? question.id : "";
+        if (id.empty() || std::find(ids.begin(), ids.end(), id) != ids.end()) {
+            throw std::invalid_argument("question ids must be nonempty and unique");
+        }
+        ids.push_back(id);
+        if (question.option_count < 1 || question.option_count > max_options) {
+            throw std::invalid_argument("question '" + id + "': 1 to " + std::to_string(max_options) +
+                                        " options are supported");
+        }
+        if (question.type == RAC_DECISION_QUESTION_SCORE && question.option_count < 2) {
+            throw std::invalid_argument("question '" + id + "': a score needs at least two levels");
+        }
+        if (question.type == RAC_DECISION_QUESTION_CHOICE) {
+            std::vector<std::string> keys;
+            for (size_t j = 0; j < question.option_count; ++j) {
+                const std::string key = question.options[j].key != nullptr ? question.options[j].key : "";
+                if (std::find(keys.begin(), keys.end(), key) != keys.end()) {
+                    throw std::invalid_argument("question '" + id + "': option keys must be unique");
+                }
+                keys.push_back(key);
+            }
+        }
+    }
+}
+
+// Probabilities of every question, parallel to the request options. Each
+// question runs in its own sequence unless joint grouping is asked for; a
+// joint sequence over the context is split in halves, as the reference does.
+std::vector<std::vector<float>> score_pplx(llama_model* model, llama_context* ctx, const llama_vocab* vocab,
+                                           const char* state, const rac_decision_question_t* questions,
+                                           size_t question_count, const rac_decision_options_t* options,
+                                           int32_t* token_count) {
+    const PplxJoint joint(model, vocab);
+    validate_pplx(questions, question_count, joint.max_options());
+    const size_t n_ctx = llama_n_ctx(ctx);
+    const bool grouped = options != nullptr && options->grouping == RAC_DECISION_GROUPING_JOINT;
+    std::vector<std::vector<size_t>> groups;
+    if (grouped) {
+        groups.emplace_back();
+        for (size_t i = 0; i < question_count; ++i) {
+            groups.back().push_back(i);
+        }
+    } else {
+        for (size_t i = 0; i < question_count; ++i) {
+            groups.push_back({i});
+        }
+    }
+
+    std::vector<PplxSequence> sequences;
+    while (!groups.empty()) {
+        std::vector<size_t> group = std::move(groups.back());
+        groups.pop_back();
+        PplxSequence sequence = joint.encode(state, questions, group);
+        if (sequence.tokens.size() <= n_ctx) {
+            sequences.push_back(std::move(sequence));
+            continue;
+        }
+        if (group.size() == 1) {
+            throw std::length_error("question '" + std::string(questions[group[0]].id) + "' needs " +
+                                    std::to_string(sequence.tokens.size()) + " tokens, over the " +
+                                    std::to_string(n_ctx) + "-token context");
+        }
+        const auto middle = group.begin() + static_cast<std::ptrdiff_t>(group.size() / 2);
+        groups.emplace_back(middle, group.end());
+        groups.emplace_back(group.begin(), middle);
+    }
+
+    std::vector<std::vector<float>> probs(question_count);
+    for (const PplxSequence& sequence : sequences) {
+        *token_count += static_cast<int32_t>(sequence.tokens.size());
+        const std::vector<std::vector<float>> rows = joint.logits(ctx, sequence);
+        for (size_t row = 0; row < rows.size(); ++row) {
+            const size_t index = sequence.questions[row];
+            const rac_decision_question_t& question = questions[index];
+            std::vector<std::string> texts;
+            std::vector<size_t> order;
+            joint.option_rows(question, &texts, &order);
+            const std::vector<float> scores(rows[row].begin(),
+                                            rows[row].begin() + static_cast<std::ptrdiff_t>(order.size()));
+            const std::vector<float> prompt_probs =
+                softmax(scores, temperature_for(model, question.type, question.option_count, options));
+            probs[index].assign(question.option_count, 0.0f);
+            for (size_t slot = 0; slot < order.size(); ++slot) {
+                probs[index][order[slot]] = prompt_probs[slot];
+            }
+        }
+    }
+    return probs;
+}
+
 }  // namespace
+
+std::string rac_llamacpp_pplx_escape(const std::string& text, const std::vector<std::string>& escapes) {
+    std::string out = text;
+    for (const std::string& token : escapes) {
+        if (token.empty()) {
+            continue;
+        }
+        std::string replacement;
+        for (const char c : token) {
+            replacement += c == '<' ? "\xEF\xBC\x9C" : c == '>' ? "\xEF\xBC\x9E" : std::string(1, c);
+        }
+        std::string next;
+        size_t at = 0;
+        for (size_t found; (found = out.find(token, at)) != std::string::npos; at = found + token.size()) {
+            next.append(out, at, found - at);
+            next += replacement;
+        }
+        next.append(out, at, std::string::npos);
+        out = std::move(next);
+    }
+    return out;
+}
+
+std::vector<std::string> rac_llamacpp_pplx_parse_string_list(const std::string& json) {
+    const common_json parsed = common_json::parse_no_throw(json);
+    std::vector<std::string> out;
+    if (parsed.is_discarded() || !parsed.is_array()) {
+        return out;
+    }
+    for (const auto& item : parsed) {
+        if (!item.is_string()) {
+            return {};
+        }
+        out.push_back(item.get<std::string>());
+    }
+    return out;
+}
 
 rac_llamacpp_d1_kind rac_llamacpp_d1_kind_of(const llama_model* model) {
     const std::string key = meta_str(model, "general.architecture") + ".decision.type";
@@ -397,6 +705,9 @@ rac_llamacpp_d1_kind rac_llamacpp_d1_kind_of(const llama_model* model) {
     }
     if (type == "gliner") {
         return rac_llamacpp_d1_kind::gliner;
+    }
+    if (type == "pplx-decider-joint") {
+        return rac_llamacpp_d1_kind::pplx_joint;
     }
     return rac_llamacpp_d1_kind::none;
 }
@@ -415,6 +726,10 @@ rac_result_t rac_llamacpp_d1_decide(llama_model* model, llama_context* ctx, rac_
     const llama_vocab* vocab = llama_model_get_vocab(model);
     int32_t n_tokens = 0;
     try {
+        std::vector<std::vector<float>> pplx_probs;
+        if (kind == rac_llamacpp_d1_kind::pplx_joint) {
+            pplx_probs = score_pplx(model, ctx, vocab, state, questions, question_count, options, &n_tokens);
+        }
         for (size_t i = 0; i < question_count; ++i) {
             const rac_decision_question_t& question = questions[i];
             auto& answer = output->answers[i];
@@ -452,7 +767,9 @@ rac_result_t rac_llamacpp_d1_decide(llama_model* model, llama_context* ctx, rac_
             }
             const float temperature = temperature_for(model, question.type, question.option_count, options);
             std::vector<float> probs;
-            if (kind == rac_llamacpp_d1_kind::omni) {
+            if (kind == rac_llamacpp_d1_kind::pplx_joint) {
+                probs = std::move(pplx_probs[i]);
+            } else if (kind == rac_llamacpp_d1_kind::omni) {
                 probs = score_omni(model, ctx, vocab, state, question, temperature, &n_tokens);
             } else if (kind == rac_llamacpp_d1_kind::gliner) {
                 probs = score_gliner(model, ctx, vocab, state, question, temperature, &n_tokens);
@@ -500,6 +817,14 @@ rac_result_t rac_llamacpp_d1_decide(llama_model* model, llama_context* ctx, rac_
                     break;
             }
         }
+    } catch (const std::invalid_argument& error) {
+        rac_error_set_details(error.what());
+        rac_decision_result_free(output);
+        return RAC_ERROR_INVALID_ARGUMENT;
+    } catch (const std::length_error& error) {
+        rac_error_set_details(error.what());
+        rac_decision_result_free(output);
+        return RAC_ERROR_TEXT_TOO_LONG;
     } catch (const std::exception&) {
         rac_decision_result_free(output);
         return RAC_ERROR_INFERENCE_FAILED;
