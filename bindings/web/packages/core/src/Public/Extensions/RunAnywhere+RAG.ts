@@ -729,7 +729,6 @@ class CrossWasmRAGProvider implements RAGProvider {
       );
     }
 
-    this.removeDocumentInternal(normalized.id);
     const nextChunks = textChunks.map((chunk, index): CrossWasmRAGChunk => ({
       id: `${normalized.id}:chunk-${index}`,
       documentId: normalized.id,
@@ -745,7 +744,12 @@ class CrossWasmRAGProvider implements RAGProvider {
       endOffset: chunk.endOffset,
       tokenCount: chunk.tokenCount,
     }));
-    for (const chunk of nextChunks) this.chunks.push(chunk);
+    // Build the replacement index fully before touching state, so a failure
+    // anywhere above leaves the previously ingested version intact (#1129).
+    const retained = this.chunks.filter((chunk) => chunk.documentId !== normalized.id);
+    for (const chunk of nextChunks) retained.push(chunk);
+    this.chunks = retained;
+    this.documents.delete(normalized.id);
     this.documents.set(normalized.id, {
       id: normalized.id,
       name: normalized.name,

@@ -197,6 +197,51 @@ describe('CrossWasmRAGProvider', () => {
     });
   });
 
+  it('keeps the previous version of a document when a replacement ingest fails (#1129)', async () => {
+    installBackendSpies();
+    const embedBatch = vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
+      async (request: EmbeddingsRequest): Promise<EmbeddingsResult> => embeddingsResult(
+        request.texts.map((text: string, index: number) => vector([1, 0], text, index)),
+      ),
+    );
+    const provider = __testing__.createCrossWasmRAGProvider();
+    await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    }));
+    const metadataJson = JSON.stringify({ docId: 'doc-1', docName: 'One' });
+    await provider.ragIngest('The Zephyr launch code is ORBIT-7.', metadataJson);
+
+    // The vector count matches, so the failure lands while the replacement
+    // chunks are being built -- after the old chunks used to be dropped.
+    embedBatch.mockImplementationOnce(async (request: EmbeddingsRequest) => {
+      const result = embeddingsResult(
+        request.texts.map((text: string, index: number) => vector([1, 0], text, index)),
+      );
+      Object.defineProperty(result.vectors, 0, {
+        get() { throw new Error('allocation failed'); },
+      });
+      return result;
+    });
+    await expect(provider.ragIngest('A replacement document.', metadataJson))
+      .rejects.toThrow('allocation failed');
+
+    await expect(provider.ragListDocuments?.()).resolves.toEqual([
+      { id: 'doc-1', name: 'One', chunkCount: 1 },
+    ]);
+    await expect(provider.ragGetStatistics?.()).resolves.toMatchObject({
+      indexedDocuments: 1,
+      indexedChunks: 1,
+    });
+    vi.spyOn(Embeddings, 'embed').mockResolvedValue(
+      embeddingsResult([vector([1, 0], 'launch code', 0)]),
+    );
+    const results = await provider.ragSearch?.('launch code', 1);
+    expect(results?.map((result) => result.text)).toEqual([
+      'The Zephyr launch code is ORBIT-7.',
+    ]);
+  });
+
   it('supports typed document removal, clear, and statistics', async () => {
     installBackendSpies();
     vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
