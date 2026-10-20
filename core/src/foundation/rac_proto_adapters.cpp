@@ -293,19 +293,20 @@ bool rac_stt_result_to_proto(const rac_stt_result_t* in, ::runanywhere::v1::STTO
 // TTS
 // ===========================================================================
 
-bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out) {
+rac_result_t rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in,
+                                        rac_tts_options_t* out) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     *out = RAC_TTS_OPTIONS_DEFAULT;
     out->language = nullptr;
     char* voice = copy_string(in.voice());
     if (!in.voice().empty() && !voice)
-        return false;
+        return RAC_ERROR_OUT_OF_MEMORY;
     char* language = rac_strdup(in.language_code().empty() ? RAC_TTS_OPTIONS_DEFAULT.language
                                                            : in.language_code().c_str());
     if (!language) {
         rac_free(voice);
-        return false;
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
     out->voice = voice;
     out->language = language;
@@ -319,7 +320,7 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts
     // enable_ssml deleted from TTSOptions -- no backend parses SSML. use_ssml
     // stays at RAC_TTS_OPTIONS_DEFAULT's value (false).
     // sample_rate has no proto field on TTSOptions; keep default.
-    return true;
+    return RAC_SUCCESS;
 }
 
 // rac_tts_phoneme_timestamp_to_proto / _from_proto deleted: TTSPhonemeTimestamp
