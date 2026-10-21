@@ -185,6 +185,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake -S . -B build/rag-no-protobuf -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRAC_ENABLE_PROTOBUF=OFF -DRAC_BACKEND_RAG=ON -DRAC_BUILD_BACKENDS=OFF -DRAC_BUILD_TESTS=OFF
       - run: cmake --build build/rag-no-protobuf --target rac_backend_rag -j "$(nproc)"
