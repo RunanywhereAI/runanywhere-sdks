@@ -135,7 +135,7 @@ initializer is what keeps the ABI from drifting silently.
 5. **Registration** — `RAC_PLUGIN_ENTRY_DEF(<name>)` plus a static/dynamic
    register carrier (Build & registration below).
 
-`RAC_PLUGIN_API_VERSION` is currently `13u` (defined in `core/include/rac/plugin/rac_plugin_entry.h`); a mismatch rejects the plugin outright.
+`RAC_PLUGIN_API_VERSION` is currently `14u` (defined in `core/include/rac/plugin/rac_plugin_entry.h`); a mismatch rejects the plugin outright.
 
 ---
 
