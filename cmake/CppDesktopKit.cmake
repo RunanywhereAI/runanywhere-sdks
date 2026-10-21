@@ -134,7 +134,7 @@ set(_abi_header "${RAC_SOURCE_DIR}/core/include/rac/plugin/rac_plugin_entry.h")
 file(STRINGS "${_abi_header}" _abi_line REGEX "#define[ \t]+RAC_PLUGIN_API_VERSION")
 string(REGEX REPLACE ".*[^0-9]([0-9]+)u?.*" "\\1" RAC_PLUGIN_API_VERSION "${_abi_line}")
 if(NOT RAC_PLUGIN_API_VERSION)
-    set(RAC_PLUGIN_API_VERSION "9")
+    set(RAC_PLUGIN_API_VERSION "14")
 endif()
 
 set(_kit_depends rac_commons)

@@ -147,7 +147,7 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* ─────────── Primitive slot groups (10 active) ─────────── */
+    /* ─────────── Primitive slot groups (13 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
     const struct rac_llm_service_ops* llm_ops;
@@ -186,7 +186,7 @@ typedef struct rac_engine_vtable {
      *  exactly as rerank_ops did in v8. */
     const struct rac_image_embedding_service_ops* image_embedding_ops;
 
-    /* ─────────── Reserved slot pool (5 slots) ─────────── */
+    /* ─────────── Reserved slot pool (4 slots) ─────────── */
     /*
      * Keeps the struct layout binary-stable as new primitives land. Each
      * reserved slot is a `const void*` so the compiler can fill with NULL

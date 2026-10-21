@@ -111,10 +111,10 @@ Feature-family classification, because not every capability fits one mold:
 ### Plugin ABI (full history — the root `AGENTS.md` links here for this)
 
 All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10
-active primitive slots and 7 reserved slots (the single source of truth for primitive slots is
+active primitive slots and 4 reserved slots (the single source of truth for primitive slots is
 the `RAC_PRIMITIVE_TABLE` X-macro in that header). A NULL primitive slot means not supported. An
 ABI version mismatch (`metadata.abi_version != RAC_PLUGIN_API_VERSION`) is rejected at
-registration. The current handshake is `RAC_PLUGIN_API_VERSION = 13u`: ABI v9 widened
+registration. The current handshake is `RAC_PLUGIN_API_VERSION = 14u`: ABI v9 widened
 `rac_llm_stream_callback_fn` with `tokens_in_delta` and added `get_stream_token_counts` on
 `rac_llm_service_ops_t` (a NULL callback makes commons estimate counts and set
 `TokenUsage.counts_estimated`). `RAC_PRIMITIVE_RERANK` (wire value 11, `rerank_ops`, promoted
