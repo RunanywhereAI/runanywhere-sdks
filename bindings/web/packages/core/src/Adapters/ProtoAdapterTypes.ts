@@ -577,7 +577,7 @@ export function streamCallback<T>(
         // Kept for the consumer that is not parked right now (a decode that
         // throws while earlier events are still buffered, say); without it the
         // next `next()` would read the stream as a clean end.
-        failure = { reason: error };
+        if (waiters.length === 0) failure = { reason: error };
         while (waiters.length > 0) {
           waiters.shift()!.reject(error);
         }

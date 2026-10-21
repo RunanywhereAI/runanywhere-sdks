@@ -10,6 +10,10 @@
  * arrived while the consumer was between `next()` calls was reported to the
  * following `next()` as a clean end-of-stream.
  *
+ * The opposite case is pinned too: a failure rejected into a consumer that is
+ * already parked is not kept as well, or the next `next()` would raise the same
+ * error a second time.
+ *
  * Run from `bindings/web/packages/core`:
  *
  *     npx vitest run tests/unit/runtime/StreamFailureNotParked.test.ts
@@ -251,5 +255,35 @@ describe('a stream failure that lands while the consumer is not parked', () => {
     worker.onerror?.({ message: 'simulated crash' } as ErrorEvent);
 
     await expect(iterator.next()).rejects.toThrow();
+  });
+});
+
+describe('a stream failure that lands while consumers are parked on next()', () => {
+  it('rejects every parked waiter and is not raised again afterwards', async () => {
+    const fake = makeFakeModule();
+    let failNativeCall!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      failNativeCall = resolve;
+    });
+
+    // The native call starts on a microtask after the first `next()`, so both
+    // waiters below are parked before the gate opens.
+    const iterator = streamCallback(fake, uint32Codec, 'parked_test_stream', async () => {
+      await gate;
+      throw new Error('native call failed');
+    })[Symbol.asyncIterator]();
+
+    const first = iterator.next();
+    const second = iterator.next();
+    const settled = Promise.allSettled([first, second]);
+
+    failNativeCall();
+
+    const [firstResult, secondResult] = await settled;
+    expect(firstResult).toMatchObject({ status: 'rejected', reason: new Error('native call failed') });
+    expect(secondResult).toMatchObject({ status: 'rejected', reason: new Error('native call failed') });
+
+    // Both waiters already got the error, so the stream reads as ended.
+    expect(await iterator.next()).toEqual({ value: undefined, done: true });
   });
 });
