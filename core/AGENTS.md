@@ -81,7 +81,7 @@ The full option set (per-backend `RAC_BACKEND_<NAME>` flags, `RAC_DESKTOP_ADAPTE
 `runanywhere-commons` (this directory) is a unified C/C++ library (C++20 internals, pure C API
 surface) that sits between platform SDKs and ML inference backends (`../engines/`). It is the
 single source of truth for business logic; platform SDKs are thin bridges. The repo-root
-`AGENTS.md` covers the cross-platform layer diagram and the `rac_engine_vtable_t` v9 ABI at the
+`AGENTS.md` covers the cross-platform layer diagram and the `rac_engine_vtable_t` plugin ABI at the
 level every SDK needs; what follows here is `core/`-internal detail that needs multiple files
 to piece together.
 
@@ -108,13 +108,13 @@ Feature-family classification, because not every capability fits one mold:
 - Composed pipelines (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
 - VAD is a dual-backend special case: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
-### Plugin ABI v9 (full history — the root `AGENTS.md` links here for this)
+### Plugin ABI (full history — the root `AGENTS.md` links here for this)
 
 All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10
-active primitive slots and 7 reserved slots (the single source of truth for primitive slots is
+active primitive slots and 4 reserved slots (the single source of truth for primitive slots is
 the `RAC_PRIMITIVE_TABLE` X-macro in that header). A NULL primitive slot means not supported. An
 ABI version mismatch (`metadata.abi_version != RAC_PLUGIN_API_VERSION`) is rejected at
-registration. The current handshake is `RAC_PLUGIN_API_VERSION = 9u`: ABI v9 widened
+registration. The current handshake is `RAC_PLUGIN_API_VERSION = 14u`: ABI v9 widened
 `rac_llm_stream_callback_fn` with `tokens_in_delta` and added `get_stream_token_counts` on
 `rac_llm_service_ops_t` (a NULL callback makes commons estimate counts and set
 `TokenUsage.counts_estimated`). `RAC_PRIMITIVE_RERANK` (wire value 11, `rerank_ops`, promoted

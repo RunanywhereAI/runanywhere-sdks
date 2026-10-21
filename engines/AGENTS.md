@@ -19,9 +19,9 @@ count) — when reality and this doc disagree, the code wins; fix the doc.
 ## What an engine is
 
 An **engine is an op-table adapter for modalities.** It fills exactly **one**
-`rac_engine_vtable_t` (`core/include/rac/plugin/rac_engine_vtable.h`) — 10 live
+`rac_engine_vtable_t` (`core/include/rac/plugin/rac_engine_vtable.h`) — 13 live
 primitive slots (`llm_ops`/`stt_ops`/`tts_ops`/`vad_ops`/`embedding_ops`/
-`vlm_ops`/`diffusion_ops`/`diarization_ops`/`segmentation_ops`/`rerank_ops`);
+`vlm_ops`/`diffusion_ops`/`diarization_ops`/`segmentation_ops`/`rerank_ops`/`image_embedding_ops`/`ocr_ops`/`decision_ops`);
 **NULL means "I do not serve that primitive."** Serving more than one modality
 just means filling more than one slot — today `llamacpp` fills four
 (`llm`/`embedding`/`vlm`/`rerank`), `sherpa` fills three (`stt`/`tts`/`vad`). It
@@ -109,8 +109,8 @@ initializer is what keeps the ABI from drifting silently.
    model file, e.g. cloud); `availability` (PUBLIC/PRIVATE), `priority`,
    package owner/name.
 2. **A `rac_engine_vtable_t`**: served-primitive slots non-NULL, **every other
-   slot explicit NULL** (10 primitive slots + the optional
-   `get_stream_token_counts` callback + **7 reserved slots**). Lives in
+   slot explicit NULL** (13 primitive slots + the optional
+   `get_stream_token_counts` callback + **4 reserved slots**). Lives in
    `.rodata`; a future reserved-slot promotion turns the aggregate initializer
    into a compile error — the intended tripwire.
 3. **The uniform MODEL LIFECYCLE** on each served op-table:
@@ -135,7 +135,7 @@ initializer is what keeps the ABI from drifting silently.
 5. **Registration** — `RAC_PLUGIN_ENTRY_DEF(<name>)` plus a static/dynamic
    register carrier (Build & registration below).
 
-`RAC_PLUGIN_API_VERSION` is currently `9u`; a mismatch rejects the plugin outright.
+`RAC_PLUGIN_API_VERSION` is currently `14u` (defined in `core/include/rac/plugin/rac_plugin_entry.h`); a mismatch rejects the plugin outright.
 
 ---
 

@@ -149,8 +149,8 @@ llamacpp=100, sherpa=90, onnx/cloud=50. An explicit engine name is honored throu
 - **Two-phase init**: every SDK does Phase 1 (sync: register adapter, load native libs,
   configure logging) then Phase 2 (async: authenticate, register device, fetch model
   assignments, discover downloaded models).
-- **Plugin ABI**: `RAC_PLUGIN_API_VERSION = 9u`; a version mismatch is an immediate
-  rejection. Each vtable has 10 active primitive slots and 7 reserved. NULL slot = not
+- **Plugin ABI**: `RAC_PLUGIN_API_VERSION = 14u` (see `core/include/rac/plugin/rac_plugin_entry.h`); a version mismatch is an immediate
+  rejection. Each vtable has 13 active primitive slots and 4 reserved. NULL slot = not
   supported. `rerank_ops` (wire value 11) was promoted from `reserved_slot_2` in ABI v8;
   wire value 6, retired in ABI v4, stays permanently retired — never reuse it. See
   `core/AGENTS.md` for the full ABI history and how to add a primitive.
