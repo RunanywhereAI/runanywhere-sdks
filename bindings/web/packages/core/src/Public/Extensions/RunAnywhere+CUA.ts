@@ -154,6 +154,89 @@ export const CUA = {
   faraProfile: FARA_PROFILE,
 
   /**
+   * Teach the SDK a new computer-use model family at runtime.
+   *
+   * A profile is the only thing that differs between one such model and
+   * another: the system prompt that gives it its action vocabulary, and the
+   * coordinate space it answers in. Parsing and rescaling are shared.
+   *
+   * This exists so supporting a new model does not require a C++ change, an SDK
+   * rebuild, and a release across every binding. It is engine-agnostic by
+   * construction — the same profile applies whether the model runs through
+   * llama.cpp, MLX, ONNX or an NPU, because none of this touches inference.
+   *
+   * Registering an existing id replaces it, including a built-in, so a shipped
+   * prompt can be corrected without waiting for a release. `unregisterProfile`
+   * restores the built-in.
+   *
+   * The prompt and space must match what the model was actually trained to
+   * emit. A plausible-looking guess produces confidently wrong clicks, which is
+   * worse than having no profile at all.
+   */
+  registerProfile(profile: string, systemPrompt: string, modelSpace: CuaDisplaySize): void {
+    requireDimensions(modelSpace, 'modelSpace');
+    const module = requireModule();
+    const registerFn = module._rac_cua_register_profile;
+    if (typeof registerFn !== 'function') {
+      throw new SDKException(-1, `WASM module missing _rac_cua_register_profile. ${REBUILD_HINT}`);
+    }
+    const profilePtr = allocCString(module, profile);
+    const promptPtr = allocCString(module, systemPrompt);
+    try {
+      const rc = registerFn(profilePtr, promptPtr, modelSpace.width, modelSpace.height);
+      if (rc !== 0) {
+        throw new SDKException(rc, `Could not register CUA profile '${profile}'.`);
+      }
+    } finally {
+      module._free(promptPtr);
+      module._free(profilePtr);
+    }
+  },
+
+  /**
+   * Remove a runtime-registered profile. If it was overriding a built-in, the
+   * built-in comes back. Returns false if no runtime profile had that id.
+   */
+  unregisterProfile(profile: string): boolean {
+    const module = requireModule();
+    const unregisterFn = module._rac_cua_unregister_profile;
+    if (typeof unregisterFn !== 'function') {
+      throw new SDKException(-1, `WASM module missing _rac_cua_unregister_profile. ${REBUILD_HINT}`);
+    }
+    const profilePtr = allocCString(module, profile);
+    try {
+      return unregisterFn(profilePtr) === 0;
+    } finally {
+      module._free(profilePtr);
+    }
+  },
+
+  /** Every known profile id, runtime-registered first, then built-ins. */
+  listProfiles(): string[] {
+    const module = requireModule();
+    const countFn = module._rac_cua_profile_count;
+    const idAtFn = module._rac_cua_profile_id_at;
+    if (typeof countFn !== 'function' || typeof idAtFn !== 'function') {
+      throw new SDKException(-1, `WASM module missing the CUA profile-listing exports. ${REBUILD_HINT}`);
+    }
+
+    const total = countFn();
+    const ids: string[] = [];
+    for (let index = 0; index < total; index += 1) {
+      const needed = idAtFn(index, 0, 0);
+      if (needed <= 0) continue;
+      const bufferPtr = module._malloc(needed + 1);
+      try {
+        idAtFn(index, bufferPtr, needed + 1);
+        ids.push(module.UTF8ToString(bufferPtr));
+      } finally {
+        module._free(bufferPtr);
+      }
+    }
+    return ids;
+  },
+
+  /**
    * The system prompt (identity + `computer_use` tool schema) for a profile,
    * rendered at the profile's coordinate space. Returns null for an unknown
    * profile, or if `display` is neither the profile's own space (1000×1000 for

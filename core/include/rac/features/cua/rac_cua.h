@@ -38,6 +38,72 @@ extern "C" {
 /** Built-in profile IDs. */
 #define RAC_CUA_PROFILE_FARA "fara"
 
+/**
+ * Register a CUA profile at runtime.
+ *
+ * A profile is everything that differs between one computer-use model family
+ * and another: the system prompt that teaches it the action vocabulary, and the
+ * coordinate space it was trained to answer in. Everything downstream —
+ * parsing, rescaling into a real viewport — is shared.
+ *
+ * This exists so that supporting a new model family does not require editing
+ * this library, rebuilding it, and republishing six language bindings. An
+ * application can register a profile at startup and use it immediately. It is
+ * also engine-agnostic by construction: the same profile works whether the
+ * model runs through llama.cpp, MLX, ONNX or the Hexagon NPU, because nothing
+ * here touches inference.
+ *
+ * Strings are COPIED, so the caller may free them on return.
+ *
+ * Registering an id that already exists REPLACES it, including a built-in.
+ * That is deliberate: it lets an application correct a shipped prompt without
+ * waiting for an SDK release.
+ *
+ * @param profile_id       Stable identifier, e.g. "my-vlm". Must be non-empty.
+ * @param system_prompt    Prompt teaching the model its action vocabulary.
+ * @param model_space_w    Width of the coordinate space the model answers in.
+ * @param model_space_h    Height of that space.
+ * @return RAC_SUCCESS, or RAC_ERROR_INVALID_ARGUMENT for a null/empty id, a null
+ *         prompt, or a coordinate space outside 1..65536.
+ *
+ * Thread-safe.
+ */
+rac_result_t rac_cua_register_profile(const char* profile_id, const char* system_prompt,
+                                      uint32_t model_space_w, uint32_t model_space_h);
+
+/**
+ * Remove a runtime-registered profile.
+ *
+ * Only affects the runtime registry. Unregistering an id that was overriding a
+ * built-in restores the built-in rather than removing it, which is what makes
+ * an override safely reversible.
+ *
+ * @return RAC_SUCCESS if a runtime profile was removed, or
+ *         RAC_ERROR_INVALID_ARGUMENT for a null id or an id that was not
+ *         registered at runtime.
+ *
+ * Thread-safe.
+ */
+rac_result_t rac_cua_unregister_profile(const char* profile_id);
+
+/**
+ * Number of profiles currently known, built-in plus runtime-registered.
+ * Thread-safe, but only a snapshot — another thread may register meanwhile.
+ */
+size_t rac_cua_profile_count(void);
+
+/**
+ * Write the id of the profile at @p index into @p out.
+ *
+ * Runtime-registered profiles come first, then built-ins, so an override of a
+ * built-in id appears once, in the runtime position.
+ *
+ * @return the id's length excluding the terminator, or -1 if @p index is out of
+ *         range. As elsewhere here, a too-small buffer truncates rather than
+ *         failing, and the return value is the length that was needed.
+ */
+int rac_cua_profile_id_at(size_t index, char* out, size_t out_size);
+
 /** Model-agnostic action type parsed from a CUA model's output. */
 typedef enum {
     RAC_CUA_ACTION_UNKNOWN = 0,

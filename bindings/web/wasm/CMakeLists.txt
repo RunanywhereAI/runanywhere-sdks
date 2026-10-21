@@ -415,6 +415,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # helpers exported above — no struct sizeof/offset helpers needed.
     "_rac_cua_system_prompt"
     "_rac_cua_parse_action_proto"
+    "_rac_cua_register_profile"
+    "_rac_cua_unregister_profile"
+    "_rac_cua_profile_count"
+    "_rac_cua_profile_id_at"
 
     # Canonical rac_result_t -> SDKError proto mapping. Lets
     # SDKException route error construction through the shared commons helper
