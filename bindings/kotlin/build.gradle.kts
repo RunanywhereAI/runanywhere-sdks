@@ -17,21 +17,53 @@ plugins {
 
 // Ant's <get> has no connect/read timeout (only maxtime, which does not interrupt a stalled
 // read), so a hung server would block the build forever. Every native-lib download task in
-// this build, including the backend modules', goes through this one helper.
+// this build, including the backend modules', goes through this one helper. It keeps Ant's
+// 3 attempts; the timeouts and the total deadline apply to each attempt, the partial file is
+// deleted between attempts, and a 4xx is final because retrying cannot change it.
+class NonRetryableDownloadException(message: String) : GradleException(message)
+
 extra["downloadWithTimeouts"] =
     fun(url: String, dest: File) {
-        val connection = URI(url).toURL().openConnection() as HttpURLConnection
-        connection.connectTimeout = 30_000
-        connection.readTimeout = 60_000
-        connection.instanceFollowRedirects = true
-        try {
-            if (connection.responseCode != 200) {
-                throw GradleException("HTTP ${connection.responseCode} for $url")
+        val maxAttempts = 3
+        val deadlineMillis = 10 * 60_000L
+        var lastFailure: Exception? = null
+        for (attempt in 1..maxAttempts) {
+            dest.delete()
+            val connection = URI(url).toURL().openConnection() as HttpURLConnection
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 60_000
+            connection.instanceFollowRedirects = true
+            try {
+                val code = connection.responseCode
+                if (code in 400..499) throw NonRetryableDownloadException("HTTP $code for $url")
+                if (code != 200) throw GradleException("HTTP $code for $url")
+                val deadline = System.nanoTime() + deadlineMillis * 1_000_000L
+                connection.inputStream.use { input ->
+                    dest.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            if (System.nanoTime() > deadline) {
+                                throw GradleException("Download of $url exceeded ${deadlineMillis / 1000}s")
+                            }
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                }
+                return
+            } catch (e: NonRetryableDownloadException) {
+                dest.delete()
+                throw e
+            } catch (e: Exception) {
+                dest.delete()
+                lastFailure = e
+                if (attempt < maxAttempts) Thread.sleep(2_000L * attempt)
+            } finally {
+                connection.disconnect()
             }
-            connection.inputStream.use { input -> dest.outputStream().use { input.copyTo(it) } }
-        } finally {
-            connection.disconnect()
         }
+        throw GradleException("Download failed after $maxAttempts attempts: $url", lastFailure)
     }
 
 allprojects {
