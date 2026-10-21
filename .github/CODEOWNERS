@@ -1,0 +1,3 @@
+# Require review from an approved merger before anything can merge.
+# See https://docs.github.com/articles/about-codeowners
+* @RunanywhereAI/merge-approvers
