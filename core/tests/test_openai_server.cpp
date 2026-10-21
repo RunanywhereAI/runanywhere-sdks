@@ -3,6 +3,7 @@
 #define google runanywhere_internal
 #include "../src/generated/proto/llm_service.pb.h"
 #undef google
+#include "http_server.h"
 #include "openai_handler.h"
 #include "openai_translation.h"
 #include "rac/server/rac_server.h"
@@ -120,9 +121,11 @@ struct Fixture {
     httplib::Server server;
     std::thread thread;
     int port;
-    explicit Fixture(bool structured = true) {
+    explicit Fixture(bool structured = true, const char* corsOrigins = nullptr) {
         if (!structured)
             ops.generate_chat_stream = nullptr;
+        if (corsOrigins)
+            server.set_pre_routing_handler(rac::server::corsPreRoutingHandler(corsOrigins));
         server.Post("/v1/chat/completions",
                     [&](const auto& req, auto& res) { handler.handleChatCompletions(req, res); });
         server.Get("/health", [&](const auto& req, auto& res) { handler.handleHealth(req, res); });
@@ -382,6 +385,39 @@ void test_server_context_query_requires_running_model() {
           "context query rejects stopped server");
     check(contextLength == 0, "failed context query clears output");
 }
+
+void test_cors_headers() {
+    Fixture fixture(true, "https://app.example");
+    httplib::Client client("127.0.0.1", fixture.port);
+    client.set_read_timeout(5, 0);
+
+    auto plain = client.Get("/health");
+    check(plain && plain->status == 200, "GET without Origin succeeds");
+    check(plain->get_header_value("Access-Control-Allow-Origin") == "https://app.example",
+          "configured origin is sent without an Origin header");
+    check(plain->get_header_value("Access-Control-Allow-Headers") == "Content-Type, Authorization",
+          "default allow-headers without a request header list");
+
+    auto withOrigin = client.Get("/health", {{"Origin", "https://other.example"}});
+    check(withOrigin && withOrigin->get_header_value("Access-Control-Allow-Origin") ==
+                            "https://app.example",
+          "Origin is not reflected, the configured value is sent");
+    check(withOrigin->get_header_value("Vary").find("Origin") == std::string::npos,
+          "Vary does not name Origin: the origin is static, not reflected");
+
+    auto preflight =
+        client.Options("/v1/chat/completions",
+                       {{"Origin", "https://app.example"},
+                        {"Access-Control-Request-Method", "POST"},
+                        {"Access-Control-Request-Headers", "content-type, x-ra-harness"}});
+    check(preflight && preflight->status == 204, "preflight answers 204");
+    check(preflight->get_header_value("Access-Control-Allow-Methods") == "GET, POST, OPTIONS",
+          "preflight allow-methods");
+    check(preflight->get_header_value("Access-Control-Allow-Headers") ==
+              "content-type, x-ra-harness",
+          "preflight reflects requested headers");
+    check(preflight->body.empty(), "preflight has no body");
+}
 }  // namespace
 int main() {
     try {
@@ -391,6 +427,7 @@ int main() {
         test_structured_history_and_fallback();
         test_serialization_and_timeout();
         test_server_context_query_requires_running_model();
+        test_cors_headers();
         std::printf("OpenAI server: %d assertions passed\n", assertions);
         return 0;
     } catch (const std::exception& error) {

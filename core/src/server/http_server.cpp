@@ -319,22 +319,34 @@ void HttpServer::setupRoutes() {
 }
 
 void HttpServer::setupCors() {
-    std::string origins = config_.cors_origins ? config_.cors_origins : "*";
-
     server_->set_pre_routing_handler(
-        [origins](const httplib::Request& req, httplib::Response& res) {
-            res.set_header("Access-Control-Allow-Origin", origins);
-            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        corsPreRoutingHandler(config_.cors_origins ? config_.cors_origins : "*"));
+}
 
-            // Handle preflight
-            if (req.method == "OPTIONS") {
-                res.status = 204;
-                return httplib::Server::HandlerResponse::Handled;
-            }
+httplib::Server::HandlerWithResponse corsPreRoutingHandler(std::string origins) {
+    return [origins = std::move(origins)](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", origins);
+        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        // Reflect whatever headers the browser asked to send, the way the
+        // hosted LiteLLM gateway does (verified against the dev deployment
+        // 2026-09-06). A pinned allowlist silently breaks any client that
+        // adds a benign header — the console's X-RA-Harness attribution
+        // header was the one that exposed this. CORS is not an auth
+        // boundary, and this server does not authorize callers: no route
+        // checks Authorization, so a non-loopback host is open to anyone
+        // who can reach it.
+        std::string requested = req.get_header_value("Access-Control-Request-Headers");
+        res.set_header("Access-Control-Allow-Headers",
+                       requested.empty() ? "Content-Type, Authorization" : requested);
 
-            return httplib::Server::HandlerResponse::Unhandled;
-        });
+        // Handle preflight
+        if (req.method == "OPTIONS") {
+            res.status = 204;
+            return httplib::Server::HandlerResponse::Handled;
+        }
+
+        return httplib::Server::HandlerResponse::Unhandled;
+    };
 }
 
 rac_result_t HttpServer::loadModel(const std::string& modelPath) {
