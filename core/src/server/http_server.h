@@ -28,6 +28,9 @@ namespace server {
 
 class OpenAIHandler;
 
+/** Pre-routing handler that adds the CORS headers and answers preflight OPTIONS. */
+httplib::Server::HandlerWithResponse corsPreRoutingHandler(std::string origins);
+
 /**
  * @brief HTTP Server implementation
  *
