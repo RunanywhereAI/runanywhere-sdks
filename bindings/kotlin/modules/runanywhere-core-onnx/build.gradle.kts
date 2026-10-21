@@ -225,6 +225,9 @@ tasks.register("downloadJniLibs") {
         outputDir.mkdirs()
         tempDir.mkdirs()
 
+        @Suppress("UNCHECKED_CAST")
+        val downloadWithTimeouts = rootProject.extra["downloadWithTimeouts"] as (String, File) -> Unit
+
         var totalDownloaded = 0
 
         targetAbis.forEach { abi ->
@@ -236,9 +239,7 @@ tasks.register("downloadJniLibs") {
             val tempZip = file("$tempDir/$packageName")
 
             try {
-                ant.withGroovyBuilder {
-                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-                }
+                downloadWithTimeouts(zipUrl, tempZip)
 
                 val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
                 extractDir.mkdirs()
