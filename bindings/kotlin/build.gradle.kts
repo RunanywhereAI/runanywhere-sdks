@@ -15,6 +15,25 @@ plugins {
     signing
 }
 
+// Ant's <get> has no connect/read timeout (only maxtime, which does not interrupt a stalled
+// read), so a hung server would block the build forever. Every native-lib download task in
+// this build, including the backend modules', goes through this one helper.
+extra["downloadWithTimeouts"] =
+    fun(url: String, dest: File) {
+        val connection = URI(url).toURL().openConnection() as HttpURLConnection
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 60_000
+        connection.instanceFollowRedirects = true
+        try {
+            if (connection.responseCode != 200) {
+                throw GradleException("HTTP ${connection.responseCode} for $url")
+            }
+            connection.inputStream.use { input -> dest.outputStream().use { input.copyTo(it) } }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
 allprojects {
     dependencyLocking {
         lockAllConfigurations()
@@ -552,22 +571,8 @@ tasks.register("downloadJniLibs") {
         outputDir.mkdirs()
         tempDir.mkdirs()
 
-        // Ant's <get> has no connect/read timeout (only maxtime, which does not interrupt a
-        // stalled read), so a hung server would block the build forever.
-        fun downloadWithTimeouts(url: String, dest: File) {
-            val connection = URI(url).toURL().openConnection() as HttpURLConnection
-            connection.connectTimeout = 30_000
-            connection.readTimeout = 60_000
-            connection.instanceFollowRedirects = true
-            try {
-                if (connection.responseCode != 200) {
-                    throw GradleException("HTTP ${connection.responseCode} for $url")
-                }
-                connection.inputStream.use { input -> dest.outputStream().use { input.copyTo(it) } }
-            } finally {
-                connection.disconnect()
-            }
-        }
+        @Suppress("UNCHECKED_CAST")
+        val downloadWithTimeouts = rootProject.extra["downloadWithTimeouts"] as (String, File) -> Unit
 
         var totalDownloaded = 0
         val downloadFailures = mutableListOf<String>()
