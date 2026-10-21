@@ -217,7 +217,11 @@ describe('canonical lifecycle VAD facade', () => {
       sampleRate: 16_000,
       channels: 1,
     });
-    expect(request?.options?.activationThreshold).toBe(0);
+    // configureLifecycle applied the real threshold (0.2, asserted above), so
+    // the per-frame request carries no override at all. It used to send a
+    // literal 0 as that sentinel, which commons now reads as an explicit
+    // request for a 0.0 threshold.
+    expect(request?.options?.activationThreshold).toBeUndefined();
     const audioBytes = request?.audio?.audioData;
     expect(audioBytes).toBeDefined();
     const view = new DataView(
@@ -250,7 +254,9 @@ describe('canonical lifecycle VAD facade', () => {
       'reset',
     ]);
     expect(counters.requests).toHaveLength(3);
-    expect(counters.requests.every((request) => request.options?.activationThreshold === 0)).toBe(true);
+    expect(
+      counters.requests.every((request) => request.options?.activationThreshold === undefined),
+    ).toBe(true);
     expect(counters).toMatchObject({
       componentCreates: 0,
       componentLoads: 0,

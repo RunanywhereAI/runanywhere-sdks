@@ -195,9 +195,13 @@ function lifecycleVADAdapter(feature: string): VADProtoAdapter {
   return adapter;
 }
 
+// `activationThreshold` is passed explicitly by every caller, and `undefined`
+// means "send no per-frame override". It cannot be a defaulted parameter:
+// passing `undefined` to one would re-trigger the default and silently put the
+// caller's threshold back on the wire.
 function callOptions(
-  options?: DetectVoiceOptions,
-  activationThreshold = options?.activationThreshold ?? 0,
+  options: DetectVoiceOptions | undefined,
+  activationThreshold: number | undefined,
 ): VADOptions {
   const defaults = vADOptionsDefaults();
   return {
@@ -436,11 +440,13 @@ export async function detectVoice(
   if (!await adapter.configureLifecycle(config)) {
     throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
   }
-  // The threshold was applied by configureLifecycle. Keeping the per-frame
-  // override at zero avoids rebuilding Sherpa's detector for this frame.
+  // The threshold was applied by configureLifecycle, so this frame sends no
+  // per-frame override and Sherpa's detector is not rebuilt. Absence, not 0:
+  // `activation_threshold` is an `optional` proto field and commons now reads
+  // its presence, so a literal 0 is a request for a 0.0 threshold.
   const result = await adapter.processLifecycle(
     audio,
-    callOptions(options, 0),
+    callOptions(options, undefined),
     config.sampleRate || 16_000,
   );
   if (!result) {
@@ -489,7 +495,8 @@ export async function* streamVoiceActivity(
       throw SDKException.processingFailed('Failed to start the lifecycle VAD service');
     }
     started = true;
-    const frameOptions = callOptions(options, 0);
+    // No per-frame override; see the note in detectVoice above.
+    const frameOptions = callOptions(options, undefined);
     for await (const chunk of audio) {
       if (chunk.length === 0) continue;
       const result = await adapter.processLifecycle(chunk, frameOptions, configuredRate);
