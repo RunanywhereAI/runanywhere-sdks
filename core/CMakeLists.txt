@@ -619,6 +619,11 @@ if(RAC_BUILD_SERVER)
         GIT_SHALLOW TRUE
     )
 
+    # Pin optional codecs off so librac_server links identically on every arch
+    # (otherwise a host-installed zstd/brotli leaks in as a hidden dependency).
+    set(HTTPLIB_USE_ZSTD_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_USE_BROTLI_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+
     message(STATUS "Fetching server dependencies (cpp-httplib)...")
     FetchContent_MakeAvailable(cpp-httplib)
     message(STATUS "Server dependencies ready")

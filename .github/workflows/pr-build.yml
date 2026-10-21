@@ -177,6 +177,20 @@ jobs:
       - run: cmake --build --preset linux-asan
       - run: ctest --preset linux-asan
 
+  linux-rag-no-protobuf:
+    # The only job that compiles core/src/features/rag with RAC_ENABLE_PROTOBUF=OFF.
+    # The wasm job also configures protobuf OFF but forces RAG off, so an unguarded
+    # commons-internal include in the RAG sources would otherwise break this
+    # configuration with nothing red in CI.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake -S . -B build/rag-no-protobuf -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRAC_ENABLE_PROTOBUF=OFF -DRAC_BACKEND_RAG=ON -DRAC_BUILD_BACKENDS=OFF -DRAC_BUILD_TESTS=OFF
+      - run: cmake --build build/rag-no-protobuf --target rac_backend_rag -j "$(nproc)"
+
   windows-commons-release:
     # PR-time coverage for core/scripts/build-windows.bat, i.e. exactly what
     # release.yml's native_windows job ships as RACommons-windows-x64-v*.zip.
