@@ -44,11 +44,13 @@ const REASONING_TO_PROTO: Record<ReasoningMode, ProtoReasoningMode> = {
 
 /**
  * The public `reasoning` option as the generated message. Every request that
- * carries `LLMGenerationOptions` (the LLM path here, the RAG query in data.ts)
+ * carries a `reasoning` option (the LLM path here, the RAG query in data.ts)
  * goes through this one function, so the two cannot encode the option differently.
  */
 export function toProtoReasoning(reasoning: ReasoningOptions): ProtoReasoningOptions {
   return {
+    // An unset mode stays UNSPECIFIED, which the IDL defines as "reasoning-capable
+    // models think, others don't": the documented default ON. Commons only acts on OFF.
     mode: reasoning.mode
       ? REASONING_TO_PROTO[reasoning.mode]
       : ProtoReasoningMode.REASONING_MODE_UNSPECIFIED,
