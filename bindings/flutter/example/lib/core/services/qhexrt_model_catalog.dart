@@ -13,6 +13,7 @@ const _embedding = ModelCategory.MODEL_CATEGORY_EMBEDDING;
 const _stt = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
 const _tts = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
 const _hnpuDescription = 'Qualcomm Hexagon NPU model bundle.';
+final _racErrorNotFound = -ErrorCode.ERROR_CODE_NOT_FOUND.value;
 
 typedef QHexRTCatalogRegistrar =
     Future<ModelInfo?> Function(RegisterModelFromUrlRequest request);
@@ -25,9 +26,12 @@ class QHexRTCatalogModel {
     required this.url,
     required this.category,
     required this.memoryBytes,
+    this.downloadBytes,
     this.contextLength,
     this.supportsThinking = false,
     this.supportsLora = false,
+    this.excludedArchitectures = const <HexagonArch>{},
+    this.pinnedArchitecture,
   });
 
   final String id;
@@ -35,25 +39,40 @@ class QHexRTCatalogModel {
   final String url;
   final ModelCategory category;
   final int memoryBytes;
+  final int? downloadBytes;
   final int? contextLength;
   final bool supportsThinking;
   final bool supportsLora;
+  final Set<HexagonArch> excludedArchitectures;
+  final HexagonArch? pinnedArchitecture;
 
-  RegisterModelFromUrlRequest toRegistrationRequest() =>
-      RegisterModelFromUrlRequest(
-        id: id,
-        name: name,
-        url: url,
-        framework: _qhexrt,
-        category: category,
-        source: ModelSource.MODEL_SOURCE_REMOTE,
-        memoryRequiredBytes: Int64(memoryBytes),
-        downloadSizeBytes: Int64(memoryBytes),
-        contextLength: contextLength,
-        supportsThinking: supportsThinking,
-        supportsLora: supportsLora,
-        description: _hnpuDescription,
-      );
+  bool isEligibleFor(NpuCapability capability) {
+    final architecture = capability.hexagonArch;
+    return capability.supported &&
+        !excludedArchitectures.contains(architecture) &&
+        (pinnedArchitecture == null || pinnedArchitecture == architecture);
+  }
+
+  RegisterModelFromUrlRequest toRegistrationRequest() {
+    final request = RegisterModelFromUrlRequest(
+      id: id,
+      name: name,
+      url: url,
+      framework: _qhexrt,
+      category: category,
+      source: ModelSource.MODEL_SOURCE_REMOTE,
+      memoryRequiredBytes: Int64(memoryBytes),
+      contextLength: contextLength,
+      supportsThinking: supportsThinking,
+      supportsLora: supportsLora,
+      description: _hnpuDescription,
+    );
+    final artifactBytes = downloadBytes;
+    if (artifactBytes != null) {
+      request.downloadSizeBytes = Int64(artifactBytes);
+    }
+    return request;
+  }
 }
 
 @immutable
@@ -82,11 +101,11 @@ class QHexRTCatalogSeedResult {
   final Set<String> registeredModelIds;
 }
 
-/// Flutter's app-owned QHexRT definitions and native registration results.
+/// Flutter's app-owned QHexRT catalog rows and eligibility policy.
 ///
-/// URLs and presentation metadata stay in the example app. Device probing,
-/// architecture selection, model-ID materialization, and registry insertion
-/// stay in QHexRT's native catalog facade.
+/// The app registers eligible rows through the shared SDK model API. Native
+/// QHexRT owns device probing and logical-reference architecture-variant
+/// resolution.
 abstract final class QHexRTModelCatalog {
   static final ValueNotifier<QHexRTCatalogSnapshot> snapshots = ValueNotifier(
     const QHexRTCatalogSnapshot(),
@@ -454,6 +473,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json',
       category: _stt,
       memoryBytes: 5491333979,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'moonshine_tiny',
@@ -534,6 +554,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
       category: _tts,
       memoryBytes: 44135896,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kitten_micro_0_8',
@@ -542,6 +563,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
       category: _tts,
       memoryBytes: 103930338,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kitten_mini_0_8',
@@ -550,6 +572,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
       category: _tts,
       memoryBytes: 184334815,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kokoro_en',
@@ -557,6 +580,7 @@ abstract final class QHexRTModelCatalog {
       url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
       category: _tts,
       memoryBytes: 470739484,
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
     ),
     QHexRTCatalogModel(
       id: 'magpie_tts_357m',
@@ -597,11 +621,40 @@ abstract final class QHexRTModelCatalog {
     return !isQHexRT || registeredModelIds.contains(model.id);
   }
 
-  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice() {
-    final eligible = Platform.isAndroid && QHexRT.isAvailable;
+  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice({
+    required bool backendRegistered,
+  }) {
+    var capability = NpuCapability();
+    if (Platform.isAndroid && QHexRT.isAvailable) {
+      try {
+        capability = QHexRT.probeNpu();
+      } catch (error) {
+        debugPrint('QHexRT capability probe failed: $error');
+      }
+    }
     return registerWith(
-      deviceEligible: eligible,
-      registrar: (request) => QHexRT.registerModelForDevice(request: request),
+      deviceEligible: backendRegistered && capability.supported,
+      capability: capability,
+      registrar: (request) => RunAnywhere.models.register(
+        ModelRegistration.url(
+          id: request.id,
+          name: request.name,
+          url: request.url,
+          framework: request.framework,
+          category: request.category,
+          memoryRequirementBytes: request.memoryRequiredBytes.toInt(),
+          downloadSizeBytes: request.hasDownloadSizeBytes()
+              ? request.downloadSizeBytes.toInt()
+              : null,
+          contextLength: request.hasContextLength()
+              ? request.contextLength
+              : null,
+          source: request.source,
+          description: request.description,
+          supportsThinking: request.supportsThinking,
+          supportsLora: request.supportsLora,
+        ),
+      ),
     );
   }
 
@@ -609,6 +662,7 @@ abstract final class QHexRTModelCatalog {
   @visibleForTesting
   static Future<QHexRTCatalogSeedResult> registerWith({
     required bool deviceEligible,
+    NpuCapability? capability,
     required QHexRTCatalogRegistrar registrar,
   }) async {
     var registered = 0;
@@ -620,6 +674,10 @@ abstract final class QHexRTModelCatalog {
       skippedNative = models.length;
     } else {
       for (final model in models) {
+        if (capability != null && !model.isEligibleFor(capability)) {
+          skippedNative++;
+          continue;
+        }
         try {
           final saved = await registrar(model.toRegistrationRequest());
           if (saved == null) {
@@ -629,8 +687,12 @@ abstract final class QHexRTModelCatalog {
             registeredIds.add(saved.id);
           }
         } catch (error) {
-          failed++;
-          debugPrint('QHexRT catalog: ${model.id} failed: $error');
+          if (_isMissingManifest(error)) {
+            skippedNative++;
+          } else {
+            failed++;
+            debugPrint('QHexRT catalog: ${model.id} failed: $error');
+          }
         }
       }
     }
@@ -652,4 +714,7 @@ abstract final class QHexRTModelCatalog {
   static void resetForTesting() {
     snapshots.value = const QHexRTCatalogSnapshot();
   }
+
+  static bool _isMissingManifest(Object error) =>
+      error is SDKException && error.error.cAbiCode == _racErrorNotFound;
 }

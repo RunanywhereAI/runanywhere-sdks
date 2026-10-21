@@ -11,6 +11,7 @@ import ai.runanywhere.proto.v1.ConnectClientStartRequest
 import ai.runanywhere.proto.v1.ConnectHandshakeResponse
 import ai.runanywhere.proto.v1.ConnectPlatformPolicy
 import ai.runanywhere.proto.v1.ConnectPlatformPolicyRequest
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
@@ -19,9 +20,11 @@ internal object CppBridgeConnect {
     fun platformPolicy(request: ConnectPlatformPolicyRequest): ConnectPlatformPolicy =
         decode(
             bytes =
-                RunAnywhereBridge.racConnectGetPlatformPolicyProto(
-                    ConnectPlatformPolicyRequest.ADAPTER.encode(request),
-                ),
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racConnectGetPlatformPolicyProto(
+                        ConnectPlatformPolicyRequest.ADAPTER.encode(request),
+                    )
+                },
             operation = "read Connect platform policy",
             decode = ConnectPlatformPolicy.ADAPTER::decode,
         )
@@ -29,9 +32,11 @@ internal object CppBridgeConnect {
     fun createClientHello(request: ConnectClientStartRequest): ConnectClientHello =
         decode(
             bytes =
-                RunAnywhereBridge.racConnectClientCreateHelloProto(
-                    ConnectClientStartRequest.ADAPTER.encode(request),
-                ),
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racConnectClientCreateHelloProto(
+                        ConnectClientStartRequest.ADAPTER.encode(request),
+                    )
+                },
             operation = "create Connect client hello",
             decode = ConnectClientHello.ADAPTER::decode,
         )
@@ -39,9 +44,11 @@ internal object CppBridgeConnect {
     fun validateHost(response: ConnectHandshakeResponse): ConnectClientSessionState =
         decode(
             bytes =
-                RunAnywhereBridge.racConnectClientValidateHostProto(
-                    ConnectHandshakeResponse.ADAPTER.encode(response),
-                ),
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racConnectClientValidateHostProto(
+                        ConnectHandshakeResponse.ADAPTER.encode(response),
+                    )
+                },
             operation = "validate Connect host",
             decode = ConnectClientSessionState.ADAPTER::decode,
         )
