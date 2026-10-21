@@ -251,8 +251,10 @@ SHERPA_ONNX_COMMIT_WEB=3dc7c569f31ca2cd4a20ed6f7db780327e6714c5
 # Q2_0_g64 artifacts instead of its older conflicting 128-value Q2_0 encoding.
 # Maple is CPU-only until its ternary expert mul_mm_id kernels exist on GPU;
 # the engine enforces that after reading general.architecture from the GGUF.
+# b10453.9 adds Recursive Flint (`flint` arch, upstream ggml-org/llama.cpp#30928
+# cherry-picked before it merged) and the pplx-decider v1.2 converter.
 # See the fork's RUNANYWHERE.md before rebasing.
-LLAMACPP_VERSION=runanywhere-b10453.8
+LLAMACPP_VERSION=runanywhere-b10453.9
 # Repository the llama.cpp FetchContent clones. Consumed by
 # engines/llamacpp/CMakeLists.txt via LoadVersions (RAC_LLAMACPP_GIT_REPOSITORY).
 LLAMACPP_GIT_REPOSITORY=https://github.com/RunanywhereAI/llama.cpp.git
