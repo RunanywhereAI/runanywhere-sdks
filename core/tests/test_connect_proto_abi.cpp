@@ -365,6 +365,7 @@ void test_cluster_orchestration() {
     valid_request.set_cluster_id("cluster-alpha");
     valid_request.mutable_model()->set_model_id("llama-3-70b");
     valid_request.mutable_model()->set_display_name("Llama 3 70B");
+    valid_request.set_platform(v1::CONNECT_PLATFORM_MACOS);
     auto* v2_assign = valid_request.add_assignments();
     v2_assign->set_instance_id("android-snapdragon");
     v2_assign->set_layer_start(16);
@@ -382,6 +383,23 @@ void test_cluster_orchestration() {
     CHECK(active_state.is_active(), "Cluster state is marked active");
     CHECK(active_state.peer_count() == 2, "Cluster state tracks 2 participating devices");
     CHECK(active_state.cluster_id() == "cluster-alpha", "Cluster ID matches request");
+
+    // 4b. Cluster start rejects an unknown or non-host coordinator platform
+    v1::ClusterStartRequest no_platform_request = valid_request;
+    no_platform_request.set_cluster_id("cluster-no-platform");
+    no_platform_request.set_platform(v1::CONNECT_PLATFORM_UNSPECIFIED);
+    v1::ClusterState no_platform_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, no_platform_request, &no_platform_state) ==
+              RAC_ERROR_NOT_SUPPORTED,
+          "Cluster start rejects an unknown coordinator platform as NOT_SUPPORTED");
+
+    v1::ClusterStartRequest client_only_request = valid_request;
+    client_only_request.set_cluster_id("cluster-ios-coordinator");
+    client_only_request.set_platform(v1::CONNECT_PLATFORM_IOS);
+    v1::ClusterState client_only_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, client_only_request, &client_only_state) ==
+              RAC_ERROR_NOT_SUPPORTED,
+          "Cluster start rejects a coordinator whose host role is not enabled");
 
     // 5. Idempotent cluster start with same cluster_id
     v1::ClusterState idempotent_state;
@@ -409,6 +427,7 @@ void test_cluster_orchestration() {
     join_request.set_cluster_id("cluster-alpha");
     join_request.set_instance_id("android-snapdragon");
     join_request.mutable_peer_capability()->set_instance_id("android-snapdragon");
+    join_request.mutable_peer_capability()->set_platform(v1::CONNECT_PLATFORM_ANDROID);
     join_request.mutable_peer_capability()->set_available_memory_bytes(8589934592ULL);
     join_request.mutable_peer_capability()->set_acceleration(v1::ACCELERATION_PREFERENCE_NPU);
 
@@ -426,6 +445,24 @@ void test_cluster_orchestration() {
     CHECK(call_proto(rac_connect_cluster_join_proto, undersized_join, &undersized_response) == RAC_SUCCESS,
           "Undersized-capacity join returns typed validation response");
     CHECK(!undersized_response.accepted(), "Peer whose max_layers is below its span is rejected");
+
+    // 7c. Peers advertising an unknown or non-client platform are rejected
+    v1::ClusterJoinRequest unknown_platform_join = join_request;
+    unknown_platform_join.mutable_peer_capability()->set_platform(v1::CONNECT_PLATFORM_UNSPECIFIED);
+    v1::ClusterStartResponse unknown_platform_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, unknown_platform_join,
+                     &unknown_platform_response) == RAC_SUCCESS,
+          "Unknown-platform join returns typed validation response");
+    CHECK(!unknown_platform_response.accepted(), "Peer with an unknown platform is rejected");
+
+    v1::ClusterJoinRequest disabled_platform_join = join_request;
+    disabled_platform_join.mutable_peer_capability()->set_platform(v1::CONNECT_PLATFORM_WEB);
+    v1::ClusterStartResponse disabled_platform_response;
+    CHECK(call_proto(rac_connect_cluster_join_proto, disabled_platform_join,
+                     &disabled_platform_response) == RAC_SUCCESS,
+          "Planned-platform join returns typed validation response");
+    CHECK(!disabled_platform_response.accepted(),
+          "Peer on a platform without an enabled client role is rejected");
 
     // 8. Peer join with unknown instance_id is rejected
     v1::ClusterJoinRequest unknown_peer_join = join_request;

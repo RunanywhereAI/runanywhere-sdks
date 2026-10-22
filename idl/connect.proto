@@ -253,6 +253,9 @@ message ClusterStartRequest {
     string cluster_id = 1;
     ConnectModelDescriptor model = 2;
     repeated ClusterLayerAssignment assignments = 3;
+    // Platform of the coordinating device. The coordinator is the host side of the
+    // cluster, so it must be a platform whose host role is ENABLED.
+    ConnectPlatform platform = 4;
 }
 
 // Sent by a peer device when joining a cluster to validate its assignment and register capabilities.

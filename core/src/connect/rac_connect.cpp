@@ -782,6 +782,19 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // Same code as every other entry point for "platform not in the role policy", so callers
+    // can tell an unusable platform from a malformed request.
+    if (find_platform_policy(request.platform()) == nullptr) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_NOT_SUPPORTED,
+                                   "ClusterStartRequest has an unknown coordinator platform");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (!is_host_role_enabled(request.platform())) {
+        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_NOT_SUPPORTED,
+                                   "This platform is not enabled to coordinate a cluster");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
     if (cluster.is_active) {
         if (cluster.cluster_id == request.cluster_id()) {
             if (cluster.model.model_id() != request.model().model_id() ||
@@ -872,6 +885,12 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
                request.peer_capability().instance_id() != request.instance_id()) {
         response.set_accepted(false);
         response.set_rejection_reason("Peer capability instance_id does not match request identity");
+    } else if (find_platform_policy(request.peer_capability().platform()) == nullptr) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Peer capability has an unknown platform");
+    } else if (!is_client_role_enabled(request.peer_capability().platform())) {
+        response.set_accepted(false);
+        response.set_rejection_reason("Peer platform is not enabled as a Connect client");
     } else {
         auto it = cluster.peer_assignments.find(request.instance_id());
         if (it == cluster.peer_assignments.end()) {
