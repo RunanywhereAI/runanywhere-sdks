@@ -389,6 +389,15 @@ void test_cluster_orchestration() {
           "Repeated cluster start with same ID is idempotent");
     CHECK(idempotent_state.is_active(), "Idempotent start returns active state");
 
+    // 5a. Repeat start with the same model_id but another descriptor field is rejected too
+    v1::ClusterStartRequest changed_context_request = valid_request;
+    changed_context_request.mutable_model()->set_context_window(
+        valid_request.model().context_window() + 1024);
+    v1::ClusterState changed_context_state;
+    CHECK(call_proto(rac_connect_cluster_start_proto, changed_context_request,
+                     &changed_context_state) == RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat start with a changed descriptor field (context_window) is rejected");
+
     // 5b. Repeat start with the same cluster_id but a changed model is rejected, not ignored
     v1::ClusterStartRequest changed_layout_request = valid_request;
     changed_layout_request.mutable_model()->set_model_id("different-model");

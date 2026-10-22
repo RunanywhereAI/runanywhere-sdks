@@ -784,7 +784,7 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
 
     if (cluster.is_active) {
         if (cluster.cluster_id == request.cluster_id()) {
-            if (cluster.model.model_id() != request.model().model_id() ||
+            if (!same_model_descriptor(cluster.model, request.model()) ||
                 !same_layer_assignments(cluster.assignments, request.assignments())) {
                 rac_proto_buffer_set_error(
                     out_cluster_state, RAC_ERROR_INVALID_CONFIGURATION,
