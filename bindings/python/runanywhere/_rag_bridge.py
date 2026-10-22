@@ -9,6 +9,7 @@ backend).
 
 from __future__ import annotations
 
+import numbers
 from typing import Any, List, Optional
 
 from .errors import ErrorCode, SDKException
@@ -103,16 +104,17 @@ def build_document(text: str, doc_id: str, metadata: Optional[dict]) -> bytes:
 def _int32_option(name: str, value: Any) -> int:
     """Return ``value`` for an int32 proto field, rejecting non-integers and overflow.
 
-    ``int()`` would truncate ``-0.5`` to ``0`` and wrap nothing, so the native
-    validator would never see what the caller actually passed.
+    ``int()`` would turn ``-0.5`` into a legal-looking ``0`` and ``2.5`` into ``2``, so the
+    native validator would never see what the caller passed. Fractional and non-finite
+    values are rejected here, naming the value; the range itself (e.g. ``rrf_k > 0``) is
+    checked by commons, the single source of truth for every SDK.
     """
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise SDKException.invalid_input(
-            f"RagRetrievalOptions.{name} must be an int, got {type(value).__name__}"
-        )
-    if not -(2**31) <= value < 2**31:
-        raise SDKException.invalid_input(f"RagRetrievalOptions.{name} must fit int32, got {value}")
-    return value
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise SDKException.invalid_input(f"RagRetrievalOptions.{name} must be an int, got {value!r}")
+    as_int = int(value)
+    if not -(2**31) <= as_int < 2**31:
+        raise SDKException.invalid_input(f"RagRetrievalOptions.{name} must fit int32, got {as_int}")
+    return as_int
 
 
 def _vector_store_option(value: Any) -> int:
