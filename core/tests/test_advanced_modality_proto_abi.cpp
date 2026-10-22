@@ -2296,6 +2296,40 @@ int test_rag_search_retrieval_only() {
     CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "rag.search rejects non-finite bm25_k1");
     rac_proto_buffer_free(&out);
 
+    // Per-query top_k / score_threshold are bounded like the session config. top_k == 0 keeps
+    // meaning "use the session default", which every SDK sends when the caller leaves it unset.
+    const auto search_with =
+        [&](const runanywhere::v1::RAGRetrievalOptions& retrieval) -> rac_result_t {
+        runanywhere::v1::RAGSearchRequest request;
+        request.set_query("Where does RAG live?");
+        *request.mutable_retrieval() = retrieval;
+        std::vector<uint8_t> request_bytes;
+        if (!serialize(request, &request_bytes))
+            return RAC_ERROR_PROCESSING_FAILED;
+        rac_proto_buffer_t response_buffer;
+        rac_proto_buffer_init(&response_buffer);
+        const rac_result_t result = rac_rag_search_proto(full_session, request_bytes.data(),
+                                                         request_bytes.size(), &response_buffer);
+        rac_proto_buffer_free(&response_buffer);
+        return result;
+    };
+    runanywhere::v1::RAGRetrievalOptions negative_top_k;
+    negative_top_k.set_top_k(-1);
+    CHECK(search_with(negative_top_k) == RAC_ERROR_INVALID_ARGUMENT,
+          "rag.search rejects a negative per-query top_k");
+    runanywhere::v1::RAGRetrievalOptions oversized_threshold;
+    oversized_threshold.set_score_threshold(1.5f);
+    CHECK(search_with(oversized_threshold) == RAC_ERROR_INVALID_ARGUMENT,
+          "rag.search rejects a per-query score_threshold above 1");
+    runanywhere::v1::RAGRetrievalOptions nan_threshold;
+    nan_threshold.set_score_threshold(std::numeric_limits<float>::quiet_NaN());
+    CHECK(search_with(nan_threshold) == RAC_ERROR_INVALID_ARGUMENT,
+          "rag.search rejects a NaN per-query score_threshold");
+    runanywhere::v1::RAGRetrievalOptions default_top_k;
+    default_top_k.set_top_k(0);
+    CHECK(search_with(default_top_k) == RAC_SUCCESS,
+          "rag.search accepts top_k 0 as the session-default sentinel");
+
     rac_rag_session_destroy_proto(full_session);
     (void)rac_plugin_unregister("onnx");
     (void)rac_plugin_unregister("llamacpp");

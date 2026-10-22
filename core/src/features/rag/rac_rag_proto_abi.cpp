@@ -371,6 +371,27 @@ rac_result_t check_vector_store(bool has_vector_store, runanywhere::v1::VectorSt
     return RAC_ERROR_INVALID_ARGUMENT;
 }
 
+// Per-query top_k and score_threshold. The session config bounds both, but the per-query path
+// copied them through unchecked, so a bad value silently mis-retrieved. top_k == 0 stays the
+// "use the session default" value every SDK already sends; only a negative top_k is an error.
+bool validate_retrieval_bounds(const runanywhere::v1::RAGRetrievalOptions& retrieval,
+                               std::string* out_message) {
+    if (retrieval.has_top_k() && retrieval.top_k() < 0) {
+        if (out_message)
+            *out_message = "RAGRetrievalOptions.top_k must be >= 0 (0 uses the session default)";
+        return false;
+    }
+    if (retrieval.has_score_threshold()) {
+        const float threshold = retrieval.score_threshold();
+        if (!std::isfinite(threshold) || threshold < 0.0f || threshold > 1.0f) {
+            if (out_message)
+                *out_message = "RAGRetrievalOptions.score_threshold must be in 0.0...1.0";
+            return false;
+        }
+    }
+    return true;
+}
+
 bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
                                 std::string* out_message) {
     const RAGBackendConfig defaults;
@@ -547,6 +568,9 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
             check_vector_store(retrieval.has_vector_store(), retrieval.vector_store(), out_error);
         store_rc != RAC_SUCCESS) {
         return store_rc;
+    }
+    if (!validate_retrieval_bounds(retrieval, out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
     }
     if (!validate_bm25_rrf_params(retrieval.has_bm25_k1(), retrieval.bm25_k1(),
                                   retrieval.has_bm25_b(), retrieval.bm25_b(),
@@ -751,6 +775,9 @@ rac_result_t execute_rag_search(const std::shared_ptr<Session>& s,
             check_vector_store(retrieval.has_vector_store(), retrieval.vector_store(), out_error);
         store_rc != RAC_SUCCESS) {
         return store_rc;
+    }
+    if (!validate_retrieval_bounds(retrieval, out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
     }
     if (!validate_bm25_rrf_params(retrieval.has_bm25_k1(), retrieval.bm25_k1(),
                                   retrieval.has_bm25_b(), retrieval.bm25_b(),
