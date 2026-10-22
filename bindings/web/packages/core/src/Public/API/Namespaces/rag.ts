@@ -2,7 +2,7 @@
  * `RunAnywhere.rag` — retrieval-augmented sessions over an ingested corpus.
  */
 
-import { RAGStreamEventKind } from '@runanywhere/proto-ts/rag';
+import { RAGStreamEventKind, VectorStore } from '@runanywhere/proto-ts/rag';
 import type { RAGQueryOverrides } from '../../Extensions/RunAnywhere+RAG.js';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import {
@@ -66,11 +66,21 @@ function isRagQueryOptions(
 function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQueryOverrides {
   if (!options) return {};
   if (isRagQueryOptions(options)) {
+    const vectorStore: unknown = options.retrieval?.vectorStore;
+    if (vectorStore !== undefined && vectorStore !== 'usearch') {
+      throw SDKException.invalidConfiguration(
+        `RagRetrievalOptions.vectorStore must be 'usearch' (the only on-device store); got ${String(vectorStore)}`,
+      );
+    }
     return {
       retrieval: {
         topK: options.retrieval?.topK,
         scoreThreshold: options.retrieval?.similarityThreshold,
         enableMultiQuery: false,
+        bm25K1: options.retrieval?.bm25K1,
+        bm25B: options.retrieval?.bm25B,
+        rrfK: options.retrieval?.rrfK,
+        vectorStore: vectorStore === 'usearch' ? VectorStore.VECTOR_STORE_USEARCH : undefined,
       },
       generation: options.generation ? toProtoLlmOptions(options.generation) : undefined,
     };
@@ -136,8 +146,12 @@ function createSession(): RagSession {
      */
     queryStream(question: string, options?: RagQueryOptions | LlmOptions): AsyncIterable<RagEvent> {
       requireOpen(session, 'queryStream');
+      // Validate the options here, like the closed-session check above, so an invalid
+      // option throws from this call (as `query` rejects) instead of surfacing from
+      // inside the stream after the caller has started iterating.
+      const overrides = normalizeQueryOptions(options);
       return (async function* answer(): AsyncGenerator<RagEvent> {
-        const events = ragQueryStream(question, normalizeQueryOptions(options));
+        const events = ragQueryStream(question, overrides);
         let announcedSources = false;
         try {
           for await (const event of events) {
