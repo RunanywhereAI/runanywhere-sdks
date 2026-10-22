@@ -962,6 +962,17 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
                                "Cluster orchestration requires protobuf support");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
+    // Ceiling before parsing: ParseFromArray would allocate tensor_data in full, and the
+    // declared seq_len/hidden_size come from the same untrusted message, so they cannot bound
+    // it. The serialized size bounds tensor_data from above.
+    if (request_size > RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES) {
+        v1::ConnectInvocationValidation oversized;
+        oversized.set_rejection_reason(
+            "ClusterActivation exceeds the 256 MiB protocol ceiling "
+            "(RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES)");
+        return serialize_message(oversized, out_validation);
+    }
+
     v1::ClusterActivation request;
     const rac_result_t parse_result =
         parse_message(request_bytes, request_size, &request, out_validation,
