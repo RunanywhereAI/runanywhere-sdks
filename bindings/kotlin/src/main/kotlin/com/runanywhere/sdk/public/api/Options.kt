@@ -56,14 +56,20 @@ public sealed class ToolChoice {
 }
 
 /** Schema the generated text must conform to. */
-public data class StructuredOutput(
-    val schema: JsonSchema,
-    val strict: Boolean = true,
-)
+public data class StructuredOutput
+    @JvmOverloads
+    constructor(
+        val schema: JsonSchema,
+        val strict: Boolean = true,
+        val mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
+    ) {
+        /** Backward compatibility constructor for callers passing (schema, mode). */
+        public constructor(schema: JsonSchema, mode: StructuredOutputMode) : this(schema, strict = true, mode = mode)
+    }
 
 /** Enforcement level `llm.generateStructured` applies to its schema. */
 public enum class StructuredOutputMode {
-    /** Engine-constrained decoding; fails preflight until a constrained-decoding engine is wired in. */
+    /** Engine-constrained decoding (GBNF grammar sampling). */
     CONSTRAINED,
 
     /** Generate freely, then validate against the schema. */
@@ -89,8 +95,6 @@ public data class LlmOptions(
     val stopSequences: List<String> = emptyList(),
     val systemPrompt: String? = null,
     val reasoning: ReasoningOptions? = null,
-    // No structured-output schema field: `llm.generateStructured` owns
-    // schema configuration through its own `schema`/`mode` parameters.
     /** Empty uses the tools registered through `llm.tools`. */
     val tools: List<ToolDefinition> = emptyList(),
     val toolChoice: ToolChoice = ToolChoice.Auto,
@@ -103,6 +107,13 @@ public data class LlmOptions(
      * `llm.generate`/`llm.generateStream` with inline `tools`.
      */
     val autoExecute: Boolean = true,
+    /**
+     * Optional structured-output override for `llm.generateStructured`, which supplies the
+     * schema and uses this field's `mode` in preference to its own `mode` argument.
+     * `strict` is not forwarded: `StructuredOutputOptions` has no strict field on the wire.
+     * Declared last so existing positional arguments and `componentN()` keep their slots.
+     */
+    val structuredOutput: StructuredOutput? = null,
 ) {
     /** Sampling and tool-loop defaults, as annotated in idl/. */
     public companion object {

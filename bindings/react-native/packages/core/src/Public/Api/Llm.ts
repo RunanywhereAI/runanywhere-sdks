@@ -338,10 +338,9 @@ export const llm = {
    * Generate a value that conforms to `schema`.
    *
    * `mode` picks how the schema is enforced:
-   * - `'validationOnly'` (default): generate freely, then validate.
+   * - `'constrained'` (default): engine-constrained decoding (GBNF grammar sampling).
+   * - `'validationOnly'`: generate freely, then validate against the schema.
    * - `'repair'`: validate, then retry once with a repair instruction if invalid.
-   * - `'constrained'`: engine-constrained decoding — fails preflight until a
-   *   constrained-decoding engine is wired in.
    *
    * `StructuredOutputRequest` and the standalone
    * `rac_structured_output_generate_proto` ABI are deleted outright: idl's
@@ -359,14 +358,8 @@ export const llm = {
     prompt: string,
     schema: JsonSchema,
     options?: LlmOptions,
-    mode: StructuredOutputMode = 'validationOnly'
+    mode: StructuredOutputMode = 'constrained'
   ): Promise<StructuredResult<T>> {
-    if (mode === 'constrained') {
-      throw SDKException.notImplemented(
-        "llm.generateStructured(mode: 'constrained') needs engine-level constrained decoding, " +
-          "which is not wired in yet; use 'validationOnly' or 'repair'"
-      );
-    }
     const native = await preflight();
     const requestId = nextRequestId('structured');
     if (options?.model) {
@@ -375,9 +368,15 @@ export const llm = {
         ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
     }
+    const effectiveMode = options?.structuredOutput?.mode ?? mode;
     const effectiveOptions: LlmOptions = {
       ...options,
-      structuredOutput: { schema, strict: options?.structuredOutput?.strict },
+      structuredOutput: {
+        schema,
+        mode: effectiveMode,
+        strict: options?.structuredOutput?.strict,
+      },
+      toolChoice: 'none',
     };
 
     const extract = async (text: string): Promise<StructuredOutputResult> => {
@@ -395,28 +394,16 @@ export const llm = {
       return decode(resultBytes, StructuredOutputResult, 'structuredOutputParse');
     };
 
-    const runOnce = async (text: string): Promise<GenerationResult> => {
-      const request = await buildRequest(text, effectiveOptions, requestId, []);
-      const resultBytes = await native.llmGenerateProto(
-        encode(request, LLMGenerateRequest)
-      );
-      return toGenerationResult(
-        decode(resultBytes, LLMGenerationResult, 'llmGenerate'),
-        requestId
-      );
-    };
-
-    let generation = await runOnce(prompt);
-    let result = await extract(generation.text);
-    if (mode === 'repair' && !(result.validation?.isValid ?? true)) {
-      const repairPrompt =
-        `${prompt}\n\nYour previous answer did not match the required JSON schema. ` +
-        'Reply again with ONLY JSON that satisfies this schema.\n\n' +
-        `Previous invalid answer: ${result.rawText ?? generation.text}`;
-      generation = await runOnce(repairPrompt);
-      result = await extract(generation.text);
-    }
-    return toStructuredResult<T>(result, generation, mode);
+    const request = await buildRequest(prompt, effectiveOptions, requestId, []);
+    const resultBytes = await native.llmGenerateProto(
+      encode(request, LLMGenerateRequest)
+    );
+    const generation = toGenerationResult(
+      decode(resultBytes, LLMGenerationResult, 'llmGenerate'),
+      requestId
+    );
+    const result = await extract(generation.text);
+    return toStructuredResult<T>(result, generation, effectiveMode);
   },
 
   /** Tools the model may call during generation. */

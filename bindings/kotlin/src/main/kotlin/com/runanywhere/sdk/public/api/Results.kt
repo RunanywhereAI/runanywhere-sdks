@@ -50,7 +50,7 @@ public data class StructuredResult(
     val value: String,
     val raw: String,
     val valid: Boolean,
-    val mode: StructuredOutputMode = StructuredOutputMode.VALIDATION_ONLY,
+    val mode: StructuredOutputMode = StructuredOutputMode.CONSTRAINED,
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
     val timeToFirstTokenMs: Long = 0L,
