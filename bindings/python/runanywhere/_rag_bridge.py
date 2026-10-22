@@ -9,11 +9,12 @@ backend).
 
 from __future__ import annotations
 
+import numbers
 from typing import Any, List, Optional
 
 from .errors import ErrorCode, SDKException
 from .events import RagEvent, RagEventKind
-from .options import RagConfig, RagQueryOptions, ReasoningMode
+from .options import RagConfig, RagQueryOptions, RagVectorStore, ReasoningMode
 from .results import Match, RagResult, RagStats, TokenKind
 
 try:
@@ -100,6 +101,32 @@ def build_document(text: str, doc_id: str, metadata: Optional[dict]) -> bytes:
     return doc.SerializeToString()
 
 
+def _int32_option(name: str, value: Any) -> int:
+    """Return ``value`` for an int32 proto field, rejecting non-integers and overflow.
+
+    ``int()`` would turn ``-0.5`` into a legal-looking ``0`` and ``2.5`` into ``2``, so the
+    native validator would never see what the caller passed. Fractional and non-finite
+    values are rejected here, naming the value; the range itself (e.g. ``rrf_k > 0``) is
+    checked by commons, the single source of truth for every SDK.
+    """
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise SDKException.invalid_input(f"RagRetrievalOptions.{name} must be an int, got {value!r}")
+    as_int = int(value)
+    if not -(2**31) <= as_int < 2**31:
+        raise SDKException.invalid_input(f"RagRetrievalOptions.{name} must fit int32, got {as_int}")
+    return as_int
+
+
+def _vector_store_option(value: Any) -> int:
+    """Return the wire value of a :class:`RagVectorStore`, rejecting anything else."""
+    try:
+        return int(RagVectorStore(value))
+    except ValueError:
+        raise SDKException.invalid_input(
+            f"RagRetrievalOptions.vector_store must be a RagVectorStore, got {value!r}"
+        ) from None
+
+
 def build_query(
     question: str,
     options: Optional[RagQueryOptions],
@@ -113,6 +140,14 @@ def build_query(
                 query.retrieval.top_k = int(retrieval.top_k)
             if retrieval.similarity_threshold is not None:
                 query.retrieval.score_threshold = retrieval.similarity_threshold
+            if retrieval.bm25_k1 is not None:
+                query.retrieval.bm25_k1 = retrieval.bm25_k1
+            if retrieval.bm25_b is not None:
+                query.retrieval.bm25_b = retrieval.bm25_b
+            if retrieval.rrf_k is not None:
+                query.retrieval.rrf_k = _int32_option("rrf_k", retrieval.rrf_k)
+            if retrieval.vector_store is not None:
+                query.retrieval.vector_store = _vector_store_option(retrieval.vector_store)
         generation = options.generation
         if generation is not None:
             query.generation.max_output_tokens = generation.max_output_tokens
