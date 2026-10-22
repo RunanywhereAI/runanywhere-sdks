@@ -134,8 +134,12 @@ RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes
 
 /**
  * Validate an intermediate activation tensor payload between pipeline stages.
- * Accepts ClusterActivation and verifies cluster binding, tensor dimensions,
- * and valid layer boundaries. (Validation only; transport occurs out-of-band).
+ * Accepts ClusterActivation and verifies cluster binding, non-zero tensor dimensions,
+ * and a valid layer boundary. `dtype` must name FP16, BF16 or FP32 (UNSPECIFIED or an
+ * unknown value is rejected), and `tensor_data` must hold exactly
+ * `seq_len * hidden_size * element_size(dtype)` bytes: a packed, little-endian, row-major
+ * `[seq_len][hidden_size]` array (hidden_size contiguous). (Validation only; transport
+ * occurs out-of-band).
  */
 RAC_API rac_result_t
 rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,

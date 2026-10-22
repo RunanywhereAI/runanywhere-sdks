@@ -268,6 +268,16 @@ message ClusterStartResponse {
     ClusterPeerCapability peer_capability = 3;
 }
 
+// Element format of ClusterActivation.tensor_data. The payload is a packed,
+// little-endian, row-major `[seq_len][hidden_size]` array (hidden_size is the
+// contiguous dimension) of `seq_len * hidden_size` elements of this format.
+enum ClusterActivationDtype {
+    CLUSTER_ACTIVATION_DTYPE_UNSPECIFIED = 0;
+    CLUSTER_ACTIVATION_DTYPE_FP16        = 1; // IEEE 754 binary16, 2 bytes per element
+    CLUSTER_ACTIVATION_DTYPE_BF16        = 2; // bfloat16, 2 bytes per element
+    CLUSTER_ACTIVATION_DTYPE_FP32        = 3; // IEEE 754 binary32, 4 bytes per element
+}
+
 // Intermediate activation tensor passed between pipeline stages.
 message ClusterActivation {
     string cluster_id = 1;
@@ -276,6 +286,9 @@ message ClusterActivation {
     bytes  tensor_data = 4;
     uint32 seq_len     = 5;
     uint32 hidden_size = 6;
+    // Required: element format of tensor_data. UNSPECIFIED is rejected so a
+    // receiver never has to guess between FP16 and BF16 bit layouts.
+    ClusterActivationDtype dtype = 7;
 }
 
 message ClusterStopRequest {
