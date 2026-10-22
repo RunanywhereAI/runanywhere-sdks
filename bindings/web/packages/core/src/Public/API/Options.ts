@@ -200,10 +200,25 @@ export interface RagConfig {
   persistPath?: string;
 }
 
-/** Per-query retrieval overrides of `RagSession.query`/`queryStream`. */
+/** Vector store backing RAG retrieval. Only the in-process store is available on-device. */
+export type RagVectorStore = 'usearch';
+
+/**
+ * Per-query retrieval overrides of `RagSession.query`/`queryStream`.
+ *
+ * `bm25K1`, `bm25B`, `rrfK` and `vectorStore` are honored only by the native RAG session
+ * provider; the cross-WASM fallback rejects them with an error rather than ignoring them.
+ */
 export interface RagRetrievalOptions {
   topK?: number;
   similarityThreshold?: number;
+  /** BM25 term-frequency saturation; finite and `>= 0`. Unset uses the session default. */
+  bm25K1?: number;
+  /** BM25 document-length normalization in `0..1`. Unset uses the session default. */
+  bm25B?: number;
+  /** Reciprocal-rank-fusion constant, `>= 0`. Unset uses the session default. */
+  rrfK?: number;
+  vectorStore?: RagVectorStore;
 }
 
 /** Per-query knobs of `RagSession.query`/`queryStream`. */
