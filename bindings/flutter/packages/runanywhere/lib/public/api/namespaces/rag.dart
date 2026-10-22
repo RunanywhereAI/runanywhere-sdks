@@ -271,6 +271,18 @@ class RagSession {
     proto.topK = topK;
     final threshold = override?.similarityThreshold ?? _config.similarityThreshold;
     if (threshold != null) proto.scoreThreshold = threshold;
+    final bm25K1 = override?.bm25K1;
+    if (bm25K1 != null) proto.bm25K1 = bm25K1;
+    final bm25B = override?.bm25B;
+    if (bm25B != null) proto.bm25B = bm25B;
+    final rrfK = override?.rrfK;
+    if (rrfK != null) proto.rrfK = rrfK;
+    switch (override?.vectorStore) {
+      case RagVectorStore.usearch:
+        proto.vectorStore = rag_pb.VectorStore.VECTOR_STORE_USEARCH;
+      case null:
+        break;
+    }
     return proto;
   }
 
