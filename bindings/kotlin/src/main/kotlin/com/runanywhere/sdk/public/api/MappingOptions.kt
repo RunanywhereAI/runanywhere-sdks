@@ -34,6 +34,7 @@ import ai.runanywhere.proto.v1.DiarizationOptions as ProtoDiarizationOptions
 import ai.runanywhere.proto.v1.ReasoningMode as ProtoReasoningMode
 import ai.runanywhere.proto.v1.ReasoningOptions as ProtoReasoningOptions
 import ai.runanywhere.proto.v1.SegmentationOptions as ProtoSegmentationOptions
+import ai.runanywhere.proto.v1.StructuredOutputMode as ProtoStructuredOutputMode
 
 /** The IDL's neutral repetition penalty, used when the caller leaves it unset. */
 private val NEUTRAL_REPETITION_PENALTY = LLMGenerationOptions.defaults().repeat_penalty
@@ -41,8 +42,8 @@ private val NEUTRAL_REPETITION_PENALTY = LLMGenerationOptions.defaults().repeat_
 internal fun LlmOptions?.orDefault(): LlmOptions = this ?: LlmOptions()
 
 /**
- * [structuredOutput] is never populated from a public [LlmOptions] field —
- * only `llm.generateStructured` supplies it, through its own internal call path.
+ * [structuredOutput] is supplied by `llm.generateStructured`, which merges the
+ * caller's [LlmOptions.structuredOutput] overrides with its schema.
  */
 internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLMGenerationOptions =
     LLMGenerationOptions(
@@ -112,17 +113,18 @@ internal fun ReasoningOptions.toProto(): ProtoReasoningOptions =
     )
 
 /**
- * `StructuredOutputOptions.strict_mode`/`.mode`/`.repair_json` are all
- * deleted (idl/structured_output.proto): the message shrank to
- * `include_schema_in_prompt` plus a `oneof constraint { schema | grammar |
- * regex }`. [StructuredOutput.strict] has no wire home any more — retry
- * behaviour for an invalid first pass is owned entirely by the Kotlin-side
- * `llm.generateStructured(mode = REPAIR)` loop, not by a commons flag.
+ * Build the proto structured-output options for [StructuredOutput].
  */
 internal fun StructuredOutput.toProto(): StructuredOutputOptions =
     StructuredOutputOptions(
         schema = schema.rawJson,
         include_schema_in_prompt = true,
+        mode =
+            when (mode) {
+                StructuredOutputMode.CONSTRAINED -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED
+                StructuredOutputMode.VALIDATION_ONLY -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY
+                StructuredOutputMode.REPAIR -> ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR
+            },
     )
 
 internal fun SttOptions?.orDefault(): SttOptions = this ?: SttOptions()

@@ -13,7 +13,11 @@ import {
 import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { ToolChoiceMode } from '@runanywhere/proto-ts/tool_calling';
-import type { StructuredOutputOptions, StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
+import {
+  StructuredOutputMode as ProtoStructuredOutputMode,
+  type StructuredOutputOptions,
+  type StructuredOutputResult,
+} from '@runanywhere/proto-ts/structured_output';
 import type { STTOptions, STTOutput } from '@runanywhere/proto-ts/stt_options';
 import type { TTSOptions, TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
 import type { VADOptions, VADResult as ProtoVadResult } from '@runanywhere/proto-ts/vad_options';
@@ -306,21 +310,24 @@ export function vlmToGenerationResult(result: VLMResult, requestId = ''): Genera
 
 /**
  * Build the proto structured-output request options for one
- * `llm.generateStructured` call. `CONSTRAINED` is not wired on Web (no
- * grammar-constrained decoding hook) — callers must preflight-reject it
- * before reaching this helper. `StructuredOutputOptions` no longer carries a
- * `mode`/`strictMode`/`repairJson` knob: it is just
- * `includeSchemaInPrompt`/`schema`/`grammar`/`regex` now, so `mode` is kept
- * only as the caller-facing enforcement level threaded through to
- * `toStructuredResult` — commons always validates+extracts on the result.
+ * `llm.generateStructured` call.
  */
 export function toProtoStructuredOutputOptions(
   json: string,
-  _mode: Exclude<StructuredOutputMode, 'constrained'>,
+  mode?: StructuredOutputMode,
 ): StructuredOutputOptions {
+  let protoMode: ProtoStructuredOutputMode | undefined;
+  if (mode === 'constrained') {
+    protoMode = ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED;
+  } else if (mode === 'validationOnly') {
+    protoMode = ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY;
+  } else if (mode === 'repair') {
+    protoMode = ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR;
+  }
   return {
     includeSchemaInPrompt: true,
     schema: json,
+    ...(protoMode !== undefined ? { mode: protoMode } : {}),
   };
 }
 
