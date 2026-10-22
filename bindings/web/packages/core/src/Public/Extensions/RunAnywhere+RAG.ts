@@ -833,6 +833,7 @@ class CrossWasmRAGProvider implements RAGProvider {
     feature: 'RAG.query' | 'RAG.queryStream',
   ): Promise<CrossWasmPreparedQuery> {
     this.requireInitialized(feature);
+    assertNativeOnlyRetrievalKnobsUnset(options, feature);
     const version = this.lifecycleVersion;
     const query = question.trim();
     if (!query) {
@@ -1497,8 +1498,41 @@ function makeRAGQuery(
       enableMultiQuery: options.retrieval?.enableMultiQuery ?? retrievalDefaults.enableMultiQuery,
       multiQueryCount: options.retrieval?.multiQueryCount ?? retrievalDefaults.multiQueryCount,
       scopePrefix: options.retrieval?.scopePrefix,
+      bm25K1: options.retrieval?.bm25K1,
+      bm25B: options.retrieval?.bm25B,
+      rrfK: options.retrieval?.rrfK,
+      vectorStore: options.retrieval?.vectorStore,
     },
   };
+}
+
+/**
+ * The cross-WASM provider ranks by embedding cosine similarity in TypeScript and reads
+ * only `topK` / `scoreThreshold`, so the BM25 / RRF / vector-store knobs, multi-query
+ * expansion and scope filtering would change nothing there. Fail loudly instead of
+ * silently ignoring them; only the native `wasm-session` provider honors them.
+ *
+ * The four tuning knobs count whenever present. For the other three only a value that
+ * would change native retrieval counts: `enableMultiQuery: false` (which the
+ * `RunAnywhere.rag` namespace always sends), `multiQueryCount: 0` (the native "use the
+ * default") and an empty `scopePrefix` (the whole index) are what this provider does anyway.
+ */
+function assertNativeOnlyRetrievalKnobsUnset(options: RAGQueryOverrides, feature: string): void {
+  const retrieval = options.retrieval;
+  if (!retrieval) return;
+  const set: string[] = (
+    ['bm25K1', 'bm25B', 'rrfK', 'vectorStore'] as const
+  ).filter((key) => retrieval[key] !== undefined);
+  if (retrieval.enableMultiQuery === true) set.push('enableMultiQuery');
+  if (retrieval.multiQueryCount !== undefined && retrieval.multiQueryCount !== 0) {
+    set.push('multiQueryCount');
+  }
+  if (retrieval.scopePrefix) set.push('scopePrefix');
+  if (set.length === 0) return;
+  throw SDKException.invalidConfiguration(
+    `${feature}: ${set.join(', ')} require the native RAG session provider; the active `
+      + "'cross-wasm' provider ranks by embedding similarity only and cannot honor them.",
+  );
 }
 
 function makeRAGSearchRequest(
