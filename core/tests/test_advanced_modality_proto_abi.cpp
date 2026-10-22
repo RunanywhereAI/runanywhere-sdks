@@ -2287,6 +2287,26 @@ int test_rag_search_retrieval_only() {
     CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "rag.search rejects bm25_b outside [0, 1]");
     rac_proto_buffer_free(&out);
 
+    // An explicit zero is the "unset" sentinel below the ABI, so it is rejected rather than
+    // silently replaced by the default.
+    runanywhere::v1::RAGSearchRequest zero_k1_search = tuned_search;
+    zero_k1_search.mutable_retrieval()->set_bm25_k1(0.0f);
+    std::vector<uint8_t> zero_k1_bytes;
+    CHECK(serialize(zero_k1_search, &zero_k1_bytes), "bm25_k1 zero request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(full_session, zero_k1_bytes.data(), zero_k1_bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "rag.search rejects an explicit bm25_k1 of 0");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGSearchRequest zero_rrf_search = tuned_search;
+    zero_rrf_search.mutable_retrieval()->set_rrf_k(0);
+    std::vector<uint8_t> zero_rrf_bytes;
+    CHECK(serialize(zero_rrf_search, &zero_rrf_bytes), "rrf_k zero request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(full_session, zero_rrf_bytes.data(), zero_rrf_bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "rag.search rejects an explicit rrf_k of 0");
+    rac_proto_buffer_free(&out);
+
     runanywhere::v1::RAGSearchRequest inf_k1_search = tuned_search;
     inf_k1_search.mutable_retrieval()->set_bm25_k1(std::numeric_limits<float>::infinity());
     std::vector<uint8_t> inf_k1_bytes;

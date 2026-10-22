@@ -207,11 +207,11 @@ export type RagVectorStore = 'usearch';
 export interface RagRetrievalOptions {
   topK?: number;
   similarityThreshold?: number;
-  /** BM25 term-frequency saturation; finite and `>= 0`. Unset uses the session default. */
+  /** BM25 term-frequency saturation; finite and `> 0` (0 is rejected). Unset uses the session default. */
   bm25K1?: number;
   /** BM25 document-length normalization in `0..1`. Unset uses the session default. */
   bm25B?: number;
-  /** Reciprocal-rank-fusion constant, `>= 0`. Unset uses the session default. */
+  /** Reciprocal-rank-fusion constant, `> 0` (0 is rejected). Unset uses the session default. */
   rrfK?: number;
   vectorStore?: RagVectorStore;
 }

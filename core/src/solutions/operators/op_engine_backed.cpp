@@ -96,6 +96,12 @@ const std::string* find_param(const runanywhere::v1::OperatorSpec& spec, const s
     return &it->second;
 }
 
+// True when `key` is present with a non-empty value.
+bool has_param(const runanywhere::v1::OperatorSpec& spec, const std::string& key) {
+    const std::string* value = find_param(spec, key);
+    return value != nullptr && !value->empty();
+}
+
 int param_int_or(const runanywhere::v1::OperatorSpec& spec, const std::string& key, int fallback) {
     const std::string* value = find_param(spec, key);
     if (!value || value->empty())
@@ -158,12 +164,6 @@ bool param_float_strict(const runanywhere::v1::OperatorSpec& spec, const std::st
     }
     *out = parsed;
     return true;
-}
-
-// True when `key` is present with a non-empty value.
-bool has_param(const runanywhere::v1::OperatorSpec& spec, const std::string& key) {
-    const std::string* value = find_param(spec, key);
-    return value != nullptr && !value->empty();
 }
 
 // Parse an unsigned 64-bit identifier (e.g. a host-provided session handle)
@@ -805,12 +805,12 @@ class RetrieveNode final : public OperatorNode {
         } else if (has_param(spec, "similarity_threshold") &&
                    (similarity_threshold_ < 0.0f || similarity_threshold_ > 1.0f)) {
             param_error_ = "retrieve param 'similarity_threshold' must be in 0.0...1.0";
-        } else if (bm25_k1_ < 0.0f) {
-            param_error_ = "retrieve param 'bm25_k1' must be >= 0";
+        } else if (has_param(spec, "bm25_k1") && bm25_k1_ <= 0.0f) {
+            param_error_ = "retrieve param 'bm25_k1' must be > 0";
         } else if (has_param(spec, "bm25_b") && (bm25_b_ < 0.0f || bm25_b_ > 1.0f)) {
             param_error_ = "retrieve param 'bm25_b' must be in 0.0...1.0";
-        } else if (rrf_k_ < 0) {
-            param_error_ = "retrieve param 'rrf_k' must be >= 0";
+        } else if (has_param(spec, "rrf_k") && rrf_k_ <= 0) {
+            param_error_ = "retrieve param 'rrf_k' must be > 0";
         }
         if (const std::string* p = find_param(spec, "system_prompt"); p) {
             system_prompt_ = *p;
