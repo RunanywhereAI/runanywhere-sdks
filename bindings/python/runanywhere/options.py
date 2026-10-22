@@ -88,7 +88,7 @@ class StructuredOutput:
 class StructuredOutputMode(IntEnum):
     """Enforcement level ``llm.generate_structured`` applies to its schema."""
 
-    #: Engine-constrained decoding (GBNF grammar sampling).
+    #: Engine-constrained decoding (GBNF grammar sampling, enforced by the llama.cpp engine only; other backends generate unconstrained).
     CONSTRAINED = 0
     #: Generate freely, then validate against the schema.
     VALIDATION_ONLY = 1

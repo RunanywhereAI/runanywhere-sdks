@@ -126,7 +126,7 @@ public class LlmNamespace internal constructor() {
      * Generate a completion constrained to [schema] and parse it.
      *
      * [mode] picks how the schema is enforced:
-     * - [StructuredOutputMode.CONSTRAINED] (default): engine-constrained decoding (GBNF grammar sampling).
+     * - [StructuredOutputMode.CONSTRAINED] (default): engine-constrained decoding (GBNF grammar sampling, enforced by the llama.cpp engine only; other backends generate unconstrained).
      * - [StructuredOutputMode.VALIDATION_ONLY]: generate freely, then validate against the schema.
      * - [StructuredOutputMode.REPAIR]: validate, then retry once with a repair instruction if invalid.
      *
