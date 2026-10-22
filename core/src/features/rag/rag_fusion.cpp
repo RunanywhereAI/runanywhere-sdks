@@ -13,35 +13,40 @@ namespace runanywhere {
 namespace rag {
 
 std::vector<SearchResult> fuse_rankings(const std::vector<std::vector<std::string>>& rankings,
-                                        const VectorStoreUSearch* vector_store, size_t top_k) {
-    static constexpr float kRRFConstant = 60.0f;
+                                        const VectorStoreUSearch* vector_store, size_t top_k,
+                                        int32_t rrf_k) {
+    // Accumulate in double: with a large rrf_k (up to INT32_MAX) adjacent float
+    // denominators round to the same value and would tie unrelated candidates.
+    const double kRRFConstant = rrf_k > 0 ? static_cast<double>(rrf_k) : 60.0;
 
-    std::unordered_map<std::string, float> rrf_scores;
+    std::unordered_map<std::string, double> rrf_scores;
     for (const auto& ranking : rankings) {
         for (size_t i = 0; i < ranking.size(); ++i) {
-            rrf_scores[ranking[i]] += 1.0f / (kRRFConstant + static_cast<float>(i + 1));
+            rrf_scores[ranking[i]] += 1.0 / (kRRFConstant + static_cast<double>(i + 1));
         }
     }
 
-    std::vector<std::pair<std::string, float>> sorted_ids(rrf_scores.begin(), rrf_scores.end());
-    std::sort(sorted_ids.begin(), sorted_ids.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::vector<std::pair<std::string, double>> sorted_ids(rrf_scores.begin(), rrf_scores.end());
+    // Ties break on id so the order never depends on unordered_map iteration.
+    std::sort(sorted_ids.begin(), sorted_ids.end(), [](const auto& a, const auto& b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
     if (sorted_ids.size() > top_k)
         sorted_ids.resize(top_k);
 
     // Best achievable score: rank-1 in every ranking. Normalizes into [0,1] so
     // the reported similarity is comparable regardless of fan-out.
-    const float max_possible =
-        rankings.empty() ? 1.0f : static_cast<float>(rankings.size()) / (kRRFConstant + 1.0f);
+    const double max_possible =
+        rankings.empty() ? 1.0 : static_cast<double>(rankings.size()) / (kRRFConstant + 1.0);
 
     std::vector<SearchResult> fused;
     fused.reserve(sorted_ids.size());
     for (const auto& [id, rrf_score] : sorted_ids) {
-        float normalized = max_possible > 0.0f ? rrf_score / max_possible : rrf_score;
-        normalized = std::min(1.0f, std::max(0.0f, normalized));
+        double normalized = max_possible > 0.0 ? rrf_score / max_possible : rrf_score;
+        normalized = std::min(1.0, std::max(0.0, normalized));
         SearchResult result;
         result.id = id;
-        result.score = normalized;
+        result.score = static_cast<float>(normalized);
         if (vector_store) {
             auto chunk = vector_store->get_chunk(id);
             if (chunk) {
