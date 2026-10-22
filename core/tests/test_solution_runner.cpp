@@ -1233,6 +1233,16 @@ TEST(rag_yaml_explicit_zero_tuning_reaches_the_retrieve_operator) {
                                                   &defaults_cfg) == RAC_SUCCESS);
     CHECK(!defaults_cfg.rag().has_bm25_k1() && !defaults_cfg.rag().has_rrf_k());
 
+    // An unknown vector_store token is a load error too, not a silent UNSPECIFIED.
+    SolutionConfig typo_store_cfg;
+    rac_error_clear_details();
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  vector_store: usearchh\n",
+                                                  &typo_store_cfg) == RAC_ERROR_INVALID_FORMAT);
+    const char* typo_details = rac_error_get_details();
+    CHECK(typo_details != nullptr && std::string(typo_details).find("usearchh") != std::string::npos);
+
     // Garbage used to become 0 through to_float(); it is a load error now.
     SolutionConfig garbage_cfg;
     rac_error_clear_details();
