@@ -466,6 +466,17 @@ void test_cluster_orchestration() {
           "Invalid layer boundary activation returns typed validation");
     CHECK(!invalid_boundary_validation.accepted(), "Invalid layer boundary is rejected");
 
+    // 11a. from_layer 0 is the first stage's input, not an inter-stage handoff
+    v1::ClusterActivation layer_zero_activation = valid_activation;
+    layer_zero_activation.set_from_layer(0);
+    v1::ConnectInvocationValidation layer_zero_validation;
+    CHECK(call_proto(rac_connect_cluster_validate_activation_proto, layer_zero_activation,
+                     &layer_zero_validation) == RAC_SUCCESS,
+          "Layer-zero activation returns typed validation");
+    CHECK(!layer_zero_validation.accepted(), "Activation from_layer 0 is rejected");
+    CHECK(layer_zero_validation.rejection_reason().find("first stage's input") != std::string::npos,
+          "Layer-zero rejection names the real cause, not a missing boundary");
+
     // 11b. Activation validation rejection on undersized tensor bytes (e.g. 1 byte/element instead of min 2)
     v1::ClusterActivation undersized_activation = valid_activation;
     undersized_activation.set_tensor_data(std::string(4096 * 1, 'A')); // 4096 bytes < 4096 * 2 min_bytes

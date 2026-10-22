@@ -135,7 +135,8 @@ RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes
 /**
  * Validate an intermediate activation tensor payload between pipeline stages.
  * Accepts ClusterActivation and verifies cluster binding, tensor dimensions,
- * and valid layer boundaries. (Validation only; transport occurs out-of-band).
+ * and that from_layer is the start of a non-first stage (layer 0 is the first stage's input, not
+ * an inter-stage handoff). (Validation only; transport occurs out-of-band).
  */
 RAC_API rac_result_t
 rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
