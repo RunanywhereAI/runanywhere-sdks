@@ -157,13 +157,16 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
         (*retrieve->mutable_params())["vector_store"] =
             runanywhere::v1::VectorStore_Name(cfg.vector_store());
     }
-    if (cfg.bm25_k1() > 0.0f) {
+    // Forward by presence, not value: a value test here turned an explicit 0 into "unset"
+    // (silently 1.2 / 60, and bm25_b = 0 dropped entirely) before the retrieve operator's
+    // range check could see the key.
+    if (cfg.has_bm25_k1()) {
         (*retrieve->mutable_params())["bm25_k1"] = format_float_param(cfg.bm25_k1());
     }
-    if (cfg.bm25_b() > 0.0f) {
+    if (cfg.has_bm25_b()) {
         (*retrieve->mutable_params())["bm25_b"] = format_float_param(cfg.bm25_b());
     }
-    if (cfg.rrf_k() > 0) {
+    if (cfg.has_rrf_k()) {
         (*retrieve->mutable_params())["rrf_k"] = std::to_string(cfg.rrf_k());
     }
     (void)llm;
