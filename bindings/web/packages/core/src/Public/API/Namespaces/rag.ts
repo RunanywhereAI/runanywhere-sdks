@@ -146,8 +146,12 @@ function createSession(): RagSession {
      */
     queryStream(question: string, options?: RagQueryOptions | LlmOptions): AsyncIterable<RagEvent> {
       requireOpen(session, 'queryStream');
+      // Validate the options here, like the closed-session check above, so an invalid
+      // option throws from this call (as `query` rejects) instead of surfacing from
+      // inside the stream after the caller has started iterating.
+      const overrides = normalizeQueryOptions(options);
       return (async function* answer(): AsyncGenerator<RagEvent> {
-        const events = ragQueryStream(question, normalizeQueryOptions(options));
+        const events = ragQueryStream(question, overrides);
         let announcedSources = false;
         try {
           for await (const event of events) {
