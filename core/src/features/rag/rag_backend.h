@@ -178,8 +178,8 @@ class RAGBackend {
 
     std::vector<SearchResult>
     fuse_results(const std::vector<SearchResult>& dense_results,
-                 const std::vector<std::pair<std::string, float>>& bm25_results,
-                 size_t top_k) const;
+                 const std::vector<std::pair<std::string, float>>& bm25_results, size_t top_k,
+                 int32_t rrf_k) const;
 
     RAGBackendConfig config_;
     std::unique_ptr<VectorStoreUSearch> vector_store_;

@@ -411,10 +411,11 @@ std::vector<SearchResult> RAGBackend::search_with_embedding(const std::string& q
         // BM25 keyword search
         std::vector<std::pair<std::string, float>> bm25_results;
         if (bm25_index_) {
-            bm25_results = bm25_index_->search(query_text, top_k);
+            // Same session tuning the query path uses, so this route cannot silently diverge.
+            bm25_results = bm25_index_->search(query_text, top_k, config_.bm25_k1, config_.bm25_b);
         }
 
-        auto fused = fuse_results(dense_results, bm25_results, top_k);
+        auto fused = fuse_results(dense_results, bm25_results, top_k, config_.rrf_k);
         LOGI("Hybrid search: %zu dense, %zu bm25, %zu fused", dense_results.size(),
              bm25_results.size(), fused.size());
 
@@ -433,9 +434,12 @@ std::vector<SearchResult> RAGBackend::search_with_embedding(const std::string& q
 std::vector<SearchResult>
 RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
                          const std::vector<std::pair<std::string, float>>& bm25_results,
-                         size_t top_k) const {
-    static constexpr float kRRFConstant = 60.0f;
-    static constexpr float kMaxRRFScore = 2.0f / 61.0f;
+                         size_t top_k, int32_t rrf_k) const {
+    // rrf_k <= 0 means "unset": fall back to the classic RRF constant of 60.
+    const float kRRFConstant = rrf_k > 0 ? static_cast<float>(rrf_k) : 60.0f;
+    // Best achievable fused score: rank 1 in both lists, so the normaliser must follow the same
+    // constant as the rank terms rather than the hardcoded 60.
+    const float kMaxRRFScore = 2.0f / (kRRFConstant + 1.0f);
 
     if (bm25_results.empty())
         return dense_results;
