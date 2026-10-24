@@ -117,38 +117,41 @@ static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* a
                                                  const std::string& model_path,
                                                  bool* has_finished_artifact) {
     *has_finished_artifact = false;
+    std::vector<std::string> pending{model_path};
     std::vector<rac_directory_entry_t> entries;
-    rac_result_t rc = list_directory_via_adapter(adapter, model_path.c_str(), &entries);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-    for (const rac_directory_entry_t& child : entries) {
-        if (is_finished_artifact_entry(child)) {
-            *has_finished_artifact = true;
-            return RAC_SUCCESS;
-        }
-    }
-
-    // Sherpa archives can place their artifacts one directory below the model.
+    size_t directory_count = 1;
     rac_result_t nested_error = RAC_SUCCESS;
-    for (const rac_directory_entry_t& child : entries) {
-        if (child.is_dir != RAC_TRUE || child.name[0] == '\0' || child.name[0] == '.') {
-            continue;
-        }
-        std::vector<rac_directory_entry_t> nested;
-        const std::string nested_path = model_path + "/" + child.name;
-        rc = list_directory_via_adapter(adapter, nested_path.c_str(), &nested);
+    while (!pending.empty()) {
+        const std::string current_path = std::move(pending.back());
+        pending.pop_back();
+        const rac_result_t rc = list_directory_via_adapter(adapter, current_path.c_str(), &entries);
         if (rc != RAC_SUCCESS) {
+            if (current_path == model_path) {
+                return rc;
+            }
             // The parent exists; a child disappearing during enumeration is
             // an inconclusive read, not proof that the parent path vanished.
             nested_error = RAC_ERROR_FILE_READ_FAILED;
             continue;
         }
-        for (const rac_directory_entry_t& leaf : nested) {
-            if (is_finished_artifact_entry(leaf)) {
+        for (const rac_directory_entry_t& child : entries) {
+            if (is_finished_artifact_entry(child)) {
                 *has_finished_artifact = true;
                 return RAC_SUCCESS;
             }
+        }
+        // Descriptors can name arbitrarily nested subdirectories. Bound the
+        // total walk (including directory-link cycles) using the listing cap;
+        // exhaustion is inconclusive, so pruning preserves the registry row.
+        for (const rac_directory_entry_t& child : entries) {
+            if (child.is_dir != RAC_TRUE || child.name[0] == '\0' || child.name[0] == '.') {
+                continue;
+            }
+            if (directory_count >= kRescanMaxEntryCapacity) {
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+            ++directory_count;
+            pending.push_back(current_path + "/" + child.name);
         }
     }
     return nested_error;
