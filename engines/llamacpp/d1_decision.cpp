@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -179,6 +180,10 @@ std::string render_template(const llama_model* model, const common_json& input) 
 }
 
 void decode_all(llama_context* ctx, const std::vector<llama_token>& tokens) {
+    // The whole prompt goes in one batch; llama.cpp asserts rather than fails past these caps.
+    if (tokens.size() > std::min(llama_n_batch(ctx), llama_n_ubatch(ctx))) {
+        throw std::length_error("decision prompt exceeds the decode batch");
+    }
     llama_batch batch =
         llama_batch_get_one(const_cast<llama_token*>(tokens.data()), static_cast<int32_t>(tokens.size()));
     if (llama_decode(ctx, batch) != 0) {
@@ -500,6 +505,9 @@ rac_result_t rac_llamacpp_d1_decide(llama_model* model, llama_context* ctx, rac_
                     break;
             }
         }
+    } catch (const std::length_error&) {
+        rac_decision_result_free(output);
+        return RAC_ERROR_TEXT_TOO_LONG;
     } catch (const std::exception&) {
         rac_decision_result_free(output);
         return RAC_ERROR_INFERENCE_FAILED;
