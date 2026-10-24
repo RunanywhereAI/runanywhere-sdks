@@ -5,6 +5,7 @@
 #include "segmentation_service_internal.h"
 
 #include <cstdlib>
+#include <limits>
 
 #include "../common/rac_service_factory_internal.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -86,8 +87,25 @@ rac_result_t rac_segmentation_segment(rac_handle_t handle, const rac_segmentatio
         return RAC_ERROR_NOT_SUPPORTED;
     }
     *out_result = {};
+    if (image->width == 0 || image->height == 0 ||
+        image->width > std::numeric_limits<size_t>::max() / image->height) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
     const rac_segmentation_options_t defaults = RAC_SEGMENTATION_OPTIONS_DEFAULT;
-    return service->ops->segment(service->impl, image, options ? options : &defaults, out_result);
+    const auto* effective_options = options ? options : &defaults;
+    rac_result_t rc = service->ops->segment(service->impl, image, effective_options, out_result);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    const size_t pixels = static_cast<size_t>(image->width) * image->height;
+    const bool confidence_requested = effective_options->include_confidence == RAC_TRUE;
+    if ((confidence_requested &&
+         (!out_result->confidence_mask || out_result->confidence_mask_size != pixels)) ||
+        (!confidence_requested && out_result->confidence_mask_size != 0)) {
+        rac_segmentation_result_free(out_result);
+        return RAC_ERROR_ENCODING_ERROR;
+    }
+    return RAC_SUCCESS;
 }
 
 rac_result_t rac_segmentation_cleanup(rac_handle_t handle) {
@@ -117,6 +135,7 @@ void rac_segmentation_result_free(rac_segmentation_result_t* result) {
     }
     std::free(result->class_mask);
     std::free(result->diagnostic_rgba);
+    std::free(result->confidence_mask);
     if (result->class_summaries) {
         for (size_t i = 0; i < result->class_summary_count; ++i) {
             std::free(result->class_summaries[i].label);

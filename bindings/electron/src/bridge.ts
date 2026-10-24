@@ -241,6 +241,7 @@ export interface NativeAddon {
     classMask: Uint16Array;
     classes: Array<{ classId: number; label?: string; pixelCount: number; fraction: number }>;
     diagnosticRgba?: Uint8Array;
+    confidenceMask?: Uint8Array;
   }>;
   unloadSegmentationModel(handle: number): Promise<void>;
   shutdown(): Promise<void>;

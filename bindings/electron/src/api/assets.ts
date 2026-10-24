@@ -1420,6 +1420,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
         toSegmentationRequest(input.rgb, input.width, input.height, {
           includeDiagnosticImage:
             options.includeDiagnosticImage ?? SEGMENTATION_DEFAULTS.includeDiagnosticImage,
+          includeConfidence: options.includeConfidence ?? SEGMENTATION_DEFAULTS.includeConfidence,
         })
       );
       // Commons owns SegmentationClassSummary.fraction (tag 5).
@@ -1433,6 +1434,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
           pixelCount: c.pixelCount,
           fraction: c.fraction ?? 0,
         })),
+        confidenceMask: native.confidenceMaskU8,
       };
     },
   };

@@ -66,6 +66,7 @@ class Segmentation:
             height=image.height,
             pixel_format=_PIXEL_FORMAT_RGB8,
             include_diagnostic_rgba=bool(options and options.include_diagnostic_image),
+            include_confidence=bool(options and options.include_confidence),
         )
         mask = raw["class_mask"]
         if isinstance(mask, np.ndarray):
@@ -85,6 +86,7 @@ class Segmentation:
             width=int(raw["width"]),
             height=int(raw["height"]),
             classes=classes,
+            confidence_mask=raw.get("confidence_mask"),
         )
 
 

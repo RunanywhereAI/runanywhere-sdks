@@ -400,12 +400,17 @@ public struct SegmentationResult: Sendable {
     public let width: Int
     public let height: Int
     public let classes: [ClassInfo]
+    /// Chosen-class probabilities as one byte per source pixel (0...255),
+    /// in row-major order matching `classMask`, with `width * height` bytes;
+    /// `nil` when confidence was not requested.
+    public let confidenceMask: Data?
 
     init(proto: RASegmentationResult) {
         self.classMask = proto.classMaskU16Le
         self.width = Int(proto.width)
         self.height = Int(proto.height)
         self.classes = proto.classSummaries.map { ClassInfo(proto: $0) }
+        self.confidenceMask = proto.hasConfidenceMaskU8 ? proto.confidenceMaskU8 : nil
     }
 }
 
