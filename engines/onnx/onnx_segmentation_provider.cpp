@@ -534,11 +534,10 @@ rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& i
                 const float value = top * (1.0f - wy) + bottom * wy;
                 if (value > best_value) {
                     if (options.include_confidence == RAC_TRUE) {
-                        probability_denominator = std::isfinite(best_value)
-                                                      ? probability_denominator *
-                                                                std::exp(best_value - value) +
-                                                            1.0
-                                                      : 1.0;
+                        probability_denominator =
+                            std::isfinite(best_value)
+                                ? probability_denominator * std::exp(best_value - value) + 1.0
+                                : 1.0;
                     }
                     best_value = value;
                     best_class = static_cast<uint16_t>(class_id);

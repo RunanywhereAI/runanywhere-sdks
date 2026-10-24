@@ -1993,9 +1993,8 @@ py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t 
                       result.diagnostic_rgba_size);
     }
     if (result.confidence_mask && result.confidence_mask_size) {
-        out["confidence_mask"] =
-            py::bytes(reinterpret_cast<const char*>(result.confidence_mask),
-                      result.confidence_mask_size);
+        out["confidence_mask"] = py::bytes(reinterpret_cast<const char*>(result.confidence_mask),
+                                           result.confidence_mask_size);
     }
     rac_segmentation_result_free(&result);
     return out;

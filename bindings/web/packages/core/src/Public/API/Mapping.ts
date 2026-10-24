@@ -565,7 +565,7 @@ export function toSegmentationResult(result: ProtoSegmentationResult): Segmentat
     width: result.width,
     height: result.height,
     diagnosticImage: result.diagnosticRgba,
-    confidenceMask: result.confidenceMaskU8,
+    ...(result.confidenceMaskU8?.byteLength ? { confidenceMask: result.confidenceMaskU8 } : {}),
     classes: result.classSummaries.map((summary) => ({
       id: summary.classId,
       label: summary.label,

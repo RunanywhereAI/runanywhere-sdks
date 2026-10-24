@@ -28,7 +28,7 @@ typedef struct rac_segmentation_image {
     rac_segmentation_pixel_format_t pixel_format;
 } rac_segmentation_image_t;
 
-/** ABI 14: native callers and providers must rebuild against this header. */
+/** ABI 15: native callers and providers must rebuild against this header. */
 typedef struct rac_segmentation_options {
     rac_bool_t include_diagnostic_rgba;
     rac_bool_t include_confidence;

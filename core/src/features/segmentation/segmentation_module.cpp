@@ -200,8 +200,7 @@ rac_result_t validate_request(const runanywhere::v1::SegmentationRequest& reques
 
 rac_result_t result_to_proto(const rac_segmentation_result_t& source, uint32_t expected_width,
                              uint32_t expected_height, bool diagnostic_requested,
-                             bool confidence_requested,
-                             const char* fallback_model_id,
+                             bool confidence_requested, const char* fallback_model_id,
                              runanywhere::v1::SegmentationResult* out) {
     if (!out) {
         return RAC_ERROR_NULL_POINTER;
@@ -319,9 +318,9 @@ rac_result_t segment_with_service(rac_handle_t service, const char* model_id,
     }
 
     runanywhere::v1::SegmentationResult result;
-    rc = result_to_proto(raw, image.width, image.height,
-                         options.include_diagnostic_rgba == RAC_TRUE,
-                         options.include_confidence == RAC_TRUE, model_id, &result);
+    rc =
+        result_to_proto(raw, image.width, image.height, options.include_diagnostic_rgba == RAC_TRUE,
+                        options.include_confidence == RAC_TRUE, model_id, &result);
     if (rc == RAC_SUCCESS) {
         rc = rac::proto::copy_message(result, out_result, "failed to serialize SegmentationResult");
     } else {

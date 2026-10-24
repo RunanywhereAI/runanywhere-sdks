@@ -3559,11 +3559,11 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
             out.Set("classes", classes);
             if (result.diagnostic_rgba && result.diagnostic_rgba_size) {
                 out.Set("diagnosticRgba", Napi::Buffer<uint8_t>::Copy(e, result.diagnostic_rgba,
-                                                                       result.diagnostic_rgba_size));
+                                                                      result.diagnostic_rgba_size));
             }
             if (result.confidence_mask && result.confidence_mask_size) {
                 out.Set("confidenceMask", Napi::Buffer<uint8_t>::Copy(e, result.confidence_mask,
-                                                                        result.confidence_mask_size));
+                                                                      result.confidence_mask_size));
             }
             return out;
         },

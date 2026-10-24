@@ -285,8 +285,8 @@ int main() {
     }
 
     // (2) Reject old segmentation providers before invoking any plugin callback.
-    // ABI 13 belongs to a different contract on main and must also be rejected.
-    for (uint32_t old_abi : {6u, 12u, 13u}) {
+    // ABIs 13 and 14 predate confidence output and must also be rejected.
+    for (uint32_t old_abi : {6u, 12u, 13u, 14u}) {
         const int segmentation_sentinel = 10;
         auto vt = make_vt("old-abi", 50, old_abi);
         vt.llm_ops = nullptr;
