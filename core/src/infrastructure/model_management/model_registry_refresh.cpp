@@ -110,6 +110,50 @@ rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, c
     return RAC_SUCCESS;
 }
 
+// Check the same finished-artifact shapes for both rescan and orphan pruning.
+// Propagate unreadable directories so pruning cannot mistake an I/O failure for
+// a missing artifact.
+static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* adapter,
+                                                 const std::string& model_path,
+                                                 bool* has_finished_artifact) {
+    *has_finished_artifact = false;
+    std::vector<rac_directory_entry_t> entries;
+    rac_result_t rc = list_directory_via_adapter(adapter, model_path.c_str(), &entries);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    for (const rac_directory_entry_t& child : entries) {
+        if (is_finished_artifact_entry(child)) {
+            *has_finished_artifact = true;
+            return RAC_SUCCESS;
+        }
+    }
+
+    // Sherpa archives can place their artifacts one directory below the model.
+    rac_result_t nested_error = RAC_SUCCESS;
+    for (const rac_directory_entry_t& child : entries) {
+        if (child.is_dir != RAC_TRUE || child.name[0] == '\0' || child.name[0] == '.') {
+            continue;
+        }
+        std::vector<rac_directory_entry_t> nested;
+        const std::string nested_path = model_path + "/" + child.name;
+        rc = list_directory_via_adapter(adapter, nested_path.c_str(), &nested);
+        if (rc != RAC_SUCCESS) {
+            // The parent exists; a child disappearing during enumeration is
+            // an inconclusive read, not proof that the parent path vanished.
+            nested_error = RAC_ERROR_FILE_READ_FAILED;
+            continue;
+        }
+        for (const rac_directory_entry_t& leaf : nested) {
+            if (is_finished_artifact_entry(leaf)) {
+                *has_finished_artifact = true;
+                return RAC_SUCCESS;
+            }
+        }
+    }
+    return nested_error;
+}
+
 // Walk {models_dir}/{framework}/{model_id}/ and link any registry entry whose
 // on-disk folder contains at least one file. Returns the number of models we
 // linked.
@@ -137,7 +181,6 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
 
     int32_t linked = 0;
     std::vector<rac_directory_entry_t> framework_entries;
-    std::vector<rac_directory_entry_t> model_entries;
 
     for (const rac_inference_framework_t framework : frameworks) {
         char framework_dir[1024];
@@ -173,39 +216,10 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
             // not finish, and counting it linked a killed download as a
             // downloaded model that then failed at load with "no .gguf file
             // found". See is_finished_artifact_entry.
-            if (list_directory_via_adapter(adapter, model_path.c_str(), &model_entries) !=
+            bool has_regular_file = false;
+            if (folder_has_finished_artifact(adapter, model_path, &has_regular_file) !=
                 RAC_SUCCESS) {
                 continue;
-            }
-            bool has_regular_file = false;
-            for (const rac_directory_entry_t& child : model_entries) {
-                if (is_finished_artifact_entry(child)) {
-                    has_regular_file = true;
-                    break;
-                }
-            }
-            if (!has_regular_file) {
-                // Allow one level of nested folder (sherpa-onnx archives ship
-                // as <name>/<files>).
-                for (const rac_directory_entry_t& child : model_entries) {
-                    if (child.is_dir != RAC_TRUE || child.name[0] == '.') {
-                        continue;
-                    }
-                    std::vector<rac_directory_entry_t> nested;
-                    std::string nested_path = model_path + "/" + child.name;
-                    if (list_directory_via_adapter(adapter, nested_path.c_str(), &nested) ==
-                        RAC_SUCCESS) {
-                        for (const rac_directory_entry_t& leaf : nested) {
-                            if (is_finished_artifact_entry(leaf)) {
-                                has_regular_file = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (has_regular_file) {
-                        break;
-                    }
-                }
             }
             if (!has_regular_file) {
                 RAC_LOG_INFO("ModelRegistry",
@@ -306,8 +320,6 @@ int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
     if (!adapter || !adapter->file_exists) {
         return 0;
     }
-    const bool can_probe_directories =
-        adapter->is_non_empty_directory || adapter->file_list_directory;
 
     std::vector<ModelInfo> models;
     {
@@ -328,16 +340,56 @@ int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
 
         // Archive and multi-file downloads record a model folder as local_path.
         const bool is_directory_artifact = model.has_archive() || model.has_multi_file();
-        if (is_directory_artifact && !can_probe_directories) {
-            RAC_LOG_WARNING("ModelRegistry",
-                            "Skipping orphan prune for '%s': directory callbacks unavailable",
-                            model.id().c_str());
-            continue;
-        }
-        if (rac_path_is_non_empty_directory(model.local_path().c_str()) == RAC_TRUE ||
-            (!is_directory_artifact &&
-             adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE)) {
-            continue;
+        if (adapter->file_list_directory) {
+            bool has_finished_artifact = false;
+            const rac_result_t probe_rc =
+                folder_has_finished_artifact(adapter, model.local_path(), &has_finished_artifact);
+            if (probe_rc == RAC_SUCCESS) {
+                if (has_finished_artifact) {
+                    const bool has_expected_files =
+                        (model.has_single_file() && model.single_file().has_expected_files()) ||
+                        (model.has_archive() && model.archive().has_expected_files());
+                    std::error_code ec;
+                    if (!(has_expected_files || model.has_multi_file()) ||
+                        !std::filesystem::exists(model.local_path(), ec) ||
+                        model_folder_is_complete(model, model.local_path())) {
+                        continue;
+                    }
+                }
+            } else {
+                // Some adapters report a non-directory file as FILE_NOT_FOUND;
+                // desktop reports a storage error. Only regular files may use
+                // file_exists after a failed directory probe.
+                std::error_code ec;
+                const bool is_regular_file =
+                    std::filesystem::is_regular_file(model.local_path(), ec);
+                if (!is_directory_artifact &&
+                    (is_regular_file || probe_rc == RAC_ERROR_FILE_NOT_FOUND ||
+                     probe_rc == RAC_ERROR_DIRECTORY_NOT_FOUND) &&
+                    adapter->file_exists(model.local_path().c_str(), adapter->user_data) ==
+                        RAC_TRUE) {
+                    continue;
+                }
+                if (probe_rc != RAC_ERROR_FILE_NOT_FOUND &&
+                    probe_rc != RAC_ERROR_DIRECTORY_NOT_FOUND) {
+                    RAC_LOG_WARNING("ModelRegistry", "Skipping orphan prune for '%s': probe rc=%d",
+                                    model.id().c_str(), probe_rc);
+                    continue;
+                }
+            }
+        } else {
+            // Without enumeration we cannot distinguish a model folder from
+            // one containing only a manifest or partial download. Preserve it.
+            if (is_directory_artifact ||
+                rac_path_is_non_empty_directory(model.local_path().c_str()) == RAC_TRUE) {
+                RAC_LOG_WARNING("ModelRegistry",
+                                "Skipping orphan prune for '%s': directory listing unavailable",
+                                model.id().c_str());
+                continue;
+            }
+            if (adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE) {
+                continue;
+            }
         }
 
         if (clear_download_status_if_path_matches(handle, model.id(), model.local_path())) {
@@ -424,8 +476,8 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
             // figures) were reserved off ModelRegistryRefreshResult; log
             // them instead of silently dropping the diagnostic.
             RAC_LOG_INFO("ModelRegistry",
-                        "Refresh rescan: manifest_restored=%d adapter_rescan_linked=%d",
-                        manifest_restored, adapter_rescan_linked);
+                         "Refresh rescan: manifest_restored=%d adapter_rescan_linked=%d",
+                         manifest_restored, adapter_rescan_linked);
         }
     }
 
@@ -470,7 +522,8 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
         const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
         if (!adapter || !adapter->file_exists) {
             result.add_warnings(
-                "prune_orphans requires the platform file_exists callback in the C ABI refresh path");
+                "prune_orphans requires the platform file_exists callback "
+                "in the C ABI refresh path");
         }
     }
     if (!request.catalog_uri().empty()) {
