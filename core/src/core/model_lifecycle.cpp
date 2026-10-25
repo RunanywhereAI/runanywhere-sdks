@@ -115,6 +115,7 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
     model->diffusion_ops = nullptr;
     model->diarization_ops = nullptr;
     model->segmentation_ops = nullptr;
+    model->segmentation_provider.reset();
     model->ocr_ops = nullptr;
 }
 
@@ -947,6 +948,17 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         vt = rac_plugin_find(primitive);
     }
 
+    // Pin before reading plugin metadata or invoking create. This admission
+    // compares pointer identity under the registry lock, so a stale selection
+    // fails without dereferencing an unloaded vtable.
+    std::shared_ptr<rac::segmentation::ProviderContext> segmentation_provider;
+    if (vt && primitive == RAC_PRIMITIVE_SEGMENT) {
+        rc = rac::segmentation::acquire_provider(vt, &segmentation_provider);
+        if (rc != RAC_SUCCESS) {
+            return rac_proto_buffer_set_error(out_result, rc, "segmentation provider unavailable");
+        }
+    }
+
     // v4 placement truth, filled in below once an engine is known. Populated
     // even on the "no backend found"/"create failed" error paths (minus the
     // device_* fields, since no device ever ran) so callers can see what was
@@ -1182,6 +1194,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->diarization_ops = vt->diarization_ops;
     } else if (primitive == RAC_PRIMITIVE_SEGMENT) {
         loaded->segmentation_ops = vt->segmentation_ops;
+        loaded->segmentation_provider = std::move(segmentation_provider);
     } else if (primitive == RAC_PRIMITIVE_OCR) {
         loaded->ocr_ops = vt->ocr_ops;
     } else if (primitive == RAC_PRIMITIVE_DECIDE) {

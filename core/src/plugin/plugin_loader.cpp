@@ -266,7 +266,7 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         /* The registry recorded the reason under the vtable's own name; add
          * the path, which only the loader knows and which is what makes a
          * "wrong/stale library staged" diagnosis possible. */
-        if (rc != RAC_ERROR_PLUGIN_DUPLICATE)
+        if (rc != RAC_ERROR_PLUGIN_DUPLICATE && rc != RAC_ERROR_PLUGIN_BUSY)
             rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
         return rc;
     }
@@ -336,16 +336,13 @@ rac_result_t rac_registry_unload_plugin(const char* name) {
     if (name == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
-#if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
-    /* Take the handle BEFORE unregister so we don't lose track of it on the
-     * race window where another thread re-registers the same name. */
-    void* handle = rac_plugin_registry_take_dl_handle(name);
-#endif
-
-    rac_result_t rc = rac_plugin_unregister(name);
+    void* handle = nullptr;
+    // Removal and handle transfer share the registry lock. Busy model leases
+    // leave both the plugin and its library mapping intact.
+    rac_result_t rc = rac_plugin_registry_unregister(name, &handle);
 
 #if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
-    if (handle != nullptr) {
+    if (rc == RAC_SUCCESS && handle != nullptr) {
         /* The plugin is now unregistered (removed from every primitive bucket
          * under the registry lock), so no caller can obtain its vtable. Close
          * the dynamic library to unmap the plugin's code and `.rodata`. */

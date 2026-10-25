@@ -7,11 +7,12 @@
  * ONNX Runtime model services.
  */
 
+#include "rac_onnx_api.h"
 #include "rac_runtime_onnxrt.h"
 
-#include "rac_onnx_api.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/segmentation/rac_segmentation_confidence.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -46,6 +47,7 @@ void* const volatile rac_onnxrt_runtime_anchor =
 extern RAC_ONNX_API const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
 #endif
 extern RAC_ONNX_API const rac_segmentation_service_ops_t g_onnx_segmentation_ops;
+extern RAC_ONNX_API const rac_segmentation_confidence_ops_v1_t g_onnx_segmentation_confidence_ops;
 extern RAC_ONNX_API const rac_diarization_service_ops_t g_onnx_diarization_ops;
 
 static const rac_runtime_id_t k_onnx_runtimes[] = {
@@ -73,27 +75,33 @@ static const rac_primitive_t k_onnx_primitives[] = {
 // Autoregister regression fix: the onnx engine plugin
 // only owns the embeddings primitive on this build (stt/tts/vad ops are
 // nullptr and shipped by engines/sherpa). Keep priority below sherpa's 90.
-static const rac_engine_manifest_t k_onnx_manifest = {
-    .name = "onnx",
-    .display_name = "ONNX Runtime",
-    .version = nullptr,
-    .package_owner = "runanywhere",
-    .package_name = "rac_backend_onnx",
-    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority = 50,
-    .capability_flags = 0,
-    .primitives = k_onnx_primitives,
-    .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
-    .runtimes = k_onnx_runtimes,
-    .runtimes_count = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
-    .formats = k_onnx_formats,
-    .formats_count = sizeof(k_onnx_formats) / sizeof(k_onnx_formats[0]),
-    .reserved_0 = 0,
-    .reserved_1 = 0,
+static const rac_segmentation_confidence_manifest_v1_t k_onnx_manifest = {
+    .manifest =
+        {
+            .name = "onnx",
+            .display_name = "ONNX Runtime",
+            .version = nullptr,
+            .package_owner = "runanywhere",
+            .package_name = "rac_backend_onnx",
+            .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
+            .priority = 50,
+            .capability_flags = RAC_ENGINE_CAP_SEGMENTATION_CONFIDENCE_V1,
+            .primitives = k_onnx_primitives,
+            .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
+            .runtimes = k_onnx_runtimes,
+            .runtimes_count = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
+            .formats = k_onnx_formats,
+            .formats_count = sizeof(k_onnx_formats) / sizeof(k_onnx_formats[0]),
+            .reserved_0 = 0,
+            .reserved_1 = 0,
+        },
+    .struct_size = sizeof(rac_segmentation_confidence_manifest_v1_t),
+    .version = RAC_SEGMENTATION_CONFIDENCE_VERSION_1,
+    .confidence_ops = &g_onnx_segmentation_confidence_ops,
 };
 
 static const rac_engine_vtable_t g_onnx_engine_vtable = {
-    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_onnx_manifest),
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_onnx_manifest.manifest),
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
 
@@ -123,7 +131,7 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(onnx) {
-    return rac_engine_entry_with_manifest(&k_onnx_manifest, &g_onnx_engine_vtable);
+    return rac_engine_entry_with_manifest(&k_onnx_manifest.manifest, &g_onnx_engine_vtable);
 }
 
 }  // extern "C"

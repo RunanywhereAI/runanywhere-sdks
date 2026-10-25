@@ -396,13 +396,18 @@ rac_result_t ONNXSegmentationProvider::initialize(const std::string& model_path)
     }
 }
 
-rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& image,
-                                               const rac_segmentation_options_t& options,
-                                               rac_segmentation_result_t* out_result) {
+rac_result_t ONNXSegmentationProvider::segment(
+    const rac_segmentation_image_t& image, const rac_segmentation_options_t& options,
+    rac_segmentation_result_t* out_result, rac_segmentation_confidence_mask_v1_t* out_confidence) {
     if (!out_result || !image.data || image.width == 0 || image.height == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     *out_result = {};
+    if (out_confidence && (out_confidence->struct_size < sizeof(*out_confidence) ||
+                           out_confidence->version != RAC_SEGMENTATION_CONFIDENCE_VERSION_1 ||
+                           out_confidence->data || out_confidence->size != 0)) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
     const size_t channels = image.pixel_format == RAC_SEGMENTATION_PIXEL_FORMAT_RGB8 ? 3 : 4;
     if ((image.pixel_format != RAC_SEGMENTATION_PIXEL_FORMAT_RGB8 &&
          image.pixel_format != RAC_SEGMENTATION_PIXEL_FORMAT_RGBA8 &&
@@ -490,13 +495,13 @@ rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& i
     if (!out_result->class_mask) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    if (options.include_confidence == RAC_TRUE) {
-        out_result->confidence_mask = static_cast<uint8_t*>(std::malloc(pixel_count));
-        if (!out_result->confidence_mask) {
+    if (out_confidence) {
+        out_confidence->data = static_cast<uint8_t*>(std::malloc(pixel_count));
+        if (!out_confidence->data) {
             rac_segmentation_result_free(out_result);
             return RAC_ERROR_OUT_OF_MEMORY;
         }
-        out_result->confidence_mask_size = pixel_count;
+        out_confidence->size = pixel_count;
     }
     std::vector<uint64_t> counts(class_count, 0);
     const size_t max_y = logits_height - 1;
@@ -533,7 +538,7 @@ rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& i
                                      logit_at(plane + y1 * logits_width + x1) * wx;
                 const float value = top * (1.0f - wy) + bottom * wy;
                 if (value > best_value) {
-                    if (options.include_confidence == RAC_TRUE) {
+                    if (out_confidence) {
                         probability_denominator =
                             std::isfinite(best_value)
                                 ? probability_denominator * std::exp(best_value - value) + 1.0
@@ -541,15 +546,15 @@ rac_result_t ONNXSegmentationProvider::segment(const rac_segmentation_image_t& i
                     }
                     best_value = value;
                     best_class = static_cast<uint16_t>(class_id);
-                } else if (options.include_confidence == RAC_TRUE) {
+                } else if (out_confidence) {
                     probability_denominator += std::exp(value - best_value);
                 }
             }
             const size_t pixel_index = y * image.width + x;
             out_result->class_mask[pixel_index] = best_class;
-            if (options.include_confidence == RAC_TRUE) {
+            if (out_confidence) {
                 const long quantized = std::lround(255.0 / probability_denominator);
-                out_result->confidence_mask[pixel_index] =
+                out_confidence->data[pixel_index] =
                     static_cast<uint8_t>(std::clamp(quantized, 0L, 255L));
             }
             ++counts[best_class];

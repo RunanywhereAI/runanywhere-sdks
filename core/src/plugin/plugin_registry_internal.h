@@ -4,16 +4,16 @@
  *        dynamic loader.
  *
  * The PUBLIC ABI lives in `rac/plugin/rac_plugin_loader.h`. This header is
- * intentionally not installed; only the two internal TUs
- * (`rac_plugin_registry.cpp`, `plugin_loader.cpp`) include it. Keeps the
- * `dlopen` handle map private to commons while letting both files agree on
- * the bookkeeping signatures.
+ * intentionally not installed. The registry, loader and segmentation service
+ * use it to keep library bookkeeping and model leases private to commons.
  */
 
 #ifndef RAC_PLUGIN_REGISTRY_INTERNAL_H
 #define RAC_PLUGIN_REGISTRY_INTERNAL_H
 
 #include <stddef.h>
+
+#include "rac/plugin/rac_engine_manifest.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,11 +43,25 @@ void rac_plugin_registry_set_dl_handle(const char* name, void* handle) RAC_PLUGI
 
 /**
  * Pop the dlopen handle associated with `name` (returns `NULL` if there is
- * none, e.g. for statically-registered plugins). Called by `rac_plugin_unregister`
- * so the loader can `dlclose` the right handle exactly once. After this call
- * the registry no longer tracks the handle.
+ * none, e.g. for statically-registered plugins). Used by the loader when
+ * replacing a plugin after successful registration. Unload uses the atomic
+ * unregister-and-transfer operation below. After this call the registry no
+ * longer tracks the handle.
  */
 void* rac_plugin_registry_take_dl_handle(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
+/** Atomically remove an idle plugin and return its OS handle to the loader.
+ * A model lease returns RAC_ERROR_PLUGIN_BUSY without removing any state.
+ */
+rac_result_t rac_plugin_registry_unregister(const char* name,
+                                            void** out_dl_handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
+/** Pin an accepted vtable by pointer identity without dereferencing stale data.
+ * The returned manifest remains valid until the matching release. */
+rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
+                                         const rac_engine_manifest_t** out_manifest)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
+void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * Snapshot the names of every currently-registered plugin into `out_names`

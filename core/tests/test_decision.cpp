@@ -4,7 +4,7 @@
  *
  * Backend-neutral: registers a small in-test fake decision engine (no model
  * file, no llama.cpp) and asserts:
- *   - RAC_PLUGIN_API_VERSION == 15 and the primitive/vtable-slot wiring.
+ *   - RAC_PLUGIN_API_VERSION == 14 and the primitive/vtable-slot wiring.
  *   - A registered decision engine routes via rac_plugin_find(RAC_PRIMITIVE_DECIDE)
  *     and rac_engine_vtable_slot() resolves decision_ops.
  *   - Full DecisionRequest → DecisionResult proto round-trip through the
@@ -244,7 +244,7 @@ int main() {
     // (1) ABI + primitive naming. The version pin is an exact tripwire: bumping
     // it is only correct once the wire value below has been re-verified, because
     // a promotion that shifted wire 14 would reroute every decision call.
-    check(RAC_PLUGIN_API_VERSION == 15u, "RAC_PLUGIN_API_VERSION must be 15");
+    check(RAC_PLUGIN_API_VERSION == 14u, "RAC_PLUGIN_API_VERSION must be 14");
     check(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_DECIDE), "decide") == 0,
           "rac_primitive_name(RAC_PRIMITIVE_DECIDE) == \"decide\"");
     check(static_cast<int>(RAC_PRIMITIVE_DECIDE) == 14, "RAC_PRIMITIVE_DECIDE wire value is 14");

@@ -64,6 +64,7 @@ struct State {
         manifests_by_vtable;
     /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
     std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
+    std::unordered_map<const rac_engine_vtable_t*, size_t> model_leases;
 };
 
 State& state() {
@@ -175,6 +176,41 @@ void* take_dl_handle_locked(State& s, const std::string& name) {
 
 extern "C" {
 
+rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
+                                         const rac_engine_manifest_t** out_manifest) noexcept {
+    if (!vtable || !out_manifest) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_manifest = nullptr;
+    try {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+        const auto accepted = std::ranges::find_if(
+            s.by_name, [vtable](const auto& entry) { return entry.second == vtable; });
+        if (accepted == s.by_name.end()) {
+            return RAC_ERROR_BACKEND_NOT_READY;
+        }
+        ++s.model_leases[vtable];
+        *out_manifest = attached_manifest_locked(s, vtable);
+        return RAC_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
+}
+
+void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) noexcept {
+    try {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+        auto it = s.model_leases.find(vtable);
+        if (it != s.model_leases.end() && --it->second == 0) {
+            s.model_leases.erase(it);
+        }
+    } catch (...) {}
+}
+
 const char* rac_engine_availability_name(rac_engine_availability_t availability) {
     switch (availability) {
         case RAC_ENGINE_AVAILABILITY_PUBLIC:
@@ -278,6 +314,9 @@ rac_result_t rac_engine_manifest_detach_vtable(const rac_engine_vtable_t* vtable
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
         const rac_engine_manifest_t* manifest = nullptr;
+        if (s.model_leases.contains(vtable)) {
+            return RAC_ERROR_PLUGIN_BUSY;
+        }
         auto it = s.manifests_by_vtable.find(vtable);
         if (it != s.manifests_by_vtable.end()) {
             manifest = it->second;
@@ -414,6 +453,9 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) noexcept {
             auto dup = s.by_name.find(name);
             const bool replacing_existing = dup != s.by_name.end();
             if (replacing_existing) {
+                if (s.model_leases.contains(dup->second)) {
+                    return RAC_ERROR_PLUGIN_BUSY;
+                }
                 // Duplicate by name: replace only if incoming priority >= existing.
                 int32_t existing_prio = dup->second->metadata.priority;
                 if (vtable->metadata.priority < existing_prio) {
@@ -486,10 +528,17 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) noexcept {
 }
 
 rac_result_t rac_plugin_unregister(const char* name) noexcept {
+    return rac_plugin_registry_unregister(name, nullptr);
+}
+
+rac_result_t rac_plugin_registry_unregister(const char* name, void** out_dl_handle) noexcept {
     /* C ABI boundary: noexcept. std::string / unordered_map ops may throw
      * std::bad_alloc, and the plugin-supplied `on_unload` is third-party
      * code that may also throw. */
     try {
+        if (out_dl_handle) {
+            *out_dl_handle = nullptr;
+        }
         if (name == nullptr) {
             return RAC_ERROR_NULL_POINTER;
         }
@@ -503,10 +552,9 @@ rac_result_t rac_plugin_unregister(const char* name) noexcept {
          *
          * Also drains `dl_handles`, honouring the contract documented in
          * plugin_registry_internal.h ("drained by rac_plugin_unregister").
-         * The loader's `rac_registry_unload_plugin` takes the handle
-         * BEFORE calling this function (plugin_loader.cpp:209), so for the
-         * loader path our take returns nullptr and no behavioural change
-         * occurs. For direct callers that bypass the loader (tests, future
+         * The loader receives the handle through out_dl_handle in the same
+         * critical section that removes the idle plugin. Busy model leases
+         * leave both entries intact. For direct callers that bypass the loader (tests, future
          * Kotlin/Swift hot-swap helpers) draining here prevents the stale
          * `void*` from haunting a later same-name reload via
          * `rac_registry_load_plugin` → `take_dl_handle` → dlclose-on-
@@ -525,6 +573,9 @@ rac_result_t rac_plugin_unregister(const char* name) noexcept {
                 return RAC_ERROR_NOT_FOUND;
             }
             v = it->second;
+            if (s.model_leases.contains(v)) {
+                return RAC_ERROR_PLUGIN_BUSY;
+            }
             stale_dl_handle = take_dl_handle_locked(s, key);
 
             s.by_name.erase(it);
@@ -540,7 +591,9 @@ rac_result_t rac_plugin_unregister(const char* name) noexcept {
                 RAC_LOG_ERROR(LOG_CAT, "rac_plugin_unregister: '%s' on_unload threw", name);
             }
         }
-        if (stale_dl_handle != nullptr) {
+        if (out_dl_handle != nullptr) {
+            *out_dl_handle = stale_dl_handle;
+        } else if (stale_dl_handle != nullptr) {
             RAC_LOG_WARNING(LOG_CAT,
                             "rac_plugin_unregister: '%s' had a tracked dlopen handle but the "
                             "caller bypassed rac_registry_unload_plugin; OS handle leaked.",

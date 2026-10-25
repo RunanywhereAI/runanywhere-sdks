@@ -28,15 +28,12 @@ typedef struct rac_segmentation_image {
     rac_segmentation_pixel_format_t pixel_format;
 } rac_segmentation_image_t;
 
-/** ABI 15: native callers and providers must rebuild against this header. */
 typedef struct rac_segmentation_options {
     rac_bool_t include_diagnostic_rgba;
-    rac_bool_t include_confidence;
 } rac_segmentation_options_t;
 
 static const rac_segmentation_options_t RAC_SEGMENTATION_OPTIONS_DEFAULT = {
     .include_diagnostic_rgba = RAC_FALSE,
-    .include_confidence = RAC_FALSE,
 };
 
 typedef struct rac_segmentation_class_summary {
@@ -57,9 +54,6 @@ typedef struct rac_segmentation_result {
     size_t class_summary_count;
     int64_t processing_time_ms;
     char* model_id;
-    /** One byte per source pixel, row-major, quantized to 0..255 when requested. */
-    uint8_t* confidence_mask;
-    size_t confidence_mask_size;
 } rac_segmentation_result_t;
 
 /** Free every malloc-owned result field and zero the struct. */

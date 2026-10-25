@@ -9,7 +9,7 @@
 #include <string>
 
 #include "rac/core/rac_error.h"
-#include "rac/features/segmentation/rac_segmentation_types.h"
+#include "rac/features/segmentation/rac_segmentation_confidence.h"
 
 namespace runanywhere::segmentation {
 
@@ -24,7 +24,8 @@ class ONNXSegmentationProvider {
     rac_result_t initialize(const std::string& model_path);
     rac_result_t segment(const rac_segmentation_image_t& image,
                          const rac_segmentation_options_t& options,
-                         rac_segmentation_result_t* out_result);
+                         rac_segmentation_result_t* out_result,
+                         rac_segmentation_confidence_mask_v1_t* out_confidence = nullptr);
     void cleanup();
     bool is_ready() const;
 

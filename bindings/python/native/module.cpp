@@ -48,22 +48,23 @@
 #ifdef RAC_HAVE_BACKEND_NEURT
 #include "rac/plugin/rac_plugin_entry_neurt.h"
 #endif
-#include "rac/plugin/rac_plugin_entry_sherpa.h"
+#include "rac/core/rac_audio_utils.h"
+#include "rac/features/diarization/rac_diarization_service.h"
+#include "rac/features/diarization/rac_diarization_types.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/lora/rac_lora_service.h"
+#include "rac/features/segmentation/rac_segmentation_confidence.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
+#include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
-#include "rac/core/rac_audio_utils.h"
-#include "rac/features/llm/rac_llm_service.h"
-#include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_stream.h"
 #include "rac/features/vad/rac_vad_types.h"
-#include "rac/features/diarization/rac_diarization_service.h"
-#include "rac/features/diarization/rac_diarization_types.h"
-#include "rac/features/segmentation/rac_segmentation_service.h"
-#include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
+#include "rac/plugin/rac_plugin_entry_sherpa.h"
 #if defined(RAC_HAVE_BACKEND_NEURT)
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/diffusion/rac_diffusion_types.h"
@@ -1955,16 +1956,22 @@ py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t 
     if (include_diagnostic_rgba.has_value() && *include_diagnostic_rgba) {
         opts.include_diagnostic_rgba = RAC_TRUE;
     }
-    if (include_confidence.has_value() && *include_confidence) {
-        opts.include_confidence = RAC_TRUE;
-    }
 
     rac_segmentation_result_t result;
     std::memset(&result, 0, sizeof(result));
+    auto confidence = RAC_SEGMENTATION_CONFIDENCE_MASK_DEFAULT;
+    const auto free_result =
+        std::unique_ptr<rac_segmentation_result_t, decltype(&rac_segmentation_result_free)>(
+            &result, rac_segmentation_result_free);
+    const auto free_confidence = std::unique_ptr<rac_segmentation_confidence_mask_v1_t,
+                                                 decltype(&rac_segmentation_confidence_mask_free)>(
+        &confidence, rac_segmentation_confidence_mask_free);
     rac_result_t rc;
     {
         py::gil_scoped_release release;
-        rc = rac_segmentation_segment(h, &image, &opts, &result);
+        rc = include_confidence.value_or(false)
+                 ? rac_segmentation_segment_with_confidence(h, &image, &opts, &result, &confidence)
+                 : rac_segmentation_segment(h, &image, &opts, &result);
     }
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "segment");
 
@@ -1992,11 +1999,10 @@ py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t 
             py::bytes(reinterpret_cast<const char*>(result.diagnostic_rgba),
                       result.diagnostic_rgba_size);
     }
-    if (result.confidence_mask && result.confidence_mask_size) {
-        out["confidence_mask"] = py::bytes(reinterpret_cast<const char*>(result.confidence_mask),
-                                           result.confidence_mask_size);
+    if (confidence.data && confidence.size) {
+        out["confidence_mask"] =
+            py::bytes(reinterpret_cast<const char*>(confidence.data), confidence.size);
     }
-    rac_segmentation_result_free(&result);
     return out;
 }
 

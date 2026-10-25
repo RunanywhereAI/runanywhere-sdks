@@ -113,7 +113,7 @@ static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_UNKNOWN) == RAC_MODEL_FORMA
 namespace {
 
 // Layout before confidence output. Keep every pre-existing result field at its
-// original offset, even though the larger result requires a matching ABI rebuild.
+// original offset and size: confidence uses a separate optional output.
 struct LegacySegmentationResult {
     uint32_t width;
     uint32_t height;
@@ -147,8 +147,8 @@ static_assert(offsetof(rac_segmentation_result_t, processing_time_ms) ==
               offsetof(LegacySegmentationResult, processing_time_ms));
 static_assert(offsetof(rac_segmentation_result_t, model_id) ==
               offsetof(LegacySegmentationResult, model_id));
-static_assert(offsetof(rac_segmentation_result_t, confidence_mask) >=
-              offsetof(LegacySegmentationResult, model_id) + sizeof(char*));
+static_assert(sizeof(rac_segmentation_result_t) == sizeof(LegacySegmentationResult));
+static_assert(sizeof(rac_segmentation_options_t) == sizeof(rac_bool_t));
 
 int g_capability_check_rc = RAC_SUCCESS;
 
@@ -285,8 +285,8 @@ int main() {
     }
 
     // (2) Reject old segmentation providers before invoking any plugin callback.
-    // ABIs 13 and 14 predate confidence output and must also be rejected.
-    for (uint32_t old_abi : {6u, 12u, 13u, 14u}) {
+    // Confidence is additive to ABI 14; main's earlier ABI changes still apply.
+    for (uint32_t old_abi : {6u, 12u, 13u}) {
         const int segmentation_sentinel = 10;
         auto vt = make_vt("old-abi", 50, old_abi);
         vt.llm_ops = nullptr;
