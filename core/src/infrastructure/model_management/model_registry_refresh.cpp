@@ -304,12 +304,27 @@ bool clear_download_status_if_path_matches(rac_model_registry_handle_t handle,
         return false;
     }
 
+    ModelInfo snapshot = model_snapshot_locked(handle, model_id, it->second);
     std::free(it->second->local_path);
     it->second->local_path = nullptr;
     it->second->updated_at = rac_get_current_time_ms();
-    return store_proto_snapshot_locked(handle, model_id, it->second,
-                                       /*preserve_proto_only_fields=*/true,
-                                       /*overwrite_registry_state=*/true) == RAC_SUCCESS;
+    overlay_struct_runtime_fields_to_proto(it->second, &snapshot,
+                                           /*overwrite_registry_state=*/true);
+    auto* files =
+        snapshot.has_multi_file() ? snapshot.mutable_multi_file()->mutable_files() : nullptr;
+    if (snapshot.has_single_file() && snapshot.single_file().has_expected_files()) {
+        files = snapshot.mutable_single_file()->mutable_expected_files()->mutable_files();
+    } else if (snapshot.has_archive() && snapshot.archive().has_expected_files()) {
+        files = snapshot.mutable_archive()->mutable_expected_files()->mutable_files();
+    }
+    if (files) {
+        // These are runtime locations, not the destination paths/URLs needed
+        // for a retry. Keep every other descriptor field intact.
+        for (ModelFileDescriptor& file : *files) {
+            file.clear_local_path();
+        }
+    }
+    return store_parsed_proto_snapshot_locked(handle, model_id, snapshot) == RAC_SUCCESS;
 }
 
 // Clear registry state for downloaded models whose recorded artifact path no
@@ -336,7 +351,7 @@ int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
 
     int32_t pruned = 0;
     for (const ModelInfo& model : models) {
-        if (model.id().empty() || model.local_path().empty() ||
+        if (model.id().empty() || model.local_path().empty() || model_is_built_in(model) ||
             model.local_path().rfind("builtin:", 0) == 0) {
             continue;
         }
