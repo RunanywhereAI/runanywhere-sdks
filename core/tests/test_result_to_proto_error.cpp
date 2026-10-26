@@ -275,24 +275,63 @@ void test_canonical_category_ranges() {
     };
     const Case cases[] = {
         {static_cast<rac_result_t>(-100), ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION},
+        {static_cast<rac_result_t>(-109), ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION},
+        {static_cast<rac_result_t>(-110), ::runanywhere::v1::ERROR_CATEGORY_MODEL},
+        {static_cast<rac_result_t>(-129), ::runanywhere::v1::ERROR_CATEGORY_MODEL},
         {static_cast<rac_result_t>(-130), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
+        {static_cast<rac_result_t>(-149), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
+        {static_cast<rac_result_t>(-150), ::runanywhere::v1::ERROR_CATEGORY_NETWORK},
+        {static_cast<rac_result_t>(-179), ::runanywhere::v1::ERROR_CATEGORY_NETWORK},
+        {static_cast<rac_result_t>(-180), ::runanywhere::v1::ERROR_CATEGORY_IO},
+        {static_cast<rac_result_t>(-219), ::runanywhere::v1::ERROR_CATEGORY_IO},
+        {static_cast<rac_result_t>(-220), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
+        {static_cast<rac_result_t>(-229), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
         {static_cast<rac_result_t>(-230), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
-        {static_cast<rac_result_t>(-330), ::runanywhere::v1::ERROR_CATEGORY_AUTH},
-        {static_cast<rac_result_t>(-351), ::runanywhere::v1::ERROR_CATEGORY_IO},
-        {static_cast<rac_result_t>(-371), ::runanywhere::v1::ERROR_CATEGORY_VALIDATION},
-        {static_cast<rac_result_t>(-401), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
-        {static_cast<rac_result_t>(-501), ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION},
-        {static_cast<rac_result_t>(-601), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
-        {static_cast<rac_result_t>(-701), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
-        {static_cast<rac_result_t>(-801), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
-        {static_cast<rac_result_t>(-901), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
+        {static_cast<rac_result_t>(-249), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
+        {static_cast<rac_result_t>(-250), ::runanywhere::v1::ERROR_CATEGORY_VALIDATION},
+        {static_cast<rac_result_t>(-279), ::runanywhere::v1::ERROR_CATEGORY_VALIDATION},
+        {static_cast<rac_result_t>(-280), ::runanywhere::v1::ERROR_CATEGORY_IO},
+        {static_cast<rac_result_t>(-299), ::runanywhere::v1::ERROR_CATEGORY_IO},
+        {static_cast<rac_result_t>(-300), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
+        {static_cast<rac_result_t>(-319), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
+        {static_cast<rac_result_t>(-320), ::runanywhere::v1::ERROR_CATEGORY_AUTH},
+        {static_cast<rac_result_t>(-349), ::runanywhere::v1::ERROR_CATEGORY_AUTH},
+        {static_cast<rac_result_t>(-350), ::runanywhere::v1::ERROR_CATEGORY_IO},
+        {static_cast<rac_result_t>(-369), ::runanywhere::v1::ERROR_CATEGORY_IO},
+        {static_cast<rac_result_t>(-370), ::runanywhere::v1::ERROR_CATEGORY_VALIDATION},
+        {static_cast<rac_result_t>(-379), ::runanywhere::v1::ERROR_CATEGORY_VALIDATION},
+        {static_cast<rac_result_t>(-380), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
+        {static_cast<rac_result_t>(-389), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
+        {static_cast<rac_result_t>(-400), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
+        {static_cast<rac_result_t>(-499), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
+        {static_cast<rac_result_t>(-500), ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION},
+        {static_cast<rac_result_t>(-599), ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION},
+        {static_cast<rac_result_t>(-600), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
+        {static_cast<rac_result_t>(-699), ::runanywhere::v1::ERROR_CATEGORY_COMPONENT},
+        {static_cast<rac_result_t>(-700), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
+        {static_cast<rac_result_t>(-999), ::runanywhere::v1::ERROR_CATEGORY_INTERNAL},
     };
-    for (const Case& test_case : cases) {
+    for (const auto& test_case : cases) {
         CHECK(rac::foundation::rac_result_to_proto_category(test_case.code) == test_case.category,
-              "canonical category range");
+              "canonical negative range boundary");
         CHECK(rac::foundation::rac_result_to_proto_category(-test_case.code) ==
                   ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED,
-              "positive code is unspecified");
+              "positive result is not an error");
+        rac_proto_buffer_t buffer;
+        rac_proto_buffer_init(&buffer);
+        CHECK(rac_result_to_proto_error(test_case.code, &buffer) == RAC_SUCCESS,
+              "range boundary serializes");
+        ::runanywhere::v1::SDKError parsed;
+        CHECK(parsed.ParseFromArray(buffer.data, static_cast<int>(buffer.size)),
+              "range boundary proto parses");
+        CHECK(parsed.category() == test_case.category, "serialized category matches mapper");
+        CHECK(parsed.c_abi_code() == test_case.code, "serialized ABI code preserved");
+        rac_proto_buffer_free(&buffer);
+    }
+    for (const rac_result_t code : {0, -1, -99, -390, -399, -1000, -12345, INT32_MIN}) {
+        CHECK(rac::foundation::rac_result_to_proto_category(code) ==
+                  ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED,
+              "unmapped and minimum integer codes remain unspecified");
     }
 }
 
@@ -320,22 +359,24 @@ void test_unknown_negative_code_is_handled() {
     // A code outside any known range still serializes; category falls back to
     // UNSPECIFIED, which IS allowed for genuinely unknown codes (not in the
     // canonical -100..-999 ranges).
-    rac_proto_buffer_t buffer;
-    rac_proto_buffer_init(&buffer);
-
-    const rac_result_t kBogus = static_cast<rac_result_t>(-12345);
-    const rac_result_t rc = rac_result_to_proto_error(kBogus, &buffer);
-    CHECK(rc == RAC_SUCCESS, "bogus code still serializes");
-
-    ::runanywhere::v1::SDKError parsed;
-    const bool parsed_ok = parsed.ParseFromArray(buffer.data, static_cast<int>(buffer.size));
-    CHECK(parsed_ok, "bogus code parses");
-    CHECK(parsed.c_abi_code() == -12345, "bogus c_abi_code preserved");
+    for (const rac_result_t code : {-12345, INT32_MIN}) {
+        rac_proto_buffer_t buffer;
+        rac_proto_buffer_init(&buffer);
+        const rac_result_t rc = rac_result_to_proto_error(code, &buffer);
+        CHECK(rc == RAC_SUCCESS, "unknown code still serializes");
+        ::runanywhere::v1::SDKError parsed;
+        CHECK(parsed.ParseFromArray(buffer.data, static_cast<int>(buffer.size)),
+              "unknown code parses");
+        CHECK(parsed.c_abi_code() == code, "unknown ABI code preserved");
         CHECK(parsed.category() == ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED,
-            "bogus category is unspecified");
-    CHECK(!parsed.message().empty(), "bogus code message not empty");
-
-    rac_proto_buffer_free(&buffer);
+              "unknown category is unspecified");
+        if (code == INT32_MIN) {
+            CHECK(parsed.code() == ::runanywhere::v1::ERROR_CODE_UNKNOWN,
+                  "unrepresentable magnitude maps to UNKNOWN");
+        }
+        CHECK(!parsed.message().empty(), "unknown code message not empty");
+        rac_proto_buffer_free(&buffer);
+    }
 }
 
 #endif  // RAC_HAVE_PROTOBUF

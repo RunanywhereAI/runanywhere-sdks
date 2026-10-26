@@ -24,7 +24,7 @@ applications of it:)
 - Public options/results are dataclasses or IntEnums — never raw string status codes.
 - Native error codes come from `idl/errors.proto` / `rac_error.h`. Keep `ErrorCode` /
   `ErrorCategory` exhaustive relative to the IDL and map categories with
-  `category_for_code` using the canonical 18-range mapping (including AUTH
+  `category_for_code`, generated from commons’ shared 18-range manifest (including AUTH
   320–349); unmapped negative values remain `UNSPECIFIED`.
 - Registry framework/category ints are **C ABI enums** (`RAC_FRAMEWORK_*`,
   `RAC_MODEL_CATEGORY_*`), not proto wire values. Name them and pin them in tests.

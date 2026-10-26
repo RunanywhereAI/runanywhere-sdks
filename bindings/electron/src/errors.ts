@@ -63,6 +63,8 @@ export const ErrorCategories: Readonly<Record<ErrorCategoryName, ErrorCategory>>
 ) as Readonly<Record<ErrorCategoryName, ErrorCategory>>;
 
 export interface SDKErrorFields {
+  /** Serialized proto retained when a native error crosses utility-process RPC. */
+  sdkError?: Uint8Array;
   code: ErrorCode;
   message: string;
   category?: ErrorCategory;
@@ -85,6 +87,7 @@ export interface SDKErrorFields {
  * Carries the canonical `code` / `category` for cross-SDK-uniform handling.
  */
 export class SDKException extends Error {
+  readonly sdkError?: Uint8Array;
   readonly code: ErrorCode;
   readonly category: ErrorCategory;
   /** Negative rac_result_t equivalent, when applicable. */
@@ -105,6 +108,7 @@ export class SDKException extends Error {
   constructor(fields: SDKErrorFields) {
     super(fields.message || 'SDK error');
     this.name = 'SDKException';
+    this.sdkError = fields.sdkError;
     this.code = fields.code;
     this.category = fields.category ?? categoryForCode(fields.code);
     this.cAbiCode =
@@ -162,7 +166,8 @@ export class SDKException extends Error {
       requestId: error.requestId,
       severity: error.severity,
       timestampMs: error.timestampMs,
-    });
+      sdkError: SDKError.encode(error).finish(),
+    }, true);
   }
 
   static notInitialized(component?: string): SDKException {
@@ -273,11 +278,11 @@ function fromSerializedSdkError(value: unknown, contextualMessage?: string): SDK
   if (!(value instanceof Uint8Array) || value.length === 0) return null;
   try {
     const proto = SDKError.decode(value);
-    // Prefer the contextual message from make_rac_error (e.g. "ragClear failed: -42")
-    // over the generic proto message when the proto carries none, so operation details
-    // remain visible to the caller.
-    if (contextualMessage && !proto.message) {
-      proto.message = contextualMessage;
+    // Keep operation/backend context alongside the canonical code-level message.
+    if (contextualMessage && proto.message !== contextualMessage) {
+      proto.message = proto.message
+        ? `${contextualMessage} (${proto.message})`
+        : contextualMessage;
     }
     return SDKException.fromProto(proto);
   } catch {
@@ -307,8 +312,8 @@ const KNOWN_ERROR_CODES: ReadonlySet<number> = new Set(
  * counterpart) still reports `UNKNOWN`, with the raw value readable on
  * `cAbiCode`, because typing it as an `ErrorCode` would be a lie.
  *
- * A category is only derived when the wire supplied none — proto3 leaves an
- * unset enum at 0, so `UNSPECIFIED` counts as unset.
+ * Serialized proto categories are authoritative, including UNSPECIFIED. Loose
+ * legacy fields still derive a category when their category is absent or zero.
  */
 function fromStructuredError(args: {
   code: number;
@@ -322,18 +327,25 @@ function fromStructuredError(args: {
   requestId?: string;
   severity?: number;
   timestampMs?: number;
-}): SDKException {
+  sdkError?: Uint8Array;
+}, authoritativeCategory = false): SDKException {
   const magnitude = Math.abs(Math.trunc(args.code));
   const code = (KNOWN_ERROR_CODES.has(magnitude) ? magnitude : ErrorCode.ERROR_CODE_UNKNOWN) as ErrorCode;
-  const wireCategory =
-    args.category != null && Math.trunc(args.category) !== ErrorCategory.ERROR_CATEGORY_UNSPECIFIED
-      ? (Math.trunc(args.category) as ErrorCategory)
-      : undefined;
+  const knownCategory = args.category != null && Number.isInteger(args.category) &&
+    args.category >= ErrorCategory.ERROR_CATEGORY_UNSPECIFIED &&
+    args.category <= ErrorCategory.ERROR_CATEGORY_CONFIGURATION
+    ? args.category as ErrorCategory
+    : ErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
+  const category = authoritativeCategory ||
+    (args.category != null && args.category !== ErrorCategory.ERROR_CATEGORY_UNSPECIFIED)
+    ? knownCategory
+    : categoryForCode(magnitude);
   return new SDKException({
     code,
     message: args.message,
     cAbiCode: args.cAbiCode,
-    category: wireCategory ?? categoryForCode(code),
+    category,
+    sdkError: args.sdkError,
     nestedMessage: args.nestedMessage,
     fieldPath: args.fieldPath,
     component: args.component,

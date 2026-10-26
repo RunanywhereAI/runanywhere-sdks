@@ -4,8 +4,9 @@
  *
  * HAND-AUTHORED — not produced by `idl/codegen/generate_ts_convenience.py`.
  * The fold from numeric ranges onto the 9-bucket proto `ErrorCategory` exists
- * only as C++ control flow, not as proto annotations, so there is nothing for
- * the IDL codegen to emit. Do not invent a second table in an SDK.
+ * in `core/include/rac/core/rac_error_categories.def`, shared by commons and
+ * Python codegen. Keep this TS fallback aligned with that manifest.
+ * Do not invent a second table in an SDK.
  *
  * This table is the richer 18-range mapping historically shared byte-for-byte
  * by Web and React Native. It deliberately covers bands beyond |329|

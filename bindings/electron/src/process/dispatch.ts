@@ -117,6 +117,7 @@ export const ALLOWED_RPC_METHODS: ReadonlySet<string> = new Set([
   ...BACKEND_METHODS.map(rpcMethodFor),
 ]);
 
+/** Retain native SDK error fields and proto bytes across the utility-process boundary. */
 function rpcError(e: unknown): string | RpcErrorPayload {
   if (typeof e === 'string') return e;
   if (e instanceof Error) {

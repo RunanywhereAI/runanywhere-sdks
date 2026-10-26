@@ -4,39 +4,7 @@ from __future__ import annotations
 
 from typing import Any, NoReturn
 
-from ._generated_errors import ErrorCategory, ErrorCode
-
-
-def category_for_code(code: int) -> ErrorCategory:
-    """Map a signed C ABI code or positive proto code to its canonical category."""
-    magnitude = abs(int(code))
-    if magnitude == 0:
-        return ErrorCategory.UNSPECIFIED
-    if 100 <= magnitude <= 109:
-        return ErrorCategory.CONFIGURATION
-    if 110 <= magnitude <= 129:
-        return ErrorCategory.MODEL
-    if 130 <= magnitude <= 149 or 220 <= magnitude <= 229:
-        return ErrorCategory.INTERNAL
-    if 150 <= magnitude <= 179:
-        return ErrorCategory.NETWORK
-    if 180 <= magnitude <= 219 or 280 <= magnitude <= 299 or 350 <= magnitude <= 369:
-        return ErrorCategory.IO
-    if 230 <= magnitude <= 249 or 300 <= magnitude <= 319:
-        return ErrorCategory.COMPONENT
-    if 250 <= magnitude <= 279 or 370 <= magnitude <= 379:
-        return ErrorCategory.VALIDATION
-    if 320 <= magnitude <= 349:
-        return ErrorCategory.AUTH
-    if 380 <= magnitude <= 389 or 700 <= magnitude <= 999:
-        return ErrorCategory.INTERNAL
-    if 400 <= magnitude <= 499:
-        return ErrorCategory.COMPONENT
-    if 500 <= magnitude <= 599:
-        return ErrorCategory.CONFIGURATION
-    if 600 <= magnitude <= 699:
-        return ErrorCategory.COMPONENT
-    return ErrorCategory.UNSPECIFIED
+from ._generated_errors import ErrorCategory, ErrorCode, category_for_code
 
 
 class SDKException(Exception):
@@ -66,6 +34,7 @@ class SDKException(Exception):
         nested_message: str | None = None,
         field_path: str | None = None,
     ) -> None:
+        """Retain explicit wire categories; derive local defaults from shared generated data."""
         super().__init__(message or "SDK error")
         self.message = message or "SDK error"
         self.code = code
@@ -108,6 +77,7 @@ class SDKException(Exception):
         nested_message: str | None = None,
         field_path: str | None = None,
     ) -> "SDKException":
+        """Construct an exception with optional wire details and category overrides."""
         return SDKException(
             code,
             message,
@@ -203,6 +173,7 @@ class SDKException(Exception):
     def storage_error(
         details: str | None = None, cause: BaseException | None = None
     ) -> "SDKException":
+        """Describe file/download I/O failures while retaining their nested cause."""
         return SDKException.of(
             ErrorCode.STORAGE_ERROR,
             details if details is not None else "Storage error",

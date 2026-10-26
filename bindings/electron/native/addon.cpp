@@ -262,13 +262,13 @@ rac_handle_t take_handle_when_idle(std::unordered_map<int32_t, rac_handle_t>& ma
     return h;
 }
 
-int rac_code_abs(rac_result_t code) {
-    int value = static_cast<int>(code);
+/** Return a code magnitude without overflowing for INT32_MIN. */
+int64_t rac_code_abs(rac_result_t code) {
+    int64_t value = static_cast<int64_t>(code);
     return value < 0 ? -value : value;
 }
 
-// Build a structured JS Error for a rac_result_t so the TS layer can recover a
-// typed SDKException without depending on string parsing alone.
+/** Build a native error with canonical proto details and the operation message. */
 Napi::Error make_rac_error(Napi::Env env, rac_result_t code, const std::string& message) {
     Napi::Error error = Napi::Error::New(env, message);
     Napi::Object value = error.Value();
@@ -3597,8 +3597,7 @@ Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
 // RAGResult/RAGStatistics in an owned rac_proto_buffer_t that we copy into a
 // Napi::Buffer and free.
 
-// Copy an owned proto-out buffer to a JS Buffer (throwing on failure), always
-// releasing the native buffer.
+/** Copy an owned proto buffer to JS, preserving failure status before freeing it. */
 static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const char* what) {
     if (buf->status != RAC_SUCCESS || buf->data == nullptr) {
         // Capture status and message before freeing: rac_proto_buffer_free resets

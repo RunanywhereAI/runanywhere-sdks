@@ -1,6 +1,7 @@
 // Unit tests for SDKException — the house-uniform throwable (src/errors.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { SDKError } from '@runanywhere/proto-ts/errors';
 
 import {
   SDKException,
@@ -162,9 +163,50 @@ test('asSDKException prefers structured native fields over UNKNOWN', () => {
   assert.equal(e.code, ErrorCodes.MODEL_LOAD_FAILED);
   assert.equal(e.cAbiCode, -111);
   assert.equal(e.category, ErrorCategories.MODEL);
+  for (const [wireMessage, context, expected] of [
+    ['Model load failed', 'ragClear failed: -111 (backend detail)', 'ragClear failed: -111 (backend detail) (Model load failed)'],
+    ['', 'operation detail', 'operation detail'],
+    ['same detail', 'same detail', 'same detail'],
+    ['wire detail', '', 'wire detail'],
+  ]) {
+    const sdkError = SDKError.encode(SDKError.fromPartial({
+      code: ErrorCodes.MODEL_LOAD_FAILED,
+      category: ErrorCategories.MODEL,
+      cAbiCode: -111,
+      message: wireMessage,
+      nestedMessage: 'backend cause',
+      param: 'model',
+    })).finish();
+    const structured = asSDKException({ message: context, sdkError });
+    assert.equal(structured.message, expected);
+    assert.equal(structured.code, ErrorCodes.MODEL_LOAD_FAILED);
+    assert.equal(structured.category, ErrorCategories.MODEL);
+    assert.equal(structured.cAbiCode, -111);
+    assert.equal(structured.nestedMessage, 'backend cause');
+    assert.equal(structured.fieldPath, 'model');
+  }
 });
 
 test('asSDKException maps trailing rac codes in native strings', () => {
+  for (const code of [1, 99, 390, 399, 1000, 9999]) {
+    const sdkError = SDKError.encode(SDKError.fromPartial({
+      code, category: ErrorCategories.UNSPECIFIED, cAbiCode: -code,
+      message: 'unmapped native code',
+    })).finish();
+    const decoded = asSDKException({ sdkError });
+    assert.equal(decoded.category, ErrorCategories.UNSPECIFIED);
+    assert.equal(decoded.cAbiCode, -code);
+    assert.equal(asSDKException({ code, cAbiCode: -code }).category, ErrorCategories.UNSPECIFIED);
+  }
+  for (const category of [ErrorCategories.UNSPECIFIED, -1, 999]) {
+    const decoded = SDKException.fromProto(SDKError.fromPartial({
+      code: ErrorCodes.MODEL_LOAD_FAILED, category, message: 'future category',
+    }));
+    assert.equal(decoded.category, ErrorCategories.UNSPECIFIED);
+    if (category !== ErrorCategories.UNSPECIFIED) {
+      assert.equal(asSDKException({ code: 111, category }).category, ErrorCategories.UNSPECIFIED);
+    }
+  }
   const e = asSDKException('stream failed: -130');
   assert.equal(e.code, ErrorCodes.GENERATION_FAILED);
   assert.equal(e.cAbiCode, -130);

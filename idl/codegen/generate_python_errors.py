@@ -10,8 +10,8 @@
 # reader to "keep in sync" — the kind of instruction nothing enforces.
 #
 # This generates both enums instead. errors.py keeps its SDKException, its
-# category_for_code range table, and everything else that is real logic; only
-# the transcription moves here.
+# helpers and factories. Category ranges come from the same manifest commons
+# compiles, so Python never maintains a second table.
 #
 # Output:
 #   bindings/python/runanywhere/_generated_errors.py
@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -82,7 +83,28 @@ def collect(
     return found
 
 
+def category_ranges() -> list[tuple[int, int, str]]:
+    """Read the same declarative category ranges compiled by commons."""
+    manifest = Path(__file__).resolve().parents[2] / "core/include/rac/core/rac_error_categories.def"
+    ranges: list[tuple[int, int, str]] = []
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("//"):
+            continue
+        match = re.fullmatch(r"RAC_ERROR_CATEGORY_RANGE\((\d+), (\d+), ([A-Z]+)\)", line)
+        if match is None:
+            raise ValueError(f"Invalid error-category range: {line}")
+        first, last, category = match.groups()
+        start, end = int(first), int(last)
+        if start <= 0 or start > end or (ranges and start <= ranges[-1][1]):
+            raise ValueError(f"Unordered or overlapping error-category range: {line}")
+        ranges.append((start, end, category))
+    if not ranges:
+        raise ValueError("Error-category manifest is empty")
+    return ranges
+
+
 def render(enums: dict[str, list[tuple[str, int, str]]]) -> str:
+    """Emit error enums and the category helper from shared canonical inputs."""
     lines: list[str] = []
     # One-line docstring then the future import, per the Python SDK's module
     # convention; everything else is a comment below them.
@@ -92,6 +114,7 @@ def render(enums: dict[str, list[tuple[str, int, str]]]) -> str:
     lines.append("")
     lines.append("# GENERATED FILE - DO NOT EDIT.")
     lines.append("# Regenerate with: idl/codegen/generate_python_errors.py")
+    lines.append("# Category ranges: core/include/rac/core/rac_error_categories.def")
     lines.append("#")
     lines.append("# Values are the positive canonical numbers from the IDL. The C ABI returns")
     lines.append("# them negated as rac_result_t; negate once at the boundary rather than")
@@ -115,8 +138,25 @@ def render(enums: dict[str, list[tuple[str, int, str]]]) -> str:
                 lines.append(f"    {py_name} = {number}")
         lines.append("")
 
+    lines.extend([
+        "",
+        "def category_for_code(code: int) -> ErrorCategory:",
+        '    """Map code magnitudes using the canonical commons category ranges."""',
+        "    magnitude = abs(int(code))",
+    ])
+    categories = {name for name, _, _ in enums["ErrorCategory"]}
+    for first, last, category in category_ranges():
+        if category not in categories:
+            raise ValueError(f"Unknown error category in manifest: {category}")
+        lines.extend([
+            f"    if {first} <= magnitude <= {last}:",
+            f"        return ErrorCategory.{category}",
+        ])
+    lines.extend(["    return ErrorCategory.UNSPECIFIED", ""])
+
     # Sorted so RUF022 stays quiet on every regeneration.
-    names = ", ".join(f'"{n}"' for n in sorted(n for n in WANTED if enums.get(n)))
+    exported = sorted([n for n in WANTED if enums.get(n)] + ["category_for_code"])
+    names = ", ".join(f'"{n}"' for n in exported)
     lines.append("")
     lines.append(f"__all__ = [{names}]")
     lines.append("")

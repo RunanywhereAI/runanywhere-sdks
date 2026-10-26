@@ -81,11 +81,14 @@ def test_category_for_code_matches_canonical_range_boundaries(
 ):
     assert category_for_code(first) == category
     assert category_for_code(last) == category
+    assert category_for_code(-first) == category
+    assert category_for_code(-last) == category
 
 
 def test_category_for_code_preserves_zero_and_out_of_range_cases():
-    assert category_for_code(0) == ErrorCategory.UNSPECIFIED
-    assert category_for_code(-12345) == ErrorCategory.UNSPECIFIED
+    for code in (0, 1, 99, 390, 399, 1000, 12345, 2**31):
+        assert category_for_code(code) == ErrorCategory.UNSPECIFIED
+        assert category_for_code(-code) == ErrorCategory.UNSPECIFIED
 
 
 def test_from_proto_preserves_wire_category():

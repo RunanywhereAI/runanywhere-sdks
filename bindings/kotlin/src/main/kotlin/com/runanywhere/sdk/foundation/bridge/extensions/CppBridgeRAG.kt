@@ -11,8 +11,8 @@ import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGSearchResponse
-import ai.runanywhere.proto.v1.RAGStreamEvent
 import ai.runanywhere.proto.v1.RAGStatistics
+import ai.runanywhere.proto.v1.RAGStreamEvent
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -235,6 +235,7 @@ object CppBridgeRAG {
     private fun requireSession(): Long =
         sessionHandle.takeIf { it != 0L } ?: throw SDKException.notInitialized("RAG session not created")
 
+    /** Reuse canonical native error conversion, including its serialization-failure fallback. */
     private fun createSessionException(rc: Int): SDKException {
         if (rc == RunAnywhereBridge.RAC_SUCCESS) {
             return SDKException.operation("racRagSessionCreateProto returned 0")
