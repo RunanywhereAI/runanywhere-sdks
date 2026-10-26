@@ -308,6 +308,23 @@ def test_stale_pin_in_a_kotlin_module_readme_is_rejected(tmp_path):
     assert "runanywhere-core-onnx/README.md: expected" in result.stderr
 
 
+def test_unpinned_package_in_a_per_sdk_readme_is_rejected(tmp_path):
+    # Same hole as the root README: @runanywhere/core stays pinned, so only a
+    # check of every package reference sees the unpinned backend.
+    version = _core_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/react-native/packages/llamacpp/README.md",
+        f"@runanywhere/llamacpp@{version}",
+        "@runanywhere/llamacpp@latest",
+    )
+    assert result.returncode == 1
+    assert (
+        "bindings/react-native/packages/llamacpp/README.md: expected "
+        f"{version}, found '@runanywhere/llamacpp@latest'" in result.stderr
+    )
+
+
 def test_per_sdk_readme_with_no_pin_is_rejected(tmp_path):
     # A reworded README that no shape matches would silently drop out of the gate.
     result = _mutate_file(
