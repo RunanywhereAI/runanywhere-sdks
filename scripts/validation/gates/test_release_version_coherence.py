@@ -11,6 +11,7 @@ failure means the mutation caused it.
 
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -82,6 +83,16 @@ def _core_version():
     return (REPO_ROOT / "core/VERSION").read_text(encoding="utf-8").strip()
 
 
+def _readme_pin_version():
+    # The registry pins follow core/VERSION unless a TEMP marker holds them on
+    # the last published version.
+    match = re.search(
+        r"TEMP: install pins stay on (\S+) until v",
+        (REPO_ROOT / "README.md").read_text(encoding="utf-8"),
+    )
+    return match.group(1) if match else _core_version()
+
+
 def _mutate_readme(tmp_path, old, new):
     sandbox = _mirror(tmp_path, writable={"README.md"})
     text = (sandbox / "README.md").read_text(encoding="utf-8")
@@ -148,7 +159,7 @@ def test_every_rn_podspec_is_covered(tmp_path):
 def test_one_stale_readme_pin_is_rejected(tmp_path):
     # The case expect_literal misses: every other pin still names the current
     # version, so the version string is present and only a per-pin check fails.
-    version = _core_version()
+    version = _readme_pin_version()
     pin = f"io.github.sanchitmonga22:runanywhere-sdk:{version}"
     result = _mutate_readme(tmp_path, pin, "io.github.sanchitmonga22:runanywhere-sdk:0.0.1")
     assert result.returncode == 1
@@ -160,7 +171,7 @@ def test_one_stale_readme_pin_is_rejected(tmp_path):
 
 def test_readme_pin_with_a_prerelease_suffix_is_rejected(tmp_path):
     # The version must end the pin: a suffix names a different artifact.
-    version = _core_version()
+    version = _readme_pin_version()
     result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}-rc.1")
     assert result.returncode == 1
     assert f"found 'runanywhere=={version}-rc.1'" in result.stderr
@@ -168,7 +179,7 @@ def test_readme_pin_with_a_prerelease_suffix_is_rejected(tmp_path):
 
 def test_readme_pin_with_an_attached_prerelease_suffix_is_rejected(tmp_path):
     # PEP 440 attaches the suffix with no separator; a prefix match would pass it.
-    version = _core_version()
+    version = _readme_pin_version()
     result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}rc1")
     assert result.returncode == 1
     assert f"found 'runanywhere=={version}rc1'" in result.stderr
@@ -177,7 +188,7 @@ def test_readme_pin_with_an_attached_prerelease_suffix_is_rejected(tmp_path):
 def test_readme_pin_with_an_unrecognized_suffix_is_rejected(tmp_path):
     # A suffix the version regex does not know must not be cut off before the
     # comparison, or the truncated pin reads as current.
-    version = _core_version()
+    version = _readme_pin_version()
     for suffix in ("+build.1", "_rc1"):
         result = _mutate_readme(
             tmp_path / suffix.strip("+_"),
@@ -191,7 +202,7 @@ def test_readme_pin_with_an_unrecognized_suffix_is_rejected(tmp_path):
 def test_unpinned_package_beside_a_pinned_one_is_rejected(tmp_path):
     # @runanywhere/core is still pinned, so the shape has a match; the gate has
     # to look at every package reference, not only the version-shaped ones.
-    version = _core_version()
+    version = _readme_pin_version()
     result = _mutate_readme(
         tmp_path, f"@runanywhere/llamacpp@{version}", "@runanywhere/llamacpp@latest"
     )
@@ -202,7 +213,7 @@ def test_unpinned_package_beside_a_pinned_one_is_rejected(tmp_path):
 def test_readme_pin_followed_by_a_full_stop_passes(tmp_path):
     # Sentence punctuation after a pin is not part of the version; reading it as
     # a suffix fails the gate and makes the sync delete the full stop.
-    version = _core_version()
+    version = _readme_pin_version()
     result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}.")
     assert result.returncode == 0, result.stderr
 
@@ -210,10 +221,42 @@ def test_readme_pin_followed_by_a_full_stop_passes(tmp_path):
 def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
     # A shape with no match means the README was reworded under the gate, which
     # would otherwise stop checking that install command without saying so.
-    version = _core_version()
+    version = _readme_pin_version()
     result = _mutate_readme(tmp_path, f"runanywhere=={version}", "runanywhere")
     assert result.returncode == 1
     assert "no version pin matches 'runanywhere=='" in result.stderr
+
+
+def test_readme_temp_marker_for_another_release_is_rejected(tmp_path):
+    # A marker left over from an earlier release must not keep vouching for the
+    # old pins after the next bump.
+    version = _core_version()
+    result = _mutate_readme(
+        tmp_path,
+        f"until v{version} is on the package registries.",
+        "until v0.0.1 is on the package registries.",
+    )
+    assert result.returncode == 1
+    assert f"marker must name v{version}, found 'TEMP: install pins stay on" in result.stderr
+
+
+def test_readme_pins_follow_core_version_without_a_temp_marker(tmp_path):
+    # With the marker gone the pins must name core/VERSION again, so publishing
+    # cannot be forgotten once the marker is deleted.
+    sandbox = _mirror(tmp_path, writable={"README.md"})
+    readme = sandbox / "README.md"
+    lines = readme.read_text(encoding="utf-8").splitlines(keepends=True)
+    readme.write_text(
+        "".join(line for line in lines if "TEMP: install pins stay on" not in line),
+        encoding="utf-8",
+    )
+    pin_version = _readme_pin_version()
+    result = _run(sandbox)
+    if pin_version == _core_version():
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode == 1
+        assert f"expected {_core_version()}, found 'runanywhere=={pin_version}'" in result.stderr
 
 
 if __name__ == "__main__":

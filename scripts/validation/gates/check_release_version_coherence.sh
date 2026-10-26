@@ -454,28 +454,50 @@ done
 
 # The root README carries one pin per install command plus the version-line
 # sentence. expect_literal would pass with a single current occurrence and one
-# stale pin beside it, so every pin of each shape has to name ${VERSION}. Each
-# pin is read up to the next space, quote, bracket or bold marker, so `@latest`,
-# `+build.1` or `_rc1` is compared whole instead of being cut back to a match;
-# only a sentence-ending full stop is allowed after the version.
-readme_version_regex="${VERSION//./\\.}"
-for readme_pin in \
-  'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
-  'runanywhere[a-z_]*: \^' \
-  '@runanywhere/[a-z-]+@' \
-  'runanywhere==' \
-  'version line, currently \*\*'; do
+# stale pin beside it, so every pin of each shape has to name the expected
+# version. Each pin is read up to the next space, quote, bracket or bold marker,
+# so `@latest`, `+build.1` or `_rc1` is compared whole instead of being cut back
+# to a match; only a sentence-ending full stop is allowed after the version.
+expect_readme_pins() {
+  local readme_pin="$1" expected="$2" readme_pins readme_stale
+  local expected_regex="${expected//./\\.}"
   readme_pins="$(grep -Eo -- "${readme_pin}[^][:space:]\"'\`(),*]*" "${REPO_ROOT}/README.md" || true)"
   if [ -z "${readme_pins}" ]; then
     echo "[FAIL] README.md: no version pin matches '${readme_pin}'" >&2
     FAILURES=$((FAILURES + 1))
-    continue
+    return
   fi
   while IFS= read -r readme_stale; do
-    echo "[FAIL] README.md: expected ${VERSION}, found '${readme_stale}'" >&2
+    echo "[FAIL] README.md: expected ${expected}, found '${readme_stale}'" >&2
     FAILURES=$((FAILURES + 1))
-  done < <(grep -Ev -- "${readme_pin}${readme_version_regex}\.?\$" <<< "${readme_pins}")
+  done < <(grep -Ev -- "${readme_pin}${expected_regex}\.?\$" <<< "${readme_pins}")
+}
+
+# The install commands resolve from npm, Maven Central, pub.dev and PyPI, which
+# can lag the repo version the same way the SwiftPM assets do. README.md records
+# that state with a TEMP marker naming the last published version, and the pins
+# stay on it until v${VERSION} is out. The marker must name ${VERSION}, so one
+# left over from an earlier release cannot vouch for this one.
+README_PIN_VERSION="${VERSION}"
+readme_temp_marker="$(grep -Eo -- "TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v[^ ]+ is on the package registries\." "${REPO_ROOT}/README.md" || true)"
+if [ -n "${readme_temp_marker}" ]; then
+  readme_temp_version="$(awk 'NR == 1 { print $6 }' <<< "${readme_temp_marker}")"
+  if [ "${readme_temp_marker}" = "TEMP: install pins stay on ${readme_temp_version} until v${VERSION} is on the package registries." ]; then
+    README_PIN_VERSION="${readme_temp_version}"
+    echo "[OK] README.md install commands temporarily pin ${README_PIN_VERSION} until v${VERSION} is on the package registries"
+  else
+    echo "[FAIL] README.md: the TEMP install-pin marker must name v${VERSION}, found '${readme_temp_marker}'" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+fi
+for readme_pin in \
+  'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+  'runanywhere[a-z_]*: \^' \
+  '@runanywhere/[a-z-]+@' \
+  'runanywhere=='; do
+  expect_readme_pins "${readme_pin}" "${README_PIN_VERSION}"
 done
+expect_readme_pins 'version line, currently \*\*' "${VERSION}"
 
 if [ "${FAILURES}" -ne 0 ]; then
   echo "[FAIL] release version coherence: ${FAILURES} mismatch(es)" >&2
