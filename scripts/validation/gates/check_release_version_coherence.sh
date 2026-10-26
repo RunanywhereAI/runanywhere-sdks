@@ -454,7 +454,10 @@ done
 
 # The root README carries one pin per install command plus the version-line
 # sentence. expect_literal would pass with a single current occurrence and one
-# stale pin beside it, so every pin of each shape has to name ${VERSION}.
+# stale pin beside it, so every pin of each shape has to name ${VERSION}. Each
+# pin is read up to the next space, quote, bracket or bold marker, so `@latest`,
+# `+build.1` or `_rc1` is compared whole instead of being cut back to a match;
+# only a sentence-ending full stop is allowed after the version.
 readme_version_regex="${VERSION//./\\.}"
 for readme_pin in \
   'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
@@ -462,7 +465,7 @@ for readme_pin in \
   '@runanywhere/[a-z-]+@' \
   'runanywhere==' \
   'version line, currently \*\*'; do
-  readme_pins="$(grep -Eo -- "${readme_pin}[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" "${REPO_ROOT}/README.md" || true)"
+  readme_pins="$(grep -Eo -- "${readme_pin}[^][:space:]\"'\`(),*]*" "${REPO_ROOT}/README.md" || true)"
   if [ -z "${readme_pins}" ]; then
     echo "[FAIL] README.md: no version pin matches '${readme_pin}'" >&2
     FAILURES=$((FAILURES + 1))
@@ -471,7 +474,7 @@ for readme_pin in \
   while IFS= read -r readme_stale; do
     echo "[FAIL] README.md: expected ${VERSION}, found '${readme_stale}'" >&2
     FAILURES=$((FAILURES + 1))
-  done < <(grep -Ev -- "${readme_pin}${readme_version_regex}\$" <<< "${readme_pins}")
+  done < <(grep -Ev -- "${readme_pin}${readme_version_regex}\.?\$" <<< "${readme_pins}")
 done
 
 if [ "${FAILURES}" -ne 0 ]; then

@@ -174,6 +174,31 @@ def test_readme_pin_with_an_attached_prerelease_suffix_is_rejected(tmp_path):
     assert f"found 'runanywhere=={version}rc1'" in result.stderr
 
 
+def test_readme_pin_with_an_unrecognized_suffix_is_rejected(tmp_path):
+    # A suffix the version regex does not know must not be cut off before the
+    # comparison, or the truncated pin reads as current.
+    version = _core_version()
+    for suffix in ("+build.1", "_rc1"):
+        result = _mutate_readme(
+            tmp_path / suffix.strip("+_"),
+            f"runanywhere=={version}",
+            f"runanywhere=={version}{suffix}",
+        )
+        assert result.returncode == 1
+        assert f"found 'runanywhere=={version}{suffix}'" in result.stderr
+
+
+def test_unpinned_package_beside_a_pinned_one_is_rejected(tmp_path):
+    # @runanywhere/core is still pinned, so the shape has a match; the gate has
+    # to look at every package reference, not only the version-shaped ones.
+    version = _core_version()
+    result = _mutate_readme(
+        tmp_path, f"@runanywhere/llamacpp@{version}", "@runanywhere/llamacpp@latest"
+    )
+    assert result.returncode == 1
+    assert "found '@runanywhere/llamacpp@latest'" in result.stderr
+
+
 def test_readme_pin_followed_by_a_full_stop_passes(tmp_path):
     # Sentence punctuation after a pin is not part of the version; reading it as
     # a suffix fails the gate and makes the sync delete the full stop.
