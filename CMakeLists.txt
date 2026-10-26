@@ -376,7 +376,6 @@ if(RAC_BUILD_TESTS)
         target_compile_features(test_plugin_entry_llamacpp PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_llamacpp_tests COMMAND test_plugin_entry_llamacpp)
     endif()
-    # Real-model test; SKIPs unless RAC_TEST_D1_GGUF names a D1 Omni/GLiNER GGUF.
     if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp AND
        NOT TARGET test_decision_llamacpp_d1_long_prompt)
         add_executable(test_decision_llamacpp_d1_long_prompt

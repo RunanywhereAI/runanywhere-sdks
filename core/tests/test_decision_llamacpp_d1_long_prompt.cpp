@@ -1,17 +1,3 @@
-/**
- * @file test_decision_llamacpp_d1_long_prompt.cpp
- * @brief A D1 Omni / GLiNER prompt longer than the decode batch is rejected, not aborted.
- *
- * Those checkpoints decode the whole rendered prompt in one non-causal batch
- * capped at 512 tokens, so a longer prompt used to trip a GGML_ASSERT inside
- * llama_decode. It must come back as RAC_ERROR_TEXT_TOO_LONG instead.
- *
- * Needs a real model, so it SKIPs (exit 0) unless one is given:
- *
- *   RAC_TEST_D1_GGUF  path to a D1 Omni or GLiNER decision GGUF
- *                     (e.g. LiquidAI/d1-omni-600M-GGUF d1-omni-600M-Q8_0.gguf)
- */
-
 #include <cstdio>
 #include <cstdlib>
 #include <string>
