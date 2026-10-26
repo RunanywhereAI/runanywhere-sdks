@@ -376,6 +376,24 @@ if(RAC_BUILD_TESTS)
         target_compile_features(test_plugin_entry_llamacpp PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_llamacpp_tests COMMAND test_plugin_entry_llamacpp)
     endif()
+    if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp AND
+       NOT TARGET test_decision_llamacpp_d1_long_prompt)
+        add_executable(test_decision_llamacpp_d1_long_prompt
+            core/tests/test_decision_llamacpp_d1_long_prompt.cpp)
+        target_include_directories(test_decision_llamacpp_d1_long_prompt PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+        )
+        target_link_libraries(test_decision_llamacpp_d1_long_prompt PRIVATE
+            rac_commons
+            rac_backend_llamacpp
+        )
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_decision_llamacpp_d1_long_prompt)
+        endif()
+        target_compile_features(test_decision_llamacpp_d1_long_prompt PRIVATE cxx_std_17)
+        add_test(NAME decision_llamacpp_d1_long_prompt_tests
+            COMMAND test_decision_llamacpp_d1_long_prompt)
+    endif()
     # Reranking primitive (RAC_PRIMITIVE_RERANK, ABI v8) contract test. Backend-
     # neutral: it registers an in-test fake rerank engine, so it needs only
     # rac_commons + the protobuf runtime (no llama.cpp / ONNX linkage).
