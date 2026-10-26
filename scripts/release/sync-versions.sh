@@ -645,7 +645,7 @@ for readme in \
         if grep -Eq "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+" "$readme"; then
             readme_pinned=1
             bump_all_on_line "$readme" \
-                "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9.-]+)?" \
+                "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
                 "\1${NEW_VERSION}"
         fi
     done

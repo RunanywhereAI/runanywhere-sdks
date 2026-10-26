@@ -519,13 +519,17 @@ for readme in \
   core/docs/DEVELOPMENT.md; do
   readme_found=0
   for readme_pin in "${README_PIN_SHAPES[@]}"; do
-    readme_pins="$(grep -Eo -- "${readme_pin}[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9.-]+)?" "${REPO_ROOT}/${readme}" || true)"
+    # Read each pin whole, as for the root README. The prose shapes (ending in a
+    # backtick or bold marker) also open ordinary sentences, so those start at a digit.
+    readme_token="[^][:space:]\"'\`(),*]*"
+    case "${readme_pin}" in *'`' | *'\*\*') readme_token="[0-9]${readme_token}" ;; esac
+    readme_pins="$(grep -Eo -- "${readme_pin}${readme_token}" "${REPO_ROOT}/${readme}" || true)"
     [ -z "${readme_pins}" ] && continue
     readme_found=1
     while IFS= read -r readme_stale; do
       echo "[FAIL] ${readme}: expected ${VERSION}, found '${readme_stale}'" >&2
       FAILURES=$((FAILURES + 1))
-    done < <(grep -Ev -- "${readme_pin}${readme_version_regex}\$" <<< "${readme_pins}")
+    done < <(grep -Ev -- "${readme_pin}${readme_version_regex}\.?\$" <<< "${readme_pins}")
   done
   if [ "${readme_found}" -eq 0 ]; then
     echo "[FAIL] ${readme}: no version pin matches any known shape" >&2
