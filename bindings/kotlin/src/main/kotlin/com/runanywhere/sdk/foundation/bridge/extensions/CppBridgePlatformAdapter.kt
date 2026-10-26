@@ -153,14 +153,20 @@ object CppBridgePlatformAdapter {
                 return
             }
 
-            val result = RunAnywhereBridge.racSetPlatformAdapter(this)
-            if (result != 0) {
-                logCallback(LogLevel.ERROR, TAG, "Failed to set platform adapter: $result")
-                SDKException.throwIfError(result)
-            }
-
-            isRegistered = true
+            onPlatformAdapterRegisterResult(RunAnywhereBridge.racSetPlatformAdapter(this))
         }
+    }
+
+    /**
+     * Interprets [racSetPlatformAdapter] return codes. Internal for unit tests (JNI is not mockable on JVM).
+     */
+    internal fun onPlatformAdapterRegisterResult(result: Int) {
+        if (result != 0) {
+            logCallback(LogLevel.ERROR, TAG, "Failed to set platform adapter: $result")
+            SDKException.throwIfError(result)
+            return
+        }
+        isRegistered = true
     }
 
     /**
