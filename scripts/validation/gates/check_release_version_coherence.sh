@@ -503,6 +503,7 @@ expect_readme_pins 'version line, currently \*\*' "${VERSION}"
 # the "Current release" line, a few prose sentences). Each file has to carry at
 # least one pin, and every pin it carries has to name ${VERSION}. Keep this list
 # and shape set identical to sync-versions.sh.
+readme_version_regex="${VERSION//./\\.}"
 README_PIN_SHAPES=(
   'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
   'runanywhere[a-z_]*: \^?' \
