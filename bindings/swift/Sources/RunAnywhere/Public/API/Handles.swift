@@ -30,6 +30,7 @@ public enum AcceleratorPolicy: Sendable {
 /// Ordered backend preference for model load.
 public struct BackendPreference: Sendable {
     public var backend: InferenceFramework
+    /// Hard fallback boundary. Swift rejects `true` until the load wire can carry it.
     public var required: Bool
 
     public init(backend: InferenceFramework, required: Bool = false) {
