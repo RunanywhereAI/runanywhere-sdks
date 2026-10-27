@@ -119,7 +119,7 @@ constexpr const char* LOG_CAT = "PluginLoader";
  * is called on the final success branch. Replaces the prior manual
  * `rac_dl_close(handle)` on every error path: a future maintainer who adds a
  * new validation step between the dlopen and the final
- * `rac_plugin_registry_set_dl_handle` no longer needs to remember to balance
+ * `rac_plugin_registry_register_dynamic` no longer needs to remember to balance
  * the open — the destructor handles it. Linux `dlopen` refcounts the mapping,
  * so any leaked handle would persist for the whole process lifetime. */
 struct DlGuard {
@@ -255,10 +255,13 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
+    // Copy before publishing: a concurrent unload may unmap vt on success.
+    const std::string name(vt->metadata.name);
+    void* prior = nullptr;
     /* Registry centralizes ABI + capability + dedup checks. The single log
      * line on ABI mismatch is emitted from there (see
      * rac_plugin_registry.cpp). We do NOT (void)-cast the result here. */
-    rac_result_t rc = rac_plugin_register(vt);
+    rac_result_t rc = rac_plugin_registry_register_dynamic(vt, guard.h, &prior);
     if (rc != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d",
                       path, vt->metadata.name, static_cast<int>(rc));
@@ -266,34 +269,22 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         /* The registry recorded the reason under the vtable's own name; add
          * the path, which only the loader knows and which is what makes a
          * "wrong/stale library staged" diagnosis possible. */
-        if (rc != RAC_ERROR_PLUGIN_DUPLICATE)
+        if (rc != RAC_ERROR_PLUGIN_DUPLICATE && rc != RAC_ERROR_PLUGIN_BUSY)
             rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
         return rc;
     }
 
-    /* Replacement load: the registry accepts equal-priority duplicates by
-     * overwriting the by-name entry. Any previously tracked OS handle must be
-     * dlclosed here — `rac_plugin_registry_set_dl_handle` overwrites the
-     * stored handle unconditionally and the registry itself has no ownership
-     * of the OS library mapping (see plugin_registry_internal.h). Without
-     * this we leak one shared-library mapping per same-name reload from a
-     * different path, and on POSIX the extra refcount from a same-path
-     * re-dlopen is never balanced. Taking before setting also avoids a race
-     * window where a concurrent unload could see the new handle before we
-     * drop the old one. Note `prior` may equal `guard.h` on POSIX when the
-     * same path is reopened (dlopen returns the same handle and bumps the
-     * refcount); the matching dlclose still has to happen so the OS refcount
-     * returns to 1 after the redundant load. */
-    if (void* prior = rac_plugin_registry_take_dl_handle(vt->metadata.name); prior != nullptr) {
+    // Registration already transferred ownership under the registry lock.
+    // Do not touch vt again: unload may have removed and unmapped it meanwhile.
+    (void)guard.release();
+    // The replaced mapping stayed alive through its final on_unload callback.
+    // Same-path dlopen returns the same handle with an extra reference, which
+    // still needs this balancing close.
+    if (prior != nullptr) {
         rac_dl_close(static_cast<rac_lib_handle_t>(prior));
     }
-
-    /* Track the handle so unload can dlclose it exactly once. Ownership of the
-     * dlopen mapping transfers from `guard` to the registry here — `release()`
-     * suppresses the destructor's close so we don't double-free. */
-    rac_plugin_registry_set_dl_handle(vt->metadata.name, guard.release());
     RAC_LOG_DEBUG(LOG_CAT, "rac_registry_load_plugin('%s'): registered '%s' from '%s'", path,
-                  vt->metadata.name, sym.c_str());
+                  name.c_str(), sym.c_str());
     return RAC_SUCCESS;
 }
 
@@ -336,16 +327,13 @@ rac_result_t rac_registry_unload_plugin(const char* name) {
     if (name == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
-#if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
-    /* Take the handle BEFORE unregister so we don't lose track of it on the
-     * race window where another thread re-registers the same name. */
-    void* handle = rac_plugin_registry_take_dl_handle(name);
-#endif
-
-    rac_result_t rc = rac_plugin_unregister(name);
+    void* handle = nullptr;
+    // Removal and handle transfer share the registry lock. Busy model leases
+    // leave both the plugin and its library mapping intact.
+    rac_result_t rc = rac_plugin_registry_unregister(name, &handle);
 
 #if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
-    if (handle != nullptr) {
+    if (rc == RAC_SUCCESS && handle != nullptr) {
         /* The plugin is now unregistered (removed from every primitive bucket
          * under the registry lock), so no caller can obtain its vtable. Close
          * the dynamic library to unmap the plugin's code and `.rodata`. */

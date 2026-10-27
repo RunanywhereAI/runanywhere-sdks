@@ -99,6 +99,13 @@ function validateResult(
     );
   }
 
+  const confidenceBytes = result.confidenceMaskU8?.byteLength ?? 0;
+  if (request.options?.includeConfidence ? confidenceBytes !== pixels : confidenceBytes !== 0) {
+    throw SDKException.processingFailed(
+      'Segmentation returned an invalid confidence-mask byte length.',
+    );
+  }
+
   let summarizedPixels = 0;
   for (const summary of result.classSummaries) {
     if (!Number.isInteger(summary.pixelCount) || summary.pixelCount < 0) {
