@@ -7,6 +7,10 @@
 #include "pipeline.pb.h"
 #include "solutions.pb.h"
 
+#include <iomanip>
+#include <limits>
+#include <locale>
+#include <sstream>
 #include <string>
 
 #include "rac/core/rac_error.h"
@@ -33,6 +37,16 @@ void add_edge(PipelineSpec* spec, const std::string& from, const std::string& to
     auto* e = spec->add_edges();
     e->set_from(from);
     e->set_to(to);
+}
+
+// Operator params are strings. Format floats with the classic "C" locale and enough digits to
+// round-trip, matching the retrieve operator's locale-independent parser; std::to_string follows
+// the process locale (a comma-decimal host would emit "1,500000") and keeps only six decimals.
+std::string format_float_param(float value) {
+    std::ostringstream stream;
+    stream.imbue(std::locale::classic());
+    stream << std::setprecision(std::numeric_limits<float>::max_digits10) << value;
+    return stream.str();
 }
 
 // ---------------------------------------------------------------------------
@@ -144,10 +158,10 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
             runanywhere::v1::VectorStore_Name(cfg.vector_store());
     }
     if (cfg.bm25_k1() > 0.0f) {
-        (*retrieve->mutable_params())["bm25_k1"] = std::to_string(cfg.bm25_k1());
+        (*retrieve->mutable_params())["bm25_k1"] = format_float_param(cfg.bm25_k1());
     }
     if (cfg.bm25_b() > 0.0f) {
-        (*retrieve->mutable_params())["bm25_b"] = std::to_string(cfg.bm25_b());
+        (*retrieve->mutable_params())["bm25_b"] = format_float_param(cfg.bm25_b());
     }
     if (cfg.rrf_k() > 0) {
         (*retrieve->mutable_params())["rrf_k"] = std::to_string(cfg.rrf_k());

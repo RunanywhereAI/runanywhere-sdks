@@ -8,6 +8,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "llm_options.proto";
+import "rag.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -98,12 +99,6 @@ message RAGConfig {
     int32  rrf_k   = 10;
 
     string prompt_template = 11;
-}
-
-enum VectorStore {
-    VECTOR_STORE_UNSPECIFIED = 0;
-    VECTOR_STORE_USEARCH     = 1;  // in-process HNSW
-    VECTOR_STORE_PGVECTOR    = 2;  // server deployments only, no on-device path
 }
 
 message AgentLoopConfig {

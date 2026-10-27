@@ -28,6 +28,7 @@ import ai.runanywhere.proto.v1.ToolChoiceMode
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VLMGenerationRequest
 import ai.runanywhere.proto.v1.VLMImage
+import ai.runanywhere.proto.v1.VectorStore
 import com.runanywhere.sdk.generated.convenience.defaults
 import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
 import ai.runanywhere.proto.v1.DiarizationOptions as ProtoDiarizationOptions
@@ -252,6 +253,14 @@ internal fun ragQueryProto(
                 top_k = options?.retrieval?.topK ?: config.topK,
                 score_threshold = options?.retrieval?.similarityThreshold ?: config.similarityThreshold,
                 enable_multi_query = config.multiQuery,
+                bm25_k1 = options?.retrieval?.bm25K1,
+                bm25_b = options?.retrieval?.bm25B,
+                rrf_k = options?.retrieval?.rrfK,
+                vector_store =
+                    when (options?.retrieval?.vectorStore) {
+                        RagVectorStore.USEARCH -> VectorStore.VECTOR_STORE_USEARCH
+                        null -> null
+                    },
             ),
         generation = options?.generation?.toProto(),
     )
