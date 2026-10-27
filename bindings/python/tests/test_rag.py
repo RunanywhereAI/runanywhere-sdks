@@ -270,6 +270,11 @@ def test_query_threads_bm25_rrf_and_vector_store_into_the_proto(rag_core) -> Non
         (RagRetrievalOptions(rrf_k=float("nan")), r"rrf_k.*nan"),  # type: ignore[arg-type]
         (RagRetrievalOptions(rrf_k=2**31), r"rrf_k.*int32"),
         (RagRetrievalOptions(vector_store=7), r"vector_store"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(vector_store=True), r"vector_store"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(vector_store=1), r"vector_store"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(bm25_k1=True), r"bm25_k1"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(bm25_b="0.5"), r"bm25_b"),  # type: ignore[arg-type]
+        (RagRetrievalOptions(top_k=2.5), r"top_k"),  # type: ignore[arg-type]
     ],
 )
 def test_query_rejects_malformed_retrieval_knobs_before_serializing(
