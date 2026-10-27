@@ -109,13 +109,19 @@ std::shared_ptr<ArrayBuffer> ownedProtoBuffer(uint8_t *protoBytes,
 }
 
 std::shared_ptr<ArrayBuffer>
-ownedRegistryBuffer(const char *operation, rac_proto_buffer_t &protoBuffer) {
-  if (protoBuffer.status != RAC_SUCCESS) {
+ownedRegistryBuffer(const char *operation, rac_proto_buffer_t &protoBuffer,
+                    rac_result_t callStatus = RAC_SUCCESS) {
+  const rac_result_t status =
+      callStatus != RAC_SUCCESS ? callStatus : protoBuffer.status;
+  if (status != RAC_SUCCESS) {
     if (protoBuffer.error_message) {
       LOGE("%s proto error: %s", operation, protoBuffer.error_message);
     }
+    const std::string message =
+        "RAC_RESULT=" + std::to_string(status) + " " + operation;
+    const std::runtime_error error(message);
     rac_proto_buffer_free(&protoBuffer);
-    return emptyProtoBuffer();
+    throw error;
   }
 
   if (!protoBuffer.data || protoBuffer.size == 0) {
@@ -220,13 +226,7 @@ HybridRunAnywhereCore::registerModelFromUrlProto(
         rac_proto_buffer_init(&out);
         rac_result_t rc = rac_register_model_from_url_proto(
             bytes.data(), bytes.size(), &out);
-        if (rc != RAC_SUCCESS) {
-          LOGE("registerModelFromUrlProto: rc=%d", rc);
-          rac_proto_buffer_free(&out);
-          return emptyProtoBuffer();
-        }
-
-        return ownedRegistryBuffer("registerModelFromUrlProto", out);
+        return ownedRegistryBuffer("registerModelFromUrlProto", out, rc);
       });
 }
 
@@ -247,13 +247,7 @@ HybridRunAnywhereCore::registerMultiFileModelProto(
         rac_proto_buffer_init(&out);
         rac_result_t rc = rac_register_multi_file_model_proto(
             bytes.data(), bytes.size(), &out);
-        if (rc != RAC_SUCCESS) {
-          LOGE("registerMultiFileModelProto: rc=%d", rc);
-          rac_proto_buffer_free(&out);
-          return emptyProtoBuffer();
-        }
-
-        return ownedRegistryBuffer("registerMultiFileModelProto", out);
+        return ownedRegistryBuffer("registerMultiFileModelProto", out, rc);
       });
 }
 

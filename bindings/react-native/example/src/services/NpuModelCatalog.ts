@@ -4,6 +4,10 @@ import {
   ModelSource,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
+import {
+  HexagonArch,
+  type NpuCapability,
+} from '@runanywhere/proto-ts/hardware_profile';
 import type { ModelRegistration } from '@runanywhere/core';
 
 const HNPU_DESCRIPTION = 'Qualcomm Hexagon NPU model bundle.';
@@ -16,12 +20,14 @@ export type NpuBundle = Readonly<{
   estimatedSizeBytes: number;
   contextLength?: number;
   supportsThinking?: boolean;
+  excludedArchitectures?: readonly HexagonArch[];
+  pinnedArchitecture?: HexagonArch;
 }>;
 
 /**
- * App-owned QHexRT examples. Each URL points at a dedicated model artifact and
- * is registered unchanged through the core SDK. QHexRT does not select models
- * or rewrite URLs.
+ * App-owned QHexRT examples. Rows carry logical or explicitly pinned bundle
+ * references; Commons and QHexRT resolve logical references to the probed
+ * architecture folder while leaving matching pinned references unchanged.
  */
 export const NPU_BUNDLES: readonly NpuBundle[] = [
   {
@@ -334,6 +340,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 5_491_333_979,
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
   },
   {
     id: 'canary_1b_flash',
@@ -362,6 +369,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 470_739_484,
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
   },
   {
     id: 'kitten_nano_0_8',
@@ -407,6 +415,19 @@ export function toNpuModelRegistration(
       ? { supportsThinking: true }
       : {}),
   };
+}
+
+export function isNpuBundleEligible(
+  bundle: NpuBundle,
+  capability: NpuCapability
+): boolean {
+  const architecture = capability.hexagonArch;
+  return (
+    capability.supported &&
+    !bundle.excludedArchitectures?.includes(architecture) &&
+    (bundle.pinnedArchitecture === undefined ||
+      bundle.pinnedArchitecture === architecture)
+  );
 }
 
 export type NpuCatalogSnapshot = Readonly<{

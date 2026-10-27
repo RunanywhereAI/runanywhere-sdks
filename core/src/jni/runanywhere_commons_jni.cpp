@@ -544,18 +544,14 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
 }
 
 static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buffer,
-                                            const char* operation,
-                                            bool preserveFailure = false) {
+                                            const char* operation) {
     if (buffer == nullptr) {
         return nullptr;
     }
     if (RAC_FAILED(buffer->status)) {
         LOGe("%s: native proto API failed with code %d (%s)", operation, buffer->status,
              buffer->error_message ? buffer->error_message : "");
-        const rac_result_t status = buffer->status;
-        if (preserveFailure) {
-            throwNativeProtoFailure(env, operation, status, buffer->error_message);
-        }
+        throwNativeProtoFailure(env, operation, buffer->status, buffer->error_message);
         rac_proto_buffer_free(buffer);
         return nullptr;
     }
@@ -655,7 +651,7 @@ static jbyteArray callModelRegistryProtoBuffer(JNIEnv* env, jbyteArray requestPr
 using ProtoBufferCallFn = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
 
 static jbyteArray callProtoBufferFn(JNIEnv* env, jbyteArray requestProto, ProtoBufferCallFn callFn,
-                                    const char* operation, bool preserveFailure = false) {
+                                    const char* operation) {
     if (requestProto == nullptr) {
         return nullptr;
     }
@@ -677,7 +673,7 @@ static jbyteArray callProtoBufferFn(JNIEnv* env, jbyteArray requestProto, ProtoB
     if (RAC_FAILED(rc) && result.status == RAC_SUCCESS) {
         rac_proto_buffer_set_error(&result, rc, operation);
     }
-    return makeProtoBufferByteArray(env, &result, operation, preserveFailure);
+    return makeProtoBufferByteArray(env, &result, operation);
 }
 
 static jbyteArray callLifecycleLoadProtoFn(JNIEnv* env, jbyteArray requestProto) {
@@ -2401,14 +2397,14 @@ JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegisterModelFromUrlProto(
     JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
     return callProtoBufferFn(env, requestBytes, rac_register_model_from_url_proto,
-                             "racRegisterModelFromUrlProto", true);
+                             "racRegisterModelFromUrlProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegisterMultiFileModelProto(
     JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
     return callProtoBufferFn(env, requestBytes, rac_register_multi_file_model_proto,
-                             "racRegisterMultiFileModelProto", true);
+                             "racRegisterMultiFileModelProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
