@@ -275,6 +275,19 @@ bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::Clu
         }
         expected_start = assignment.layer_end();
     }
+
+    int coordinator_count = 0;
+    for (const auto& assignment : sorted_assignments) {
+        if (assignment.is_coordinator()) {
+            ++coordinator_count;
+        }
+    }
+    if (coordinator_count != 1) {
+        if (out_rejection_reason != nullptr) {
+            *out_rejection_reason = "Cluster must have exactly one coordinator assignment";
+        }
+        return false;
+    }
     return true;
 }
 
