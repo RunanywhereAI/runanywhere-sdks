@@ -190,7 +190,7 @@ test('asSDKException prefers structured native fields over UNKNOWN', () => {
 });
 
 test('asSDKException maps trailing rac codes in native strings', () => {
-  for (const code of [1, 99, 390, 399, 1000, 9999]) {
+  for (const code of [1, 99, 390, 399, 1000, 9999, 12345]) {
     const sdkError = SDKError.encode(SDKError.fromPartial({
       code, category: ErrorCategories.UNSPECIFIED, cAbiCode: -code,
       message: 'unmapped native code',
