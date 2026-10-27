@@ -25,6 +25,7 @@ class QHexRTCatalogModel {
     required this.url,
     required this.category,
     required this.memoryBytes,
+    this.downloadBytes,
     this.contextLength,
     this.supportsThinking = false,
     this.supportsLora = false,
@@ -35,25 +36,31 @@ class QHexRTCatalogModel {
   final String url;
   final ModelCategory category;
   final int memoryBytes;
+  final int? downloadBytes;
   final int? contextLength;
   final bool supportsThinking;
   final bool supportsLora;
 
-  RegisterModelFromUrlRequest toRegistrationRequest() =>
-      RegisterModelFromUrlRequest(
-        id: id,
-        name: name,
-        url: url,
-        framework: _qhexrt,
-        category: category,
-        source: ModelSource.MODEL_SOURCE_REMOTE,
-        memoryRequiredBytes: Int64(memoryBytes),
-        downloadSizeBytes: Int64(memoryBytes),
-        contextLength: contextLength,
-        supportsThinking: supportsThinking,
-        supportsLora: supportsLora,
-        description: _hnpuDescription,
-      );
+  RegisterModelFromUrlRequest toRegistrationRequest() {
+    final request = RegisterModelFromUrlRequest(
+      id: id,
+      name: name,
+      url: url,
+      framework: _qhexrt,
+      category: category,
+      source: ModelSource.MODEL_SOURCE_REMOTE,
+      memoryRequiredBytes: Int64(memoryBytes),
+      contextLength: contextLength,
+      supportsThinking: supportsThinking,
+      supportsLora: supportsLora,
+      description: _hnpuDescription,
+    );
+    final artifactBytes = downloadBytes;
+    if (artifactBytes != null) {
+      request.downloadSizeBytes = Int64(artifactBytes);
+    }
+    return request;
+  }
 }
 
 @immutable
