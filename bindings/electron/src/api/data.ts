@@ -17,11 +17,12 @@ import {
   RAGStreamEvent,
   RAGStreamEventKind,
 } from '@runanywhere/proto-ts/rag';
+import type { ReasoningOptions as ProtoReasoningOptions } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
 import { DataAbi, toEmbeddingsRequest, toRerankRequest } from './data-abi';
-import { toPublicGenerationMetrics } from './llm-abi';
+import { toProtoReasoning, toPublicGenerationMetrics } from './llm-abi';
 import { RAC_CATEGORY, RAC_FRAMEWORK } from './native-backend';
 import { optionDefaults } from './options';
 import type { EmbedOptions, LlmOptions, RagConfig } from './options';
@@ -227,6 +228,7 @@ interface RagGeneration {
   seed?: number;
   stopSequences?: string[];
   systemPrompt?: string;
+  reasoning?: ProtoReasoningOptions;
 }
 
 // The same sampling knobs the LLM path forwards in llm-abi.ts toProtoOptions, so a
@@ -248,6 +250,9 @@ function toRagGeneration(options: LlmOptions = {}): RagGeneration {
     out.stopSequences = [...options.stopSequences];
   }
   if (options.systemPrompt !== undefined) out.systemPrompt = options.systemPrompt;
+  // Commons turns thinking off for a RAG answer when `reasoning.mode` is OFF. It goes
+  // through the same translation as the LLM path, so the two cannot drift.
+  if (options.reasoning !== undefined) out.reasoning = toProtoReasoning(options.reasoning);
   return out;
 }
 
