@@ -27,10 +27,9 @@ import 'package:runanywhere_qhexrt/qhexrt.dart';
 await RunAnywhere.initialize();
 
 final npu = QHexRT.probeNpu(); // safe on any device
-if (npu.supported) {
-  await QHexRT.register();
+if (npu.supported && await QHexRT.register()) {
+  // Register, download, load, and infer via core RunAnywhere APIs.
 }
-// Register, download, load, and infer via core RunAnywhere APIs
 ```
 
 See the [Flutter SDK README](../../README.md) for full examples.

@@ -10,14 +10,15 @@
 /// import 'package:runanywhere/runanywhere.dart';
 /// import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 ///
+/// await RunAnywhere.initialize();
+///
 /// final npu = QHexRT.probeNpu();
-/// if (npu.supported) {
-///   await QHexRT.register();
+/// if (npu.supported && await QHexRT.register()) {
 ///   await RunAnywhere.models.register(
 ///     ModelRegistration.url(
 ///       id: 'my-qhexrt-model',
 ///       name: 'My QHexRT Model',
-///       url: 'https://huggingface.co/organization/dedicated-qhexrt-model/model.json',
+///       url: 'https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json',
 ///       framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
 ///     ),
 ///   );

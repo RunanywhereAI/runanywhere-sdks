@@ -12,8 +12,9 @@ import 'package:runanywhere/native/types/basic_types.dart';
 
 /// FFI bindings for the private QHexRT (Qualcomm Hexagon NPU) backend.
 ///
-/// Capability symbols live in `librac_backend_qhexrt.so`. Model registration,
-/// HTTP, download, extraction, and registry work stay in the core SDK.
+/// Capability, backend registration/unregistration, and skel-directory symbols
+/// live in `librac_backend_qhexrt.so`. Model registration, HTTP, download,
+/// extraction, and registry work stay in the core SDK. Android/Snapdragon only.
 class QhexrtBindings {
   final DynamicLibrary _backend;
 

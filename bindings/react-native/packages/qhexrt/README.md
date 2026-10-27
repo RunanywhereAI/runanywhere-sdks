@@ -17,13 +17,19 @@ See the [React Native SDK README](../../README.md) for Android setup.
 ## Usage
 
 ```typescript
+import { RunAnywhere } from '@runanywhere/core';
 import { QHexRT } from '@runanywhere/qhexrt';
 
+await RunAnywhere.initialize({ apiKey: 'your-key' });
+
 const npu = await QHexRT.probeNpu(); // safe on any device
-if (npu.qhexrtSupported) {
-  await QHexRT.register();
+if (!npu.supported) {
+  console.warn(`Hexagon ${npu.socModel} is outside V75/V79/V81`);
+} else if (!(await QHexRT.register())) {
+  console.warn('QHexRT backend registration failed');
+} else {
+  // Register, download, load, and infer via @runanywhere/core.
 }
-// Register, download, load, and infer via @runanywhere/core
 ```
 
 See the [React Native SDK README](../../README.md) for full examples.

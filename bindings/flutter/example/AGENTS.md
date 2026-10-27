@@ -88,7 +88,7 @@ App startup runs `_initializeSDK()` from `initState` via `addPostFrameCallback`.
 
 1. **Backend registration** (`_registerBackends()`) — guarded by a static flag to survive hot-reload. Registers LlamaCpp, physical-device-only Apple MLX, ONNX/Sherpa, then QHexRT NPU (`QHexRT.isAvailable` guards Android/Snapdragon only; a no-op elsewhere); MLX reports unavailable in the iOS Simulator
 2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
-3. **Catalog registration** (`ModelCatalogBootstrap.registerAll(mlxRegistered:)`) — seeds the curated model catalog on every cold launch (safe to re-run; commons merges runtime fields). Only the Apple MLX catalog section is gated on `mlxRegistered`; ONNX and QHexRT catalog entries register unconditionally regardless of whether those backends actually registered
+3. **Catalog registration** (`ModelCatalogBootstrap.registerAll(mlxRegistered:, qhexrtRegistered:)`) — seeds the curated model catalog on every cold launch (safe to re-run; commons merges runtime fields). Apple MLX entries are gated on `mlxRegistered`; QHexRT entries require `qhexrtRegistered` and a supported device capability probe. ONNX entries register unconditionally
 
 ### State Management
 
