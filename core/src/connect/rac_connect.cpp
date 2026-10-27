@@ -1021,7 +1021,8 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
             validation.set_rejection_reason(
                 "Activation from_layer 0 is the first stage's input, not an inter-stage handoff");
         } else if (!valid_boundary) {
-            validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
+            validation.set_rejection_reason(
+                "Activation from_layer does not match any cluster layer boundary");
         } else if (request.tensor_data().size() < min_bytes) {
             validation.set_rejection_reason(
                 "Activation tensor_data size is smaller than expected tensor bytes (minimum 2 "
