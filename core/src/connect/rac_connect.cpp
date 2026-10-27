@@ -1029,7 +1029,8 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
         const uint64_t elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
         const bool size_overflows = element_size != 0 && elements > UINT64_MAX / element_size;
         if (!valid_boundary) {
-            validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
+            validation.set_rejection_reason(
+                "Activation from_layer does not match any cluster layer boundary");
         } else if (element_size == 0) {
             validation.set_rejection_reason("Activation dtype is unspecified or unknown");
         } else if (size_overflows) {
