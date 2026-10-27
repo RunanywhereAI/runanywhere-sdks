@@ -4,6 +4,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <locale>
+#include <sstream>
 #include <string>
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -1163,20 +1165,93 @@ TEST(rag_retrieval_params_reach_the_retrieve_operator) {
     CHECK(store != params.end());
     CHECK(store->second == "VECTOR_STORE_USEARCH");
     // Values, not just presence: a converter that forwarded the wrong number
-    // would satisfy a presence-only check. Compared against std::to_string so
-    // the assertion tracks the converter's own float formatting.
+    // would satisfy a presence-only check. Floats travel as classic-locale text
+    // that round-trips exactly, which is what the retrieve operator parses.
+    const auto parse_float = [](const std::string& text) {
+        std::istringstream stream(text);
+        stream.imbue(std::locale::classic());
+        float value = -1.0f;
+        stream >> value;
+        return value;
+    };
     const auto bm25_k1 = params.find("bm25_k1");
     CHECK(bm25_k1 != params.end());
-    CHECK(bm25_k1->second == std::to_string(1.5f));
+    CHECK(bm25_k1->second == "1.5");
     const auto bm25_b = params.find("bm25_b");
     CHECK(bm25_b != params.end());
-    CHECK(bm25_b->second == std::to_string(0.6f));
+    CHECK(bm25_b->second.find(',') == std::string::npos);
+    CHECK(parse_float(bm25_b->second) == 0.6f);
     const auto rrf = params.find("rrf_k");
     CHECK(rrf != params.end());
     CHECK(rrf->second == "30");
 
     runner.close_input();
     runner.wait();
+}
+
+// ---------------------------------------------------------------------------
+// 10c. An explicit solution-YAML zero reaches the retrieve operator instead of
+//      collapsing into "unset" (issue #1076), and garbage fails at load time.
+// ---------------------------------------------------------------------------
+TEST(rag_yaml_explicit_zero_tuning_reaches_the_retrieve_operator) {
+    ScopedSolutionStandins standins;
+
+    SolutionConfig cfg;
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  llm_model_id: \"qwen3-4b\"\n"
+                                                  "  bm25_k1: 0\n"
+                                                  "  bm25_b: 0\n"
+                                                  "  rrf_k: 0\n",
+                                                  &cfg) == RAC_SUCCESS);
+    CHECK(cfg.rag().has_bm25_k1() && cfg.rag().has_bm25_b() && cfg.rag().has_rrf_k());
+
+    SolutionRunner runner(cfg);
+    CHECK(runner.start() == RAC_SUCCESS);
+    const runanywhere::v1::OperatorSpec* retrieve = nullptr;
+    for (const auto& op : runner.spec().operators()) {
+        if (op.name() == "retrieve")
+            retrieve = &op;
+    }
+    CHECK(retrieve != nullptr);
+    if (retrieve != nullptr) {
+        // Present, so the operator's "> 0" guard sees bm25_k1/rrf_k and rejects them,
+        // and bm25_b = 0 (no length normalization) is honored instead of dropped.
+        const auto& params = retrieve->params();
+        CHECK(params.count("bm25_k1") == 1 && params.at("bm25_k1") == "0");
+        CHECK(params.count("bm25_b") == 1 && params.at("bm25_b") == "0");
+        CHECK(params.count("rrf_k") == 1 && params.at("rrf_k") == "0");
+    }
+    runner.close_input();
+    runner.wait();
+
+    // An unset key still means "session default": nothing is forwarded.
+    SolutionConfig defaults_cfg;
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  llm_model_id: \"qwen3-4b\"\n",
+                                                  &defaults_cfg) == RAC_SUCCESS);
+    CHECK(!defaults_cfg.rag().has_bm25_k1() && !defaults_cfg.rag().has_rrf_k());
+
+    // An unknown vector_store token is a load error too, not a silent UNSPECIFIED.
+    SolutionConfig typo_store_cfg;
+    rac_error_clear_details();
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  vector_store: usearchh\n",
+                                                  &typo_store_cfg) == RAC_ERROR_INVALID_FORMAT);
+    const char* typo_details = rac_error_get_details();
+    CHECK(typo_details != nullptr && std::string(typo_details).find("usearchh") != std::string::npos);
+
+    // Garbage used to become 0 through to_float(); it is a load error now.
+    SolutionConfig garbage_cfg;
+    rac_error_clear_details();
+    CHECK(rac::solutions::load_solution_from_yaml("rag:\n"
+                                                  "  embed_model_id: \"bge-small\"\n"
+                                                  "  bm25_b: \"abc\"\n",
+                                                  &garbage_cfg) == RAC_ERROR_INVALID_FORMAT);
+    const char* details = rac_error_get_details();
+    CHECK(details != nullptr && std::string(details).find("rag.bm25_b") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -1375,6 +1450,112 @@ TEST(retrieve_without_session_handle_fails_honestly) {
 }
 
 // ---------------------------------------------------------------------------
+// 13b. RetrieveNode rejects VECTOR_STORE_PGVECTOR honestly.
+// ---------------------------------------------------------------------------
+TEST(retrieve_pgvector_is_rejected) {
+    // Needs the engine-backed retrieve factory registered, so the PGVECTOR
+    // guard it exercises is the one RetrieveNode actually installs. Same call
+    // as test 13 above, which is the only registration entry point here.
+    auto& registry = OperatorRegistry::instance();
+    static_cast<void>(rac::solutions::register_engine_backed_operators(registry));
+
+    PipelineSpec spec;
+    spec.set_name("retrieve_pgvector_rejection");
+    auto* src = spec.add_operators();
+    src->set_name("query");
+    src->set_type("source");
+    auto* retrieve = spec.add_operators();
+    retrieve->set_name("retrieve");
+    retrieve->set_type("retrieve");
+    (*retrieve->mutable_params())["session_handle_id"] = "12345";
+    (*retrieve->mutable_params())["vector_store"] = "VECTOR_STORE_PGVECTOR";
+    auto* sink = spec.add_operators();
+    sink->set_name("ctx");
+    sink->set_type("sink");
+    auto* e1 = spec.add_edges();
+    e1->set_from("query.out");
+    e1->set_to("retrieve.in");
+    auto* e2 = spec.add_edges();
+    e2->set_from("retrieve.results");
+    e2->set_to("ctx.in");
+
+    SolutionRunner runner(spec);
+    CHECK(runner.start() == RAC_SUCCESS);
+    CHECK(runner.feed(Item::text("why is the sky blue?")) == RAC_SUCCESS);
+    runner.wait();
+    const char* details = rac_error_get_details();
+    CHECK(details != nullptr);
+    CHECK(std::string(details).find("VECTOR_STORE_PGVECTOR is not supported on-device") !=
+          std::string::npos);
+
+    registry.unregister_factory("retrieve");
+    rac::solutions::register_builtin_operators(registry);
+}
+
+// ---------------------------------------------------------------------------
+// 13c. RetrieveNode rejects malformed numeric params and unknown vector stores
+//      instead of falling back to defaults.
+// ---------------------------------------------------------------------------
+TEST(retrieve_rejects_malformed_params) {
+    auto& registry = OperatorRegistry::instance();
+    static_cast<void>(rac::solutions::register_engine_backed_operators(registry));
+
+    struct Case {
+        const char* key;
+        const char* value;
+        const char* expected;
+    };
+    const Case cases[] = {
+        {"k", "30junk", "fully-numeric"},
+        {"bm25_k1", "0,8", "fully-numeric"},
+        {"bm25_k1", "inf", "fully-numeric"},
+        {"bm25_b", "100", "0.0...1.0"},
+        {"rrf_k", "-5", "rrf_k"},
+        {"rrf_k", "0", "rrf_k"},
+        {"bm25_k1", "0", "bm25_k1"},
+        {"bm25_b", "-0.5", "0.0...1.0"},
+        {"k", "0", "'k' must be >= 1"},
+        {"similarity_threshold", "1.5", "similarity_threshold"},
+        {"vector_store", "PGVECTOR", "unknown vector_store"},
+        {"vector_store", "usearch ", "unknown vector_store"},
+    };
+    for (const Case& c : cases) {
+        // A case that records no detail must not pass on the previous case's message.
+        rac_error_clear_details();
+        PipelineSpec spec;
+        spec.set_name("retrieve_param_rejection");
+        auto* src = spec.add_operators();
+        src->set_name("query");
+        src->set_type("source");
+        auto* retrieve = spec.add_operators();
+        retrieve->set_name("retrieve");
+        retrieve->set_type("retrieve");
+        (*retrieve->mutable_params())["session_handle_id"] = "12345";
+        (*retrieve->mutable_params())[c.key] = c.value;
+        auto* sink = spec.add_operators();
+        sink->set_name("ctx");
+        sink->set_type("sink");
+        auto* e1 = spec.add_edges();
+        e1->set_from("query.out");
+        e1->set_to("retrieve.in");
+        auto* e2 = spec.add_edges();
+        e2->set_from("retrieve.results");
+        e2->set_to("ctx.in");
+
+        SolutionRunner runner(spec);
+        CHECK(runner.start() == RAC_SUCCESS);
+        CHECK(runner.feed(Item::text("why is the sky blue?")) == RAC_SUCCESS);
+        runner.wait();
+        const char* details = rac_error_get_details();
+        CHECK(details != nullptr);
+        CHECK(std::string(details).find(c.expected) != std::string::npos);
+    }
+
+    registry.unregister_factory("retrieve");
+    rac::solutions::register_builtin_operators(registry);
+}
+
+// ---------------------------------------------------------------------------
 // 14. Null / invalid handle paths.
 // ---------------------------------------------------------------------------
 TEST(null_handle_paths) {
@@ -1417,11 +1598,14 @@ int main() {
     run_test_voice_agent_explicit_zero_temperature_reaches_llm_operator();
     run_test_rag_solution_compiles();
     run_test_rag_retrieval_params_reach_the_retrieve_operator();
+    run_test_rag_yaml_explicit_zero_tuning_reaches_the_retrieve_operator();
     run_test_c_abi_proto_bytes_lifecycle();
     run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_c_abi_yaml_solution_lifecycle();
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();
+    run_test_retrieve_pgvector_is_rejected();
+    run_test_retrieve_rejects_malformed_params();
     run_test_null_handle_paths();
 
     std::fprintf(stderr, "\n%d passed / %d failed\n", g_passed, g_failed);
