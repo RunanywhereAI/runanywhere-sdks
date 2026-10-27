@@ -72,6 +72,12 @@ function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQuery
         `RagRetrievalOptions.vectorStore must be 'usearch' (the only on-device store); got ${String(vectorStore)}`,
       );
     }
+    const rrfK = options.retrieval?.rrfK;
+    if (rrfK !== undefined && (!Number.isInteger(rrfK) || rrfK < -(2 ** 31) || rrfK >= 2 ** 31)) {
+      throw SDKException.invalidConfiguration(
+        `RagRetrievalOptions.rrfK must be an int32 integer; got ${String(rrfK)}`,
+      );
+    }
     return {
       retrieval: {
         topK: options.retrieval?.topK,
@@ -147,9 +153,9 @@ function createSession(): RagSession {
     queryStream(question: string, options?: RagQueryOptions | LlmOptions): AsyncIterable<RagEvent> {
       requireOpen(session, 'queryStream');
       return (async function* answer(): AsyncGenerator<RagEvent> {
-        const events = ragQueryStream(question, normalizeQueryOptions(options));
         let announcedSources = false;
         try {
+          const events = ragQueryStream(question, normalizeQueryOptions(options));
           for await (const event of events) {
             if (event.error) {
               yield { type: 'failed', error: event.error };
