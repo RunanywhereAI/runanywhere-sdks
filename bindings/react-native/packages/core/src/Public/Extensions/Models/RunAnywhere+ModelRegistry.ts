@@ -133,6 +133,8 @@ export interface RegisterMultiFileModelInput {
   framework: InferenceFramework;
   modality?: ModelCategory;
   memoryRequirement?: number;
+  /** Exact aggregate artifact bytes, independent from runtime RAM. */
+  downloadSize?: number;
   /**
    * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
    * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
@@ -365,6 +367,9 @@ export async function registerMultiFileModel(
       ? {
           memoryRequiredBytes: input.memoryRequirement,
         }
+      : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
       : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     // ModelFileDescriptor.isRequired was renamed isOptional — NOT a bare

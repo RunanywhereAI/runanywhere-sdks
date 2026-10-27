@@ -13,6 +13,7 @@ import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
 import ai.runanywhere.proto.v1.LoraApplyResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
@@ -43,69 +44,75 @@ object CppBridgeLoraRegistry {
     suspend fun apply(request: RALoRAApplyRequest): LoraApplyResult =
         decodeOrThrow(
             LoraApplyResult.ADAPTER,
-            RunAnywhereBridge.racLoraApplyProto(request.encode()),
+            withNativeProtoFailure { RunAnywhereBridge.racLoraApplyProto(request.encode()) },
             "racLoraApplyProto",
         )
 
     suspend fun remove(request: RALoRARemoveRequest): RALoRAState =
         decodeOrThrow(
             RALoRAState.ADAPTER,
-            RunAnywhereBridge.racLoraRemoveProto(request.encode()),
+            withNativeProtoFailure { RunAnywhereBridge.racLoraRemoveProto(request.encode()) },
             "racLoraRemoveProto",
         )
 
     suspend fun list(request: RALoRAState): RALoRAState =
         decodeOrThrow(
             RALoRAState.ADAPTER,
-            RunAnywhereBridge.racLoraListProto(request.encode()),
+            withNativeProtoFailure { RunAnywhereBridge.racLoraListProto(request.encode()) },
             "racLoraListProto",
         )
 
     suspend fun state(request: RALoRAState): RALoRAState =
         decodeOrThrow(
             RALoRAState.ADAPTER,
-            RunAnywhereBridge.racLoraStateProto(request.encode()),
+            withNativeProtoFailure { RunAnywhereBridge.racLoraStateProto(request.encode()) },
             "racLoraStateProto",
         )
 
     suspend fun compatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult =
         decodeOrThrow(
             LoraCompatibilityResult.ADAPTER,
-            RunAnywhereBridge.racLoraCompatibilityProto(config.encode()),
+            withNativeProtoFailure { RunAnywhereBridge.racLoraCompatibilityProto(config.encode()) },
             "racLoraCompatibilityProto",
         )
 
     fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry =
         decodeOrThrow(
             LoraAdapterCatalogEntry.ADAPTER,
-            RunAnywhereBridge.racLoraRegisterProto(LoraAdapterCatalogEntry.ADAPTER.encode(entry)),
+            withNativeProtoFailure { RunAnywhereBridge.racLoraRegisterProto(LoraAdapterCatalogEntry.ADAPTER.encode(entry)) },
             "racLoraRegisterProto",
         )
 
     fun listCatalog(request: LoraAdapterCatalogListRequest): LoraAdapterCatalogListResult =
         decodeOrThrow(
             LoraAdapterCatalogListResult.ADAPTER,
-            RunAnywhereBridge.racLoraCatalogListProto(
-                LoraAdapterCatalogListRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racLoraCatalogListProto(
+                    LoraAdapterCatalogListRequest.ADAPTER.encode(request),
+                )
+            },
             "racLoraCatalogListProto",
         )
 
     fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult =
         decodeOrThrow(
             LoraAdapterCatalogListResult.ADAPTER,
-            RunAnywhereBridge.racLoraCatalogQueryProto(
-                LoraAdapterCatalogQuery.ADAPTER.encode(query),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racLoraCatalogQueryProto(
+                    LoraAdapterCatalogQuery.ADAPTER.encode(query),
+                )
+            },
             "racLoraCatalogQueryProto",
         )
 
     fun getCatalogEntry(request: LoraAdapterCatalogGetRequest): LoraAdapterCatalogGetResult =
         decodeOrThrow(
             LoraAdapterCatalogGetResult.ADAPTER,
-            RunAnywhereBridge.racLoraCatalogGetProto(
-                LoraAdapterCatalogGetRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racLoraCatalogGetProto(
+                    LoraAdapterCatalogGetRequest.ADAPTER.encode(request),
+                )
+            },
             "racLoraCatalogGetProto",
         )
 

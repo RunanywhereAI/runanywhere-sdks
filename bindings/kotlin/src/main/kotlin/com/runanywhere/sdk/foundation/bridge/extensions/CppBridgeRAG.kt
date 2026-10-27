@@ -15,6 +15,7 @@ import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGSearchResponse
 import ai.runanywhere.proto.v1.RAGStatistics
 import ai.runanywhere.proto.v1.RAGStreamEvent
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -59,10 +60,12 @@ object CppBridgeRAG {
     fun ingest(document: RARAGDocument): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagIngestProto(
-                requireSession(),
-                RAGDocument.ADAPTER.encode(document),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRagIngestProto(
+                    requireSession(),
+                    RAGDocument.ADAPTER.encode(document),
+                )
+            },
             "racRagIngestProto",
         )
 
@@ -84,14 +87,16 @@ object CppBridgeRAG {
     ): RAGResult =
         decodeOrThrow(
             RAGResult.ADAPTER,
-            RunAnywhereBridge.racRagQueryRequestProto(
-                requestId,
-                // The coordinator owns the lifecycle gate before this method
-                // is called. Capture only now so a queued query cannot retain
-                // a session that create/destroy replaces ahead of admission.
-                requireSession(),
-                request.queryProto,
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRagQueryRequestProto(
+                    requestId,
+                    // The coordinator owns the lifecycle gate before this method
+                    // is called. Capture only now so a queued query cannot retain
+                    // a session that create/destroy replaces ahead of admission.
+                    requireSession(),
+                    request.queryProto,
+                )
+            },
             "racRagQueryRequestProto",
         )
 
@@ -136,14 +141,14 @@ object CppBridgeRAG {
     fun clear(): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagClearProto(requireSession()),
+            withNativeProtoFailure { RunAnywhereBridge.racRagClearProto(requireSession()) },
             "racRagClearProto",
         )
 
     fun stats(): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagStatsProto(requireSession()),
+            withNativeProtoFailure { RunAnywhereBridge.racRagStatsProto(requireSession()) },
             "racRagStatsProto",
         )
 
@@ -169,21 +174,21 @@ object CppBridgeRAG {
     internal fun ingestOn(handle: Long, document: RARAGDocument): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagIngestProto(handle, RAGDocument.ADAPTER.encode(document)),
+            withNativeProtoFailure { RunAnywhereBridge.racRagIngestProto(handle, RAGDocument.ADAPTER.encode(document)) },
             "racRagIngestProto",
         )
 
     internal fun clearOn(handle: Long): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagClearProto(handle),
+            withNativeProtoFailure { RunAnywhereBridge.racRagClearProto(handle) },
             "racRagClearProto",
         )
 
     internal fun statsOn(handle: Long): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagStatsProto(handle),
+            withNativeProtoFailure { RunAnywhereBridge.racRagStatsProto(handle) },
             "racRagStatsProto",
         )
 
@@ -194,7 +199,7 @@ object CppBridgeRAG {
     ): RAGResult =
         decodeOrThrow(
             RAGResult.ADAPTER,
-            RunAnywhereBridge.racRagQueryRequestProto(requestId, handle, request.queryProto),
+            withNativeProtoFailure { RunAnywhereBridge.racRagQueryRequestProto(requestId, handle, request.queryProto) },
             "racRagQueryRequestProto",
         )
 
@@ -205,7 +210,7 @@ object CppBridgeRAG {
     ): RAGSearchResponse =
         decodeOrThrow(
             RAGSearchResponse.ADAPTER,
-            RunAnywhereBridge.racRagSearchRequestProto(requestId, handle, request.requestProto),
+            withNativeProtoFailure { RunAnywhereBridge.racRagSearchRequestProto(requestId, handle, request.requestProto) },
             "racRagSearchRequestProto",
         )
 
