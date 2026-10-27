@@ -76,10 +76,13 @@ public struct ReasoningOptions: Sendable {
 
 // MARK: - StructuredOutput
 
-/// Force generation to satisfy a JSON schema.
+/// Schema constraints enforced on generation according to the specified mode.
 public struct StructuredOutput: Sendable {
     /// Schema the output must validate against, as raw JSON Schema text.
     public var schema: JsonSchema
+
+    /// How the schema constraint is enforced during generation.
+    public var mode: StructuredEnforcementMode = .constrained
 
     /// Reject output that does not validate instead of returning it raw.
     ///
@@ -92,13 +95,27 @@ public struct StructuredOutput: Sendable {
     public var strict: Bool = true
 
     /// Build a structured-output constraint.
-    public init(schema: JsonSchema, strict: Bool = true) {
+    public init(
+        schema: JsonSchema,
+        strict: Bool = true,
+        mode: StructuredEnforcementMode = .constrained
+    ) {
         self.schema = schema
         self.strict = strict
+        self.mode = mode
     }
 
     func toProto() -> RAStructuredOutputOptions {
-        RAStructuredOutputOptions.defaults(schema: schema, includeSchemaInPrompt: true)
+        var proto = RAStructuredOutputOptions.defaults(schema: schema, includeSchemaInPrompt: true)
+        switch mode {
+        case .constrained:
+            proto.mode = .constrained
+        case .validationOnly:
+            proto.mode = .validationOnly
+        case .repair:
+            proto.mode = .repair
+        }
+        return proto
     }
 }
 
