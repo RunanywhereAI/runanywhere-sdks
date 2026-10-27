@@ -179,10 +179,14 @@ object CppBridgeModelRegistry {
         request: ProtoModelDiscoveryRequest = defaultDiscoveryRequest(),
     ): ProtoModelDiscoveryResult {
         val bytes =
-            withNativeProtoFailure {
-                RunAnywhereBridge.racModelRegistryDiscoverProto(
-                    ProtoModelDiscoveryRequest.ADAPTER.encode(request),
-                )
+            try {
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racModelRegistryDiscoverProto(
+                        ProtoModelDiscoveryRequest.ADAPTER.encode(request),
+                    )
+                }
+            } catch (e: SDKException) {
+                return ProtoModelDiscoveryResult(error = e.error)
             } ?: return ProtoModelDiscoveryResult(
                 error =
                     ai.runanywhere.proto.v1.SDKError(

@@ -161,7 +161,11 @@ val RAToolValue.`object`: Map<String, RAToolValue>? get() = object_value?.fields
  */
 fun RAToolValue.toJSONString(pretty: Boolean = false): String? {
     val resultBytes =
-        withNativeProtoFailure { RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) } ?: return null
+        try {
+            withNativeProtoFailure { RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) }
+        } catch (_: SDKException) {
+            return null
+        } ?: return null
     val json =
         runCatching { ToolValueJSON.ADAPTER.decode(resultBytes).json }.getOrNull() ?: return null
     if (!pretty) return json
