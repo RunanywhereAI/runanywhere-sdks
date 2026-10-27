@@ -37,9 +37,12 @@
 //     param is missing or unparseable the operator fails honestly on the
 //     first input and the runner cancels the graph.
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <locale>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -114,6 +117,53 @@ float param_float_or(const runanywhere::v1::OperatorSpec& spec, const std::strin
     } catch (...) {
         return fallback;
     }
+}
+
+// Strict variants: a key that is present and non-empty must parse in full
+// ("30junk" and "0,8" are rejected) and, for floats, be finite. Returns false
+// on malformed input so the caller can fail honestly instead of silently
+// substituting a value; an absent or empty key writes *out = fallback.
+bool param_int_strict(const runanywhere::v1::OperatorSpec& spec, const std::string& key,
+                      int fallback, int* out) {
+    *out = fallback;
+    const std::string* value = find_param(spec, key);
+    if (!value || value->empty())
+        return true;
+    try {
+        size_t pos = 0;
+        const int parsed = std::stoi(*value, &pos);
+        if (pos != value->size())
+            return false;
+        *out = parsed;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool param_float_strict(const runanywhere::v1::OperatorSpec& spec, const std::string& key,
+                        float fallback, float* out) {
+    *out = fallback;
+    const std::string* value = find_param(spec, key);
+    if (!value || value->empty())
+        return true;
+    // Parse with the classic "C" locale: std::stof follows the process locale, so a
+    // host that set a comma-decimal locale would reject "0.8" and accept "0,8".
+    std::istringstream stream(*value);
+    stream.imbue(std::locale::classic());
+    float parsed = 0.0f;
+    if (!(stream >> parsed) || stream.peek() != std::char_traits<char>::eof() ||
+        !std::isfinite(parsed)) {
+        return false;
+    }
+    *out = parsed;
+    return true;
+}
+
+// True when `key` is present with a non-empty value.
+bool has_param(const runanywhere::v1::OperatorSpec& spec, const std::string& key) {
+    const std::string* value = find_param(spec, key);
+    return value != nullptr && !value->empty();
 }
 
 // Parse an unsigned 64-bit identifier (e.g. a host-provided session handle)
@@ -739,16 +789,55 @@ class RetrieveNode final : public OperatorNode {
     RetrieveNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
         : PipelineNode(std::move(name), /*input*/ 8, /*output*/ 8, OverflowPolicy::BlockProducer),
           model_id_(spec.model_id()),
-          retrieval_top_k_(param_int_or(spec, "k", 0)),
-          similarity_threshold_(param_float_or(spec, "similarity_threshold", 0.0f)),
           has_session_handle_(param_uint64(spec, "session_handle_id", &session_handle_id_)) {
+        const bool numeric_ok = param_int_strict(spec, "k", 0, &retrieval_top_k_) &&
+                                param_float_strict(spec, "similarity_threshold", 0.0f,
+                                                   &similarity_threshold_) &&
+                                param_float_strict(spec, "bm25_k1", 0.0f, &bm25_k1_) &&
+                                param_float_strict(spec, "bm25_b", -1.0f, &bm25_b_) &&
+                                param_int_strict(spec, "rrf_k", 0, &rrf_k_);
+        if (!numeric_ok) {
+            param_error_ =
+                "retrieve params 'k', 'similarity_threshold', 'bm25_k1', 'bm25_b' and 'rrf_k' "
+                "must be fully-numeric finite values";
+        } else if (has_param(spec, "k") && retrieval_top_k_ < 1) {
+            param_error_ = "retrieve param 'k' must be >= 1";
+        } else if (has_param(spec, "similarity_threshold") &&
+                   (similarity_threshold_ < 0.0f || similarity_threshold_ > 1.0f)) {
+            param_error_ = "retrieve param 'similarity_threshold' must be in 0.0...1.0";
+        } else if (bm25_k1_ < 0.0f) {
+            param_error_ = "retrieve param 'bm25_k1' must be >= 0";
+        } else if (has_param(spec, "bm25_b") && (bm25_b_ < 0.0f || bm25_b_ > 1.0f)) {
+            param_error_ = "retrieve param 'bm25_b' must be in 0.0...1.0";
+        } else if (rrf_k_ < 0) {
+            param_error_ = "retrieve param 'rrf_k' must be >= 0";
+        }
         if (const std::string* p = find_param(spec, "system_prompt"); p) {
             system_prompt_ = *p;
+        }
+        if (const std::string* vs = find_param(spec, "vector_store"); vs) {
+            vector_store_ = *vs;
         }
     }
 
    protected:
     void process(Item item, OutputEdge& out) override {
+        if (!param_error_.empty()) {
+            set_error_detail(name(), param_error_);
+            cancel_graph(this->cancel_token());
+            return;
+        }
+        if (!vector_store_.empty() && vector_store_ != "VECTOR_STORE_USEARCH" &&
+            vector_store_ != "usearch") {
+            const bool pgvector =
+                vector_store_ == "VECTOR_STORE_PGVECTOR" || vector_store_ == "pgvector";
+            set_error_detail(name(), pgvector ? "VECTOR_STORE_PGVECTOR is not supported "
+                                                "on-device; only VECTOR_STORE_USEARCH is supported"
+                                              : "unknown vector_store '" + vector_store_ +
+                                                    "'; only VECTOR_STORE_USEARCH is supported");
+            cancel_graph(this->cancel_token());
+            return;
+        }
         if (!has_session_handle_) {
             set_error_detail(name(),
                              "retrieve requires OperatorSpec.params['session_handle_id'] "
@@ -784,6 +873,18 @@ class RetrieveNode final : public OperatorNode {
         }
         if (similarity_threshold_ > 0.0f) {
             request.mutable_retrieval()->set_score_threshold(similarity_threshold_);
+        }
+        if (bm25_k1_ > 0.0f) {
+            request.mutable_retrieval()->set_bm25_k1(bm25_k1_);
+        }
+        if (bm25_b_ >= 0.0f) {
+            request.mutable_retrieval()->set_bm25_b(bm25_b_);
+        }
+        if (rrf_k_ > 0) {
+            request.mutable_retrieval()->set_rrf_k(rrf_k_);
+        }
+        if (!vector_store_.empty()) {
+            request.mutable_retrieval()->set_vector_store(runanywhere::v1::VECTOR_STORE_USEARCH);
         }
         // Per the RAG service contract, retrieve does not generate. Setting
         // max_tokens to 0 still produces a RAGResult with retrieved_chunks
@@ -858,8 +959,13 @@ class RetrieveNode final : public OperatorNode {
 
    private:
     std::string model_id_;
-    int retrieval_top_k_;
-    float similarity_threshold_;
+    int retrieval_top_k_{0};
+    float similarity_threshold_{0.0f};
+    float bm25_k1_{0.0f};
+    float bm25_b_{-1.0f};
+    int rrf_k_{0};
+    std::string vector_store_;
+    std::string param_error_;
     std::uint64_t session_handle_id_{0};
     bool has_session_handle_{false};
     std::string system_prompt_;

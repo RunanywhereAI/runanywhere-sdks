@@ -22,12 +22,14 @@ namespace rag {
  * @brief Reciprocal Rank Fusion over an arbitrary set of ranked id lists
  * (dense + BM25 for the original query and every multi-query variant).
  *
- * Score for an id = sum over rankings of 1/(k + rank), k=60, rank 1-based.
+ * Score for an id = sum over rankings of 1/(k + rank), rank 1-based, k = `rrf_k`
+ * (the RAG config / per-query override); a non-positive `rrf_k` falls back to 60.
  * Results are sorted by score, truncated to top_k, normalized into [0,1], and
  * materialized (text + metadata) from `vector_store` when non-null.
  */
 std::vector<SearchResult> fuse_rankings(const std::vector<std::vector<std::string>>& rankings,
-                                        const VectorStoreUSearch* vector_store, size_t top_k);
+                                        const VectorStoreUSearch* vector_store, size_t top_k,
+                                        int32_t rrf_k = 60);
 
 /**
  * @brief Parse an LLM query-rewrite response into up to `count` variants.
