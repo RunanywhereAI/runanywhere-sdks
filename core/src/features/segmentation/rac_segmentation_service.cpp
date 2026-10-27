@@ -191,7 +191,7 @@ rac_result_t rac::segmentation::create_service(const char* model_id, const char*
     try {
         auto& registry = provider_registry();
         std::lock_guard<std::mutex> lock(registry.mutex);
-        registry.providers.emplace(service, provider);
+        registry.providers.insert_or_assign(service, provider);
     } catch (...) {
         rac_segmentation_destroy(service);
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -272,14 +272,17 @@ void rac_segmentation_destroy(rac_handle_t handle) {
     auto* service = static_cast<rac_segmentation_service_t*>(handle);
     // Keep the lease through the engine's final destructor callback.
     auto provider = rac::segmentation::service_provider(handle);
+    {
+        // Remove the key before freeing the address for another service to reuse.
+        auto& registry = provider_registry();
+        std::lock_guard<std::mutex> lock(registry.mutex);
+        registry.providers.erase(handle);
+    }
     if (service->ops && service->ops->destroy) {
         service->ops->destroy(service->impl);
     }
     std::free(const_cast<char*>(service->model_id));
     std::free(service);
-    auto& registry = provider_registry();
-    std::lock_guard<std::mutex> lock(registry.mutex);
-    registry.providers.erase(handle);
 }
 
 void rac_segmentation_result_free(rac_segmentation_result_t* result) {

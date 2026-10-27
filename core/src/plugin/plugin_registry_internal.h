@@ -32,23 +32,14 @@ extern "C" {
 #endif
 
 /**
- * Associate a `dlopen` handle with a registered plugin name. Called by the
- * loader immediately after `rac_plugin_register` succeeds. Replaces any
- * previously-stored handle for the same name (the previous one's `dlclose`
- * is the caller's responsibility).
- *
- * Pass `handle = NULL` to clear the association without unregistering.
+ * Register a dynamic plugin and transfer its OS handle under the registry lock.
+ * On success, the registry owns `handle` and returns the replaced handle (if any)
+ * through `out_previous_handle`; the loader closes it after the unload callback.
+ * On failure, the caller retains `handle` and no handle ownership is transferred.
  */
-void rac_plugin_registry_set_dl_handle(const char* name, void* handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
-
-/**
- * Pop the dlopen handle associated with `name` (returns `NULL` if there is
- * none, e.g. for statically-registered plugins). Used by the loader when
- * replacing a plugin after successful registration. Unload uses the atomic
- * unregister-and-transfer operation below. After this call the registry no
- * longer tracks the handle.
- */
-void* rac_plugin_registry_take_dl_handle(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+rac_result_t
+rac_plugin_registry_register_dynamic(const rac_engine_vtable_t* vtable, void* handle,
+                                     void** out_previous_handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /** Atomically remove an idle plugin and return its OS handle to the loader.
  * A model lease returns RAC_ERROR_PLUGIN_BUSY without removing any state.

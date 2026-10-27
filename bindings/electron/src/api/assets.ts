@@ -1434,7 +1434,9 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
           pixelCount: c.pixelCount,
           fraction: c.fraction ?? 0,
         })),
-        confidenceMask: native.confidenceMaskU8,
+        ...(native.confidenceMaskU8?.byteLength
+          ? { confidenceMask: native.confidenceMaskU8 }
+          : {}),
       };
     },
   };

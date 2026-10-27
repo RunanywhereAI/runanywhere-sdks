@@ -537,17 +537,25 @@ rac_result_t ONNXSegmentationProvider::segment(
                 const float bottom = logit_at(plane + y1 * logits_width + x0) * (1.0f - wx) +
                                      logit_at(plane + y1 * logits_width + x1) * wx;
                 const float value = top * (1.0f - wy) + bottom * wy;
+                if (out_confidence && !std::isfinite(value)) {
+                    rac_segmentation_result_free(out_result);
+                    std::free(out_confidence->data);
+                    *out_confidence = RAC_SEGMENTATION_CONFIDENCE_MASK_DEFAULT;
+                    return RAC_ERROR_MODEL_VALIDATION_FAILED;
+                }
                 if (value > best_value) {
                     if (out_confidence) {
                         probability_denominator =
                             std::isfinite(best_value)
-                                ? probability_denominator * std::exp(best_value - value) + 1.0
+                                ? probability_denominator *
+                                          std::exp(static_cast<double>(best_value) - value) +
+                                      1.0
                                 : 1.0;
                     }
                     best_value = value;
                     best_class = static_cast<uint16_t>(class_id);
                 } else if (out_confidence) {
-                    probability_denominator += std::exp(value - best_value);
+                    probability_denominator += std::exp(static_cast<double>(value) - best_value);
                 }
             }
             const size_t pixel_index = y * image.width + x;
