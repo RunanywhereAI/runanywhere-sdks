@@ -320,12 +320,86 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
         bc.prompt_template = proto.prompt_template();
     bc.rerank = proto.rerank_results();
     bc.embedding_model_id = proto.embedding_model_id();
+    if (proto.has_bm25_k1() && proto.bm25_k1() > 0.0f)
+        bc.bm25_k1 = proto.bm25_k1();
+    if (proto.has_bm25_b() && proto.bm25_b() >= 0.0f)
+        bc.bm25_b = proto.bm25_b();
+    if (proto.has_rrf_k() && proto.rrf_k() > 0)
+        bc.rrf_k = proto.rrf_k();
     return bc;
+}
+
+// Rejects non-finite or out-of-range BM25 / RRF tuning values at the ABI boundary:
+// b outside [0, 1] or an infinite k1 makes every BM25 score drop out of the
+// `score > 0` filter (negative or NaN), which would silently return no hits.
+bool validate_bm25_rrf_params(bool has_k1, float k1, bool has_b, float b, bool has_rrf_k,
+                              int32_t rrf_k, const char* owner, std::string* out_message) {
+    const auto fail = [&](const char* detail) {
+        if (out_message)
+            *out_message = std::string(owner) + "." + detail;
+        return false;
+    };
+    if (has_k1 && (!std::isfinite(k1) || k1 < 0.0f))
+        return fail("bm25_k1 must be a finite value >= 0");
+    if (has_b && (!std::isfinite(b) || b < 0.0f || b > 1.0f))
+        return fail("bm25_b must be a finite value in 0.0...1.0");
+    if (has_rrf_k && rrf_k < 0)
+        return fail("rrf_k must be >= 0");
+    return true;
+}
+
+// Only the in-process USearch store exists on-device. PGVECTOR is a known server-only store
+// (NOT_SUPPORTED); any other value -- proto3 keeps unknown enum numbers -- is rejected as an
+// invalid argument instead of silently running against USearch.
+rac_result_t check_vector_store(bool has_vector_store, runanywhere::v1::VectorStore store,
+                                std::string* out_message) {
+    if (!has_vector_store || store == runanywhere::v1::VECTOR_STORE_UNSPECIFIED ||
+        store == runanywhere::v1::VECTOR_STORE_USEARCH) {
+        return RAC_SUCCESS;
+    }
+    if (store == runanywhere::v1::VECTOR_STORE_PGVECTOR) {
+        if (out_message) {
+            *out_message = "VECTOR_STORE_PGVECTOR is not supported on-device; only "
+                           "VECTOR_STORE_USEARCH is supported";
+        }
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (out_message) {
+        *out_message = "unknown vector_store value " + std::to_string(static_cast<int>(store)) +
+                       "; only VECTOR_STORE_USEARCH is supported";
+    }
+    return RAC_ERROR_INVALID_ARGUMENT;
+}
+
+// Per-query top_k and score_threshold. The session config bounds both, but the per-query path
+// copied them through unchecked, so a bad value silently mis-retrieved. top_k == 0 stays the
+// "use the session default" value every SDK already sends; only a negative top_k is an error.
+bool validate_retrieval_bounds(const runanywhere::v1::RAGRetrievalOptions& retrieval,
+                               std::string* out_message) {
+    if (retrieval.has_top_k() && retrieval.top_k() < 0) {
+        if (out_message)
+            *out_message = "RAGRetrievalOptions.top_k must be >= 0 (0 uses the session default)";
+        return false;
+    }
+    if (retrieval.has_score_threshold()) {
+        const float threshold = retrieval.score_threshold();
+        if (!std::isfinite(threshold) || threshold < 0.0f || threshold > 1.0f) {
+            if (out_message)
+                *out_message = "RAGRetrievalOptions.score_threshold must be in 0.0...1.0";
+            return false;
+        }
+    }
+    return true;
 }
 
 bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
                                 std::string* out_message) {
     const RAGBackendConfig defaults;
+
+    if (check_vector_store(proto.has_vector_store(), proto.vector_store(), out_message) !=
+        RAC_SUCCESS) {
+        return false;
+    }
 
     if (proto.has_embedding_dimension() && proto.embedding_dimension() < 1) {
         if (out_message)
@@ -374,7 +448,9 @@ bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
         return false;
     }
 
-    return true;
+    return validate_bm25_rrf_params(proto.has_bm25_k1(), proto.bm25_k1(), proto.has_bm25_b(),
+                                    proto.bm25_b(), proto.has_rrf_k(), proto.rrf_k(),
+                                    "RAGConfiguration", out_message);
 }
 
 runanywhere::v1::RAGStatistics make_stats(RAGBackend& backend) {
@@ -487,6 +563,27 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     }
     if (retrieval.has_scope_prefix())
         overrides.scope_prefix = retrieval.scope_prefix();
+
+    if (const rac_result_t store_rc =
+            check_vector_store(retrieval.has_vector_store(), retrieval.vector_store(), out_error);
+        store_rc != RAC_SUCCESS) {
+        return store_rc;
+    }
+    if (!validate_retrieval_bounds(retrieval, out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (!validate_bm25_rrf_params(retrieval.has_bm25_k1(), retrieval.bm25_k1(),
+                                  retrieval.has_bm25_b(), retrieval.bm25_b(),
+                                  retrieval.has_rrf_k(), retrieval.rrf_k(),
+                                  "RAGRetrievalOptions", out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (retrieval.has_bm25_k1())
+        overrides.bm25_k1 = retrieval.bm25_k1();
+    if (retrieval.has_bm25_b())
+        overrides.bm25_b = retrieval.bm25_b();
+    if (retrieval.has_rrf_k())
+        overrides.rrf_k = retrieval.rrf_k();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.query", 0.0f, 1, 0, nullptr, 0.0,
@@ -673,6 +770,27 @@ rac_result_t execute_rag_search(const std::shared_ptr<Session>& s,
     }
     if (retrieval.has_scope_prefix())
         overrides.scope_prefix = retrieval.scope_prefix();
+
+    if (const rac_result_t store_rc =
+            check_vector_store(retrieval.has_vector_store(), retrieval.vector_store(), out_error);
+        store_rc != RAC_SUCCESS) {
+        return store_rc;
+    }
+    if (!validate_retrieval_bounds(retrieval, out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (!validate_bm25_rrf_params(retrieval.has_bm25_k1(), retrieval.bm25_k1(),
+                                  retrieval.has_bm25_b(), retrieval.bm25_b(),
+                                  retrieval.has_rrf_k(), retrieval.rrf_k(),
+                                  "RAGRetrievalOptions", out_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (retrieval.has_bm25_k1())
+        overrides.bm25_k1 = retrieval.bm25_k1();
+    if (retrieval.has_bm25_b())
+        overrides.bm25_b = retrieval.bm25_b();
+    if (retrieval.has_rrf_k())
+        overrides.rrf_k = retrieval.rrf_k();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.search", 0.0f, 1, 0, nullptr, 0.0, s->embedding_model_id.c_str());

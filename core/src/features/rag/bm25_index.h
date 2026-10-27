@@ -26,12 +26,14 @@ class BM25Index {
     void clear();
     size_t size() const;
 
-    /// Returns (chunk_id, bm25_score) sorted descending by score
-    std::vector<std::pair<std::string, float>> search(const std::string& query, size_t top_k) const;
+    /// Returns (chunk_id, bm25_score) sorted descending by score.
+    /// k1 and b parameterize term frequency saturation and document length normalization.
+    std::vector<std::pair<std::string, float>> search(const std::string& query, size_t top_k,
+                                                      float k1 = 1.2f, float b = 0.75f) const;
 
    private:
-    static constexpr float k1_ = 1.2f;
-    static constexpr float b_ = 0.75f;
+    static constexpr float kDefaultK1_ = 1.2f;
+    static constexpr float kDefaultB_ = 0.75f;
 
     std::vector<std::string> tokenize(const std::string& text) const;
 
