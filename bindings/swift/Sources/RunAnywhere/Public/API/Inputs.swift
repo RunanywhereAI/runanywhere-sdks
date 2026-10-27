@@ -673,6 +673,8 @@ public struct ModelRegistration: Sendable {
     public var memoryRequirementBytes: Int64?
     public var downloadSizeBytes: Int64?
     public var contextLength: Int?
+    public var source: ModelSource
+    public var description: String?
     public var supportsThinking: Bool
     public var supportsLora: Bool
 
@@ -690,6 +692,8 @@ public struct ModelRegistration: Sendable {
         memoryRequirementBytes: Int64?,
         downloadSizeBytes: Int64?,
         contextLength: Int?,
+        source: ModelSource,
+        description: String?,
         supportsThinking: Bool,
         supportsLora: Bool,
         cuaProfile: String? = nil
@@ -702,6 +706,8 @@ public struct ModelRegistration: Sendable {
         self.memoryRequirementBytes = memoryRequirementBytes
         self.downloadSizeBytes = downloadSizeBytes
         self.contextLength = contextLength
+        self.source = source
+        self.description = description
         self.supportsThinking = supportsThinking
         self.supportsLora = supportsLora
         self.cuaProfile = cuaProfile
@@ -715,6 +721,10 @@ public struct ModelRegistration: Sendable {
         category: ModelCategory = .language,
         id: String? = nil,
         memoryRequirementBytes: Int64? = nil,
+        downloadSizeBytes: Int64? = nil,
+        contextLength: Int? = nil,
+        source: ModelSource = .remote,
+        description: String? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false,
         cuaProfile: String? = nil
@@ -726,8 +736,10 @@ public struct ModelRegistration: Sendable {
             framework: framework,
             category: category,
             memoryRequirementBytes: memoryRequirementBytes,
-            downloadSizeBytes: nil,
-            contextLength: nil,
+            downloadSizeBytes: downloadSizeBytes,
+            contextLength: contextLength,
+            source: source,
+            description: description,
             supportsThinking: supportsThinking,
             supportsLora: supportsLora,
             cuaProfile: cuaProfile
@@ -744,6 +756,10 @@ public struct ModelRegistration: Sendable {
         archiveType: RAArchiveType? = nil,
         id: String? = nil,
         memoryRequirementBytes: Int64? = nil,
+        downloadSizeBytes: Int64? = nil,
+        contextLength: Int? = nil,
+        source: ModelSource = .remote,
+        description: String? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false,
         cuaProfile: String? = nil
@@ -755,8 +771,10 @@ public struct ModelRegistration: Sendable {
             framework: framework,
             category: category,
             memoryRequirementBytes: memoryRequirementBytes,
-            downloadSizeBytes: nil,
-            contextLength: nil,
+            downloadSizeBytes: downloadSizeBytes,
+            contextLength: contextLength,
+            source: source,
+            description: description,
             supportsThinking: supportsThinking,
             supportsLora: supportsLora,
             cuaProfile: cuaProfile
@@ -773,7 +791,10 @@ public struct ModelRegistration: Sendable {
         memoryRequirementBytes: Int64? = nil,
         downloadSizeBytes: Int64? = nil,
         contextLength: Int? = nil,
+        source: ModelSource = .remote,
+        description: String? = nil,
         supportsThinking: Bool = false,
+        supportsLora: Bool = false,
         cuaProfile: String? = nil
     ) -> ModelRegistration {
         ModelRegistration(
@@ -785,8 +806,10 @@ public struct ModelRegistration: Sendable {
             memoryRequirementBytes: memoryRequirementBytes,
             downloadSizeBytes: downloadSizeBytes,
             contextLength: contextLength,
+            source: source,
+            description: description,
             supportsThinking: supportsThinking,
-            supportsLora: false,
+            supportsLora: supportsLora,
             cuaProfile: cuaProfile
         )
     }
