@@ -153,7 +153,7 @@ export class SDKException extends Error {
   }
 
   /** Build from a decoded proto `SDKError` payload (the D5 structured-error field). */
-  static fromProto(error: SDKError): SDKException {
+  static fromProto(error: SDKError, sdkError?: Uint8Array): SDKException {
     return fromStructuredError({
       code: error.code,
       message: error.message,
@@ -166,7 +166,7 @@ export class SDKException extends Error {
       requestId: error.requestId,
       severity: error.severity,
       timestampMs: error.timestampMs,
-      sdkError: SDKError.encode(error).finish(),
+      sdkError: sdkError ?? SDKError.encode(error).finish(),
     }, true);
   }
 
@@ -278,13 +278,19 @@ function fromSerializedSdkError(value: unknown, contextualMessage?: string): SDK
   if (!(value instanceof Uint8Array) || value.length === 0) return null;
   try {
     const proto = SDKError.decode(value);
-    // Keep operation/backend context alongside the canonical code-level message.
-    if (contextualMessage && proto.message !== contextualMessage) {
-      proto.message = proto.message
+    // Keep the native bytes untouched: they may contain fields this SDK does
+    // not know yet. Context belongs on the display exception, not in the wire
+    // payload. If it already contains the proto message, this is a second decode
+    // of an RPC error and adding the suffix again would duplicate it.
+    const exception = SDKException.fromProto(proto, value);
+    if (contextualMessage && !contextualMessage.includes(proto.message)) {
+      exception.message = proto.message
         ? `${contextualMessage} (${proto.message})`
         : contextualMessage;
+    } else if (contextualMessage) {
+      exception.message = contextualMessage;
     }
-    return SDKException.fromProto(proto);
+    return exception;
   } catch {
     return null;
   }

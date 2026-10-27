@@ -184,6 +184,8 @@ test('asSDKException prefers structured native fields over UNKNOWN', () => {
     assert.equal(structured.cAbiCode, -111);
     assert.equal(structured.nestedMessage, 'backend cause');
     assert.equal(structured.fieldPath, 'model');
+    assert.deepEqual(structured.sdkError, sdkError);
+    assert.equal(asSDKException(structured).message, expected);
   }
 });
 

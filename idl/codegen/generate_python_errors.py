@@ -90,7 +90,13 @@ def category_ranges() -> list[tuple[int, int, str]]:
     for line in manifest.read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.lstrip().startswith("//"):
             continue
-        match = re.fullmatch(r"RAC_ERROR_CATEGORY_RANGE\((\d+), (\d+), ([A-Z]+)\)", line)
+        macro = line.split("//", 1)[0].strip()
+        if not macro:
+            continue
+        match = re.fullmatch(
+            r"RAC_ERROR_CATEGORY_RANGE\(\s*(\d+)\s*,\s*(\d+)\s*,\s*([A-Z]+)\s*\)",
+            macro,
+        )
         if match is None:
             raise ValueError(f"Invalid error-category range: {line}")
         first, last, category = match.groups()

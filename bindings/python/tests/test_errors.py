@@ -79,10 +79,9 @@ def test_error_category_values():
 def test_category_for_code_matches_canonical_range_boundaries(
     first, last, category
 ):
-    assert category_for_code(first) == category
-    assert category_for_code(last) == category
-    assert category_for_code(-first) == category
-    assert category_for_code(-last) == category
+    for code in range(first, last + 1):
+        assert category_for_code(code) == category
+        assert category_for_code(-code) == category
 
 
 def test_category_for_code_preserves_zero_and_out_of_range_cases():
