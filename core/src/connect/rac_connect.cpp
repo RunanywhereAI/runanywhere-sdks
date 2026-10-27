@@ -897,7 +897,8 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes, size_t
     } else if (!request.peer_capability().instance_id().empty() &&
                request.peer_capability().instance_id() != request.instance_id()) {
         response.set_accepted(false);
-        response.set_rejection_reason("Peer capability instance_id does not match request identity");
+        response.set_rejection_reason(
+            "Peer capability instance_id does not match request identity");
     } else if (find_platform_policy(request.peer_capability().platform()) == nullptr) {
         response.set_accepted(false);
         response.set_rejection_reason("Peer capability has an unknown platform");
