@@ -609,7 +609,11 @@ export const WebModelLifecycle = {
     const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
     const { adapter } = selectModelLoadRoute(request, snapshot);
     const result = adapter.load(request);
-    if (result && !result.error) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    if (result && !result.error) {
+      clearModelOwnedByBackendWorker(request.modelId, 'llamacpp');
+      clearModelOwnedByBackendWorker(request.modelId, 'onnx');
+      recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    }
     return result;
   },
 
@@ -717,7 +721,8 @@ export const WebModelLifecycle = {
 
       const result = await adapter.loadAsync(request);
       if (result && !result.error) {
-        clearModelOwnedByBackendWorker(request.modelId);
+        clearModelOwnedByBackendWorker(request.modelId, 'llamacpp');
+        clearModelOwnedByBackendWorker(request.modelId, 'onnx');
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
       }
       return result;
@@ -747,7 +752,8 @@ export const WebModelLifecycle = {
       if (workerResult) return workerResult;
       const result = await retryAdapter.loadAsync(request);
       if (result && !result.error) {
-        clearModelOwnedByBackendWorker(request.modelId);
+        clearModelOwnedByBackendWorker(request.modelId, 'llamacpp');
+        clearModelOwnedByBackendWorker(request.modelId, 'onnx');
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(retryAdapter), true);
       }
       return result;

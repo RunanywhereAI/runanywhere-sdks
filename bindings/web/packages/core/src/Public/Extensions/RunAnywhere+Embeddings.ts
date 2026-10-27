@@ -112,6 +112,7 @@ async function ensureLoaded(modelID: string): Promise<InferenceFramework | undef
   const result: ModelLoadResult | null = await WebModelLifecycle.loadModelAsync({
     modelId: modelID,
     category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    framework: requestedFramework,
     forceReload: true,
     validateAvailability: true,
     backendPreferences: [],
