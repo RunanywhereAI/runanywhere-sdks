@@ -1,10 +1,10 @@
 import {
   InferenceFramework,
   ModelCategory,
-  type ModelInfo,
   ModelSource,
-  RegisterModelFromUrlRequest,
+  type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
+import type { ModelRegistration } from '@runanywhere/core';
 
 const HNPU_DESCRIPTION = 'Qualcomm Hexagon NPU model bundle.';
 
@@ -19,9 +19,9 @@ export type NpuBundle = Readonly<{
 }>;
 
 /**
- * App-owned QHexRT catalog. Keep this in lockstep with the Kotlin Android
- * example: native QHexRT owns device probing, per-model architecture/auth
- * policy, and chip-folder selection; the example owns URLs and presentation.
+ * App-owned QHexRT examples. Each URL points at a dedicated model artifact and
+ * is registered unchanged through the core SDK. QHexRT does not select models
+ * or rewrite URLs.
  */
 export const NPU_BUNDLES: readonly NpuBundle[] = [
   {
@@ -386,23 +386,26 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
 ];
 
-export function toNpuRegistrationRequest(
+/** Preserve caller-owned QHexRT metadata through the shared registration API. */
+export function toNpuModelRegistration(
   bundle: NpuBundle
-): RegisterModelFromUrlRequest {
-  return RegisterModelFromUrlRequest.fromPartial({
+): ModelRegistration {
+  return {
     id: bundle.id,
     name: bundle.name,
     url: bundle.url,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
     category: bundle.modality,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
-    memoryRequiredBytes: bundle.estimatedSizeBytes,
+    memoryRequirementBytes: bundle.estimatedSizeBytes,
     downloadSizeBytes: bundle.estimatedSizeBytes,
-    contextLength: bundle.contextLength,
+    ...(bundle.contextLength !== undefined
+      ? { contextLength: bundle.contextLength }
+      : {}),
+    source: ModelSource.MODEL_SOURCE_REMOTE,
+    description: HNPU_DESCRIPTION,
     supportsThinking: bundle.supportsThinking ?? false,
     supportsLora: false,
-    description: HNPU_DESCRIPTION,
-  });
+  };
 }
 
 export type NpuCatalogSnapshot = Readonly<{
@@ -435,7 +438,7 @@ export function subscribeNpuCatalog(listener: () => void): () => void {
   return () => npuCatalogListeners.delete(listener);
 }
 
-/** Keep ordinary rows and only QHexRT rows accepted by native registration. */
+/** Keep ordinary rows and QHexRT rows successfully registered by the app. */
 export function isVisibleForNativeNpuCatalog(
   model: Pick<ModelInfo, 'id' | 'framework' | 'preferredFramework'>,
   registeredNpuIds: ReadonlySet<string> = npuCatalogSnapshot.registeredModelIds

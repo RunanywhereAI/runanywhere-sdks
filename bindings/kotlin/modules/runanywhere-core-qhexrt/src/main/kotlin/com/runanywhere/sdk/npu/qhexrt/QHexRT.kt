@@ -2,9 +2,7 @@ package com.runanywhere.sdk.npu.qhexrt
 
 import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.HexagonArch
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.NpuCapability
-import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.sync.Mutex
@@ -90,42 +88,6 @@ object QHexRT {
     }
 
     /**
-     * Match native product catalog policy for [modelId] against [arch].
-     */
-    fun modelSupportsArchitecture(
-        modelId: String,
-        arch: HexagonArch,
-    ): Boolean {
-        RunAnywhereBridge.ensureNativeLibraryLoaded()
-        if (!QHexRTBridge.ensureNativeLibraryLoaded()) return false
-        return QHexRTBridge.nativeCatalogModelSupportsArch(modelId, arch.value)
-    }
-
-    /** Whether native product policy marks [modelId] as HF-authenticated. */
-    fun modelRequiresHfAuth(modelId: String): Boolean {
-        RunAnywhereBridge.ensureNativeLibraryLoaded()
-        if (!QHexRTBridge.ensureNativeLibraryLoaded()) return false
-        return QHexRTBridge.nativeCatalogModelRequiresHfAuth(modelId)
-    }
-
-    /**
-     * Register [request] only when native product policy allows it here.
-     *
-     * The app remains the source of the model URL and presentation metadata.
-     * QHexRT owns device probing and architecture selection, then composes the
-     * shared C++ URL-registration/download pipeline. Returns `null` for the
-     * normal "model is not eligible on this device" outcome.
-     */
-    suspend fun registerModelForDevice(request: RegisterModelFromUrlRequest): ModelInfo? {
-        RunAnywhereBridge.ensureNativeLibraryLoaded()
-        if (!QHexRTBridge.ensureNativeLibraryLoaded()) return null
-        val bytes =
-            QHexRTBridge.nativeCatalogRegisterModelProto(QHexRTCatalogWire.encodeRequest(request))
-                ?: return null
-        return QHexRTCatalogWire.decodeModel(bytes)
-    }
-
-    /**
      * Register the QHexRT backend with the C++ plugin registry. Suspend so
      * callers can await module bootstrap from a coroutine scope. Safe to call on
      * unsupported devices — registration is rejected and the app falls back to
@@ -176,14 +138,6 @@ object QHexRT {
     val autoRegister: Unit by lazy {
         synchronized(registrationLock) { registerInternal() }
     }
-}
-
-/** Byte/enum transport only; all QHexRT catalog policy stays native. */
-internal object QHexRTCatalogWire {
-    fun encodeRequest(request: RegisterModelFromUrlRequest): ByteArray =
-        RegisterModelFromUrlRequest.ADAPTER.encode(request)
-
-    fun decodeModel(bytes: ByteArray): ModelInfo = ModelInfo.ADAPTER.decode(bytes)
 }
 
 private val logger = SDKLogger("QHexRT")
