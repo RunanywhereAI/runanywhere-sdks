@@ -97,15 +97,7 @@ class RunAnywhereStorage {
     // a round placeholder (e.g. 500 MB for a real 397 MB file). Callers that
     // know the artifact size can provide downloadSize explicitly.
 
-    final model = await DartBridgeModelRegistry.instance.registerModelFromUrl(
-      request,
-    );
-    if (model == null) {
-      throw SDKException.internalError(
-        'rac_register_model_from_url_proto failed for model "$name"',
-      );
-    }
-    return model;
+    return DartBridgeModelRegistry.instance.registerModelFromUrl(request);
   }
 
   /// Register an archive-packaged model (tar.gz / tar.bz2 / tar.xz / zip)
@@ -259,15 +251,7 @@ class RunAnywhereStorage {
       request.description = description;
     }
 
-    final model = await DartBridgeModelRegistry.instance.registerMultiFileModel(
-      request,
-    );
-    if (model == null) {
-      throw SDKException.internalError(
-        'rac_register_multi_file_model_proto failed for model "$name"',
-      );
-    }
-    return model;
+    return DartBridgeModelRegistry.instance.registerMultiFileModel(request);
   }
 
   /// Import a stable, platform-normalized local model path into the

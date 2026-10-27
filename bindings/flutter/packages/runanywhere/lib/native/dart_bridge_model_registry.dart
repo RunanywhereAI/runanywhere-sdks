@@ -376,17 +376,23 @@ class DartBridgeModelRegistry {
   /// Mirrors Swift's `RunAnywhere.registerModel(id:name:url:...)` URL form
   /// — commons owns the build-and-save flow; we only ship the proto request
   /// bytes and decode the resulting `ModelInfo` proto.
-  Future<model_pb.ModelInfo?> registerModelFromUrl(
+  Future<model_pb.ModelInfo> registerModelFromUrl(
     model_pb.RegisterModelFromUrlRequest request,
   ) async {
-    final fn = RacNative.bindings.rac_register_model_from_url_proto;
-    return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
-      request: request,
-      invoke: fn,
-      decode: model_pb.ModelInfo.fromBuffer,
-      symbol: 'rac_register_model_from_url_proto',
-      preserveNativeError: true,
-    );
+    try {
+      final fn = RacNative.bindings.rac_register_model_from_url_proto;
+      return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
+        request: request,
+        invoke: fn,
+        decode: model_pb.ModelInfo.fromBuffer,
+        symbol: 'rac_register_model_from_url_proto',
+        preserveNativeError: true,
+      );
+    } on SDKException {
+      rethrow;
+    } catch (e) {
+      throw SDKException.internalError(e.toString());
+    }
   }
 
   /// Register a multi-file model (VLM gguf+mmproj pairs, embedding
@@ -395,17 +401,23 @@ class DartBridgeModelRegistry {
   /// Mirrors Swift's `RunAnywhere.registerModel(multiFile:...)` — commons
   /// builds the MultiFileArtifact ModelInfo and persists it with
   /// merge-on-reseed semantics.
-  Future<model_pb.ModelInfo?> registerMultiFileModel(
+  Future<model_pb.ModelInfo> registerMultiFileModel(
     model_pb.RegisterMultiFileModelRequest request,
   ) async {
-    final fn = RacNative.bindings.rac_register_multi_file_model_proto;
-    return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
-      request: request,
-      invoke: fn,
-      decode: model_pb.ModelInfo.fromBuffer,
-      symbol: 'rac_register_multi_file_model_proto',
-      preserveNativeError: true,
-    );
+    try {
+      final fn = RacNative.bindings.rac_register_multi_file_model_proto;
+      return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
+        request: request,
+        invoke: fn,
+        decode: model_pb.ModelInfo.fromBuffer,
+        symbol: 'rac_register_multi_file_model_proto',
+        preserveNativeError: true,
+      );
+    } on SDKException {
+      rethrow;
+    } catch (e) {
+      throw SDKException.internalError(e.toString());
+    }
   }
 
   /// Import a local model into the registry via
