@@ -3698,10 +3698,15 @@ class RagProtoWorker : public Napi::AsyncWorker {
         rac_proto_buffer_t out;
         rac_proto_buffer_init(&out);
         rac_result_t rc = op_(session_, input_.data(), input_.size(), &out);
-        if (rc != RAC_SUCCESS || out.status != RAC_SUCCESS)
-            details_ = current_rac_error_details();
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
             out.status = rc;
+        if (out.status != RAC_SUCCESS) {
+            if (out.error_message && out.error_message[0] != '\0') {
+                details_ = out.error_message;
+            } else {
+                details_ = current_rac_error_details();
+            }
+        }
         if (out.status == RAC_SUCCESS && out.data != nullptr) {
             result_.assign(out.data, out.data + out.size);
             ok_ = true;
