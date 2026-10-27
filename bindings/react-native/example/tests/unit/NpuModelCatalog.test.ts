@@ -73,7 +73,8 @@ describe('React Native QHexRT catalog', () => {
     const bundle = NPU_BUNDLES.find((row) => row.id === 'qwen3_5_0_8b');
     expect(bundle).toBeDefined();
 
-    expect(toNpuModelRegistration(bundle!)).toMatchObject({
+    const registration = toNpuModelRegistration(bundle!);
+    expect(registration).toMatchObject({
       id: 'qwen3_5_0_8b',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -81,8 +82,8 @@ describe('React Native QHexRT catalog', () => {
       downloadSizeBytes: 2_046_527_848,
       contextLength: 1_024,
       supportsThinking: true,
-      supportsLora: false,
     });
+    expect(registration).not.toHaveProperty('supportsLora');
   });
 
   it('retains native IDs, advances revisions, and hides stale QHexRT rows', () => {
