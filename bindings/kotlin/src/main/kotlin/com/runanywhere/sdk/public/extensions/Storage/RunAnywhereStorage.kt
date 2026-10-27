@@ -66,6 +66,9 @@ suspend fun RunAnywhere.registerModel(
     modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     artifactType: ModelArtifactType? = null,
     memoryRequirement: Long? = null,
+    contextLength: Int? = null,
+    source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+    description: String? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
     downloadSize: Long? = null,
@@ -83,13 +86,15 @@ suspend fun RunAnywhere.registerModel(
             name = name,
             framework = framework,
             category = modality,
-            source = ModelSource.MODEL_SOURCE_REMOTE,
+            source = source,
             id = id,
             memory_required_bytes = memoryRequirement,
             // Download size comes only from a real transport-size argument. When
             // the caller has none it stays unset so commons resolves it from the
             // HEAD Content-Length probe; the RAM hint must never stand in here.
             download_size_bytes = downloadSize,
+            context_length = contextLength,
+            description = description?.takeIf { it.isNotEmpty() },
             supports_thinking = if (supportsThinking) true else null,
             supports_lora = if (supportsLora) true else null,
             artifact_type = artifactType,
