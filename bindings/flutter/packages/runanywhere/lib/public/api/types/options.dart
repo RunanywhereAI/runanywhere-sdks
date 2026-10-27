@@ -850,16 +850,41 @@ enum StructuredOutputMode {
   repair,
 }
 
+/// Vector store backing RAG retrieval. Only the in-process store is available on-device.
+enum RagVectorStore {
+  /// In-process HNSW index.
+  usearch,
+}
+
 /// Per-query retrieval overrides for `RagSession.query`/`queryStream`.
 class RagRetrievalOptions {
   /// Override the session's retrieval defaults for one query.
-  const RagRetrievalOptions({this.topK, this.similarityThreshold});
+  const RagRetrievalOptions({
+    this.topK,
+    this.similarityThreshold,
+    this.bm25K1,
+    this.bm25B,
+    this.rrfK,
+    this.vectorStore,
+  });
 
   /// Chunks retrieved for this query. Null uses the session default.
   final int? topK;
 
   /// Minimum similarity a chunk needs to be returned this query.
   final double? similarityThreshold;
+
+  /// BM25 term-frequency saturation; finite and `> 0` (0 is rejected). Null uses the session default.
+  final double? bm25K1;
+
+  /// BM25 document-length normalization in `0..1`. Null uses the session default.
+  final double? bm25B;
+
+  /// Reciprocal-rank-fusion constant, `> 0` (0 is rejected). Null uses the session default.
+  final int? rrfK;
+
+  /// Vector store for this query. Null uses the session default.
+  final RagVectorStore? vectorStore;
 }
 
 /// Per-query knobs for `RagSession.query`/`queryStream`.

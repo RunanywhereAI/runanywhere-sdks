@@ -262,10 +262,20 @@ export interface RagConfig {
   persistPath?: string;
 }
 
+/** Vector store backing RAG retrieval. Only the in-process store is available on-device. */
+export type RagVectorStore = 'usearch';
+
 /** Per-query retrieval overrides for `RagSession.query`/`queryStream`. */
 export interface RagRetrievalOptions {
   topK?: number;
   similarityThreshold?: number;
+  /** BM25 term-frequency saturation; finite and `> 0` (0 is rejected). Unset uses the session default. */
+  bm25K1?: number;
+  /** BM25 document-length normalization in `0..1`. Unset uses the session default. */
+  bm25B?: number;
+  /** Reciprocal-rank-fusion constant, `> 0` (0 is rejected). Unset uses the session default. */
+  rrfK?: number;
+  vectorStore?: RagVectorStore;
 }
 
 /** Per-query knobs for `RagSession.query`/`queryStream`. */
