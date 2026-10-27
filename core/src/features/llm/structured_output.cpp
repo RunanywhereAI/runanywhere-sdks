@@ -604,8 +604,9 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
 // The system prompt below is hardened with an explicit start-token cue
 // ("Your reply must begin with %s ...") so the model is more likely to
 // emit JSON on the very first token instead of echoing the prompt.
-// On the ordinary LLM generate path, schema-derived GBNF grammar is also
-// piped through to the sampler when constrained decoding is enabled.
+// On the ordinary LLM generate path with the llama.cpp backend, schema-derived
+// GBNF grammar is also piped through to the sampler when constrained decoding
+// is enabled.
 
 extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
                                                                 char** out_prompt) {
