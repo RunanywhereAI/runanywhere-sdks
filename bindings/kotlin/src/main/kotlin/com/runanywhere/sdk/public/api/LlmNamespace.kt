@@ -140,9 +140,10 @@ public class LlmNamespace internal constructor() {
         options: LlmOptions? = null,
     ): StructuredResult {
         val opts = options.orDefault().copy(toolChoice = ToolChoice.None)
+        val effectiveSchema = opts.structuredOutput?.schema ?: schema
         val effectiveMode = opts.structuredOutput?.mode ?: mode
         val effectiveStrict = opts.structuredOutput?.strict ?: true
-        val structuredOutput = StructuredOutput(schema = schema, strict = effectiveStrict, mode = effectiveMode)
+        val structuredOutput = StructuredOutput(schema = effectiveSchema, strict = effectiveStrict, mode = effectiveMode)
         val generation = generateStructuredUnary(prompt, opts, structuredOutput)
         val parsed = parseStructuredOutput(generation, structuredOutput)
 

@@ -289,10 +289,12 @@ export const llm = {
    * Generate JSON that satisfies a schema, returning the parsed value with
    * the raw text alongside it.
    *
-   * @param mode `'constrained'` (default) lets commons compile the schema
-   *   into a grammar for constrained decoding; `'validationOnly'` generates
-   *   freely then validates; `'repair'` validates and retries once with a
-   *   repair instruction when invalid.
+   * @param mode `'constrained'` (default) asks commons to compile the schema
+   *   into a grammar for constrained decoding. Only grammar-capable engines
+   *   enforce it; other Web backends generate freely and rely on validation.
+   *   `'validationOnly'` generates freely then validates. `'repair'` validates
+   *   and, when the first response is invalid, parses it and retries once with
+   *   a repair instruction.
    * @throws SDKException when the backend cannot parse structured output.
    */
   async generateStructured(
