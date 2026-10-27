@@ -13,7 +13,7 @@ from typing import Any, List, Optional
 
 from .errors import ErrorCode, SDKException
 from .events import RagEvent, RagEventKind
-from .options import RagConfig, RagQueryOptions, ReasoningMode
+from .options import RagConfig, RagQueryOptions, RagVectorStore, ReasoningMode
 from .results import Match, RagResult, RagStats, TokenKind
 
 try:
@@ -100,6 +100,39 @@ def build_document(text: str, doc_id: str, metadata: Optional[dict]) -> bytes:
     return doc.SerializeToString()
 
 
+def _int32_option(name: str, value: Any) -> int:
+    """Return ``value`` for an int32 proto field, rejecting non-integers and overflow.
+
+    ``int()`` would truncate ``-0.5`` to ``0`` and wrap nothing, so the native
+    validator would never see what the caller actually passed.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SDKException.invalid_input(
+            f"RagRetrievalOptions.{name} must be an int, got {type(value).__name__}"
+        )
+    if not -(2**31) <= value < 2**31:
+        raise SDKException.invalid_input(f"RagRetrievalOptions.{name} must fit int32, got {value}")
+    return value
+
+
+def _vector_store_option(value: Any) -> int:
+    """Return the wire value of a :class:`RagVectorStore`, rejecting anything else."""
+    if not isinstance(value, RagVectorStore):
+        raise SDKException.invalid_input(
+            f"RagRetrievalOptions.vector_store must be a RagVectorStore, got {value!r}"
+        )
+    return int(value)
+
+
+def _float_option(name: str, value: Any) -> float:
+    """Return ``value`` as a float, rejecting bools and non-numbers."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise SDKException.invalid_input(
+            f"RagRetrievalOptions.{name} must be a number, got {type(value).__name__}"
+        )
+    return float(value)
+
+
 def build_query(
     question: str,
     options: Optional[RagQueryOptions],
@@ -110,9 +143,17 @@ def build_query(
         retrieval = options.retrieval
         if retrieval is not None:
             if retrieval.top_k is not None:
-                query.retrieval.top_k = int(retrieval.top_k)
+                query.retrieval.top_k = _int32_option("top_k", retrieval.top_k)
             if retrieval.similarity_threshold is not None:
                 query.retrieval.score_threshold = retrieval.similarity_threshold
+            if retrieval.bm25_k1 is not None:
+                query.retrieval.bm25_k1 = _float_option("bm25_k1", retrieval.bm25_k1)
+            if retrieval.bm25_b is not None:
+                query.retrieval.bm25_b = _float_option("bm25_b", retrieval.bm25_b)
+            if retrieval.rrf_k is not None:
+                query.retrieval.rrf_k = _int32_option("rrf_k", retrieval.rrf_k)
+            if retrieval.vector_store is not None:
+                query.retrieval.vector_store = _vector_store_option(retrieval.vector_store)
         generation = options.generation
         if generation is not None:
             query.generation.max_output_tokens = generation.max_output_tokens
