@@ -224,8 +224,9 @@ ClusterRuntime& cluster_runtime() {
     return instance;
 }
 
-bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
-                                std::string* out_rejection_reason) {
+bool validate_layer_assignments(
+    const google::protobuf::RepeatedPtrField<v1::ClusterLayerAssignment>& assignments,
+    std::string* out_rejection_reason) {
     if (assignments.empty()) {
         if (out_rejection_reason != nullptr) {
             *out_rejection_reason = "Cluster must have at least one layer assignment";
@@ -253,7 +254,8 @@ bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::Clu
         }
         if (assignment.layer_end() <= assignment.layer_start()) {
             if (out_rejection_reason != nullptr) {
-                *out_rejection_reason = "Invalid layer range: layer_end must be greater than layer_start";
+                *out_rejection_reason =
+                    "Invalid layer range: layer_end must be greater than layer_start";
             }
             return false;
         }
@@ -274,6 +276,19 @@ bool validate_layer_assignments(const google::protobuf::RepeatedPtrField<v1::Clu
             return false;
         }
         expected_start = assignment.layer_end();
+    }
+
+    int coordinator_count = 0;
+    for (const auto& assignment : sorted_assignments) {
+        if (assignment.is_coordinator()) {
+            ++coordinator_count;
+        }
+    }
+    if (coordinator_count != 1) {
+        if (out_rejection_reason != nullptr) {
+            *out_rejection_reason = "Cluster must have exactly one coordinator assignment";
+        }
+        return false;
     }
     return true;
 }
@@ -737,8 +752,7 @@ rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* request_bytes
  * Cluster Orchestration Implementations (Issue #541)
  * =========================================================================== */
 
-rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
-                                             size_t request_size,
+rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes, size_t request_size,
                                              rac_proto_buffer_t* out_cluster_state) {
     if (out_cluster_state == nullptr) {
         return RAC_ERROR_NULL_POINTER;
@@ -829,8 +843,7 @@ rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
 #endif
 }
 
-rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
-                                            size_t request_size,
+rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes, size_t request_size,
                                             rac_proto_buffer_t* out_response) {
     if (out_response == nullptr) {
         return RAC_ERROR_NULL_POINTER;
@@ -871,17 +884,20 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
     } else if (!request.peer_capability().instance_id().empty() &&
                request.peer_capability().instance_id() != request.instance_id()) {
         response.set_accepted(false);
-        response.set_rejection_reason("Peer capability instance_id does not match request identity");
+        response.set_rejection_reason(
+            "Peer capability instance_id does not match request identity");
     } else {
         auto it = cluster.peer_assignments.find(request.instance_id());
         if (it == cluster.peer_assignments.end()) {
             response.set_accepted(false);
-            response.set_rejection_reason("Peer instance_id not found in cluster layer assignments");
+            response.set_rejection_reason(
+                "Peer instance_id not found in cluster layer assignments");
         } else if (request.peer_capability().max_layers() > 0 &&
                    it->second.layer_end() - it->second.layer_start() >
                        request.peer_capability().max_layers()) {
             response.set_accepted(false);
-            response.set_rejection_reason("Peer max_layers is smaller than its assigned layer span");
+            response.set_rejection_reason(
+                "Peer max_layers is smaller than its assigned layer span");
         } else {
             response.set_accepted(true);
             *response.mutable_peer_capability() = request.peer_capability();
@@ -895,8 +911,7 @@ rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
 #endif
 }
 
-rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
-                                            size_t request_size,
+rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes, size_t request_size,
                                             rac_proto_buffer_t* out_cluster_state) {
     if (out_cluster_state == nullptr) {
         return RAC_ERROR_NULL_POINTER;
@@ -927,8 +942,9 @@ rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
     ClusterRuntime& cluster = cluster_runtime();
 
     if (cluster.is_active && request.cluster_id() != cluster.cluster_id) {
-        rac_proto_buffer_set_error(out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
-                                   "ClusterStopRequest cluster_id does not match the active cluster");
+        rac_proto_buffer_set_error(
+            out_cluster_state, RAC_ERROR_INVALID_ARGUMENT,
+            "ClusterStopRequest cluster_id does not match the active cluster");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -983,7 +999,8 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
     } else if (request.tensor_data().empty()) {
         validation.set_rejection_reason("Activation tensor_data is empty");
     } else if (request.seq_len() == 0 || request.hidden_size() == 0) {
-        validation.set_rejection_reason("Invalid activation tensor dimensions (seq_len/hidden_size zero)");
+        validation.set_rejection_reason(
+            "Invalid activation tensor dimensions (seq_len/hidden_size zero)");
     } else {
         // An activation is the handoff out of a real stage, so layer 0 (the first stage's input) is
         // never a valid source boundary.
@@ -996,7 +1013,8 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
         }
         // Activation tensors carry floating-point activations (typically FP16 / BF16 at 2 bytes per
         // element or FP32 at 4 bytes per element; minimum 2 bytes per element).
-        const uint64_t min_elements = static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
+        const uint64_t min_elements =
+            static_cast<uint64_t>(request.seq_len()) * request.hidden_size();
         const uint64_t min_bytes = min_elements > UINT64_MAX / 2 ? UINT64_MAX : min_elements * 2;
         if (request.from_layer() == 0) {
             // Layer 0 is a boundary, but it is the first stage's input: no stage produced it.
@@ -1005,7 +1023,9 @@ rac_result_t rac_connect_cluster_validate_activation_proto(const uint8_t* reques
         } else if (!valid_boundary) {
             validation.set_rejection_reason("Activation from_layer does not match any cluster layer boundary");
         } else if (request.tensor_data().size() < min_bytes) {
-            validation.set_rejection_reason("Activation tensor_data size is smaller than expected tensor bytes (minimum 2 bytes/element)");
+            validation.set_rejection_reason(
+                "Activation tensor_data size is smaller than expected tensor bytes (minimum 2 "
+                "bytes/element)");
         } else {
             validation.set_accepted(true);
         }
