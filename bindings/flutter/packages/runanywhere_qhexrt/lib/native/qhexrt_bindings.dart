@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/core/native/rac_native.dart' show RacProtoBuffer;
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
