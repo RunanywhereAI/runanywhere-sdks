@@ -58,6 +58,7 @@
 #include "voice_bridge.h"
 
 #include "rac/core/rac_types.h"
+#include "rac/core/rac_error_proto.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diarization/rac_diarization_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -261,18 +262,40 @@ rac_handle_t take_handle_when_idle(std::unordered_map<int32_t, rac_handle_t>& ma
     return h;
 }
 
-int rac_code_abs(rac_result_t code) {
-    int value = static_cast<int>(code);
+/** Return a code magnitude without overflowing for INT32_MIN. */
+int64_t rac_code_abs(rac_result_t code) {
+    int64_t value = static_cast<int64_t>(code);
     return value < 0 ? -value : value;
 }
 
-// Build a structured JS Error for a rac_result_t so the TS layer can recover a
-// typed SDKException without depending on string parsing alone.
-Napi::Error make_rac_error(Napi::Env env, rac_result_t code, const std::string& message) {
+std::string current_rac_error_details() {
+    const char* details = rac_error_get_details();
+    return details ? details : "";
+}
+
+/** Build a native error with canonical proto details and the operation message. */
+Napi::Error make_rac_error(Napi::Env env, rac_result_t code, const std::string& message,
+                           const std::string* worker_details = nullptr) {
     Napi::Error error = Napi::Error::New(env, message);
     Napi::Object value = error.Value();
     value.Set("code", Napi::Number::New(env, rac_code_abs(code)));  // canonical positive ErrorCode
     value.Set("cAbiCode", Napi::Number::New(env, static_cast<int>(code)));  // raw rac_result_t
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    const std::string previous_details = worker_details ? current_rac_error_details() : "";
+    if (worker_details)
+        rac_error_set_details(worker_details->empty() ? nullptr : worker_details->c_str());
+    // Only attach sdkError for genuine failures; rac_result_to_proto_error serializes a
+    // success proto when code == RAC_SUCCESS (no skip-on-success branch in commons), which
+    // would make asSDKException() see a success payload and misreport the error category.
+    if (code != RAC_SUCCESS &&
+        rac_result_to_proto_error(code, &buffer) == RAC_SUCCESS && buffer.data != nullptr &&
+        buffer.size > 0) {
+        value.Set("sdkError", Napi::Buffer<uint8_t>::Copy(env, buffer.data, buffer.size));
+    }
+    if (worker_details)
+        rac_error_set_details(previous_details.empty() ? nullptr : previous_details.c_str());
+    rac_proto_buffer_free(&buffer);
     return error;
 }
 
@@ -847,6 +870,7 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
         const rac_result_t transport_rc = rac_desktop_http_transport_register();
         if (transport_rc != RAC_SUCCESS) {
             code_ = transport_rc;
+            details_ = current_rac_error_details();
             err_ = "desktop HTTP/device bootstrap failed: " + std::to_string(transport_rc);
             return;
         }
@@ -904,6 +928,7 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
         rac_proto_buffer_free(&p1out);
         if (rc != RAC_SUCCESS) {
             code_ = rc;
+            details_ = current_rac_error_details();
             err_ = "sdk_init_phase1 failed: " + std::to_string(rc);
             return;
         }
@@ -914,6 +939,7 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
         if (rc != RAC_SUCCESS) {
             rac_proto_buffer_free(&p2out);
             code_ = rc;
+            details_ = current_rac_error_details();
             err_ = "sdk_init_phase2 failed: " + std::to_string(rc);
             return;
         }
@@ -929,7 +955,7 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
         if (ok_) {
             deferred_.Resolve(Napi::Buffer<uint8_t>::Copy(Env(), result_.data(), result_.size()));
         } else {
-            deferred_.Reject(make_rac_error(Env(), code_, err_).Value());
+            deferred_.Reject(make_rac_error(Env(), code_, err_, &details_).Value());
         }
     }
 
@@ -945,6 +971,7 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
     std::string app_identifier_, app_name_, app_version_;
     std::vector<uint8_t> phase1_, phase2_, result_;
     std::string err_;
+    std::string details_;
     bool ok_ = false;
     rac_result_t code_ = RAC_SUCCESS;
 };
@@ -1067,6 +1094,7 @@ struct StreamCtx {
     Napi::Promise::Deferred deferred;
     rac_result_t result = RAC_SUCCESS;
     std::string error_msg;
+    std::string error_details;
     std::function<rac_result_t(StreamCtx*)> run;  // performs the rac streaming call
     int32_t lease_id = 0;                         // begin_op id; end_op when the worker finishes
     bool leased = false;
@@ -1177,7 +1205,7 @@ Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
                     std::string msg = c->error_msg.empty()
                                           ? ("stream failed: " + std::to_string(c->result))
                                           : c->error_msg;
-                    c->deferred.Reject(make_rac_error(env, c->result, msg).Value());
+                    c->deferred.Reject(make_rac_error(env, c->result, msg, &c->error_details).Value());
                 }
                 delete c;
             },
@@ -1193,6 +1221,8 @@ Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
             }
             if (rc != RAC_SUCCESS && ctx->result == RAC_SUCCESS)
                 ctx->result = rc;
+            if (ctx->result != RAC_SUCCESS)
+                ctx->error_details = current_rac_error_details();
             if (ctx->leased) {
                 end_op(ctx->lease_id);
                 ctx->leased = false;
@@ -2214,6 +2244,7 @@ struct SttStreamCtx {
     std::thread worker;
     Napi::Promise::Deferred deferred;
     rac_result_t result = RAC_SUCCESS;
+    std::string error_details;
     int32_t lease_id = 0;
     bool leased = false;
     std::shared_ptr<std::mutex> gate;
@@ -2278,7 +2309,8 @@ Napi::Value TranscribeStream(const Napi::CallbackInfo& info) {
                 } else {
                     c->deferred.Reject(
                         make_rac_error(env, c->result,
-                                       "transcribe stream failed: " + std::to_string(c->result))
+                                       "transcribe stream failed: " + std::to_string(c->result),
+                                       &c->error_details)
                             .Value());
                 }
                 delete c;
@@ -2290,6 +2322,8 @@ Napi::Value TranscribeStream(const Napi::CallbackInfo& info) {
                 ctx->result = rac_stt_component_transcribe_stream(
                     ctx->handle, ctx->audio.data(), ctx->audio.size(), &ctx->opts.opts,
                     stt_stream_cb, ctx);
+                if (ctx->result != RAC_SUCCESS)
+                    ctx->error_details = current_rac_error_details();
             }
             if (ctx->leased) {
                 end_op(ctx->lease_id);
@@ -2496,6 +2530,7 @@ struct TtsStreamCtx {
     std::thread worker;
     Napi::Promise::Deferred deferred;
     rac_result_t result = RAC_SUCCESS;
+    std::string error_details;
     int32_t lease_id = 0;
     bool leased = false;
     std::shared_ptr<std::mutex> gate;
@@ -2561,7 +2596,8 @@ Napi::Value SynthesizeStream(const Napi::CallbackInfo& info) {
                 } else {
                     c->deferred.Reject(
                         make_rac_error(env, c->result,
-                                       "synthesize stream failed: " + std::to_string(c->result))
+                                       "synthesize stream failed: " + std::to_string(c->result),
+                                       &c->error_details)
                             .Value());
                 }
                 delete c;
@@ -2572,6 +2608,8 @@ Napi::Value SynthesizeStream(const Napi::CallbackInfo& info) {
                 std::lock_guard<std::mutex> serialize(*ctx->gate);
                 ctx->result = rac_tts_component_synthesize_stream(
                     ctx->handle, ctx->text.c_str(), &ctx->opts.opts, tts_stream_cb, ctx);
+                if (ctx->result != RAC_SUCCESS)
+                    ctx->error_details = current_rac_error_details();
             }
             if (ctx->leased) {
                 end_op(ctx->lease_id);
@@ -3585,18 +3623,21 @@ Napi::Value UnloadSegmentationModel(const Napi::CallbackInfo& info) {
 // RAGResult/RAGStatistics in an owned rac_proto_buffer_t that we copy into a
 // Napi::Buffer and free.
 
-// Copy an owned proto-out buffer to a JS Buffer (throwing on failure), always
-// releasing the native buffer.
+/** Copy an owned proto buffer to JS, preserving failure status before freeing it. */
 static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const char* what) {
     if (buf->status != RAC_SUCCESS || buf->data == nullptr) {
-        std::string msg = std::string(what) + " failed: " + std::to_string(buf->status);
+        // Capture status and message before freeing: rac_proto_buffer_free resets
+        // buf->status to RAC_SUCCESS via release_fields/reset_fields, so reading
+        // buf->status after the free would always report success.
+        rac_result_t status = buf->status;
+        std::string msg = std::string(what) + " failed: " + std::to_string(status);
         if (buf->error_message) {
             msg += " (";
             msg += buf->error_message;
             msg += ")";
         }
         rac_proto_buffer_free(buf);
-        make_rac_error(env, buf->status, msg).ThrowAsJavaScriptException();
+        make_rac_error(env, status, msg).ThrowAsJavaScriptException();
         return env.Undefined();
     }
     Napi::Buffer<uint8_t> out = Napi::Buffer<uint8_t>::Copy(env, buf->data, buf->size);
@@ -3659,6 +3700,13 @@ class RagProtoWorker : public Napi::AsyncWorker {
         rac_result_t rc = op_(session_, input_.data(), input_.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
             out.status = rc;
+        if (out.status != RAC_SUCCESS) {
+            if (out.error_message && out.error_message[0] != '\0') {
+                details_ = out.error_message;
+            } else {
+                details_ = current_rac_error_details();
+            }
+        }
         if (out.status == RAC_SUCCESS && out.data != nullptr) {
             result_.assign(out.data, out.data + out.size);
             ok_ = true;
@@ -3679,7 +3727,7 @@ class RagProtoWorker : public Napi::AsyncWorker {
         if (ok_) {
             deferred_.Resolve(Napi::Buffer<uint8_t>::Copy(Env(), result_.data(), result_.size()));
         } else {
-            deferred_.Reject(make_rac_error(Env(), code_, err_).Value());
+            deferred_.Reject(make_rac_error(Env(), code_, err_, &details_).Value());
         }
     }
 
@@ -3707,6 +3755,7 @@ class RagProtoWorker : public Napi::AsyncWorker {
     std::string what_;
     std::vector<uint8_t> result_;
     std::string err_;
+    std::string details_;
     bool ok_ = false;
     rac_result_t code_ = RAC_SUCCESS;
 };
@@ -3806,6 +3855,7 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
         rac_result_t rc = rac_rag_session_create_proto(config_.data(), config_.size(), &session_);
         code_ = rc;
         if (rc != RAC_SUCCESS || session_ == nullptr) {
+            details_ = current_rac_error_details();
             err_ = "rag session create failed: " + std::to_string(rc);
             session_ = nullptr;
             ok_ = false;
@@ -3817,7 +3867,7 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
     void OnOK() override {
         Napi::HandleScope scope(Env());
         if (!ok_ || session_ == nullptr) {
-            deferred_.Reject(make_rac_error(Env(), code_, err_).Value());
+            deferred_.Reject(make_rac_error(Env(), code_, err_, &details_).Value());
             return;
         }
         int32_t hid;
@@ -3859,6 +3909,7 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
     std::vector<uint8_t> config_;
     rac_handle_t session_ = nullptr;
     std::string err_;
+    std::string details_;
     bool ok_ = false;
     rac_result_t code_ = RAC_SUCCESS;
 };
@@ -3903,6 +3954,7 @@ struct RagStreamCtx {
     std::thread worker;
     Napi::Promise::Deferred deferred;
     rac_result_t result = RAC_SUCCESS;
+    std::string error_details;
     int32_t lease_id = 0;
     bool leased = false;
     rac_handle_t session = nullptr;
@@ -3954,7 +4006,8 @@ Napi::Value RagQueryStream(const Napi::CallbackInfo& info) {
                 } else {
                     c->deferred.Reject(
                         make_rac_error(env, c->result,
-                                       "rag query stream failed: " + std::to_string(c->result))
+                                       "rag query stream failed: " + std::to_string(c->result),
+                                       &c->error_details)
                             .Value());
                 }
                 delete c;
@@ -3963,6 +4016,8 @@ Napi::Value RagQueryStream(const Napi::CallbackInfo& info) {
         ctx->worker = std::thread([ctx]() {
             ctx->result = rac_rag_query_stream_proto(ctx->session, ctx->query.data(),
                                                      ctx->query.size(), rag_stream_cb, ctx);
+            if (ctx->result != RAC_SUCCESS)
+                ctx->error_details = current_rac_error_details();
             if (ctx->leased) {
                 end_op(ctx->lease_id);
                 ctx->leased = false;

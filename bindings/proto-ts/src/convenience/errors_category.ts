@@ -4,8 +4,9 @@
  *
  * HAND-AUTHORED — not produced by `idl/codegen/generate_ts_convenience.py`.
  * The fold from numeric ranges onto the 9-bucket proto `ErrorCategory` exists
- * only as C++ control flow, not as proto annotations, so there is nothing for
- * the IDL codegen to emit. Do not invent a second table in an SDK.
+ * in `core/include/rac/core/rac_error_categories.def`, shared by commons and
+ * Python codegen. Keep this TS fallback aligned with that manifest.
+ * Do not invent a second table in an SDK.
  *
  * This table is the richer 18-range mapping historically shared byte-for-byte
  * by Web and React Native. It deliberately covers bands beyond |329|
@@ -14,10 +15,9 @@
  * proto codes keep meaningful categories instead of collapsing to INTERNAL.
  *
  * C++ commons (`rac::foundation::rac_result_to_proto_category` in
- * `core/src/foundation/rac_proto_adapters.cpp`) currently
- * only maps |100|–|329| and falls through to INTERNAL — that is a known
- * under-mapping, deliberately deferred (see `ts_shared_layer.md` Known issue).
- * Do NOT “fix” this TS table down to match commons.
+ * `core/src/foundation/rac_proto_adapters.cpp`) uses the same 18-range table
+ * for serialized `SDKError` payloads. Negative values outside the mapped
+ * ranges return `UNSPECIFIED`.
  *
  * Callers may pass either the signed C ABI code or the positive proto
  * `ErrorCode` (abs magnitude); both are accepted via `Math.abs`.

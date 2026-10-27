@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -36,8 +37,11 @@ void populate_sdk_error(::runanywhere::v1::SDKError* out, rac_result_t code) {
     }
 
     const int32_t signed_code = static_cast<int32_t>(code);
-    const int32_t abs_code = signed_code < 0 ? -signed_code : signed_code;
-    out->set_code(static_cast<::runanywhere::v1::ErrorCode>(abs_code));
+    const int64_t magnitude = signed_code < 0 ? -static_cast<int64_t>(signed_code) : signed_code;
+    // INT32_MIN has no positive int32 enum equivalent; retain it in c_abi_code.
+    out->set_code(magnitude > std::numeric_limits<int32_t>::max()
+                      ? ::runanywhere::v1::ERROR_CODE_UNKNOWN
+                      : static_cast<::runanywhere::v1::ErrorCode>(magnitude));
     out->set_category(rac::foundation::rac_result_to_proto_category(code));
 
     const char* message = rac_error_message(code);
