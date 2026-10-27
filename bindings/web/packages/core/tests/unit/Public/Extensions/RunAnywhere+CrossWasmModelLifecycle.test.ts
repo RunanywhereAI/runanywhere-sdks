@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CurrentModelRequest,
   CurrentModelResult,
@@ -15,6 +15,7 @@ import {
   type ModelUnloadRequest as ProtoModelUnloadRequest,
 } from '@runanywhere/proto-ts/model_types';
 import { SDKError } from '@runanywhere/proto-ts/errors';
+import { EmbeddingsResult } from '@runanywhere/proto-ts/embeddings_options';
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
 import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
 import { Embeddings } from '../../../../src/Public/Extensions/RunAnywhere+Embeddings';
@@ -28,6 +29,8 @@ import {
   type BackendWorkerHost,
 } from '../../../../src/runtime/BackendWorkerHost';
 import type * as BackendWorkerHostModule from '../../../../src/runtime/BackendWorkerHost.js';
+import { clearModelOwnedByBackendWorker } from '../../../../src/runtime/BackendWorkerModelOwnership';
+import { ModelRegistryAdapter } from '../../../../src/Adapters/ModelRegistryAdapter';
 
 vi.mock('../../../../src/runtime/BackendWorkerHost.js', async () => {
   const actual = await vi.importActual<typeof BackendWorkerHostModule>(
@@ -58,13 +61,100 @@ interface FakeLifecycleRuntime {
   resetCalls(): number;
 }
 
+beforeEach(() => {
+  // These lifecycle-only WASMs use explicit catalog snapshots below rather
+  // than implementing the separate model-registry ABI and catalog replay.
+  vi.spyOn(ModelRegistryAdapter, 'setDefaultModule').mockImplementation(() => undefined);
+});
+
 afterEach(() => {
+  clearModelOwnedByBackendWorker();
+  clearModelOwnedByBackendWorker(undefined, 'onnx');
   clearRunanywhereModule();
   vi.mocked(getActiveBackendWorkerHost).mockReset();
   vi.restoreAllMocks();
 });
 
 describe('WebModelLifecycle multi-WASM routing', () => {
+  it.each([
+    {
+      category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      preferred: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      catalog: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    },
+    {
+      category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      preferred: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      catalog: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    },
+    {
+      category: ModelCategory.MODEL_CATEGORY_VISION,
+      preferred: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      catalog: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    },
+  ])('skips an incapable registered preference for category $category', async ({
+    category, preferred, catalog,
+  }) => {
+    const llama = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    });
+    const onnx = fakeLifecycleRuntime([], {
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    });
+    registerBackends(llama.module, onnx.module);
+    installRegistrySnapshots([modelSnapshot('model', category, catalog)]);
+    vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+    const request = ModelLoadRequest.create({
+      modelId: 'model', category, framework: preferred,
+      // LANGUAGE/VISION must also consider the catalog after exhausting
+      // incapable preferences, not merely try another explicit entry.
+      backendPreferences: category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+        ? [preferred, catalog]
+        : [preferred],
+    });
+    const owner = catalog === InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP ? llama : onnx;
+    const other = owner === llama ? onnx : llama;
+
+    expect(WebModelLifecycle.loadModel(request)?.framework).toBe(catalog);
+    await expect(WebModelLifecycle.loadModelAsync(request)).resolves.toMatchObject({
+      framework: catalog,
+    });
+    expect(owner.loadRequests).toEqual([request, request]);
+    expect(other.loadRequests).toEqual([]);
+
+    const resultBytes = ModelLoadResult.encode(ModelLoadResult.create({
+      modelId: 'model', category, framework: catalog,
+    })).finish();
+    const host = { loadModel: vi.fn(async () => ({ resultBytes })) } as unknown as BackendWorkerHost;
+    const backendId = owner === llama ? 'llamacpp' : 'onnx';
+    vi.mocked(getActiveBackendWorkerHost).mockImplementation((id) => id === backendId ? host : null);
+
+    await expect(WebModelLifecycle.loadModelAsync(request)).resolves.toMatchObject({ framework: catalog });
+    expect(host.loadModel).toHaveBeenCalledWith(
+      owner === llama ? 'llm' : 'stt', expect.objectContaining({ requestBytes: expect.any(Uint8Array) }),
+    );
+    expect(owner.loadRequests).toHaveLength(2);
+    expect(other.loadRequests).toEqual([]);
+  });
+
+  it('does not fall back to an incapable catalog or default module', () => {
+    const llama = fakeLifecycleRuntime([]);
+    registerWasmModule(['llm'], llama.module, ['llamacpp']);
+    installRegistrySnapshots([modelSnapshot(
+      'speech', ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    )]);
+
+    expect(() => WebModelLifecycle.loadModel(ModelLoadRequest.create({
+      modelId: 'speech', framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    }))).toThrow(expect.objectContaining({
+      proto: expect.objectContaining({
+        nestedMessage: expect.stringContaining("supports the 'stt' capability"),
+      }),
+    }));
+    expect(llama.loadRequests).toEqual([]);
+  });
+
   it('routes a preferred backend to its owning WASM instead of the catalog owner', () => {
     const llama = fakeLifecycleRuntime([], {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
@@ -181,6 +271,59 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     expect(getActiveBackendWorkerHost).not.toHaveBeenCalledWith('onnx');
     expect(llama.loadRequests).toEqual([]);
     expect(onnx.loadRequests).toEqual([]);
+  });
+
+  it.each([
+    { backendId: 'llamacpp' as const, actual: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      catalog: InferenceFramework.INFERENCE_FRAMEWORK_ONNX },
+    { backendId: 'onnx' as const, actual: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      catalog: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP },
+  ])('reuses the actual $backendId embedding worker after a cross-framework load', async ({
+    backendId, actual, catalog,
+  }) => {
+    const llama = fakeLifecycleRuntime([]);
+    const onnx = fakeLifecycleRuntime([]);
+    registerBackends(llama.module, onnx.module);
+    const snapshot = modelSnapshot('portable-embedding', ModelCategory.MODEL_CATEGORY_EMBEDDING, catalog);
+    installRegistrySnapshots([snapshot]);
+    vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+    vi.spyOn(WebModelLifecycle, 'supportsNativeLifecycle').mockReturnValue(true);
+    const resultBytes = ModelLoadResult.encode(ModelLoadResult.create({
+      modelId: snapshot.id, category: snapshot.category, framework: actual,
+    })).finish();
+    const embeddingBytes = EmbeddingsResult.encode(EmbeddingsResult.create({ modelId: snapshot.id })).finish();
+    const host = {
+      diagnostics: { executionContext: 'worker' },
+      loadModel: vi.fn(async () => ({ resultBytes })),
+      infer: vi.fn(async () => ({ resultBytes: embeddingBytes })),
+      unloadModel: vi.fn(async () => undefined),
+    } as unknown as BackendWorkerHost;
+    vi.mocked(getActiveBackendWorkerHost).mockImplementation((id) => id === backendId ? host : null);
+    await WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+      modelId: snapshot.id, framework: actual, backendPreferences: [actual, catalog],
+    }));
+
+    expect(WebModelLifecycle.currentModel({
+      category: snapshot.category, framework: actual, includeModelMetadata: true,
+    })).toMatchObject({
+      modelId: snapshot.id, framework: actual, found: true,
+      model: { framework: actual },
+    });
+    expect(WebModelLifecycle.currentModel({
+      category: snapshot.category, framework: catalog, includeModelMetadata: false,
+    })?.found).toBe(false);
+    expect(WebModelLifecycle.modelInfoForCategory(snapshot.category!)).toMatchObject({ framework: actual });
+    expect(ModelRegistry.getModel(snapshot.id)?.framework).toBe(catalog);
+
+    await expect(Embeddings.embed('hello', snapshot.id)).resolves.toMatchObject({ modelId: snapshot.id });
+    expect(host.loadModel).toHaveBeenCalledTimes(1);
+    expect(host.infer).toHaveBeenCalledWith('embeddings.embed', { requestBytes: expect.any(Uint8Array) });
+
+    await WebModelLifecycle.unloadModelAsync({ modelId: snapshot.id, unloadAll: false });
+    expect(host.unloadModel).toHaveBeenCalledTimes(1);
+    expect(WebModelLifecycle.currentModel({
+      category: snapshot.category, framework: actual, includeModelMetadata: false,
+    })?.found).toBe(false);
   });
 
   it('routes framework-scoped current-model queries to the owning WASM', () => {
@@ -363,12 +506,12 @@ function registerBackends(
 ): void {
   const registrations = reverse
     ? [
-        { capabilities: ['voice-agent'] as const, module: onnx, frameworks: ['onnx', 'sherpa'] },
-        { capabilities: ['tool-calling'] as const, module: llama, frameworks: ['llamacpp'] },
+        { capabilities: ['stt', 'tts', 'vad', 'embedding', 'voice-agent'] as const, module: onnx, frameworks: ['onnx', 'sherpa'] },
+        { capabilities: ['llm', 'vlm', 'embedding', 'tool-calling'] as const, module: llama, frameworks: ['llamacpp'] },
       ]
     : [
-        { capabilities: ['tool-calling'] as const, module: llama, frameworks: ['llamacpp'] },
-        { capabilities: ['voice-agent'] as const, module: onnx, frameworks: ['onnx', 'sherpa'] },
+        { capabilities: ['llm', 'vlm', 'embedding', 'tool-calling'] as const, module: llama, frameworks: ['llamacpp'] },
+        { capabilities: ['stt', 'tts', 'vad', 'embedding', 'voice-agent'] as const, module: onnx, frameworks: ['onnx', 'sherpa'] },
       ];
   for (const registration of registrations) {
     registerWasmModule(
@@ -460,6 +603,9 @@ function fakeLifecycleRuntime(
     },
     _rac_proto_buffer_free: () => undefined,
     _rac_get_model_registry: () => 1,
+    _rac_embeddings_embed_batch_lifecycle_proto: () => {
+      throw new Error('worker embedding must not fall back to the main-thread WASM');
+    },
     _rac_model_lifecycle_load_proto: (_registry, requestPointer, requestSize, outResult) => {
       const request = ModelLoadRequest.decode(
         heapU8.slice(requestPointer, requestPointer + requestSize),

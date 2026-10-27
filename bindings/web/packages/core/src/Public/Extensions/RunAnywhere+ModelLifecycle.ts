@@ -35,9 +35,10 @@ import {
 import {
   getAllRegisteredModules,
   getModuleForModel,
+  getWasmModuleRecord,
   recordModelLifecycle,
 } from '../../runtime/EmscriptenModule.js';
-import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
+import type { EmscriptenRunanywhereModule, WasmCapability } from '../../runtime/EmscriptenModule.js';
 import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import type { BackendWorkerModality } from '../../runtime/BackendWorkerProtocol.js';
 import {
@@ -91,11 +92,30 @@ function isConcreteFramework(
     && framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 }
 
-/** Select the first registered Web WASM that can own this ordered load request. */
+/** Map model categories to the primitive capabilities advertised by Web backends. */
+function modelLoadCapability(category?: ModelCategory): WasmCapability | undefined {
+  switch (category) {
+    case ModelCategoryEnum.MODEL_CATEGORY_LANGUAGE: return 'llm';
+    case ModelCategoryEnum.MODEL_CATEGORY_VISION:
+    case ModelCategoryEnum.MODEL_CATEGORY_MULTIMODAL: return 'vlm';
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEECH_RECOGNITION: return 'stt';
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEECH_SYNTHESIS: return 'tts';
+    case ModelCategoryEnum.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION: return 'vad';
+    case ModelCategoryEnum.MODEL_CATEGORY_EMBEDDING: return 'embedding';
+    case ModelCategoryEnum.MODEL_CATEGORY_IMAGE_GENERATION: return 'diffusion';
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEAKER_DIARIZATION: return 'diarization';
+    case ModelCategoryEnum.MODEL_CATEGORY_SEMANTIC_SEGMENTATION: return 'segmentation';
+    case ModelCategoryEnum.MODEL_CATEGORY_RERANK: return 'rerank';
+    default: return undefined;
+  }
+}
+
+/** Select the first registered Web WASM that supports this ordered load request. */
 function selectModelLoadRoute(
   request: ModelLoadRequest,
   model: ModelInfo | null,
 ): ModelLoadRoute {
+  const capability = modelLoadCapability(model?.category ?? request.category);
   const candidates = [
     request.framework,
     ...(request.backendPreferences ?? []),
@@ -107,16 +127,29 @@ function selectModelLoadRoute(
     visited.add(framework);
     const module = ModelLifecycleAdapter.moduleForFramework(framework);
     if (module) {
+      const adapter = ModelLifecycleAdapter.fromModule(module);
+      // Consult the candidate's own registration: a last-writer capability
+      // slot can point at a sibling that implements the same primitive.
+      const record = getWasmModuleRecord(lifecycleModuleAsEmscripten(adapter));
+      if (capability && !record?.capabilities.includes(capability)) continue;
       return {
-        adapter: ModelLifecycleAdapter.fromModule(module),
+        adapter,
         framework,
       };
     }
   }
 
   const fallbackFramework = model?.framework ?? request.framework;
+  const adapter = requireAdapter(fallbackFramework);
+  const record = getWasmModuleRecord(lifecycleModuleAsEmscripten(adapter));
+  if (capability && record && !record.capabilities.includes(capability)) {
+    throw SDKException.backendNotAvailable(
+      'ModelLifecycle',
+      `No requested or catalog backend supports the '${capability}' capability. Register a compatible backend before loading this model.`,
+    );
+  }
   return {
-    adapter: requireAdapter(fallbackFramework),
+    adapter,
     framework: isConcreteFramework(fallbackFramework) ? fallbackFramework : undefined,
   };
 }
@@ -220,8 +253,11 @@ function currentModelFromBackendWorker(
   if (owned.length === 0) return null;
 
   for (const entry of owned) {
-    const model = safeGetModelSnapshot(entry.modelId);
-    if (!model) continue;
+    const snapshot = safeGetModelSnapshot(entry.modelId);
+    if (!snapshot) continue;
+    const model = entry.framework !== undefined
+      ? { ...snapshot, framework: entry.framework }
+      : snapshot;
     if (
       request.category !== undefined
       && request.category !== null
@@ -297,7 +333,11 @@ async function loadModelViaBackendWorker(
   }
   const result = ModelLoadResultCodec.decode(response.resultBytes);
   if (!result.error) {
-    markModelOwnedByBackendWorker(request.modelId, backendId);
+    markModelOwnedByBackendWorker(
+      request.modelId,
+      backendId,
+      isConcreteFramework(result.framework) ? result.framework : undefined,
+    );
     recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
   }
   return result;

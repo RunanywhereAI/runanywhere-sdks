@@ -32,6 +32,7 @@ import {
 } from '../../runtime/EmscriptenModule.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
+import { getBackendWorkerModelFramework } from '../../runtime/BackendWorkerModelOwnership.js';
 
 const logger = new SDKLogger('Embeddings');
 let activeEmbedding: { modelID: string; framework?: InferenceFramework } | null = null;
@@ -95,6 +96,9 @@ async function ensureLoaded(modelID: string): Promise<InferenceFramework | undef
   } catch {
     requestedFramework = undefined;
   }
+  // A backend preference can load this model into a different worker than
+  // the catalog suggests. Reuse that live owner instead of reloading it.
+  requestedFramework = getBackendWorkerModelFramework(modelID) ?? requestedFramework;
   const current = WebModelLifecycle.currentModel({
     category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     framework: requestedFramework,
