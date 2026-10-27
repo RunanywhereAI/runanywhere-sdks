@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 

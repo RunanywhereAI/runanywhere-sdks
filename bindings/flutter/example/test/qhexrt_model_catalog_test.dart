@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
@@ -86,13 +87,25 @@ void main() {
               framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
             );
           }
-          return null;
+          if (request.id == 'qwen3_5_2b') {
+            return null;
+          }
+          if (request.id == 'kokoro_en') {
+            throw SDKException.make(
+              code: ErrorCode.ERROR_CODE_NETWORK_ERROR,
+              message: 'Network unavailable',
+            );
+          }
+          throw SDKException.make(
+            code: ErrorCode.ERROR_CODE_NOT_FOUND,
+            message: 'Manifest unavailable',
+          );
         },
       );
 
       expect(result.registered, 1);
-      expect(result.failed, 0);
-      expect(result.skippedNative, 59);
+      expect(result.failed, 1);
+      expect(result.skippedNative, 58);
       expect(result.registeredModelIds, {'qwen3_5_0_8b_v81'});
       expect(seenIds, hasLength(60));
       expect(seenIds, contains('kokoro_en'));

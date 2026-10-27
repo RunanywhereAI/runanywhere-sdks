@@ -380,17 +380,13 @@ class DartBridgeModelRegistry {
     model_pb.RegisterModelFromUrlRequest request,
   ) async {
     final fn = RacNative.bindings.rac_register_model_from_url_proto;
-    try {
-      return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
-        request: request,
-        invoke: fn,
-        decode: model_pb.ModelInfo.fromBuffer,
-        symbol: 'rac_register_model_from_url_proto',
-      );
-    } catch (e) {
-      _logger.debug('rac_register_model_from_url_proto error: $e');
-      return null;
-    }
+    return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
+      request: request,
+      invoke: fn,
+      decode: model_pb.ModelInfo.fromBuffer,
+      symbol: 'rac_register_model_from_url_proto',
+      preserveNativeError: true,
+    );
   }
 
   /// Register a multi-file model (VLM gguf+mmproj pairs, embedding
@@ -403,17 +399,13 @@ class DartBridgeModelRegistry {
     model_pb.RegisterMultiFileModelRequest request,
   ) async {
     final fn = RacNative.bindings.rac_register_multi_file_model_proto;
-    try {
-      return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
-        request: request,
-        invoke: fn,
-        decode: model_pb.ModelInfo.fromBuffer,
-        symbol: 'rac_register_multi_file_model_proto',
-      );
-    } catch (e) {
-      _logger.debug('rac_register_multi_file_model_proto error: $e');
-      return null;
-    }
+    return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
+      request: request,
+      invoke: fn,
+      decode: model_pb.ModelInfo.fromBuffer,
+      symbol: 'rac_register_multi_file_model_proto',
+      preserveNativeError: true,
+    );
   }
 
   /// Import a local model into the registry via
