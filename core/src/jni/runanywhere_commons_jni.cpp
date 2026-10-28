@@ -534,7 +534,7 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
     }
 
     jniClearPendingException(env);
-    jclass fallbackClass = env->FindClass("java/lang/RuntimeException");
+    jclass fallbackClass = env->FindClass("java/lang/IllegalStateException");
     if (fallbackClass == nullptr) {
         jniClearPendingException(env);
         return;

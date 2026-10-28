@@ -117,8 +117,12 @@ ownedRegistryBuffer(const char *operation, rac_proto_buffer_t &protoBuffer,
     if (protoBuffer.error_message) {
       LOGE("%s proto error: %s", operation, protoBuffer.error_message);
     }
-    const std::string message =
+    std::string message =
         "RAC_RESULT=" + std::to_string(status) + " " + operation;
+    if (protoBuffer.error_message) {
+      message += ": ";
+      message += protoBuffer.error_message;
+    }
     const std::runtime_error error(message);
     rac_proto_buffer_free(&protoBuffer);
     throw error;

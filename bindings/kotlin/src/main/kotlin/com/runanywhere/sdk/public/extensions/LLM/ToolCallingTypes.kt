@@ -157,15 +157,13 @@ val RAToolValue.`object`: Map<String, RAToolValue>? get() = object_value?.fields
  * Render this value as a JSON string. Mirrors Swift
  * `RAToolValue.toJSONString(pretty:)` — routes through
  * `rac_tool_value_to_json_proto`. `pretty` re-renders the canonical JSON with
- * sorted keys for presentation; null on any failure.
+ * sorted keys for presentation. Native failures throw [SDKException]; an
+ * unavailable or undecodable response returns null.
  */
 fun RAToolValue.toJSONString(pretty: Boolean = false): String? {
     val resultBytes =
-        try {
-            withNativeProtoFailure { RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) }
-        } catch (_: SDKException) {
-            return null
-        } ?: return null
+        withNativeProtoFailure { RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) }
+            ?: return null
     val json =
         runCatching { ToolValueJSON.ADAPTER.decode(resultBytes).json }.getOrNull() ?: return null
     if (!pretty) return json
@@ -217,12 +215,14 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
 
 /**
  * Serialize a `[String: RAToolValue]` map into a JSON object string. Mirrors
- * Swift `RAToolValue.jsonString(from:)`. Returns `"{}"` when serialization
- * fails so wire-shape callers always get valid JSON.
+ * Swift `RAToolValue.jsonString(from:)`. Serialization failures throw instead
+ * of replacing a tool's output or arguments with an empty JSON object.
  */
 fun ai.runanywhere.proto.v1.ToolValue.Companion.jsonString(
     from: Map<String, RAToolValue>,
-): String = RAToolValue.`object`(from).toJSONString() ?: "{}"
+): String =
+    RAToolValue.`object`(from).toJSONString()
+        ?: throw SDKException.operation("Failed to serialize tool value JSON")
 
 // MARK: Tool Definition Helpers --------------------------------------------
 

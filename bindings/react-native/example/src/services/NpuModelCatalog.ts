@@ -29,7 +29,8 @@ export type NpuBundle = Readonly<{
  * App-owned QHexRT examples. Rows carry logical or explicitly pinned bundle
  * references; Commons and QHexRT resolve logical references to the probed
  * architecture folder while leaving matching pinned references unchanged.
- * Rows preserve the former native architecture masks. This curated public list
+ * Rows preserve the former native architecture masks except kitten_nano_0_8,
+ * whose selected manifest is pinned to v81. This curated public list
  * deliberately omits kitten_nano_0_8_varlen; adding that private variant requires
  * an explicit HF-auth preflight, not just an architecture annotation.
  */

@@ -108,15 +108,20 @@ describe('SDKException', () => {
       'preserves the native not-found code from %s failures',
       async (operation) => {
         const result = -ErrorCode.ERROR_CODE_NOT_FOUND;
-        const wrapped = await asNativeSDKException(
-          new Error(`RAC_RESULT=${result} ${operation}`)
-        );
+        const nativeMessage = `RAC_RESULT=${result} ${operation}: model manifest missing`;
+        const wrapped = await asNativeSDKException(new Error(nativeMessage));
 
         expect(wrapped).toBeInstanceOf(SDKException);
         expect(wrapped.code).toBe(ErrorCode.ERROR_CODE_NOT_FOUND);
         expect(wrapped.cAbiCode).toBe(result);
+        expect(wrapped.proto.nestedMessage).toBe(nativeMessage);
       }
     );
+
+    it('passes an existing SDKException through unchanged', async () => {
+      const original = SDKException.unknown('RAC_RESULT=-423 already wrapped');
+      expect(await asNativeSDKException(original)).toBe(original);
+    });
 
     it('falls back to ordinary error wrapping for RAC_RESULT=0', async () => {
       const original = new Error('RAC_RESULT=0 registerModelFromUrlProto');

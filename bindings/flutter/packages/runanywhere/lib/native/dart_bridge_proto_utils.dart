@@ -143,7 +143,8 @@ class DartBridgeProtoUtils {
       final result = code != RacResultCodes.success ? code : out.ref.status;
       // The canonical mapper uses callOut's default failure handling.
       final exception = SDKException.fromResult(result)!;
-      exception.error.message = message;
+      exception.error.message =
+          '$symbol failed: ${exception.message} (${protoBufferError(out, code)})';
       throw exception;
     }
     throw SDKException.make(
