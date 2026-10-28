@@ -388,10 +388,11 @@ class DartBridgeModelRegistry {
         symbol: 'rac_register_model_from_url_proto',
         preserveNativeError: true,
       );
-    } on SDKException {
+    } on SDKException catch (e) {
+      e.error.message = '${e.message} (model "${request.name}")';
       rethrow;
     } catch (e) {
-      throw SDKException.internalError(e.toString());
+      throw SDKException.internalError('$e (model "${request.name}")');
     }
   }
 
@@ -413,10 +414,11 @@ class DartBridgeModelRegistry {
         symbol: 'rac_register_multi_file_model_proto',
         preserveNativeError: true,
       );
-    } on SDKException {
+    } on SDKException catch (e) {
+      e.error.message = '${e.message} (model "${request.name}")';
       rethrow;
     } catch (e) {
-      throw SDKException.internalError(e.toString());
+      throw SDKException.internalError('$e (model "${request.name}")');
     }
   }
 

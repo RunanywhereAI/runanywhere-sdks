@@ -2,6 +2,7 @@ import {
   InferenceFramework,
   ModelCategory,
   ModelInfo,
+  ModelSource,
 } from '@runanywhere/proto-ts/model_types';
 import {
   filterVisibleNativeNpuCatalog,
@@ -76,11 +77,14 @@ describe('React Native QHexRT catalog', () => {
     const registration = toNpuModelRegistration(bundle!);
     expect(registration).toMatchObject({
       id: 'qwen3_5_0_8b',
+      name: 'Qwen3.5 0.8B (HNPU)',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
       memoryRequirementBytes: 2_046_527_848,
       contextLength: 1_024,
       supportsThinking: true,
+      source: ModelSource.MODEL_SOURCE_REMOTE,
+      description: 'Qualcomm Hexagon NPU model bundle.',
     });
     expect(registration).not.toHaveProperty('downloadSizeBytes');
     expect(registration).not.toHaveProperty('supportsLora');

@@ -722,6 +722,9 @@ async function registerNpuBundles(
     } catch (error) {
       if (isMissingNpuManifest(error)) {
         skipped += 1;
+        logDiagnostic(
+          `[App] Skipping NPU bundle ${bundle.id}: ${String(error)}`
+        );
       } else {
         failed += 1;
         logDiagnostic(
