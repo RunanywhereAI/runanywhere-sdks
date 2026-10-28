@@ -31,11 +31,14 @@
 #include <vector>
 
 #include "features/llm/tool_calling_internal.h"
+#include "features/llm/utf8_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
+
+#include "features/llm/tool_calling_result_internal.h"
 #endif
 
 using nlohmann::json;
@@ -908,7 +911,7 @@ static std::string validation_errors_to_json(const std::vector<std::string>& err
     for (const auto& error : errors) {
         arr.push_back(error);
     }
-    return arr.dump();
+    return arr.dump(-1, ' ', false, json::error_handler_t::replace);
 }
 
 // =============================================================================
@@ -1435,7 +1438,9 @@ static std::string decode_lfm2_single_quoted_string(const std::string& value) {
 }
 
 static json parse_lfm2_argument_value(const std::string& raw_value) {
-    const std::string value = trim_ascii_whitespace(raw_value);
+    // Repair before parsing so quoted strings lose their delimiters and nested
+    // objects/arrays retain their types instead of falling back to raw strings.
+    const std::string value = rac::llm::sanitize_utf8(trim_ascii_whitespace(raw_value));
     if (value == "True") {
         return true;
     }
@@ -1476,7 +1481,7 @@ static bool lfm2_arguments_to_json(const std::string& args, std::string* out_jso
         }
         result[key] = parse_lfm2_argument_value(value);
     }
-    *out_json = result.dump();
+    *out_json = result.dump(-1, ' ', false, json::error_handler_t::replace);
     return true;
 }
 
@@ -2622,20 +2627,10 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
             }
         }
 
-        const auto result_json = [](const runanywhere::v1::ToolResult& value) {
-            if (!value.result_json().empty()) {
-                return value.result_json();
-            }
-            if (value.has_error() && !value.error().empty()) {
-                json error = json::object();
-                error["error"] = value.error();
-                return error.dump();
-            }
-            return std::string("{}");
-        };
+        using rac::llm::tool_calling::tool_result_payload_json;
 
         if (request.tool_results_size() == 1) {
-            const std::string payload = result_json(tool_result);
+            const std::string payload = tool_result_payload_json(tool_result);
             rc = rac_tool_call_build_followup_prompt(
                 request.user_prompt().c_str(),
                 tools_prompt.empty() ? nullptr : tools_prompt.c_str(),
@@ -2659,7 +2654,7 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
                 followup += "\nTool '";
                 followup += name;
                 followup += "' result:\n";
-                followup += result_json(recorded);
+                followup += tool_result_payload_json(recorded);
                 followup += "\n";
             }
             followup += "\nUsing all results above, answer the original question. ";

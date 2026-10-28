@@ -20,15 +20,18 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <nlohmann/json.hpp>
 #include <string>
 
+#include "features/llm/tool_calling_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_tool_calling.h"
-#include "features/llm/tool_calling_internal.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
+
+#include "features/llm/tool_calling_result_internal.h"
 #endif
 
 namespace {
@@ -460,6 +463,162 @@ int test_pythonic_detect_and_parse() {
     ASSERT_EQ_INT(call3.has_tool_call, RAC_FALSE);
     rac_tool_call_free(&call3);
     return 0;
+}
+
+struct Utf8ArgumentCase {
+    const char* value;
+    const char* expected;
+    rac_tool_param_type_t type;
+};
+
+// Check decoded values and schema validation, not just the presence of U+FFFD:
+// repairing only at dump time can leave extra quotes or turn objects into strings.
+int check_pythonic_utf8_arguments(const Utf8ArgumentCase* cases, size_t count) {
+    for (const auto format : {RAC_TOOL_FORMAT_LFM2, RAC_TOOL_FORMAT_PYTHONIC}) {
+        for (size_t i = 0; i < count; ++i) {
+            const auto& c = cases[i];
+            std::string input = "[inspect(value=";
+            input += c.value;
+            input += ")]";
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+            }
+            rac_tool_call_t call{};
+            const rac_result_t rc = rac_tool_call_parse(input.c_str(), &call);
+            ASSERT_EQ_INT(rc, RAC_SUCCESS);
+            ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+            ASSERT_EQ_INT(call.format, format);
+            ASSERT_TRUE(call.tool_name != nullptr);
+            ASSERT_EQ_STR(call.tool_name, "inspect");
+            ASSERT_TRUE(call.arguments_json != nullptr);
+            const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
+            ASSERT_TRUE(args.is_object());
+            ASSERT_TRUE(args.contains("value"));
+            ASSERT_TRUE(args["value"] == nlohmann::json::parse(c.expected));
+
+            rac_tool_parameter_t param{"value", c.type, "Value to inspect", RAC_TRUE, nullptr};
+            rac_tool_definition_t tool{"inspect", "Inspect a value", &param, 1, nullptr};
+            rac_tool_call_validation_t validation{};
+            ASSERT_EQ_INT(rac_tool_call_validate(&call, &tool, 1, &validation), RAC_SUCCESS);
+            ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
+            rac_tool_call_validation_free(&validation);
+            rac_tool_call_free(&call);
+        }
+    }
+    return 0;
+}
+
+int test_pythonic_utf8_strings() {
+    const Utf8ArgumentCase cases[] = {
+        {"'\xC3\x28'", "\"\xEF\xBF\xBD(\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xC3\x28\"", "\"\xEF\xBF\xBD(\"", RAC_TOOL_PARAM_STRING},
+        {"\"quoted \\\"\xFF\\\"\\nline\"", "\"quoted \\\"\xEF\xBF\xBD\\\"\\nline\"",
+         RAC_TOOL_PARAM_STRING},
+        {"\"\xE2\x82\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+    };
+    return check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0]));
+}
+
+int test_pythonic_utf8_nested_values() {
+    const Utf8ArgumentCase cases[] = {
+        {"{\"q\":\"\xFF\",\"count\":2,\"enabled\":true}",
+         "{\"q\":\"\xEF\xBF\xBD\",\"count\":2,\"enabled\":true}", RAC_TOOL_PARAM_OBJECT},
+        {"[1,{\"q\":\"\xC3\x28\"},false,null]", "[1,{\"q\":\"\xEF\xBF\xBD(\"},false,null]",
+         RAC_TOOL_PARAM_ARRAY},
+        {"{\"\xFF\":[\"\xFF\"]}", "{\"\xEF\xBF\xBD\":[\"\xEF\xBF\xBD\"]}", RAC_TOOL_PARAM_OBJECT},
+    };
+    return check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0]));
+}
+
+int test_pythonic_utf8_invalid_scalars() {
+    const Utf8ArgumentCase cases[] = {
+        {"\"\x80\"", "\"\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xC0\xAF\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xE0\x80\x80\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xED\xA0\x80\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xF4\x90\x80\x80\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\"",
+         RAC_TOOL_PARAM_STRING},
+    };
+    return check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0]));
+}
+
+int test_pythonic_utf8_valid_unicode() {
+    const char* value =
+        "\"ASCII \xC2\x80\xDF\xBF\xE0\xA0\x80\xED\x9F\xBF\xEE\x80\x80\xEF\xBF\xBF"
+        "\xF0\x90\x80\x80\xF4\x8F\xBF\xBF \xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80\"";
+    const Utf8ArgumentCase cases[] = {{value, value, RAC_TOOL_PARAM_STRING}};
+    return check_pythonic_utf8_arguments(cases, 1);
+}
+
+int test_pythonic_utf8_argument_key() {
+    for (const auto format : {RAC_TOOL_FORMAT_LFM2, RAC_TOOL_FORMAT_PYTHONIC}) {
+        std::string input = "[inspect(value=1,bad_\xFF=2)]";
+        if (format == RAC_TOOL_FORMAT_LFM2) {
+            input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+        }
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+        ASSERT_TRUE(call.arguments_json != nullptr);
+        const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
+        ASSERT_TRUE(args.is_object());
+        ASSERT_TRUE(args["value"] == 1);
+        ASSERT_TRUE(args["bad_\xEF\xBF\xBD"] == 2);
+        rac_tool_call_free(&call);
+    }
+    return 0;
+}
+
+// An unknown model-generated name must produce a validation failure, even if
+// its bytes are malformed; it must never throw while serializing the error.
+int test_validate_invalid_utf8_tool_name() {
+    rac_tool_call_t call{};
+    ASSERT_EQ_INT(rac_tool_call_parse(
+                      "<tool_call>{\"tool\":\"unknown_\xFF\",\"arguments\":{}}</tool_call>", &call),
+                  RAC_SUCCESS);
+    ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+    for (const bool json_definitions : {false, true}) {
+        rac_tool_call_validation_t validation{};
+        const rac_result_t rc = json_definitions
+                                    ? rac_tool_call_validate_json(&call, "[]", &validation)
+                                    : rac_tool_call_validate(&call, nullptr, 0, &validation);
+        ASSERT_EQ_INT(rc, RAC_SUCCESS);
+        ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
+        ASSERT_EQ_INT(validation.error_code, RAC_ERROR_VALIDATION_FAILED);
+        ASSERT_TRUE(validation.validation_errors_json != nullptr);
+        const auto errors =
+            nlohmann::json::parse(validation.validation_errors_json, nullptr, false);
+        ASSERT_TRUE(errors.is_array());
+        ASSERT_EQ_INT(errors.size(), 1);
+        ASSERT_TRUE(errors[0] == "Unknown tool: unknown_\xEF\xBF\xBD");
+        rac_tool_call_validation_free(&validation);
+    }
+    rac_tool_call_free(&call);
+    return 0;
+}
+
+int test_tool_result_utf8_error_payload() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    using rac::llm::tool_calling::tool_result_payload_json;
+    runanywhere::v1::ToolResult result;
+    ASSERT_EQ_STR(tool_result_payload_json(result).c_str(), "{}");
+    // Construct the executor result directly: malformed proto string fields
+    // cannot reliably round-trip through the strict protobuf byte parser.
+    result.set_error("failed: \"\xC3\x28\"\n");
+    auto payload = nlohmann::json::parse(tool_result_payload_json(result), nullptr, false);
+    ASSERT_TRUE(payload.is_object());
+    ASSERT_TRUE(payload["error"] == "failed: \"\xEF\xBF\xBD(\"\n");
+    result.set_error("\xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80");
+    payload = nlohmann::json::parse(tool_result_payload_json(result), nullptr, false);
+    ASSERT_TRUE(payload.is_object());
+    ASSERT_TRUE(payload["error"] == result.error());
+    // A real result takes precedence over the error, preserving its raw JSON.
+    result.set_result_json("{\"answer\":42}");
+    ASSERT_EQ_STR(tool_result_payload_json(result).c_str(), "{\"answer\":42}");
+    return 0;
+#endif
 }
 
 // RUN-80 (grammar-engage, review follow-up): the bare parser locates the call by the
@@ -1036,6 +1195,13 @@ int main(int argc, char** argv) {
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},
         {.name = "tool_call_format_per_family", .fn = test_tool_call_format_per_family},
         {.name = "pythonic_detect_and_parse", .fn = test_pythonic_detect_and_parse},
+        {.name = "pythonic_utf8_strings", .fn = test_pythonic_utf8_strings},
+        {.name = "pythonic_utf8_nested_values", .fn = test_pythonic_utf8_nested_values},
+        {.name = "pythonic_utf8_invalid_scalars", .fn = test_pythonic_utf8_invalid_scalars},
+        {.name = "pythonic_utf8_valid_unicode", .fn = test_pythonic_utf8_valid_unicode},
+        {.name = "pythonic_utf8_argument_key", .fn = test_pythonic_utf8_argument_key},
+        {.name = "validate_invalid_utf8_tool_name", .fn = test_validate_invalid_utf8_tool_name},
+        {.name = "tool_result_utf8_error_payload", .fn = test_tool_result_utf8_error_payload},
         {.name = "pythonic_multibracket_and_special_args",
          .fn = test_pythonic_multibracket_and_special_args},
         {.name = "pythonic_prompt_render", .fn = test_pythonic_prompt_render},
