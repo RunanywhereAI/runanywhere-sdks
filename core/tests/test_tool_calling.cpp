@@ -565,6 +565,28 @@ int test_pythonic_utf8_argument_key() {
         ASSERT_TRUE(args["value"] == 1);
         ASSERT_TRUE(args["bad_\xEF\xBF\xBD"] == 2);
         rac_tool_call_free(&call);
+
+        // Different raw keys can become identical after UTF-8 repair. Reject
+        // the whole call rather than silently dropping one argument.
+        const char* collisions[] = {
+            "[inspect(x\xFF=1,x\xFE=2)]",         "[inspect(x\xFF=1,x\xEF\xBF\xBD=2)]",
+            "[inspect(x\xEF\xBF\xBD=1,x\xFF=2)]", "[inspect(x\xFF=1,x\xFF=2)]",
+            "[inspect(value=1,value=2)]",
+        };
+        for (const char* collision : collisions) {
+            std::string rejected_input = collision;
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                rejected_input = "<|tool_call_start|>" + rejected_input + "<|tool_call_end|>";
+            }
+            rac_tool_call_t rejected{};
+            ASSERT_EQ_INT(rac_tool_call_parse(rejected_input.c_str(), &rejected), RAC_SUCCESS);
+            ASSERT_EQ_INT(rejected.has_tool_call, RAC_FALSE);
+            ASSERT_TRUE(rejected.tool_name == nullptr);
+            ASSERT_TRUE(rejected.arguments_json == nullptr);
+            ASSERT_TRUE(rejected.clean_text != nullptr);
+            ASSERT_EQ_STR(rejected.clean_text, rejected_input.c_str());
+            rac_tool_call_free(&rejected);
+        }
     }
     return 0;
 }
@@ -597,10 +619,8 @@ int test_validate_invalid_utf8_tool_name() {
     return 0;
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
 int test_tool_result_utf8_error_payload() {
-#if !defined(RAC_HAVE_PROTOBUF)
-    return 0;
-#else
     using rac::llm::tool_calling::tool_result_payload_json;
     runanywhere::v1::ToolResult result;
     ASSERT_EQ_STR(tool_result_payload_json(result).c_str(), "{}");
@@ -618,8 +638,8 @@ int test_tool_result_utf8_error_payload() {
     result.set_result_json("{\"answer\":42}");
     ASSERT_EQ_STR(tool_result_payload_json(result).c_str(), "{\"answer\":42}");
     return 0;
-#endif
 }
+#endif
 
 // RUN-80 (grammar-engage, review follow-up): the bare parser locates the call by the
 // MATCHING ']' (quote- and nesting-aware), so trailing text, a later bracket group, or a
@@ -1201,7 +1221,9 @@ int main(int argc, char** argv) {
         {.name = "pythonic_utf8_valid_unicode", .fn = test_pythonic_utf8_valid_unicode},
         {.name = "pythonic_utf8_argument_key", .fn = test_pythonic_utf8_argument_key},
         {.name = "validate_invalid_utf8_tool_name", .fn = test_validate_invalid_utf8_tool_name},
+#if defined(RAC_HAVE_PROTOBUF)
         {.name = "tool_result_utf8_error_payload", .fn = test_tool_result_utf8_error_payload},
+#endif
         {.name = "pythonic_multibracket_and_special_args",
          .fn = test_pythonic_multibracket_and_special_args},
         {.name = "pythonic_prompt_render", .fn = test_pythonic_prompt_render},

@@ -1474,9 +1474,15 @@ static bool lfm2_arguments_to_json(const std::string& args, std::string* out_jso
         if (assignment == std::string::npos) {
             return false;
         }
-        const std::string key = trim_ascii_whitespace(argument.substr(0, assignment));
+        const std::string key =
+            rac::llm::sanitize_utf8(trim_ascii_whitespace(argument.substr(0, assignment)));
         const std::string value = trim_ascii_whitespace(argument.substr(assignment + 1));
         if (key.empty() || value.empty()) {
+            return false;
+        }
+        // Repair keys before insertion so serialization cannot create duplicate
+        // JSON members. Ambiguous calls must not silently lose an argument.
+        if (result.contains(key)) {
             return false;
         }
         result[key] = parse_lfm2_argument_value(value);
