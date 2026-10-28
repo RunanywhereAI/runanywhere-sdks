@@ -6,14 +6,12 @@
  * `SDKExceptionTest` so cross-SDK code paths stay byte-isomorphic.
  */
 
-import {
-  ErrorCategory,
-  ErrorCode,
-} from '@runanywhere/proto-ts/errors';
+import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
 import {
   SDKException,
   isSDKException,
   asSDKException,
+  asNativeSDKException,
 } from '../../src/Foundation/Errors/SDKException';
 
 describe('SDKException', () => {
@@ -105,6 +103,45 @@ describe('SDKException', () => {
     });
   });
 
+  describe('asNativeSDKException', () => {
+    it.each(['registerModelFromUrlProto', 'registerMultiFileModelProto'])(
+      'preserves the native not-found code from %s failures',
+      async (operation) => {
+        const result = -ErrorCode.ERROR_CODE_NOT_FOUND;
+        const wrapped = await asNativeSDKException(
+          new Error(`RAC_RESULT=${result} ${operation}`)
+        );
+
+        expect(wrapped).toBeInstanceOf(SDKException);
+        expect(wrapped.code).toBe(ErrorCode.ERROR_CODE_NOT_FOUND);
+        expect(wrapped.cAbiCode).toBe(result);
+      }
+    );
+
+    it('falls back to ordinary error wrapping for RAC_RESULT=0', async () => {
+      const original = new Error('RAC_RESULT=0 registerModelFromUrlProto');
+      const wrapped = await asNativeSDKException(original);
+
+      expect(wrapped.proto).toEqual(asSDKException(original).proto);
+      expect(wrapped.code).toBe(ErrorCode.ERROR_CODE_UNKNOWN);
+      expect(wrapped.message).toBe(original.message);
+      expect(wrapped.proto.nestedMessage).toBe(original.message);
+    });
+
+    it.each([
+      'RAC_RESULT=-423 registerModelFromUrlProto',
+      { result: -423 },
+      undefined,
+      null,
+    ])('uses ordinary wrapping for non-Error input %p', async (input) => {
+      const wrapped = await asNativeSDKException(input);
+
+      expect(wrapped.proto).toEqual(asSDKException(input).proto);
+      expect(wrapped.code).toBe(ErrorCode.ERROR_CODE_UNKNOWN);
+      expect(wrapped.message).toBe(String(input));
+    });
+  });
+
   describe('categoryForCode (via static factories)', () => {
     it('maps configuration codes (100-109) to CONFIGURATION', () => {
       // notInitialized() deliberately overrides to COMPONENT (Swift parity),
@@ -113,7 +150,9 @@ describe('SDKException', () => {
         ErrorCode.ERROR_CODE_INVALID_API_KEY,
         'bad key'
       );
-      expect(exception.category).toBe(ErrorCategory.ERROR_CATEGORY_CONFIGURATION);
+      expect(exception.category).toBe(
+        ErrorCategory.ERROR_CATEGORY_CONFIGURATION
+      );
     });
 
     it('notInitialized uses COMPONENT category (Swift parity)', () => {

@@ -25,6 +25,7 @@ import ai.runanywhere.proto.v1.DiarizationResult
 import ai.runanywhere.proto.v1.DiarizationStreamEvent
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
@@ -83,9 +84,11 @@ object CppBridgeDiarization {
         val payload =
             try {
                 withContext(Dispatchers.IO) {
-                    RunAnywhereBridge.racDiarizationDiarizeLifecycleProto(
-                        DiarizationRequest.ADAPTER.encode(request),
-                    )
+                    withNativeProtoFailure {
+                        RunAnywhereBridge.racDiarizationDiarizeLifecycleProto(
+                            DiarizationRequest.ADAPTER.encode(request),
+                        )
+                    }
                 }
             } catch (error: SDKException) {
                 throw error

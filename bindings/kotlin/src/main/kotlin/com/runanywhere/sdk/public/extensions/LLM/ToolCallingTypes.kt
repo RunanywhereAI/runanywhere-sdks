@@ -24,6 +24,7 @@ package com.runanywhere.sdk.public.extensions.LLM
 
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.ToolValueJSON
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
@@ -160,7 +161,11 @@ val RAToolValue.`object`: Map<String, RAToolValue>? get() = object_value?.fields
  */
 fun RAToolValue.toJSONString(pretty: Boolean = false): String? {
     val resultBytes =
-        RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) ?: return null
+        try {
+            withNativeProtoFailure { RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) }
+        } catch (_: SDKException) {
+            return null
+        } ?: return null
     val json =
         runCatching { ToolValueJSON.ADAPTER.decode(resultBytes).json }.getOrNull() ?: return null
     if (!pretty) return json
@@ -196,7 +201,7 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
     }
     val wrapper = ToolValueJSON(json = json)
     val valueBytes =
-        RunAnywhereBridge.racToolValueFromJsonProto(ToolValueJSON.ADAPTER.encode(wrapper))
+        withNativeProtoFailure { RunAnywhereBridge.racToolValueFromJsonProto(ToolValueJSON.ADAPTER.encode(wrapper)) }
             ?: throw SDKException.invalidArgument("Malformed tool arguments JSON")
     val decoded =
         runCatching {
