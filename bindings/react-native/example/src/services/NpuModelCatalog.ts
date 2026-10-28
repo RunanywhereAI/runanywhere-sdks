@@ -29,6 +29,9 @@ export type NpuBundle = Readonly<{
  * App-owned QHexRT examples. Rows carry logical or explicitly pinned bundle
  * references; Commons and QHexRT resolve logical references to the probed
  * architecture folder while leaving matching pinned references unchanged.
+ * Rows preserve the former native architecture masks. This curated public list
+ * deliberately omits kitten_nano_0_8_varlen; adding that private variant requires
+ * an explicit HF-auth preflight, not just an architecture annotation.
  */
 export const NPU_BUNDLES: readonly NpuBundle[] = [
   {
@@ -75,6 +78,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'qwen3_5_4b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V75],
     name: 'Qwen3.5 4B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -83,6 +87,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'qwen3_0_6b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Qwen3 0.6B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -91,6 +96,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'llama3_2_1b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V75],
     name: 'Llama 3.2 1B (HNPU)',
     url: 'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -98,8 +104,9 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     // v81 ships the fully-on-NPU TRUE-TERNARY {-1,0,+1} decoder (no int8 fallback), not the older
-    // QNN W8A16 build — smaller download (~1.12 GB vs ~2.37 GB). v75/v79 are unchanged (W8A16).
+    // QNN W8A16 build — smaller download (~1.12 GB vs ~2.37 GB). v75 is unchanged (W8A16); v79 remains excluded.
     id: 'ternary_bonsai_1_7b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Ternary Bonsai 1.7B (HNPU)',
     url: 'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -108,6 +115,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'phi_tiny_moe',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V75],
     name: 'Phi Tiny MoE (HNPU)',
     url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -121,7 +129,9 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     memoryRequirementBytes: 566_263_339,
   },
   {
+    // Preserve the native QAIRT restriction: the v79 bundle needs 2.48.
     id: 'gemma3n_e4b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'Gemma 3n E4B (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -129,6 +139,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'gemma4_e2b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V75],
     name: 'Gemma 4 E2B (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -136,6 +147,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'gemma4_e4b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'Gemma 4 E4B (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -143,6 +155,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'llama_embed_nemotron_8b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'Llama Embed Nemotron 8B (HNPU)',
     url: 'https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
@@ -150,6 +163,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nv_embedcode_7b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'NV-EmbedCode 7B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
@@ -157,6 +171,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nv_embedqa_1b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'NV-EmbedQA 1B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
@@ -164,6 +179,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nv_rerankqa_1b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'NV-RerankQA 1B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
@@ -171,6 +187,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'deepseek_r1_distill_qwen_1_5b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V75],
     name: 'DeepSeek R1 Distill Qwen 1.5B (HNPU)',
     url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -179,6 +196,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'deepseek_r1_distill_qwen_7b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'DeepSeek R1 Distill Qwen 7B (HNPU)',
     url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -187,6 +205,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemotron_nano_8b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -194,6 +213,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemoguard_content_8b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'NemoGuard 8B Content Safety (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -201,6 +221,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemoguard_topic_8b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'NemoGuard 8B Topic Control (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -208,6 +229,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'qwen3_vl_2b_text',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'Qwen3-VL 2B Text (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -216,6 +238,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'qwen3_vl',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V81],
     name: 'Qwen3-VL 2B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -232,6 +255,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'gemma4_e2b_vlm',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V75],
     name: 'Gemma 4 E2B Image (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -239,6 +263,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'gemma4_e4b_vlm',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'Gemma 4 E4B Image (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -246,6 +271,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemotron_nano_vl_8b',
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -253,6 +279,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'lama_dilated',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V75],
     name: 'LaMa Dilated (HNPU)',
     url: 'https://huggingface.co/runanywhere/lama_dilated_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
@@ -260,6 +287,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemotron_ocr',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Nemotron OCR (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_ocr_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -267,6 +295,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemotron_ocr_v1',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Nemotron OCR v1 (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -274,6 +303,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemotron_parse',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Nemotron Parse (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_parse_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -316,6 +346,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'parakeet_tdt_0_6b_v2',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Parakeet TDT 0.6B v2 (HNPU)',
     url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
@@ -323,6 +354,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'parakeet_tdt_0_6b_v3',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Parakeet TDT 0.6B v3 (HNPU)',
     url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
@@ -330,6 +362,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'parakeet_rnnt_1_1b',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Parakeet RNNT 1.1B (HNPU)',
     url: 'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
@@ -345,6 +378,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'canary_1b_flash',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Canary-1B-flash (HNPU)',
     url: 'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
@@ -352,6 +386,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
   },
   {
     id: 'nemotron_asr_streaming',
+    excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
     name: 'Nemotron ASR Streaming 0.6B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
@@ -365,6 +400,7 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     memoryRequirementBytes: 120_439_053,
   },
   {
+    // Preserve the native exclusion: v79 requires downloaded executable .so files.
     id: 'kokoro_en',
     name: 'Kokoro-82M EN (HNPU)',
     url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
@@ -373,6 +409,8 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     excludedArchitectures: [HexagonArch.HEXAGON_ARCH_V79],
   },
   {
+    // This example deliberately selects the v81 manifest; the native catalog
+    // also allowed v75, which needs a different manifest.
     id: 'kitten_nano_0_8',
     name: 'Kitten-nano-0.8-fp32 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
