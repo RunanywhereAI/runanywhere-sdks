@@ -240,23 +240,34 @@ def test_readme_temp_marker_for_another_release_is_rejected(tmp_path):
     assert f"marker must name v{version}, found 'TEMP: install pins stay on" in result.stderr
 
 
-def test_readme_pins_follow_core_version_without_a_temp_marker(tmp_path):
-    # With the marker gone the pins must name core/VERSION again, so publishing
-    # cannot be forgotten once the marker is deleted.
+def _readme_without_temp_marker(tmp_path, repin):
     sandbox = _mirror(tmp_path, writable={"README.md"})
     readme = sandbox / "README.md"
     lines = readme.read_text(encoding="utf-8").splitlines(keepends=True)
-    readme.write_text(
-        "".join(line for line in lines if "TEMP: install pins stay on" not in line),
-        encoding="utf-8",
-    )
+    text = "".join(line for line in lines if "TEMP: install pins stay on" not in line)
+    if repin:
+        # With the marker line gone, every remaining copy of the held version
+        # is an install pin.
+        text = text.replace(_readme_pin_version(), _core_version())
+    readme.write_text(text, encoding="utf-8")
+    return sandbox
+
+
+def test_readme_pins_on_core_version_pass_without_a_temp_marker(tmp_path):
+    # The state after publishing: marker deleted, pins synced to core/VERSION.
+    result = _run(_readme_without_temp_marker(tmp_path, repin=True))
+    assert result.returncode == 0, result.stderr
+
+
+def test_deleting_only_the_temp_marker_rejects_stale_pins(tmp_path):
+    # With the marker gone the pins must name core/VERSION again, so publishing
+    # cannot be forgotten once the marker is deleted.
     pin_version = _readme_pin_version()
-    result = _run(sandbox)
     if pin_version == _core_version():
-        assert result.returncode == 0, result.stderr
-    else:
-        assert result.returncode == 1
-        assert f"expected {_core_version()}, found 'runanywhere=={pin_version}'" in result.stderr
+        return  # no marker, so there are no held pins to go stale
+    result = _run(_readme_without_temp_marker(tmp_path, repin=False))
+    assert result.returncode == 1
+    assert f"expected {_core_version()}, found 'runanywhere=={pin_version}'" in result.stderr
 
 
 if __name__ == "__main__":
