@@ -1,15 +1,17 @@
-"""Tests for the podspec source-tag half of check_release_version_coherence.sh.
+"""Tests for the podspec source-tag and root README pin halves of
+check_release_version_coherence.sh.
 
 The gate is the only thing standing between a podspec and a `:tag` that was
 never pushed, which fails `pod install` outright rather than degrading. It reads
 ~40 files under REPO_ROOT, so the tests run it against a sandbox that mirrors
-the real tree with symlinks and materializes only the podspecs a case mutates.
+the real tree with symlinks and materializes only the files a case mutates.
 That keeps every other assertion in the gate satisfied by the real repo, so a
 failure means the mutation caused it.
 """
 
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -77,6 +79,28 @@ def _spm_version():
     raise AssertionError("Package.swift has no sdkVersion pin")
 
 
+def _core_version():
+    return (REPO_ROOT / "core/VERSION").read_text(encoding="utf-8").strip()
+
+
+def _readme_pin_version():
+    # The registry pins follow core/VERSION unless a TEMP marker holds them on
+    # the last published version.
+    match = re.search(
+        r"TEMP: install pins stay on (\S+) until v",
+        (REPO_ROOT / "README.md").read_text(encoding="utf-8"),
+    )
+    return match.group(1) if match else _core_version()
+
+
+def _mutate_readme(tmp_path, old, new):
+    sandbox = _mirror(tmp_path, writable={"README.md"})
+    text = (sandbox / "README.md").read_text(encoding="utf-8")
+    assert text.count(old) == 1, old
+    (sandbox / "README.md").write_text(text.replace(old, new), encoding="utf-8")
+    return _run(sandbox)
+
+
 def test_unmodified_tree_passes(tmp_path):
     # Establishes the baseline the other cases lean on: whatever they trip, it
     # is not one of the gate's other forty assertions.
@@ -130,6 +154,187 @@ def test_every_rn_podspec_is_covered(tmp_path):
     assert on_disk == sorted(RN_PODSPECS)
     for podspec in on_disk:
         assert podspec in gate, f"{podspec} is not covered by {GATE}"
+
+
+def test_one_stale_readme_pin_is_rejected(tmp_path):
+    # The case expect_literal misses: every other pin still names the current
+    # version, so the version string is present and only a per-pin check fails.
+    version = _readme_pin_version()
+    pin = f"io.github.sanchitmonga22:runanywhere-sdk:{version}"
+    result = _mutate_readme(tmp_path, pin, "io.github.sanchitmonga22:runanywhere-sdk:0.0.1")
+    assert result.returncode == 1
+    assert (
+        f"expected {version}, found 'io.github.sanchitmonga22:runanywhere-sdk:0.0.1'"
+        in result.stderr
+    )
+
+
+def test_readme_pin_with_a_prerelease_suffix_is_rejected(tmp_path):
+    # The version must end the pin: a suffix names a different artifact.
+    version = _readme_pin_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}-rc.1")
+    assert result.returncode == 1
+    assert f"found 'runanywhere=={version}-rc.1'" in result.stderr
+
+
+def test_readme_pin_with_an_attached_prerelease_suffix_is_rejected(tmp_path):
+    # PEP 440 attaches the suffix with no separator; a prefix match would pass it.
+    version = _readme_pin_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}rc1")
+    assert result.returncode == 1
+    assert f"found 'runanywhere=={version}rc1'" in result.stderr
+
+
+def test_readme_pin_with_an_unrecognized_suffix_is_rejected(tmp_path):
+    # A suffix the version regex does not know must not be cut off before the
+    # comparison, or the truncated pin reads as current.
+    version = _readme_pin_version()
+    for suffix in ("+build.1", "_rc1"):
+        result = _mutate_readme(
+            tmp_path / suffix.strip("+_"),
+            f"runanywhere=={version}",
+            f"runanywhere=={version}{suffix}",
+        )
+        assert result.returncode == 1
+        assert f"found 'runanywhere=={version}{suffix}'" in result.stderr
+
+
+def test_unpinned_package_beside_a_pinned_one_is_rejected(tmp_path):
+    # @runanywhere/core is still pinned, so the shape has a match; the gate has
+    # to look at every package reference, not only the version-shaped ones.
+    version = _readme_pin_version()
+    result = _mutate_readme(
+        tmp_path, f"@runanywhere/llamacpp@{version}", "@runanywhere/llamacpp@latest"
+    )
+    assert result.returncode == 1
+    assert "found '@runanywhere/llamacpp@latest'" in result.stderr
+
+
+def test_readme_pin_followed_by_a_full_stop_passes(tmp_path):
+    # Sentence punctuation after a pin is not part of the version; reading it as
+    # a suffix fails the gate and makes the sync delete the full stop.
+    version = _readme_pin_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}.")
+    assert result.returncode == 0, result.stderr
+
+
+def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
+    # A shape with no match means the README was reworded under the gate, which
+    # would otherwise stop checking that install command without saying so.
+    version = _readme_pin_version()
+    result = _mutate_readme(tmp_path, f"runanywhere=={version}", "runanywhere")
+    assert result.returncode == 1
+    assert "no version pin matches 'runanywhere=='" in result.stderr
+
+
+def test_readme_temp_marker_for_another_release_is_rejected(tmp_path):
+    # A marker left over from an earlier release must not keep vouching for the
+    # old pins after the next bump.
+    version = _core_version()
+    result = _mutate_readme(
+        tmp_path,
+        f"until v{version} is on the package registries.",
+        "until v0.0.1 is on the package registries.",
+    )
+    assert result.returncode == 1
+    assert f"marker must name v{version}, found 'TEMP: install pins stay on" in result.stderr
+
+
+def _readme_without_temp_marker(tmp_path, repin):
+    sandbox = _mirror(tmp_path, writable={"README.md"})
+    readme = sandbox / "README.md"
+    lines = readme.read_text(encoding="utf-8").splitlines(keepends=True)
+    text = "".join(line for line in lines if "TEMP: install pins stay on" not in line)
+    if repin:
+        # With the marker line gone, every remaining copy of the held version
+        # is an install pin.
+        text = text.replace(_readme_pin_version(), _core_version())
+    readme.write_text(text, encoding="utf-8")
+    return sandbox
+
+
+def test_readme_pins_on_core_version_pass_without_a_temp_marker(tmp_path):
+    # The state after publishing: marker deleted, pins synced to core/VERSION.
+    result = _run(_readme_without_temp_marker(tmp_path, repin=True))
+    assert result.returncode == 0, result.stderr
+
+
+def test_deleting_only_the_temp_marker_rejects_stale_pins(tmp_path):
+    # With the marker gone the pins must name core/VERSION again, so publishing
+    # cannot be forgotten once the marker is deleted.
+    pin_version = _readme_pin_version()
+    if pin_version == _core_version():
+        return  # no marker, so there are no held pins to go stale
+    result = _run(_readme_without_temp_marker(tmp_path, repin=False))
+    assert result.returncode == 1
+    assert f"expected {_core_version()}, found 'runanywhere=={pin_version}'" in result.stderr
+
+
+def _mutate_file(tmp_path, relative, old, new):
+    sandbox = _mirror(tmp_path, writable={relative})
+    path = sandbox / relative
+    text = path.read_text(encoding="utf-8")
+    assert text.count(old) >= 1, old
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+    return _run(sandbox)
+
+
+def test_stale_pip_extras_pin_in_the_python_readme_is_rejected(tmp_path):
+    # runanywhere[extras]== is not one of the root README's shapes; the per-SDK
+    # READMEs are the only place it appears.
+    version = _core_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/python/README.md",
+        f"runanywhere[rag]=={version}",
+        "runanywhere[rag]==0.0.1",
+    )
+    assert result.returncode == 1
+    assert (
+        f"bindings/python/README.md: expected {version}, found 'runanywhere[rag]==0.0.1'"
+        in result.stderr
+    )
+
+
+def test_stale_pin_in_a_kotlin_module_readme_is_rejected(tmp_path):
+    version = _core_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/kotlin/modules/runanywhere-core-onnx/README.md",
+        f"runanywhere-onnx:{version}",
+        "runanywhere-onnx:0.0.1",
+    )
+    assert result.returncode == 1
+    assert "runanywhere-core-onnx/README.md: expected" in result.stderr
+
+
+def test_unpinned_package_in_a_per_sdk_readme_is_rejected(tmp_path):
+    # Same hole as the root README: @runanywhere/core stays pinned, so only a
+    # check of every package reference sees the unpinned backend.
+    version = _core_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/react-native/packages/llamacpp/README.md",
+        f"@runanywhere/llamacpp@{version}",
+        "@runanywhere/llamacpp@latest",
+    )
+    assert result.returncode == 1
+    assert (
+        "bindings/react-native/packages/llamacpp/README.md: expected "
+        f"{version}, found '@runanywhere/llamacpp@latest'" in result.stderr
+    )
+
+
+def test_per_sdk_readme_with_no_pin_is_rejected(tmp_path):
+    # A reworded README that no shape matches would silently drop out of the gate.
+    result = _mutate_file(
+        tmp_path,
+        "bindings/web/packages/core/README.md",
+        "npm install @runanywhere/web@",
+        "npm install @runanywhere/web ",
+    )
+    assert result.returncode == 1
+    assert "bindings/web/packages/core/README.md: no version pin matches" in result.stderr
 
 
 if __name__ == "__main__":

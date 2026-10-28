@@ -452,6 +452,114 @@ for release_doc in \
   expect_literal "${release_doc}" "${VERSION}"
 done
 
+# The root README carries one pin per install command plus the version-line
+# sentence. expect_literal would pass with a single current occurrence and one
+# stale pin beside it, so every pin of each shape has to name the expected
+# version. Each pin is read up to the next space, quote, bracket or bold marker,
+# so `@latest`, `+build.1` or `_rc1` is compared whole instead of being cut back
+# to a match; only a sentence-ending full stop is allowed after the version.
+expect_readme_pins() {
+  local readme_pin="$1" expected="$2" readme_pins readme_stale
+  local expected_regex="${expected//./\\.}"
+  readme_pins="$(grep -Eo -- "${readme_pin}[^][:space:]\"'\`(),*]*" "${REPO_ROOT}/README.md" || true)"
+  if [ -z "${readme_pins}" ]; then
+    echo "[FAIL] README.md: no version pin matches '${readme_pin}'" >&2
+    FAILURES=$((FAILURES + 1))
+    return
+  fi
+  while IFS= read -r readme_stale; do
+    echo "[FAIL] README.md: expected ${expected}, found '${readme_stale}'" >&2
+    FAILURES=$((FAILURES + 1))
+  done < <(grep -Ev -- "${readme_pin}${expected_regex}\.?\$" <<< "${readme_pins}")
+}
+
+# The install commands resolve from npm, Maven Central, pub.dev and PyPI, which
+# can lag the repo version the same way the SwiftPM assets do. README.md records
+# that state with a TEMP marker naming the last published version, and the pins
+# stay on it until v${VERSION} is out. The marker must name ${VERSION}, so one
+# left over from an earlier release cannot vouch for this one.
+README_PIN_VERSION="${VERSION}"
+readme_temp_marker="$(grep -Eo -- "TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v[^ ]+ is on the package registries\." "${REPO_ROOT}/README.md" || true)"
+if [ -n "${readme_temp_marker}" ]; then
+  readme_temp_version="$(awk 'NR == 1 { print $6 }' <<< "${readme_temp_marker}")"
+  if [ "${readme_temp_marker}" = "TEMP: install pins stay on ${readme_temp_version} until v${VERSION} is on the package registries." ]; then
+    README_PIN_VERSION="${readme_temp_version}"
+    echo "[OK] README.md install commands temporarily pin ${README_PIN_VERSION} until v${VERSION} is on the package registries"
+  else
+    echo "[FAIL] README.md: the TEMP install-pin marker must name v${VERSION}, found '${readme_temp_marker}'" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+fi
+for readme_pin in \
+  'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+  'runanywhere[a-z_]*: \^' \
+  '@runanywhere/[a-z-]+@' \
+  'runanywhere=='; do
+  expect_readme_pins "${readme_pin}" "${README_PIN_VERSION}"
+done
+expect_readme_pins 'version line, currently \*\*' "${VERSION}"
+
+# The per-SDK READMEs and core docs repeat those pins in more shapes (pip extras,
+# the "Current release" line, a few prose sentences). Each file has to carry at
+# least one pin, and every pin it carries has to name ${VERSION}. Keep this list
+# and shape set identical to sync-versions.sh.
+readme_version_regex="${VERSION//./\\.}"
+README_PIN_SHAPES=(
+  'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+  'runanywhere[a-z_]*: \^?' \
+  '@runanywhere/[a-z-]+@' \
+  'runanywhere(\[[a-z,]+\])?==' \
+  'Current release:\*\* `' \
+  'currently \*\*' \
+  'Pin to \*\*' \
+  'Use `'
+)
+for readme in \
+  bindings/python/README.md \
+  bindings/web/README.md \
+  bindings/web/packages/core/README.md \
+  bindings/web/packages/llamacpp/README.md \
+  bindings/web/packages/onnx/README.md \
+  bindings/react-native/README.md \
+  bindings/react-native/packages/core/README.md \
+  bindings/react-native/packages/llamacpp/README.md \
+  bindings/react-native/packages/mlx/README.md \
+  bindings/react-native/packages/onnx/README.md \
+  bindings/react-native/packages/qhexrt/README.md \
+  bindings/kotlin/README.md \
+  bindings/kotlin/docs/Documentation.md \
+  bindings/kotlin/docs/KOTLIN_MAVEN_CENTRAL_PUBLISHING.md \
+  bindings/kotlin/modules/runanywhere-core-llamacpp/README.md \
+  bindings/kotlin/modules/runanywhere-core-onnx/README.md \
+  bindings/kotlin/modules/runanywhere-core-qhexrt/README.md \
+  bindings/flutter/README.md \
+  bindings/flutter/packages/runanywhere/README.md \
+  bindings/flutter/packages/runanywhere_llamacpp/README.md \
+  bindings/flutter/packages/runanywhere_mlx/README.md \
+  bindings/flutter/packages/runanywhere_onnx/README.md \
+  bindings/flutter/packages/runanywhere_qhexrt/README.md \
+  core/README.md \
+  core/docs/DEVELOPMENT.md; do
+  readme_found=0
+  for readme_pin in "${README_PIN_SHAPES[@]}"; do
+    # Read each pin whole, as for the root README. The prose shapes (ending in a
+    # backtick or bold marker) also open ordinary sentences, so those start at a digit.
+    readme_token="[^][:space:]\"'\`(),*]*"
+    case "${readme_pin}" in *'`' | *'\*\*') readme_token="[0-9]${readme_token}" ;; esac
+    readme_pins="$(grep -Eo -- "${readme_pin}${readme_token}" "${REPO_ROOT}/${readme}" || true)"
+    [ -z "${readme_pins}" ] && continue
+    readme_found=1
+    while IFS= read -r readme_stale; do
+      echo "[FAIL] ${readme}: expected ${VERSION}, found '${readme_stale}'" >&2
+      FAILURES=$((FAILURES + 1))
+    done < <(grep -Ev -- "${readme_pin}${readme_version_regex}\.?\$" <<< "${readme_pins}")
+  done
+  if [ "${readme_found}" -eq 0 ]; then
+    echo "[FAIL] ${readme}: no version pin matches any known shape" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+done
+
 if [ "${FAILURES}" -ne 0 ]; then
   echo "[FAIL] release version coherence: ${FAILURES} mismatch(es)" >&2
   echo "Run: scripts/release/sync-versions.sh ${VERSION}" >&2
