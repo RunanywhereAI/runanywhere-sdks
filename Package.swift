@@ -129,7 +129,7 @@ let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_P
 let mlxAudioPackageDependencies: [Package.Dependency] = [
     // 0.1.9 carries mlx-swift-lm 3.31.11. The tag is what the distribution
     // repo can consume (it refuses revision pins).
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.9"),
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", branch: "siddhesh/mlx-swift-lm-3.31.14"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -138,7 +138,7 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
 ]
 
 let runAnywhereMLXSwiftVersion: Version = "0.31.8"
-let runAnywhereMLXSwiftLMVersion: Version = "3.31.11"
+let runAnywhereMLXSwiftLMVersion: Version = "3.31.14"
 
 // Local development only: build against an mlx-swift-lm checkout instead of the
 // pinned tag, so a runtime change can be tested end to end before it is released.
@@ -580,22 +580,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "e538f6909feb1c03c8188a3b4be4399818e9498b0c064dec803ebf14eeca40f0"
+                checksum: "f379a6c378380b5dcc343d1cc6a2c23d90e879a469f4f0b2db5989a6826fbd84"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "f2bd8fc13a2e2dd077d0185ae75e61fc3a76e81ec321b72f39170d9c60693026"
+                checksum: "cfc1e2ea5f0efdcf027cff1821d4292dbc25df337ffe353b9c2b93ce544b1177"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "7aa05c5ee68f39fef65a776a8b47ec173b029534934c167b1b76ee5a6a28f88f"
+                checksum: "cc21a1747c5481e37e5088fc1d766d83b75f98d55ce769b60be472d3a840ed30"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "a3a51aca86d3ef5cff15cb8f4cf0d561611be77e483de74f762fb41d724e0ea5"
+                checksum: "6d075ae36515ed667e0056493a7201a5b5c5531e8f1f1698d66976c5cffd0ffd"
             ),
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
             // unconditional dependency on this, so the remote list must carry it.
@@ -605,12 +605,12 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendNeuRTBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
-                checksum: "f2a850c9b29b0b5cb1d75fb0f737fd2ae76a2cbab2eda6e916a8f71417d97262"
+                checksum: "9b3ae711b3272e3ea80d42f4f0518d4bc8a5cb4c9bf62e04e7baea32542bd05a"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
-                checksum: "22fdca00edc3f0fbd5970189ffd329d30719a63b071e4db0e00dd29bf9cf1124"
+                checksum: "fce58cf954aa97d71960e18ef4f1d8ac8276dfdcce800e584f95f5f65926aa0f"
             ),
         ]
     }

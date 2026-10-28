@@ -13,7 +13,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if __has_include("rac/core/rac_error.h")
+#if __has_include("../features/decision/rac_decision_service.h")
+#include "../core/rac_error.h"
+#include "../core/rac_types.h"
+#include "../features/decision/rac_decision_service.h"
+#include "../features/diarization/rac_diarization_service.h"
+#include "../features/embeddings/rac_embeddings_service.h"
+#include "../features/llm/rac_llm_service.h"
+#include "../features/stt/rac_stt_service.h"
+#include "../features/tts/rac_tts_service.h"
+#include "../features/vlm/rac_vlm_service.h"
+#elif __has_include("rac/core/rac_error.h")
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/decision/rac_decision_service.h"

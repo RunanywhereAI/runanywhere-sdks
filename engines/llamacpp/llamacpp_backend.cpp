@@ -6,6 +6,7 @@
 // dedicated header (common/fit.h). Include it explicitly so callers don't
 // rely on incidental re-export from common.h.
 #include "fit.h"
+#include "chat.h"
 
 // common_batch_add left the public headers when batches moved to llama_batch_ext.
 // The text path still fills a llama_batch directly.
@@ -83,16 +84,6 @@ static constexpr int kSmallModelContextSize = 2048;
 // Generation parameters
 static constexpr int kReservedEosTokens = 4;     // Tokens reserved for EOS at end of context
 static constexpr int kRepeatPenaltyWindow = 64;  // Last-N tokens for repetition penalty
-
-// Buffer sizes
-// First-try capacity for the GGUF's `tokenizer.chat_template` metadata string.
-// Modern templates (Qwen3, LFM2, Llama 3.x, anything with tool support) run
-// well past this, so a too-small read is expected and re-queried at the exact
-// length — see apply_chat_template. Truncating instead corrupts the template
-// and silently drops the whole conversation onto the plain-text fallback.
-static constexpr size_t kChatTemplateBufSize = 4096;
-// llama_chat_apply_template takes a signed 32-bit output capacity.
-static constexpr int32_t kFormattedPromptBufSize = 256 * 1024;
 
 }  // namespace
 
@@ -847,92 +838,40 @@ std::string LlamaCppTextGeneration::apply_chat_template(
         chat_messages.push_back({role_storage.back().c_str(), content.c_str()});
     }
 
-    std::string model_template;
-    model_template.resize(kChatTemplateBufSize);
-    int32_t template_len = llama_model_meta_val_str(model_, "tokenizer.chat_template",
-                                                    model_template.data(), model_template.size());
-    // llama_model_meta_val_str reports the FULL length but writes a truncated,
-    // NUL-terminated string when the buffer is too small. Resizing the string to
-    // that reported length therefore produced a template cut off at the buffer
-    // boundary and padded with NULs — and llm_chat_detect_template is pure
-    // substring matching over that string, so every marker past the cut was
-    // invisible. The detector then answered UNKNOWN, apply returned -1, and the
-    // model was prompted with the plain "role: content" fallback, which has no
-    // end-of-turn token: the model ran straight past its answer and the raw
-    // continuation ("...\nuser: /no_think") was rendered and spoken verbatim.
-    // Re-query at the exact size so long templates are read whole.
-    //
-    // `>=`, not `>`: the buffer holds size() bytes INCLUDING the NUL, so a
-    // template whose reported length is exactly size() had its last character
-    // overwritten by the terminator. That one dropped character is enough to cut
-    // a closing marker in half and send the detector back to UNKNOWN — the same
-    // failure as a badly truncated template, just harder to spot.
-    if (template_len >= static_cast<int32_t>(model_template.size())) {
-        model_template.resize(static_cast<size_t>(template_len) + 1);
-        template_len = llama_model_meta_val_str(model_, "tokenizer.chat_template",
-                                                model_template.data(), model_template.size());
-    }
-
-    const char* tmpl_to_use = nullptr;
-    if (template_len > 0 && template_len <= static_cast<int32_t>(model_template.size())) {
-        model_template.resize(static_cast<size_t>(template_len));
-        tmpl_to_use = model_template.c_str();
-    }
-
-    std::string formatted;
-    formatted.resize(kFormattedPromptBufSize);
-
-    // llama_chat_apply_template may throw C++ exceptions for unsupported Jinja
-    // template features (e.g. certain model chat templates use advanced Jinja
-    // syntax that llama.cpp's minja parser cannot handle). We catch any exception
-    // and fall back to a simple prompt format so generation can still proceed.
-    int32_t result = -1;
+    // llama_chat_apply_template only recognises a handful of built-in families.
+    // LFM3-Omni's Jinja contains <|im_start|>, so that call detected ChatML and
+    // dropped the prefilled <think></think>. The model then ended the turn
+    // before any visible text. Run the template itself.
     try {
-        result = llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
-                                           add_assistant_token, formatted.data(),
-                                           kFormattedPromptBufSize);
+        auto tmpls = common_chat_templates_init(model_, "");
+        common_chat_templates_inputs inputs;
+        inputs.add_generation_prompt = add_assistant_token;
+        inputs.use_jinja = true;
+        inputs.enable_thinking = false;
+        inputs.reasoning_format = COMMON_REASONING_FORMAT_NONE;
+        if (!system_prompt.empty()) {
+            common_chat_msg msg;
+            msg.role = "system";
+            msg.content = system_prompt;
+            inputs.messages.push_back(std::move(msg));
+        }
+        for (const auto& message : chat_messages) {
+            if (std::string(message.role) == "system" && !system_prompt.empty()) {
+                continue;
+            }
+            common_chat_msg msg;
+            msg.role = message.role;
+            msg.content = message.content;
+            inputs.messages.push_back(std::move(msg));
+        }
+        return common_chat_templates_apply(tmpls.get(), inputs).prompt.str();
     } catch (const std::exception& e) {
-        RAC_LOG_ERROR("LLM.LlamaCpp", "llama_chat_apply_template threw exception: %s", e.what());
-        result = -1;
+        RAC_LOG_ERROR("LLM.LlamaCpp", "chat template threw exception: %s", e.what());
+        return plain_text_fallback_prompt(chat_messages, add_assistant_token);
     } catch (...) {
-        RAC_LOG_ERROR("LLM.LlamaCpp", "llama_chat_apply_template threw unknown exception");
-        result = -1;
-    }
-
-    if (result < 0) {
-        RAC_LOG_INFO("LLM.LlamaCpp",
-                     "Chat template failed (result=%d), using simple fallback format", result);
+        RAC_LOG_ERROR("LLM.LlamaCpp", "chat template threw unknown exception");
         return plain_text_fallback_prompt(chat_messages, add_assistant_token);
     }
-
-    if (result > kFormattedPromptBufSize) {
-        // The API returns the exact required size as int32_t. Reuse that value
-        // as the retry capacity so no size_t-to-int32_t narrowing is needed.
-        const int32_t retry_capacity = result;
-        formatted.resize(static_cast<size_t>(retry_capacity));
-        try {
-            result =
-                llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
-                                          add_assistant_token, formatted.data(), retry_capacity);
-        } catch (...) {
-            RAC_LOG_ERROR("LLM.LlamaCpp", "llama_chat_apply_template threw exception on retry");
-            result = -1;
-        }
-
-        if (result <= 0) {
-            RAC_LOG_INFO("LLM.LlamaCpp",
-                         "Chat template retry failed (result=%d), using simple "
-                         "fallback format",
-                         result);
-            return plain_text_fallback_prompt(chat_messages, add_assistant_token);
-        }
-    }
-
-    if (result > 0) {
-        formatted.resize(static_cast<size_t>(result));
-    }
-
-    return formatted;
 }
 
 TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationRequest& request) {

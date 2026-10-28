@@ -34,6 +34,7 @@ enum MLXTextDecisionKind {
     case jointDecider
     case decider
     case d1
+    case lfm3D1
     case omni
     case gliner
 }
@@ -88,9 +89,15 @@ enum MLXTextDecisionCheckpoint {
             return .gliner
         case "lfm2_vl":
             return config.autoModel == "modeling_d1.D1Model" ? .d1 : nil
+        case "lfm3_vl":
+            return .lfm3D1
         default:
             return nil
         }
+    }
+
+    static func modelType(at directory: URL) -> String? {
+        config(at: directory)?.modelType
     }
 
     static func glinerMaxTokens(at directory: URL) -> Int {
@@ -122,6 +129,28 @@ enum MLXTextDecisions {
                     probabilities: try keyed(question, values: values, trueFirst: question.kind == .noul)))
         }
         return MLXDecisionPass(answers: answers, inputTokens: inputTokens)
+    }
+
+    static func scoreLFM3(_ model: LFM3D1, request: ClefDecisionRequest) throws -> MLXDecisionPass {
+        guard !request.questions.isEmpty else {
+            throw MLXTextDecisionError("a decision needs at least one question")
+        }
+        let questions = request.questions.map(jointQuestion)
+        let response = try model.decide(
+            DecisionRequest(state: request.state, questions: questions))
+        let answers = try zip(request.questions, response.answers).map { question, answer in
+            let byKey = Dictionary(uniqueKeysWithValues: zip(answer.optionKeys, answer.probabilities))
+            let values = try question.options.map { option -> Float in
+                guard let value = byKey[option.key] else {
+                    throw MLXTextDecisionError("option scores do not match the question")
+                }
+                return Float(value)
+            }
+            return MLXDecisionPass.Answer(
+                optionIds: question.options.map(\.key),
+                probabilities: try keyed(question, values: values, trueFirst: false))
+        }
+        return MLXDecisionPass(answers: answers, inputTokens: response.usage.inputTokens)
     }
 
     static func scoreOmni(
