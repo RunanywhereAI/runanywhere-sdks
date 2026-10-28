@@ -85,16 +85,6 @@ static constexpr int kSmallModelContextSize = 2048;
 static constexpr int kReservedEosTokens = 4;     // Tokens reserved for EOS at end of context
 static constexpr int kRepeatPenaltyWindow = 64;  // Last-N tokens for repetition penalty
 
-// Buffer sizes
-// First-try capacity for the GGUF's `tokenizer.chat_template` metadata string.
-// Modern templates (Qwen3, LFM2, Llama 3.x, anything with tool support) run
-// well past this, so a too-small read is expected and re-queried at the exact
-// length — see apply_chat_template. Truncating instead corrupts the template
-// and silently drops the whole conversation onto the plain-text fallback.
-static constexpr size_t kChatTemplateBufSize = 4096;
-// llama_chat_apply_template takes a signed 32-bit output capacity.
-static constexpr int32_t kFormattedPromptBufSize = 256 * 1024;
-
 }  // namespace
 
 namespace runanywhere {
