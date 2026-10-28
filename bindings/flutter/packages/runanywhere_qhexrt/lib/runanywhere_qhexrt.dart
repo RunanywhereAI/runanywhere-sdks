@@ -18,7 +18,8 @@
 ///     ModelRegistration.url(
 ///       id: 'my-qhexrt-model',
 ///       name: 'My QHexRT Model',
-///       url: 'https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json',
+///       // Logical bundle reference; Commons resolves the device variant and companion files.
+///       url: 'https://huggingface.co/organization/dedicated-qhexrt-model/model.json',
 ///       framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
 ///     ),
 ///   );

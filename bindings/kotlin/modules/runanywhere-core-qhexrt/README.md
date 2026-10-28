@@ -38,20 +38,24 @@ lifecycleScope.launch {
     val npu = QHexRT.probeNpu() // safe on any device
     if (npu.supported) {
         QHexRT.register() // also installs DSP skels from AAR assets
-        RunAnywhere.models.register(
-            ModelRegistration.url(
-                id = "my-qhexrt-model",
-                name = "My QHexRT Model",
-                url = "https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json",
-                framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-            ),
-        )
-        // Download, load, and infer via core APIs.
+        if (QHexRT.isRegistered) {
+            RunAnywhere.models.register(
+                ModelRegistration.url(
+                    id = "my-qhexrt-model",
+                    name = "My QHexRT Model",
+                    url = "https://huggingface.co/organization/dedicated-qhexrt-model/model.json",
+                    framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+                ),
+            )
+            // Download, load, and infer via core APIs.
+        }
     }
 }
 ```
 
 See the [Kotlin SDK README](../../README.md) for full setup.
+
+The URL above is a logical bundle reference: Commons selects the device's architecture folder and registers the manifest with its companion files. A direct `/resolve/main/model.json` URL registers only that file. Explicitly pinned bundle references must match the device architecture.
 
 ---
 

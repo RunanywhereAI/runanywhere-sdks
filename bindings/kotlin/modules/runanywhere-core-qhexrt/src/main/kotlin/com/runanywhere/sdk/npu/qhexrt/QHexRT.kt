@@ -49,8 +49,10 @@ object QHexRT {
     /** Human-readable module name. */
     const val moduleName: String = "QHexRT"
 
+    /** Whether the QHexRT backend has registered successfully. */
     @Volatile
-    private var isRegistered = false
+    var isRegistered = false
+        private set
     private val registrationMutex = Mutex()
     private val registrationLock = Any()
 
