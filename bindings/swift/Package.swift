@@ -25,7 +25,7 @@ import Foundation
 let mlxAudioPackageDependencies: [Package.Dependency] = [
     // 0.1.9 carries mlx-swift-lm 3.31.11. The tag is what the distribution
     // repo can consume (it refuses revision pins).
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.9"),
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", branch: "siddhesh/mlx-swift-lm-3.31.14"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -34,7 +34,7 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
 ]
 
 let runAnywhereMLXSwiftVersion: Version = "0.31.8"
-let runAnywhereMLXSwiftLMVersion: Version = "3.31.11"
+let runAnywhereMLXSwiftLMVersion: Version = "3.31.14"
 
 let package = Package(
     name: "RunAnywhere",
