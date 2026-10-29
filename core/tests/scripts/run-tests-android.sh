@@ -56,11 +56,6 @@ print_header() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# The repo root, not core/: engines/ is added by the top-level CMakeLists,
-# so configuring core/ standalone with -DRAC_BUILD_BACKENDS=ON builds no
-# engines at all. core/CMakeLists.txt now refuses that combination rather
-# than handing back a backend-less build, so these runners have to point
-# -S at the root. Build dirs stay under core/.
 REPO_ROOT="$(cd "${RAC_ROOT}/.." && pwd)"
 
 # Load centralized versions
@@ -68,7 +63,7 @@ source "${RAC_ROOT}/scripts/load-versions.sh"
 
 ABI="arm64-v8a"
 BUILD_DIR="${RAC_ROOT}/build/android-test/${ABI}"
-TEST_BIN_DIR="${BUILD_DIR}/tests"
+TEST_BIN_DIR="${BUILD_DIR}/core/tests"
 DEVICE_TEST_DIR="/data/local/tmp/rac_tests"
 MODEL_DIR="${RAC_TEST_MODEL_DIR:-${HOME}/.local/share/runanywhere/Models}"
 

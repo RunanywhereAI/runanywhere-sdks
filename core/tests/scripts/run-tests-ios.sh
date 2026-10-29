@@ -58,11 +58,6 @@ print_header() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-# The repo root, not core/: engines/ is added by the top-level CMakeLists,
-# so configuring core/ standalone with -DRAC_BUILD_BACKENDS=ON builds no
-# engines at all. core/CMakeLists.txt now refuses that combination rather
-# than handing back a backend-less build, so these runners have to point
-# -S at the root. Build dirs stay under core/.
 REPO_ROOT="$(cd "${RAC_ROOT}/.." && pwd)"
 
 # Load centralized versions
@@ -70,7 +65,7 @@ source "${RAC_ROOT}/scripts/load-versions.sh"
 
 IOS_BUILD_DIR="${RAC_ROOT}/build/ios-test"
 MACOS_BUILD_DIR="${RAC_ROOT}/build/test"
-TEST_BIN_DIR="${MACOS_BUILD_DIR}/tests"
+TEST_BIN_DIR="${MACOS_BUILD_DIR}/core/tests"
 
 # Detect CPU count
 NPROC=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
@@ -209,7 +204,7 @@ print_ok "iOS Simulator build verification passed"
 echo ""
 echo "iOS Simulator test targets:"
 for binary in test_core test_vad test_stt test_tts test_llm test_voice_agent; do
-    if [ -f "${IOS_BUILD_DIR}/tests/${binary}" ] || [ -f "${IOS_BUILD_DIR}/tests/${binary}.app/${binary}" ]; then
+    if [ -f "${IOS_BUILD_DIR}/core/tests/${binary}" ] || [ -f "${IOS_BUILD_DIR}/core/tests/${binary}.app/${binary}" ]; then
         echo -e "  ${GREEN}[OK]${NC} ${binary}"
     else
         echo -e "  ${YELLOW}[--]${NC} ${binary} (not built)"
