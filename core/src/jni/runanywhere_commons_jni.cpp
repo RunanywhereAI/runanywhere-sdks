@@ -1664,36 +1664,65 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
 
-    // Clean up previous adapter
-    if (g_platform_adapter != nullptr) {
-        env->DeleteGlobalRef(g_platform_adapter);
-        g_platform_adapter = nullptr;
-    }
-
     if (adapter == nullptr) {
         LOGw("racSetPlatformAdapter: null adapter provided");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Create global reference to adapter
-    g_platform_adapter = env->NewGlobalRef(adapter);
-
-    // Cache method IDs
     jclass adapterClass = env->GetObjectClass(adapter);
 
-    g_method_log =
-        env->GetMethodID(adapterClass, "log", "(ILjava/lang/String;Ljava/lang/String;)V");
-    g_method_file_exists = env->GetMethodID(adapterClass, "fileExists", "(Ljava/lang/String;)Z");
-    g_method_file_read = env->GetMethodID(adapterClass, "fileRead", "(Ljava/lang/String;)[B");
-    g_method_file_write = env->GetMethodID(adapterClass, "fileWrite", "(Ljava/lang/String;[B)Z");
-    g_method_file_delete = env->GetMethodID(adapterClass, "fileDelete", "(Ljava/lang/String;)Z");
-    g_method_secure_get =
-        env->GetMethodID(adapterClass, "secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
-    g_method_secure_set =
-        env->GetMethodID(adapterClass, "secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
-    g_method_secure_delete =
-        env->GetMethodID(adapterClass, "secureDelete", "(Ljava/lang/String;)Z");
-    g_method_now_ms = env->GetMethodID(adapterClass, "nowMs", "()J");
+    const auto resolve_required = [&](const char* name, const char* sig) -> jmethodID {
+        const jmethodID id = env->GetMethodID(adapterClass, name, sig);
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        if (id == nullptr) {
+            LOGe("racSetPlatformAdapter: platform adapter is missing required method %s%s", name,
+                 sig);
+        }
+        return id;
+    };
+
+    const jmethodID m_log = resolve_required("log", "(ILjava/lang/String;Ljava/lang/String;)V");
+    const jmethodID m_file_exists = resolve_required("fileExists", "(Ljava/lang/String;)Z");
+    const jmethodID m_file_read = resolve_required("fileRead", "(Ljava/lang/String;)[B");
+    const jmethodID m_file_write = resolve_required("fileWrite", "(Ljava/lang/String;[B)Z");
+    const jmethodID m_file_delete = resolve_required("fileDelete", "(Ljava/lang/String;)Z");
+    const jmethodID m_secure_get =
+        resolve_required("secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
+    const jmethodID m_secure_set =
+        resolve_required("secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
+    const jmethodID m_secure_delete = resolve_required("secureDelete", "(Ljava/lang/String;)Z");
+    const jmethodID m_now_ms = resolve_required("nowMs", "()J");
+
+    if (m_log == nullptr || m_file_exists == nullptr || m_file_read == nullptr ||
+        m_file_write == nullptr || m_file_delete == nullptr || m_secure_get == nullptr ||
+        m_secure_set == nullptr || m_secure_delete == nullptr || m_now_ms == nullptr) {
+        env->DeleteLocalRef(adapterClass);
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
+
+    jobject adapterRef = env->NewGlobalRef(adapter);
+    if (adapterRef == nullptr) {
+        LOGe("racSetPlatformAdapter: failed to create a global reference for the adapter");
+        env->DeleteLocalRef(adapterClass);
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
+
+    if (g_platform_adapter != nullptr) {
+        env->DeleteGlobalRef(g_platform_adapter);
+    }
+    g_platform_adapter = adapterRef;
+    g_method_log = m_log;
+    g_method_file_exists = m_file_exists;
+    g_method_file_read = m_file_read;
+    g_method_file_write = m_file_write;
+    g_method_file_delete = m_file_delete;
+    g_method_secure_get = m_secure_get;
+    g_method_secure_set = m_secure_set;
+    g_method_secure_delete = m_secure_delete;
+    g_method_now_ms = m_now_ms;
+
     // Optional Kotlin-side directory probes. Method lookup is
     // best-effort — older host apps that haven't been recompiled against the
     // new adapter surface will miss these IDs and commons will fall through
