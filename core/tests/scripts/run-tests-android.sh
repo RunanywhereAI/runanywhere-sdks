@@ -56,14 +56,13 @@ print_header() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-REPO_ROOT="$(cd "${RAC_ROOT}/.." && pwd)"
 
 # Load centralized versions
 source "${RAC_ROOT}/scripts/load-versions.sh"
 
 ABI="arm64-v8a"
 BUILD_DIR="${RAC_ROOT}/build/android-test/${ABI}"
-TEST_BIN_DIR="${BUILD_DIR}/core/tests"
+TEST_BIN_DIR="${BUILD_DIR}/tests"
 DEVICE_TEST_DIR="/data/local/tmp/rac_tests"
 MODEL_DIR="${RAC_TEST_MODEL_DIR:-${HOME}/.local/share/runanywhere/Models}"
 
@@ -214,7 +213,7 @@ echo -e "${YELLOW}      For reliable test execution, use --run with a real devic
 echo ""
 
 print_step "Configuring CMake..."
-cmake -B "${BUILD_DIR}" -S "${REPO_ROOT}" \
+cmake -B "${BUILD_DIR}" -S "${RAC_ROOT}" \
     -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
     -DANDROID_ABI="${ABI}" \
     -DANDROID_PLATFORM="android-${ANDROID_API_LEVEL}" \

@@ -58,14 +58,13 @@ print_header() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-REPO_ROOT="$(cd "${RAC_ROOT}/.." && pwd)"
 
 # Load centralized versions
 source "${RAC_ROOT}/scripts/load-versions.sh"
 
 IOS_BUILD_DIR="${RAC_ROOT}/build/ios-test"
 MACOS_BUILD_DIR="${RAC_ROOT}/build/test"
-TEST_BIN_DIR="${MACOS_BUILD_DIR}/core/tests"
+TEST_BIN_DIR="${MACOS_BUILD_DIR}/tests"
 
 # Detect CPU count
 NPROC=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
@@ -183,7 +182,7 @@ if [ ! -f "${TOOLCHAIN_FILE}" ]; then
 fi
 
 print_step "Configuring CMake for iOS Simulator arm64..."
-cmake -B "${IOS_BUILD_DIR}" -S "${REPO_ROOT}" \
+cmake -B "${IOS_BUILD_DIR}" -S "${RAC_ROOT}" \
     -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
     -DIOS_PLATFORM=SIMULATORARM64 \
     -DCMAKE_BUILD_TYPE=Debug \
@@ -204,7 +203,7 @@ print_ok "iOS Simulator build verification passed"
 echo ""
 echo "iOS Simulator test targets:"
 for binary in test_core test_vad test_stt test_tts test_llm test_voice_agent; do
-    if [ -f "${IOS_BUILD_DIR}/core/tests/${binary}" ] || [ -f "${IOS_BUILD_DIR}/core/tests/${binary}.app/${binary}" ]; then
+    if [ -f "${IOS_BUILD_DIR}/tests/${binary}" ] || [ -f "${IOS_BUILD_DIR}/tests/${binary}.app/${binary}" ]; then
         echo -e "  ${GREEN}[OK]${NC} ${binary}"
     else
         echo -e "  ${YELLOW}[--]${NC} ${binary} (not built)"
@@ -231,7 +230,7 @@ if [ "${DOWNLOAD_FIRST}" = true ]; then
 fi
 
 print_step "Configuring CMake for macOS native..."
-cmake -B "${MACOS_BUILD_DIR}" -S "${REPO_ROOT}" \
+cmake -B "${MACOS_BUILD_DIR}" -S "${RAC_ROOT}" \
     -DRAC_BUILD_TESTS=ON \
     -DRAC_BUILD_BACKENDS=ON \
     -DCMAKE_BUILD_TYPE=Debug

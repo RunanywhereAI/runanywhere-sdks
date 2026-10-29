@@ -22,7 +22,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
 # Build with all backends enabled
-cmake -S .. -B ../build/backends -DRAC_BUILD_BACKENDS=ON -DCMAKE_BUILD_TYPE=Release
+cmake -S .. -B ../build/backends -DCMAKE_BUILD_TYPE=Release
 cmake --build ../build/backends
 
 # Build with tests

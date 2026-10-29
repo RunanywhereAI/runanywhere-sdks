@@ -42,11 +42,11 @@ option(
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND RAC_BUILD_BACKENDS)
-    message(FATAL_ERROR
-        "RAC_BUILD_BACKENDS=ON cannot be honoured here: engines/ is added by the "
-        "repo-root CMakeLists.txt, not by core/. Configure the repo root instead "
-        "(from core/: cmake -S .. -B ../build/backends -DRAC_BUILD_BACKENDS=ON), or "
-        "drop the flag for a commons-only build.")
+    message(WARNING
+        "RAC_BUILD_BACKENDS=ON builds no engines here: engines/ is added by the "
+        "repo-root CMakeLists.txt, not by core/, so this configure only gains the "
+        "RAG test suites. To build llamacpp/onnx/sherpa, configure the repo root "
+        "(from core/: cmake -S .. -B ../build/backends).")
 endif()
 
 # Ensure EMSCRIPTEN is always defined so

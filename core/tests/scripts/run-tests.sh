@@ -51,9 +51,8 @@ print_header() {
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-REPO_ROOT="$(cd "${RAC_ROOT}/.." && pwd)"
 BUILD_DIR="${RAC_ROOT}/build/test"
-TEST_BIN_DIR="${BUILD_DIR}/core/tests"
+TEST_BIN_DIR="${BUILD_DIR}/tests"
 
 # Detect CPU count
 if command -v sysctl &> /dev/null; then
@@ -151,7 +150,7 @@ fi
 print_header "Building Tests"
 
 print_step "Configuring CMake..."
-cmake -B "${BUILD_DIR}" -S "${REPO_ROOT}" \
+cmake -B "${BUILD_DIR}" -S "${RAC_ROOT}" \
     -DRAC_BUILD_TESTS=ON \
     -DRAC_BUILD_BACKENDS=ON \
     -DCMAKE_BUILD_TYPE=Debug
