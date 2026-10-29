@@ -20,6 +20,8 @@ set "ROOT_DIR=%SCRIPT_DIR%..\.."
 set "DEST_DIR=%ROOT_DIR%\third_party\sherpa-onnx-windows"
 
 :: Load versions
+set "SHERPA_ONNX_VERSION_WINDOWS="
+set "SHERPA_ONNX_WINDOWS_X64_SHA256="
 call :load_versions
 :: Fail closed rather than falling back. The old hardcoded default (1.12.23)
 :: had already drifted from core/VERSIONS (now 1.13.5), so an unreadable
