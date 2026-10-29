@@ -108,18 +108,23 @@ class YamlParser {
             std::string clean;
             bool in_sq = false, in_dq = false;
             char last_token_char = '\0';
+            size_t last_token_pos = 0;
+            const size_t first_token_pos = line.find_first_not_of(" \t");
             bool after_ws = true;
             for (size_t i = 0; i < line.size(); ++i) {
                 const char c = line[i];
                 if (i > 0) {
                     const char prev = line[i - 1];
                     after_ws = prev == ' ' || prev == '\t';
-                    if (!after_ws)
+                    if (!after_ws) {
                         last_token_char = prev;
+                        last_token_pos = i - 1;
+                    }
                 }
                 const bool can_open =
                     last_token_char == '\0' ||
-                    (after_ws && (last_token_char == ':' || last_token_char == '-'));
+                    (after_ws && (last_token_char == ':' ||
+                                  (last_token_char == '-' && last_token_pos == first_token_pos)));
                 if ((in_sq && c == '\'' && i + 1 < line.size() && line[i + 1] == '\'') ||
                     (in_dq && c == '\\' && i + 1 < line.size())) {
                     clean.push_back(c);

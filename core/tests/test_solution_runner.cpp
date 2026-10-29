@@ -1288,16 +1288,19 @@ TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
     const struct {
         const char* value;
         const char* expected;
-        bool exact;
+        const char* decoded;
     } cases[] = {
-        {"Don't use markdown  # keep replies short", "Don't use markdown", true},
-        {"Don't use markdown  # don't forget", "Don't use markdown", true},
-        {"\"has # inside\"  # don't forget", "has # inside", true},
-        {"id:'abc # don't", "id:'abc", true},
-        {"a#b  # real comment", "a#b", true},
-        {"Don't use # markdown  # keep replies short", "Don't use", true},
-        {"'Don''t use # markdown'  # keep replies short", "t use # markdown", false},
-        {"\"say \\\"hi\\\" # inside\"  # real comment", "\" # inside", false},
+        {"Don't use markdown  # keep replies short", "Don't use markdown", nullptr},
+        {"Don't use markdown  # don't forget", "Don't use markdown", nullptr},
+        {"\"has # inside\"  # don't forget", "has # inside", nullptr},
+        {"id:'abc # don't", "id:'abc", nullptr},
+        {"a#b  # real comment", "a#b", nullptr},
+        {"Don't use # markdown  # keep replies short", "Don't use", nullptr},
+        {"Don't - 'draft # don't copy", "Don't - 'draft", nullptr},
+        {"'Don''t use # markdown'  # keep replies short", "Don''t use # markdown",
+         "Don't use # markdown"},
+        {"\"say \\\"hi\\\" # inside\"  # real comment", "say \\\"hi\\\" # inside",
+         "say \"hi\" # inside"},
     };
     for (const auto& c : cases) {
         const std::string yaml =
@@ -1307,7 +1310,7 @@ TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
         CHECK(rac::solutions::load_solution_from_yaml(yaml.c_str(), &cfg) == RAC_SUCCESS);
         const std::string prompt = cfg.voice_agent().generation().system_prompt();
         std::printf("[yaml] %s -> %s\n", c.value, prompt.c_str());
-        CHECK(c.exact ? prompt == c.expected : prompt.ends_with(c.expected));
+        CHECK(prompt == c.expected || (c.decoded && prompt == c.decoded));
     }
 }
 
