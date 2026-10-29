@@ -1,6 +1,6 @@
 ---
 name: sdk-publish
-description: Manually publish an already-tagged, already-released (non-draft GitHub Release) RunAnywhere SDK version to every package registry (npm, Maven Central, pub.dev, Swift SPM dist repo) plus macOS rcli notarization, with heavy verification that nothing fake/stubbed/broken ships.
+description: Manually publish an already-tagged, already-released (non-draft GitHub Release) RunAnywhere SDK version to every package registry (npm, Maven Central, pub.dev, Swift SPM dist repo), with heavy verification that nothing fake/stubbed/broken ships.
 ---
 
 # SDK Publish
@@ -37,7 +37,9 @@ gh release view v$VERSION --json assets --jq '.assets[].name' | sort >/tmp/actua
 diff /tmp/expected.txt /tmp/actual.txt
 ```
 
-As of the last verified run (**v0.20.25, 65 assets** — up from 55 at v0.20.24 because the 5 public Electron tarballs and their sidecars joined the release; see §6), the full set is: `MANIFEST.txt`; per-platform `RACommons-{android-arm64-v8a,android-armeabi-v7a,android-x86_64,ios,linux-x86_64,web,windows-x64}-v$VERSION.{zip,tar.gz}` + `.sha256`; iOS backend zips `RABackend{LLAMACPP,MLX,NeuRT,ONNX,Sherpa}-ios-v$VERSION.zip` + `.sha256`; `RunAnywhereMLX{Metal,Resources,Runtime}-ios-v$VERSION.zip` + `.sha256`; `rcli-{linux-x86_64,macos-arm64,windows-x86_64}-v$VERSION.tar.gz`/`.zip` + `.sha256`; the 8 npm tarballs `runanywhere-{core,llamacpp,mlx,onnx,proto-ts,web,web-llamacpp,web-onnx}-$VERSION.tgz` + `.sha256`; the **5 Electron npm tarballs** `runanywhere-electron{,-llamacpp,-onnx,-sherpa,-neurt}-$VERSION.tgz` + `.sha256` (new as of v0.20.25); and `runanywhere-kotlin-maven-v$VERSION.zip` + `.sha256`. There is **no** Flutter tarball in the release (Flutter packages are staged from the native archives above, not from a dedicated release asset) and **no** `.dmg` asset in the baseline set (the macOS rcli tarball is what ships; see the notarization section for when a `.dmg` does get produced). If a `qhexrt`-named asset appears anywhere in this list, stop — that would mean `release.yml`'s own manifest assertion should have hard-failed and something is very wrong; do not publish anything from that release.
+If `<PREVIOUS_VERSION>` is `0.20.27`, expect the three `rcli-*` archives and their `.sha256` files to show up only in `expected.txt` (see §5).
+
+As of the last verified run (**v0.20.25, 65 assets** — up from 55 at v0.20.24 because the 5 public Electron tarballs and their sidecars joined the release; see §6), the full set is: `MANIFEST.txt`; per-platform `RACommons-{android-arm64-v8a,android-armeabi-v7a,android-x86_64,ios,linux-x86_64,web,windows-x64}-v$VERSION.{zip,tar.gz}` + `.sha256`; iOS backend zips `RABackend{LLAMACPP,MLX,NeuRT,ONNX,Sherpa}-ios-v$VERSION.zip` + `.sha256`; `RunAnywhereMLX{Metal,Resources,Runtime}-ios-v$VERSION.zip` + `.sha256`; `rcli-{linux-x86_64,macos-arm64,windows-x86_64}-v$VERSION.tar.gz`/`.zip` + `.sha256` (only through v0.20.27, see §5); the 8 npm tarballs `runanywhere-{core,llamacpp,mlx,onnx,proto-ts,web,web-llamacpp,web-onnx}-$VERSION.tgz` + `.sha256`; the **5 Electron npm tarballs** `runanywhere-electron{,-llamacpp,-onnx,-sherpa,-neurt}-$VERSION.tgz` + `.sha256` (new as of v0.20.25); and `runanywhere-kotlin-maven-v$VERSION.zip` + `.sha256`. There is **no** Flutter tarball in the release (Flutter packages are staged from the native archives above, not from a dedicated release asset) and **no** `.dmg` asset in the baseline set. If a `qhexrt`-named asset appears anywhere in this list, stop — that would mean `release.yml`'s own manifest assertion should have hard-failed and something is very wrong; do not publish anything from that release.
 
 ## 0. MANDATORY GATE — verify the ENTIRE release before pushing anything to any registry
 
@@ -218,7 +220,7 @@ cd /tmp/sdk-publish-$VERSION && shasum -a 256 -c '<file>.sha256'
 ```bash
 npm pack <tgz-or-package-dir> --dry-run     # npm packages: prints the exact file list it would publish
 unzip -l  <file.zip>                        # AARs, Maven repo zip, native archives
-tar -tzf  <file.tar.gz>                     # rcli, RACommons tarballs
+tar -tzf  <file.tar.gz>                     # RACommons tarballs
 ```
 
 Sanity-check what comes back:

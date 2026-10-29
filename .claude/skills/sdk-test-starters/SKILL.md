@@ -128,8 +128,8 @@ There is no `runanywhere-macos` consumer repo. Use the in-tree example, inside
 
 - `bindings/swift/example/` — a minimal SwiftPM example app/executable.
 
-The CLI is no longer in this repo; it moved to `RunanywhereAI/wally` (it was `rcli` here),
-so it is not a second in-monorepo option any more.
+The CLI is no longer in this repo; it lives in `RunanywhereAI/wally` (the `RunanywhereAI/RCLI`
+named in `CMakeLists.txt`, since renamed), so it is not an in-monorepo option.
 
 **The critical gotcha**: the repo's own `Package.swift` is fail-closed toward the
 *real published release* — it resolves the remote `binaryTargets` unless you
