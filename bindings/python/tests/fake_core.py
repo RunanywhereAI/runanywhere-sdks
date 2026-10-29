@@ -609,6 +609,13 @@ class FakeCore:
         self._record("remove_model", model_id)
         self._registry.pop(model_id, None)
 
+    def refresh_model_registry(self, request_bytes: bytes) -> bytes:
+        """Record a serialized registry refresh request and return an empty result."""
+        from runanywhere._proto import model_types_pb2
+
+        self._record("refresh_model_registry", bytes(request_bytes))
+        return model_types_pb2.ModelRegistryRefreshResult().SerializeToString()
+
     # -- secure store --------------------------------------------------------
     def secure_set(self, key: str, value: str) -> None:
         self._record("secure_set", key, value)

@@ -34,6 +34,7 @@
 #include "mtmd-helper.h"
 #include "mtmd.h"
 
+#include "llamacpp_logging.h"
 #include "llamacpp_stop_helpers.h"
 
 #include "rac/core/rac_error.h"
@@ -767,7 +768,8 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
         if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading image from file path");
             auto loaded =
-                mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path, false);
+                mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path, false,
+                                                   mtmd_helper_init_opt_default());
             if (loaded.video_ctx) {
                 if (loaded.bitmap) {
                     mtmd_bitmap_free(loaded.bitmap);
@@ -1026,6 +1028,7 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     }
 
     // Initialize llama backend
+    runanywhere::llamacpp_internal::ensure_llamacpp_ggml_log_routed();
     llama_backend_init();
 
     // Load model

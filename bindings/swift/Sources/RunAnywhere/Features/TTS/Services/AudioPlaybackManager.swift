@@ -34,7 +34,7 @@ import os
 ///     print("Playback finished: \(success)")
 /// }
 /// ```
-public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDelegate, @unchecked Sendable {
+public class AudioPlaybackManager: NSObject, ObservableObject, @unchecked Sendable {
     private let logger = SDKLogger(category: "AudioPlayback")
 
     /// AVFoundation objects and one-shot callbacks are accessed only while the
@@ -255,27 +255,33 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
         completion?(success)
     }
 
-    // MARK: - AVAudioPlayerDelegate
+    deinit {
+        stop()
+    }
+}
 
-    public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+// MARK: - AVAudioPlayerDelegate
+
+extension AudioPlaybackManager: AVAudioPlayerDelegate {
+    nonisolated public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         logger.info("Playback finished: \(flag ? "success" : "failed")")
         cleanupPlayback(success: flag)
     }
 
-    public func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+    nonisolated public func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         logger.error("Playback decode error: \(error?.localizedDescription ?? "unknown")")
         cleanupPlayback(success: false)
     }
 
     #if os(iOS) || os(tvOS)
-    public func audioPlayerBeginInterruption(_ player: AVAudioPlayer) {
+    nonisolated public func audioPlayerBeginInterruption(_ player: AVAudioPlayer) {
         logger.info("Playback interrupted")
         DispatchQueue.main.async {
             self.isPlaying = false
         }
     }
 
-    public func audioPlayerEndInterruption(_ player: AVAudioPlayer, withOptions flags: Int) {
+    nonisolated public func audioPlayerEndInterruption(_ player: AVAudioPlayer, withOptions flags: Int) {
         logger.info("Playback interruption ended")
         if flags == AVAudioSession.InterruptionOptions.shouldResume.rawValue {
             player.play()
@@ -285,10 +291,6 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
         }
     }
     #endif
-
-    deinit {
-        stop()
-    }
 }
 
 // MARK: - Errors

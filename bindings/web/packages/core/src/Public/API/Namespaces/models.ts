@@ -17,6 +17,7 @@ import { SDKException } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { Runtime } from '../../../Foundation/RuntimeConfig.js';
 import { ModelRegistry } from '../../Extensions/RunAnywhere+ModelRegistry.js';
+import type { RefreshOptions } from '../../../Adapters/ModelRegistryAdapter.js';
 import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
 import {
   registerModelArchive,
@@ -39,6 +40,8 @@ import {
 const BYTES_PER_GIB = 1024 * 1024 * 1024;
 const modelsLogger = new SDKLogger('models');
 
+export type { RefreshOptions } from '../../../Adapters/ModelRegistryAdapter.js';
+
 interface CompatibilityModule extends EmscriptenRunanywhereModule {
   _rac_model_compatibility_check_proto?(
     requestPtr: number,
@@ -47,11 +50,19 @@ interface CompatibilityModule extends EmscriptenRunanywhereModule {
   ): number;
 }
 
+/**
+ * Sentinel value (1 byte) representing a storage or RAM probe that is known
+ * and exhausted (zero or negative free space), distinguishing it from 0
+ * which commons treats as "unknown" (satisfying requirements).
+ */
+const KNOWN_EXHAUSTED_BYTES_SENTINEL = 1;
+
 /** Browser-reported available RAM in bytes, or 0 when unknown (commons contract). */
 function probeAvailableRamBytes(): number {
   if (typeof navigator === 'undefined') return 0;
   const deviceMemoryGiB = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  if (typeof deviceMemoryGiB !== 'number' || !(deviceMemoryGiB > 0)) return 0;
+  if (typeof deviceMemoryGiB !== 'number' || !Number.isFinite(deviceMemoryGiB)) return 0;
+  if (deviceMemoryGiB <= 0) return KNOWN_EXHAUSTED_BYTES_SENTINEL;
   return Math.trunc(deviceMemoryGiB * BYTES_PER_GIB);
 }
 
@@ -62,8 +73,9 @@ async function probeAvailableStorageBytes(): Promise<number> {
     const estimate = await navigator.storage.estimate();
     const quota = Number(estimate.quota ?? 0);
     const usage = Number(estimate.usage ?? 0);
-    if (!(quota > 0)) return 0;
-    return Math.max(0, Math.trunc(quota - usage));
+    if (!Number.isFinite(quota) || !Number.isFinite(usage) || !(quota > 0)) return 0;
+    const free = Math.trunc(quota - usage);
+    return free > 0 ? free : KNOWN_EXHAUSTED_BYTES_SENTINEL;
   } catch {
     return 0;
   }
@@ -188,6 +200,23 @@ function toLoadedModel(
 
 /** The model catalog and everything that governs residency. */
 export const models = {
+  /**
+   * Reconcile the native registry with model files on disk. Failures are logged and
+   * contained, matching the other SDKs. Before initialization this is a no-op.
+   */
+  async refresh(options: RefreshOptions = {}): Promise<void> {
+    if (!SDKCore.isInitialized) return;
+    try {
+      if (!ModelRegistry.refresh(options)) {
+        modelsLogger.warning('Model registry refresh failed');
+      }
+    } catch (error: unknown) {
+      modelsLogger.warning(
+        `Model registry refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+
   /**
    * List catalog entries, optionally narrowed by a filter.
    *
@@ -529,5 +558,10 @@ function toProgressEvent(progress: DownloadProgress, operationId: string, sequen
   };
 }
 
-/** Test seam for the download progress mapping. */
-export const __testing__ = { toProgressEvent };
+/** Test seam for download progress mapping and platform probes. */
+export const __testing__ = {
+  toProgressEvent,
+  probeAvailableRamBytes,
+  probeAvailableStorageBytes,
+  KNOWN_EXHAUSTED_BYTES_SENTINEL,
+};
