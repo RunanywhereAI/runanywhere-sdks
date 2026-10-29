@@ -15,6 +15,9 @@ wire = "5.5.1"
 
 junit = "4.13.2"
 junit-vintage = "6.1.0"
+# buildSrc tests (NativeArchiveDownloaderTest) run on JUnit 5.
+junit-jupiter = "5.11.4"
+junit-platform = "1.11.4"
 mockk = "1.14.11"
 
 okhttp = "5.3.2"
@@ -36,6 +39,8 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit-vintage" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
