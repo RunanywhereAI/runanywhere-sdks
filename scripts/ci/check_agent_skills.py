@@ -92,7 +92,7 @@ RULES: list[tuple[str, re.Pattern[str], str]] = [
         re.compile(
             r"(?:/Users/(?!<)[\w.-]+/"
             r"|/home/(?!<)[\w.-]+/"
-            r"|[A-Za-z]:\\+Users\\+(?!<)[\w.-]+\\+)"
+            r"|[A-Za-z]:\\+(?i:Users)\\+(?!<)[\w.-]+\\+)"
         ),
         "use ~ or a <placeholder>; an absolute home path names a person and a machine",
     ),

@@ -19,6 +19,7 @@ CASES: list[tuple[str, str, bool]] = [
     ("absolute path into a personal home directory", "/home/alice/build/", True),
     ("absolute path into a personal home directory", r"C:\Users\alice\build", True),
     ("absolute path into a personal home directory", r"D:\Users\alice\build", True),
+    ("absolute path into a personal home directory", r"c:\users\alice\build", True),
     ("absolute path into a personal home directory", r"C:\\Users\\alice\\build", True),
     ("absolute path into a personal home directory", r"C:\\Users\\<you>\\x", False),
     ("absolute path into a personal home directory", "/Users/<you>/x/", False),
