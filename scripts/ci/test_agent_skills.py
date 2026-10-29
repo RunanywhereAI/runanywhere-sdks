@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""Tests for the private-coordinate rules in check_agent_skills.py.
-
-Running the gate only proves the trees are clean TODAY. These prove each rule
-still matches the shape it was added for, so a rule cannot quietly stop
-catching anything -- which is exactly what happened to the personal-home-path
-rule: its Windows arm required a trailing forward slash, so no Windows path
-could ever reach it.
-
-Run locally exactly as CI does:
-
-    python3 scripts/ci/test_agent_skills.py
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -27,24 +14,17 @@ _spec.loader.exec_module(_gate)
 
 RULES = {label: pattern for label, pattern, _fix in _gate.RULES}
 
-# (rule label, sample, should_match)
 CASES: list[tuple[str, str, bool]] = [
-    # A personal home path names both a person and a machine, on every OS.
     ("absolute path into a personal home directory", "/Users/alice/Documents/x/", True),
     ("absolute path into a personal home directory", "/home/alice/build/", True),
     ("absolute path into a personal home directory", r"C:\Users\alice\build", True),
     ("absolute path into a personal home directory", r"D:\Users\alice\build", True),
-    # These files are scanned as raw text, so a Windows path written inside a JSON
-    # or shell snippet reaches the rule with its separators already escaped.
     ("absolute path into a personal home directory", r"C:\\Users\\alice\\build", True),
     ("absolute path into a personal home directory", r"C:\\Users\\<you>\\x", False),
-    # Placeholders are the documented way to write these, on every OS.
     ("absolute path into a personal home directory", "/Users/<you>/x/", False),
     ("absolute path into a personal home directory", r"C:\Users\<you>\x", False),
-    # Not a home directory at all.
     ("absolute path into a personal home directory", "/usr/local/bin/", False),
     ("absolute path into a personal home directory", "~/.ssh/config", False),
-    # Spot-check the neighbouring rules so a future edit cannot blank them.
     ("mesh-VPN / Tailscale hostname", "win-arm64.tail1234.ts.net", True),
     ("mesh-VPN / Tailscale hostname", "the host entry in ~/.ssh/config", False),
     ("ssh private key filename", "id_ed25519_runner", True),

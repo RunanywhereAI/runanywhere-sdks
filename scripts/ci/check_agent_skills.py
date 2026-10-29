@@ -92,11 +92,6 @@ RULES: list[tuple[str, re.Pattern[str], str]] = [
         re.compile(
             r"(?:/Users/(?!<)[\w.-]+/"
             r"|/home/(?!<)[\w.-]+/"
-            # Windows separators are backslashes, so the trailing separator has to
-            # live INSIDE each alternative: a shared trailing `/` can never match a
-            # Windows path. Any drive letter, and `\\` here is one literal backslash.
-            # `+` because these files are scanned as raw text: a path written inside
-            # a JSON or shell snippet arrives escaped, as `C:\\Users\\alice\\`.
             r"|[A-Za-z]:\\+Users\\+(?!<)[\w.-]+\\+)"
         ),
         "use ~ or a <placeholder>; an absolute home path names a person and a machine",
