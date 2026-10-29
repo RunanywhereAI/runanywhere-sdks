@@ -1110,6 +1110,54 @@ int test_auto_execute_false_returns_call_without_side_effect() {
     return 0;
 }
 
+int test_auto_execute_unset_defaults_to_true_and_executes() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny, 25C.",
+    });
+
+    runanywhere::v1::ToolCallingSessionCreateRequest request;
+    request.set_prompt("What's the weather in Tokyo?");
+    *request.mutable_options()->add_tools() = make_weather_tool();
+    request.mutable_options()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    // Note: request.mutable_options()->set_auto_execute is intentionally NOT called.
+    CHECK(!request.options().has_auto_execute(), "auto_execute field is unset");
+
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    {
+        std::lock_guard<std::mutex> lg(exec.mu);
+        exec.result_jsons.emplace_back(R"({"temp":25,"condition":"sunny"})");
+    }
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "unset auto_execute request succeeds");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete() == true, "unset auto_execute result completes");
+    CHECK(result.tool_calls_size() == 1, "unset auto_execute records tool call");
+    CHECK(result.tool_results_size() == 1, "unset auto_execute records tool result");
+    CHECK(result.iterations_used() == 2, "iterations_used == 2");
+    CHECK(result.text().find("sunny") != std::string::npos, "final text has sunny");
+    CHECK(exec.invocation_count == 1, "executor invoked once when auto_execute is unset (default true)");
+    if (!exec.received_calls.empty()) {
+        CHECK(exec.received_calls[0].name() == "get_weather", "executor saw correct name");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 int test_validation_failure_short_circuits() {
     if (!load_mock_llm())
         return 1;
@@ -2168,6 +2216,7 @@ int main() {
         test_max_tool_calls_capped();
         test_max_tool_calls_blocks_extra_side_effect();
         test_auto_execute_false_returns_call_without_side_effect();
+        test_auto_execute_unset_defaults_to_true_and_executes();
         test_validation_failure_short_circuits();
         test_executor_result_contract_is_fail_closed();
         test_history_flows_to_options_history();
