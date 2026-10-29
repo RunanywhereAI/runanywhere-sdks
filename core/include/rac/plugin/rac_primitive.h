@@ -60,7 +60,11 @@ typedef enum rac_primitive {
      *  OCR takes no prompt, is not generative, and returns geometry alongside the text, so a
      *  CTC line recognizer cannot be honestly described by the VLM contract. */
     RAC_PRIMITIVE_OCR = 13,
-    RAC_PRIMITIVE_RESERVED_14 = 14,
+    /** Joint decision scoring (state + typed questions -> calibrated answers). Promoted from
+     *  RAC_PRIMITIVE_RESERVED_14 in ABI v13. A decision model is not generative: it scores every
+     *  option of every question in one forward pass through a joint head, so GENERATE_TEXT
+     *  cannot describe it and the answer layer needs probabilities, not tokens. */
+    RAC_PRIMITIVE_DECIDE = 14,
     RAC_PRIMITIVE_RESERVED_15 = 15,
     RAC_PRIMITIVE_RESERVED_16 = 16,
     RAC_PRIMITIVE_RESERVED_17 = 17,

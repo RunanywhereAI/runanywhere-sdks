@@ -214,27 +214,39 @@ function toRagResult(raw: RAGResult, requestId: string, model: string): PublicRa
   };
 }
 
-// Only the sampling knobs commons' RAG pipeline reads; tools and structured output
-// are not part of a grounded-answer request. An unset knob stays absent so
-// commons applies its own `rac_default`, the same contract the LLM path uses.
-function toRagGeneration(options: LlmOptions = {}): {
+/** The `LLMGenerationOptions` subset a grounded-answer request carries. */
+interface RagGeneration {
   maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
   topK?: number;
+  minP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  repeatPenalty?: number;
+  seed?: number;
+  stopSequences?: string[];
   systemPrompt?: string;
-} {
-  const out: {
-    maxOutputTokens?: number;
-    temperature?: number;
-    topP?: number;
-    topK?: number;
-    systemPrompt?: string;
-  } = {};
+}
+
+// The same sampling knobs the LLM path forwards in llm-abi.ts toProtoOptions, so a
+// RAG query carries everything commons' RAG pipeline can honour (#1073); tools and
+// structured output are not part of a grounded-answer request. An unset knob stays absent so commons applies its
+// own `rac_default`, the same contract the LLM path uses.
+function toRagGeneration(options: LlmOptions = {}): RagGeneration {
+  const out: RagGeneration = {};
   if (options.maxOutputTokens !== undefined) out.maxOutputTokens = options.maxOutputTokens;
   if (options.temperature !== undefined) out.temperature = options.temperature;
   if (options.topP !== undefined) out.topP = options.topP;
   if (options.topK !== undefined) out.topK = options.topK;
+  if (options.minP !== undefined) out.minP = options.minP;
+  if (options.frequencyPenalty !== undefined) out.frequencyPenalty = options.frequencyPenalty;
+  if (options.presencePenalty !== undefined) out.presencePenalty = options.presencePenalty;
+  if (options.repetitionPenalty !== undefined) out.repeatPenalty = options.repetitionPenalty;
+  if (options.seed !== undefined) out.seed = options.seed;
+  if (options.stopSequences !== undefined && options.stopSequences.length > 0) {
+    out.stopSequences = [...options.stopSequences];
+  }
   if (options.systemPrompt !== undefined) out.systemPrompt = options.systemPrompt;
   return out;
 }
