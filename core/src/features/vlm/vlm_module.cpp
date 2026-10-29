@@ -687,6 +687,7 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     }
     ctx.cleaned_text.resize(ctx.cleaned_text.size() -
                             rac::tokens::incomplete_utf8_tail(ctx.cleaned_text));
+    ctx.full_text.resize(ctx.full_text.size() - rac::tokens::incomplete_utf8_tail(ctx.full_text));
 
     if (token_callback) {
         std::string deliverable = ctx.utf8.feed(held_tail);
