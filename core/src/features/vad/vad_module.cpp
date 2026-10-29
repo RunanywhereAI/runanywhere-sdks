@@ -1280,7 +1280,7 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
                                : RAC_VAD_DEFAULT_ENERGY_THRESHOLD);
     }
 
-    const bool has_override = options.activation_threshold() > 0.0f;
+    const bool has_override = options.has_activation_threshold();
 
     // Serialize the get→set(override)→process→
     // restore window on the same per-handle mutex used by the streaming
@@ -1428,6 +1428,11 @@ namespace {
 // its own mutex because the lifecycle entry points take no handle and therefore
 // carry no other serialization.
 std::mutex& fallback_vad_mutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::mutex& lifecycle_threshold_mutex() {
     static std::mutex m;
     return m;
 }
@@ -1636,7 +1641,7 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     }
 
     float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
-    if (request.has_options() && request.options().activation_threshold() > 0.0f) {
+    if (request.has_options() && request.options().has_activation_threshold()) {
         threshold = request.options().activation_threshold();
     }
     const int32_t sample_rate = request.audio().sample_rate() > 0 ? request.audio().sample_rate()
@@ -1647,9 +1652,21 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     rac_bool_t is_speech = RAC_FALSE;
 
     if (have_model) {
-        if (ref.ops->set_threshold && request.has_options() &&
-            request.options().activation_threshold() > 0.0f) {
-            (void)ref.ops->set_threshold(ref.impl, threshold);
+        std::unique_lock<std::mutex> threshold_lock;
+        if (request.has_options() && request.options().has_activation_threshold()) {
+            threshold_lock = std::unique_lock<std::mutex>(lifecycle_threshold_mutex());
+            if (!ref.ops->set_threshold) {
+                rac::lifecycle::release_lifecycle_vad(&ref);
+                return rac_proto_buffer_set_error(
+                    out_result, RAC_ERROR_NOT_SUPPORTED,
+                    "VAD backend cannot apply activation_threshold");
+            }
+            rc = ref.ops->set_threshold(ref.impl, threshold);
+            if (rc != RAC_SUCCESS) {
+                publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
+                rac::lifecycle::release_lifecycle_vad(&ref);
+                return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+            }
         }
         if (!ref.ops->process) {
             rac::lifecycle::release_lifecycle_vad(&ref);

@@ -159,7 +159,7 @@ internal fun VadOptions.toProto(
     sampleRate: Int = AudioFormatSpec.DEFAULT_SAMPLE_RATE,
 ): VADOptions =
     VADOptions(
-        activation_threshold = activationThreshold ?: 0f,
+        activation_threshold = activationThreshold,
         min_speech_duration_ms = minSpeechMs,
         min_silence_duration_ms = minSilenceMs,
         prefix_padding_ms = prefixPaddingMs,
