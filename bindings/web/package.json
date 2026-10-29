@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/web-root",
   "private": true,
-  "version": "0.20.36",
+  "version": "0.20.37",
   "description": "RunAnywhere Web SDK - On-device AI for the browser via RACommons WASM",
   "workspaces": [
     "../proto-ts",
@@ -10,6 +10,7 @@
     "packages/onnx"
   ],
   "scripts": {
+    "postinstall": "cd ../proto-ts && npm ci --workspaces=false --no-audit --no-fund",
     "build:wasm": "cd wasm && ./scripts/build.sh",
     "build:wasm:all": "npm run build:wasm -- --core --llamacpp --onnx && npm run build:wasm -- --webgpu --rag && npm run build:wasm -- --onnx-webgpu",
     "build:wasm:onnx-webgpu": "cd wasm && ./scripts/build.sh --onnx-webgpu",

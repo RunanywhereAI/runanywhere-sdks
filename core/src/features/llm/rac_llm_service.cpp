@@ -18,7 +18,11 @@
 #include <android/log.h>
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "RAC_LLM_SVC", __VA_ARGS__)
 #else
-#define ALOGD(...) fprintf(stderr, __VA_ARGS__)
+#define ALOGD(...)                    \
+    do {                              \
+        fprintf(stderr, __VA_ARGS__); \
+        fputc('\n', stderr);           \
+    } while (0)
 #endif
 
 #include "../common/rac_service_factory_internal.h"
@@ -68,7 +72,8 @@ std::string apply_no_think_directive_for_service(const rac_llm_service_t* servic
 
 extern "C" {
 
-rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
+rac_result_t rac_llm_create_with_config(const char* model_id, const char* config_json,
+                                        rac_handle_t* out_handle) {
     if (!model_id || !out_handle) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -98,7 +103,7 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
          .select_ops = llm_ops,
          .model_create_id = model_ref.path.c_str(),
          .model_id_for_service = model_id,
-         .config_json = nullptr,
+         .config_json = config_json,
          .framework = model_ref.framework},
         &service);
     if (result != RAC_SUCCESS) {
@@ -109,6 +114,10 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     ALOGD("LLM service created successfully");
     RAC_LOG_INFO(LOG_CAT, "LLM service created");
     return RAC_SUCCESS;
+}
+
+rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
+    return rac_llm_create_with_config(model_id, nullptr, out_handle);
 }
 
 // =============================================================================

@@ -30,6 +30,8 @@ import MLXAudioTTS
 private func raMLXMetalResourceAnchor() -> Int32
 #endif
 
+private typealias RacLoggerGetMinLevelFn = @convention(c) () -> Int32
+
 private struct MLXRuntimeLog {
     private let category: String
 
@@ -38,22 +40,34 @@ private struct MLXRuntimeLog {
     }
 
     func debug(_ message: String) {
-        write(level: "debug", message)
+        write(level: "debug", severity: 1, message)
     }
 
     func info(_ message: String) {
-        write(level: "info", message)
+        write(level: "info", severity: 2, message)
     }
 
     func warning(_ message: String) {
-        write(level: "warning", message)
+        write(level: "warning", severity: 3, message)
     }
 
     func error(_ message: String) {
-        write(level: "error", message)
+        write(level: "error", severity: 4, message)
     }
 
-    private func write(level: String, _ message: String) {
+    private static let getMinLevel: RacLoggerGetMinLevelFn? = {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "rac_logger_get_min_level") else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: RacLoggerGetMinLevelFn.self)
+    }()
+
+    private static var currentMinLevel: Int32 {
+        getMinLevel?() ?? 2 // Default to RAC_LOG_INFO (2) matching rac_logger.cpp
+    }
+
+    private func write(level: String, severity: Int32, _ message: String) {
+        guard severity >= Self.currentMinLevel else { return }
         let line = "[RunAnywhereMLX][\(category)][\(level)] \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
         FileHandle.standardError.write(data)
@@ -112,6 +126,9 @@ public enum MLX {
         callbacks.cleanup = mlxCleanup
         callbacks.destroy = mlxDestroy
         callbacks.user_data = nil
+        callbacks.llm_generate_chat_stream = nil
+        callbacks.decision = mlxDecision
+        callbacks.context_length = mlxContextLength
 
         let clearCancelResult = ra_mlx_set_clear_cancel_callback(mlxClearCancellation, nil)
         guard clearCancelResult == RAC_SUCCESS else {
@@ -124,6 +141,13 @@ public enum MLX {
         guard callbackResult == RAC_SUCCESS else {
             let message = String(cString: rac_error_message(callbackResult))
             logger.error("MLX callback registration failed: \(message)")
+            return false
+        }
+
+        let chatCallbackResult = ra_mlx_set_chat_callback(mlxLLMGenerateChat, nil)
+        guard chatCallbackResult == RAC_SUCCESS else {
+            let message = String(cString: rac_error_message(chatCallbackResult))
+            logger.error("MLX structured chat registration failed: \(message)")
             return false
         }
 
@@ -144,6 +168,7 @@ public enum MLX {
     public static func unregister() {
         guard isRegistered else { return }
         _ = rac_backend_mlx_unregister()
+        _ = ra_mlx_set_chat_callback(nil, nil)
         isRegistered = false
         logger.info("MLX backend unregistered")
     }
@@ -215,11 +240,33 @@ private enum MLXSessionKind {
     case embeddings
     case stt
     case tts
+    case decision
 }
 
-private struct TransformersTokenizerLoader: TokenizerLoader {
+/// DeBERTa v2 checkpoints are Unigram, not BPE. swift-transformers has no
+/// DebertaV2 class, so a plain load falls through to BPE and traps on the
+/// missing merges. The fork rewrites the files into the XLM-RoBERTa Unigram
+/// shape that the tokenizer library already implements.
+private struct GLiNERTextTokenizerLoader: TokenizerLoader {
     func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
-        let upstream = try await Tokenizers.AutoTokenizer.from(modelFolder: directory)
+        let files = try GLiNERTokenizerConfiguration.load(from: directory)
+        let temporary = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gliner-tokenizer-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try files.tokenizerConfig.write(to: temporary.appendingPathComponent("tokenizer_config.json"))
+        try files.tokenizerData.write(to: temporary.appendingPathComponent("tokenizer.json"))
+        let inner = try await AutoTokenizer.from(modelFolder: temporary)
+        return TransformersTokenizerBridge(inner)
+    }
+}
+
+struct TransformersTokenizerLoader: TokenizerLoader {
+    func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
+        // Non-strict: unknown tokenizer_class names (e.g. Qwen3_5Tokenizer,
+        // which is plain byte-level BPE described fully by tokenizer.json)
+        // fall back to BPETokenizer instead of throwing unsupportedTokenizer.
+        let upstream = try await Tokenizers.AutoTokenizer.from(modelFolder: directory, strict: false)
         return TransformersTokenizerBridge(upstream)
     }
 }
@@ -271,6 +318,7 @@ private struct TransformersTokenizerBridge: MLXLMCommon.Tokenizer {
 private struct MLXGenerationMetrics {
     var promptTokens = 0
     var completionTokens = 0
+    var cachedPromptTokens = 0
     var totalTimeMs: Int64 = 0
     var tokensPerSecond: Float = 0
 }
@@ -282,23 +330,23 @@ private struct MLXSTTOutput {
 }
 
 private struct MLXLLMOptionsSnapshot: Sendable {
-    let maxTokens: Int32
-    let temperature: Float
-    let topP: Float
-    let topK: Int32
-    let minP: Float
-    let repetitionPenalty: Float
-    let presencePenalty: Float
-    let frequencyPenalty: Float
-    let seed: Int64
-    let disableThinking: Bool
+    var maxTokens: Int32
+    var temperature: Float
+    var topP: Float
+    var topK: Int32
+    var minP: Float
+    var repetitionPenalty: Float
+    var presencePenalty: Float
+    var frequencyPenalty: Float
+    var seed: Int64
+    var disableThinking: Bool
     /// System prompt (options.system_prompt); nil when NULL/empty. MLX used to
     /// ignore this, so the model never saw the system instruction.
-    let systemPrompt: String?
+    var systemPrompt: String?
     /// Prior conversation turns (options.history/n_history), alternating
     /// user,assistant in chronological order (commons-normalized). MLX used to
     /// ignore these, so the model had no memory across turns.
-    let history: [String]
+    var history: [String]
 
     init(_ options: UnsafePointer<rac_llm_options_t>?) {
         guard let options = options?.pointee else {
@@ -341,6 +389,76 @@ private struct MLXLLMOptionsSnapshot: Sendable {
             history = []
         }
     }
+
+    init(_ view: ra_mlx_chat_options_view_t) {
+        self.init(nil)
+        if view.has_max_output_tokens == RAC_TRUE {
+            maxTokens = view.max_output_tokens
+        }
+        if view.has_temperature == RAC_TRUE {
+            temperature = view.temperature
+        }
+        if view.has_top_p == RAC_TRUE {
+            topP = view.top_p
+        }
+        if view.has_top_k == RAC_TRUE {
+            topK = view.top_k
+        }
+        if view.has_repeat_penalty == RAC_TRUE {
+            repetitionPenalty = view.repeat_penalty
+        }
+        if view.has_seed == RAC_TRUE {
+            seed = view.seed
+        }
+        if view.has_frequency_penalty == RAC_TRUE {
+            frequencyPenalty = view.frequency_penalty
+        }
+        if view.has_presence_penalty == RAC_TRUE {
+            presencePenalty = view.presence_penalty
+        }
+        if view.has_min_p == RAC_TRUE {
+            minP = view.min_p
+        }
+        systemPrompt = string(from: view.system_prompt)
+        disableThinking = view.disable_thinking == RAC_TRUE
+    }
+}
+
+private struct MLXChatToolResultSnapshot: Equatable, Sendable {
+    var id = ""
+    var name = ""
+    var resultJSON = ""
+    var error = ""
+    var isError = false
+}
+
+private struct MLXChatMessageSnapshot: Equatable, Sendable {
+    var role: Chat.Message.Role
+    var content = ""
+    var name = ""
+    var toolCallID = ""
+    var toolCalls: [ToolCall] = []
+    var toolResult: MLXChatToolResultSnapshot?
+    var hasAttachments = false
+}
+
+private struct MLXChatToolDefinitionSnapshot: Equatable, Sendable {
+    var name = ""
+    var description = ""
+    var parametersJSON = "{}"
+}
+
+private struct MLXStructuredRequestSnapshot: Sendable {
+    let modelID: String
+    let options: MLXLLMOptionsSnapshot
+    let messages: [MLXChatMessageSnapshot]
+    let tools: [MLXChatToolDefinitionSnapshot]
+}
+
+private enum MLXStructuredBridgeError: Error {
+    case invalidRequest
+    case unsupportedMessageRole
+    case unsupportedAttachment
 }
 
 private struct MLXVLMOptionsSnapshot: Sendable {
@@ -619,6 +737,40 @@ private enum RepetitionRunDecision {
 
 // swiftlint:disable:next type_body_length
 private final class MLXSession: @unchecked Sendable {
+    private final class LLMChatCache: @unchecked Sendable {
+        let session: ChatSession
+        let modelID: String
+        let systemPrompt: String?
+        let tools: [MLXChatToolDefinitionSnapshot]
+        let disableThinking: Bool
+        var ledger: [MLXChatMessageSnapshot]
+
+        init(
+            session: ChatSession,
+            modelID: String,
+            systemPrompt: String?,
+            tools: [MLXChatToolDefinitionSnapshot],
+            disableThinking: Bool,
+            ledger: [MLXChatMessageSnapshot]
+        ) {
+            self.session = session
+            self.modelID = modelID
+            self.systemPrompt = systemPrompt
+            self.tools = tools
+            self.disableThinking = disableThinking
+            self.ledger = ledger
+        }
+
+        func isCompatible(with request: MLXStructuredRequestSnapshot) -> Bool {
+            modelID == request.modelID
+                && systemPrompt == request.options.systemPrompt
+                && tools == request.tools
+                && disableThinking == request.options.disableThinking
+                && request.messages.count > ledger.count
+                && request.messages.starts(with: ledger)
+        }
+    }
+
     private struct State {
         var isCancelled = false
         var isLoaded = false
@@ -636,7 +788,23 @@ private final class MLXSession: @unchecked Sendable {
     /// a selected model alive until the serialized operation completes.
     private struct ModelState: @unchecked Sendable {
         var generationContainer: ModelContainer?
+        var llmChatCache: LLMChatCache?
         var embedderContainer: EmbedderModelContainer?
+        /// Decision checkpoints are not generation containers: the joint head
+        /// scores every option in one non-autoregressive pass.
+        var decisionModel: ClefDecisionModel?
+        /// PPLX-style decider checkpoints: Qwen3.5 backbone with a 255-way
+        /// readout instead of a joint head. Routed by `decision_config.json`.
+        var deciderModel: Qwen35DeciderModel?
+        /// pplx-decider v1.2: joint inline-readout protocol, text and images.
+        /// Routed by `joint_config.json`.
+        var jointDeciderModel: Qwen35JointDecider?
+        var d1Model: D1Model?
+        var d1OmniModel: D1Omni?
+        var d1OmniTokenizer: (any MLXLMCommon.Tokenizer)?
+        var glinerModel: GLiNERClassifier?
+        /// GLiNER's DeBERTa window, read from config.json at load.
+        var glinerPositionWindow: Int?
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         var sttModel: STTGenerationModel?
         var ttsModel: SpeechGenerationModel?
@@ -656,11 +824,18 @@ private final class MLXSession: @unchecked Sendable {
         MLXSessionCoordinator.register(self)
     }
 
+    var loadedContextLength: Int {
+        lock.withLock { $0.contextLength }
+    }
+
     func load(modelPath: String, resetCancellation: Bool = true) async throws {
         #if targetEnvironment(simulator)
         throw MLXRuntimeError.simulatorUnsupported
         #else
         MLXSessionCoordinator.prepareForLoad(self)
+        if kind == .llm {
+            invalidateLLMChatCache()
+        }
         let restoreMemoryPolicy = MLXMemoryPolicy.prepareForModelLoad(kind)
         defer { restoreMemoryPolicy?() }
 
@@ -673,7 +848,10 @@ private final class MLXSession: @unchecked Sendable {
                 from: directory,
                 using: tokenizerLoader
             )
-            modelLock.withLock { $0.generationContainer = container }
+            modelLock.withLock {
+                $0.generationContainer = container
+                $0.llmChatCache = nil
+            }
         case .vlm:
             let container = try await VLMModelFactory.shared.loadContainer(
                 from: directory,
@@ -700,6 +878,8 @@ private final class MLXSession: @unchecked Sendable {
             #else
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
+        case .decision:
+            try await loadDecisionModel(from: directory, using: tokenizerLoader)
         }
         let modelContextLength = MLXModelConfig.contextLength(inDirectory: directory)
         lock.withLock {
@@ -713,8 +893,65 @@ private final class MLXSession: @unchecked Sendable {
         #endif
     }
 
+    /// Resets every decision slot, then loads whichever runtime the
+    /// checkpoint declares. Exactly one slot is set afterwards.
+    private func loadDecisionModel(
+        from directory: URL,
+        using tokenizerLoader: any TokenizerLoader
+    ) async throws {
+        modelLock.withLock { models in
+            models.decisionModel = nil
+            models.deciderModel = nil
+            models.jointDeciderModel = nil
+            models.d1Model = nil
+            models.d1OmniModel = nil
+            models.d1OmniTokenizer = nil
+            models.glinerModel = nil
+            models.glinerPositionWindow = nil
+        }
+        switch MLXTextDecisionCheckpoint.kind(at: directory) {
+        case .jointDecider:
+            let decider = try await Qwen35JointDecider.load(
+                from: directory,
+                using: tokenizerLoader
+            )
+            modelLock.withLockUnchecked { $0.jointDeciderModel = decider }
+        case .decider:
+            let decider = try await Qwen35DeciderModel.load(
+                from: directory,
+                using: tokenizerLoader
+            )
+            modelLock.withLock { $0.deciderModel = decider }
+        case .d1:
+            let model = try await D1Model.load(from: directory, using: tokenizerLoader)
+            modelLock.withLockUnchecked { $0.d1Model = model }
+        case .omni:
+            let model = try await VLMModelFactory.shared.loadD1Omni(from: directory)
+            let tokenizer = try await tokenizerLoader.load(from: directory)
+            modelLock.withLockUnchecked {
+                $0.d1OmniModel = model
+                $0.d1OmniTokenizer = tokenizer
+            }
+        case .gliner:
+            let model = try await GLiNERClassifier.load(
+                from: directory, using: GLiNERTextTokenizerLoader())
+            let limit = MLXTextDecisionCheckpoint.glinerMaxTokens(at: directory)
+            modelLock.withLockUnchecked {
+                $0.glinerModel = model
+                $0.glinerPositionWindow = limit
+            }
+        case nil:
+            let decisionModel = try await ClefDecisionModel.load(
+                from: directory,
+                using: tokenizerLoader
+            )
+            modelLock.withLock { $0.decisionModel = decisionModel }
+        }
+    }
+
     func generate(prompt: String, options: MLXLLMOptionsSnapshot) async throws
         -> (String, MLXGenerationMetrics) {
+        invalidateLLMChatCache()
         let params = generateParameters(from: options)
         let input = llmUserInput(prompt: prompt, options: options)
         return try await collect(input: input, parameters: params)
@@ -726,6 +963,7 @@ private final class MLXSession: @unchecked Sendable {
         callback: rac_llm_stream_callback_fn?,
         userData: MLXCallbackUserData
     ) async throws -> MLXGenerationMetrics {
+        invalidateLLMChatCache()
         let params = generateParameters(from: options)
         let input = llmUserInput(prompt: prompt, options: options)
         let metrics = try await stream(input: input, parameters: params) { token in
@@ -738,6 +976,106 @@ private final class MLXSession: @unchecked Sendable {
             _ = "stop".withCString { reason in
                 "".withCString { empty in
                     callback(empty, RAC_TRUE, reason, /*tokens_in_delta*/ 0, userData.rawValue)
+                }
+            }
+        }
+        return metrics
+    }
+
+    // swiftlint:disable:next function_body_length
+    func generateChatStream(
+        request: MLXStructuredRequestSnapshot,
+        callback: rac_llm_stream_callback_fn?,
+        userData: MLXCallbackUserData
+    ) async throws -> MLXGenerationMetrics {
+        try await ensureResidentModelLoaded()
+        guard let container = modelLock.withLock({ $0.generationContainer }) else {
+            throw MLXRuntimeError.notLoaded(modelID)
+        }
+
+        let tools = try mlxToolSpecs(from: request.tools)
+        let parameters = generateParameters(from: request.options)
+        let additionalContext = llmAdditionalContext(from: request.options)
+        let inputMessages = request.messages.map(mlxChatMessage)
+        let fullPromptTokens = try await logicalPromptTokenCount(
+            container: container,
+            messages: inputMessages,
+            systemPrompt: request.options.systemPrompt,
+            tools: tools,
+            additionalContext: additionalContext)
+
+        let resolved = try resolveChatSession(
+            container: container,
+            request: request,
+            messages: inputMessages,
+            parameters: parameters,
+            tools: tools,
+            additionalContext: additionalContext)
+        let chatSession = resolved.cache.session
+        var metrics = MLXGenerationMetrics()
+        var assistantText = ""
+        var assistantToolCalls: [ToolCall] = []
+        var consumerStopped = false
+        var cancelled = false
+        let started = Date()
+
+        for try await event in chatSession.streamDetails(to: resolved.pendingMessages) {
+            if isCancelled || Task.isCancelled {
+                cancelled = true
+                break
+            }
+            switch event {
+            case .chunk(let text):
+                assistantText += text
+                if !emitLLMText(text, callback: callback, userData: userData) {
+                    consumerStopped = true
+                    break
+                }
+            case .toolCall(let toolCall):
+                assistantToolCalls.append(toolCall)
+                let text = try mlxToolCallEnvelope(toolCall)
+                if !emitLLMText(text, callback: callback, userData: userData) {
+                    consumerStopped = true
+                    break
+                }
+            case .info(let info):
+                metrics.promptTokens = fullPromptTokens
+                metrics.cachedPromptTokens = max(0, fullPromptTokens - info.promptTokenCount)
+                metrics.completionTokens = info.generationTokenCount
+                metrics.tokensPerSecond = Float(info.tokensPerSecond)
+                metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
+            case .rejectedToolCall(let rejection):
+                throw RejectedToolCallError(rejection)
+            }
+            if consumerStopped {
+                break
+            }
+        }
+        await chatSession.synchronize()
+
+        guard !cancelled, !consumerStopped, !isCancelled, !Task.isCancelled else {
+            invalidateLLMChatCache()
+            throw CancellationError()
+        }
+        guard !assistantText.isEmpty || !assistantToolCalls.isEmpty else {
+            invalidateLLMChatCache()
+            return metrics
+        }
+
+        var committedLedger = request.messages
+        committedLedger.append(
+            try mlxAssistantSnapshot(text: assistantText, toolCalls: assistantToolCalls))
+        let committedCache = resolved.cache
+        committedCache.ledger = committedLedger
+        modelLock.withLock { $0.llmChatCache = committedCache }
+
+        if metrics.totalTimeMs == 0 {
+            metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
+        }
+        if let callback {
+            _ = "stop".withCString { reason in
+                "".withCString { empty in
+                    callback(empty, RAC_TRUE, reason, 0, userData.rawValue)
                 }
             }
         }
@@ -790,7 +1128,16 @@ private final class MLXSession: @unchecked Sendable {
     func cleanup() {
         modelLock.withLock { models in
             models.generationContainer = nil
+            models.llmChatCache = nil
             models.embedderContainer = nil
+            models.decisionModel = nil
+            models.deciderModel = nil
+            models.jointDeciderModel = nil
+            models.d1Model = nil
+            models.d1OmniModel = nil
+            models.d1OmniTokenizer = nil
+            models.glinerModel = nil
+            models.glinerPositionWindow = nil
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             models.sttModel = nil
             models.ttsModel = nil
@@ -822,6 +1169,72 @@ private final class MLXSession: @unchecked Sendable {
 
         mlxRuntimeLogger.debug("Restoring evicted MLX \(kindDescription) model '\(modelID)'")
         try await load(modelPath: reloadPath, resetCancellation: false)
+    }
+
+    // swiftlint:disable:next strict_fileprivate
+    fileprivate func invalidateLLMChatCache() {
+        modelLock.withLock { $0.llmChatCache = nil }
+    }
+
+    private func logicalPromptTokenCount(
+        container: ModelContainer,
+        messages: [Chat.Message],
+        systemPrompt: String?,
+        tools: [ToolSpec]?,
+        additionalContext: [String: any Sendable]?
+    ) async throws -> Int {
+        var completeMessages = messages
+        if let systemPrompt {
+            completeMessages.insert(.system(systemPrompt), at: 0)
+        }
+        let input = MLXSendableBox(
+            UserInput(
+                chat: completeMessages,
+                tools: tools,
+                additionalContext: additionalContext))
+        return try await preparedTokenCount(
+            container: container,
+            input: input.consume())
+    }
+
+    private func preparedTokenCount(
+        container: ModelContainer,
+        input: consuming sending UserInput
+    ) async throws -> Int {
+        try await container.prepare(input: input).text.tokens.size
+    }
+
+    private func resolveChatSession(
+        container: ModelContainer,
+        request: MLXStructuredRequestSnapshot,
+        messages: [Chat.Message],
+        parameters: GenerateParameters,
+        tools: [ToolSpec]?,
+        additionalContext: [String: any Sendable]?
+    ) throws -> (cache: LLMChatCache, pendingMessages: [Chat.Message]) {
+        if let cache = modelLock.withLock({ $0.llmChatCache }),
+           cache.isCompatible(with: request) {
+            cache.session.generateParameters = parameters
+            return (cache, Array(messages.dropFirst(cache.ledger.count)))
+        }
+
+        guard let pending = messages.last else { throw MLXStructuredBridgeError.invalidRequest }
+        let history = Array(messages.dropLast())
+        let chatSession = ChatSession(
+            container,
+            instructions: request.options.systemPrompt,
+            history: history,
+            generateParameters: parameters,
+            additionalContext: additionalContext,
+            tools: tools)
+        let cache = LLMChatCache(
+            session: chatSession,
+            modelID: request.modelID,
+            systemPrompt: request.options.systemPrompt,
+            tools: request.tools,
+            disableThinking: request.options.disableThinking,
+            ledger: Array(request.messages.dropLast()))
+        return (cache, [pending])
     }
 
     private func collect(input: consuming sending UserInput, parameters: GenerateParameters) async throws
@@ -1006,20 +1419,103 @@ private final class MLXSession: @unchecked Sendable {
             throw MLXRuntimeError.notLoaded(modelID)
         }
 
+        let configuration = await container.configuration
+        // Harmony and Onyx own token-level framing, reasoning channels and
+        // semantic stop tokens. Keep their decoder in place for ordinary SDK
+        // generation; commons' text protocol applies to the other formats.
+        if configuration.toolCallFormat == .gptOSS || configuration.toolCallFormat == .atem {
+            return try await streamFramedProtocol(
+                container: container, input: input, parameters: parameters, onToken: onToken)
+        }
+
         let prepared = try await container.prepare(input: input)
-        let events = try await container.generate(input: prepared, parameters: parameters)
+        // Commons owns text tool-call parsing. MLX-LM's decoded generate()
+        // would intercept these frames before commons receives them.
+        let (events, generationTask) = try await container.perform(nonSendable: prepared) { context, input in
+            try MLXLMCommon.generateTokensTask(input: input, parameters: parameters, context: context)
+        }
+        var detokenizer = NaiveStreamingDetokenizer(tokenizer: await container.tokenizer)
+        var stopFilter = MLXTextStopFilter(stopStrings: configuration.effectiveStopStrings)
+        var consumerStopped = false
+        var externallyCancelled = false
         var metrics = MLXGenerationMetrics()
         let started = Date()
 
         for await event in events {
-            if isCancelled {
-                throw CancellationError()
+            if isCancelled || Task.isCancelled {
+                externallyCancelled = true
+                generationTask.cancel()
             }
             switch event {
-            case .chunk(let token):
-                if !onToken(token) {
-                    cancel()
-                    break
+            case .token(let tokenID):
+                // Cancel the producer at a textual stop, then drain its final
+                // usage event without forwarding already-buffered token IDs.
+                guard !externallyCancelled && !consumerStopped && !stopFilter.stopped else { continue }
+                detokenizer.append(token: tokenID)
+                guard let decoded = detokenizer.next() else { continue }
+                let text = stopFilter.process(decoded)
+                if !text.isEmpty && !onToken(text) {
+                    consumerStopped = true
+                    generationTask.cancel()
+                }
+                if stopFilter.stopped { generationTask.cancel() }
+            case .info(let info):
+                metrics.promptTokens = info.promptTokenCount
+                metrics.completionTokens = info.generationTokenCount
+                metrics.tokensPerSecond = Float(info.tokensPerSecond)
+                metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
+            }
+        }
+        // Do not let the next request use the model until GPU work has settled.
+        await generationTask.value
+        if externallyCancelled || isCancelled || Task.isCancelled { throw CancellationError() }
+
+        let remaining = stopFilter.finish()
+        if !consumerStopped && !remaining.isEmpty && !onToken(remaining) {
+            consumerStopped = true
+        }
+        if consumerStopped { cancel() }
+        if metrics.totalTimeMs == 0 {
+            metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
+        }
+        return metrics
+    }
+
+    private func streamFramedProtocol(
+        container: ModelContainer,
+        input: consuming sending UserInput,
+        parameters: GenerateParameters,
+        onToken: @escaping @Sendable (String) -> Bool
+    ) async throws -> MLXGenerationMetrics {
+        let prepared = try await container.prepare(input: input)
+        let (events, generationTask) = try await container.perform(nonSendable: prepared) { context, input in
+            let iterator = try TokenIterator(
+                input: input,
+                model: context.model,
+                parameters: parameters
+            )
+            return MLXLMCommon.generateTask(
+                promptTokenCount: input.text.tokens.size,
+                modelConfiguration: context.configuration,
+                tokenizer: context.tokenizer,
+                iterator: iterator
+            )
+        }
+        var metrics = MLXGenerationMetrics()
+        let started = Date()
+        var consumerStopped = false
+        var externallyCancelled = false
+
+        for await event in events {
+            if isCancelled || Task.isCancelled {
+                externallyCancelled = true
+                generationTask.cancel()
+            }
+            switch event {
+            case .chunk(let text):
+                if !externallyCancelled && !consumerStopped && !onToken(text) {
+                    consumerStopped = true
+                    generationTask.cancel()
                 }
             case .info(let info):
                 metrics.promptTokens = info.promptTokenCount
@@ -1029,17 +1525,71 @@ private final class MLXSession: @unchecked Sendable {
             case .toolCall:
                 break
             case .rejectedToolCall(let rejection):
-                // Do not leak the rejection's raw model output through logs or
-                // flatten it into ordinary response text. Callers receive the
-                // non-sensitive LocalizedError provided by MLX-LM.
                 throw RejectedToolCallError(rejection)
             }
         }
-
+        await generationTask.value
+        if externallyCancelled || isCancelled || Task.isCancelled { throw CancellationError() }
+        if consumerStopped { cancel() }
         if metrics.totalTimeMs == 0 {
             metrics.totalTimeMs = Int64(Date().timeIntervalSince(started) * 1000)
         }
         return metrics
+    }
+
+    /// One joint decision pass over the state and questions. Returns the
+    /// model result plus the encoded prompt size. Answer option ids may be in
+    /// canonical order (choice sorts by key, noul is true-then-false); the
+    /// caller maps them back onto the request's option order.
+    func decide(
+        state: String,
+        questions: [ClefDecisionQuestion],
+        controls: MLXDecisionControls
+    ) async throws -> (MLXDecisionPass, Int) {
+        if isCancelled { throw CancellationError() }
+        let request = ClefDecisionRequest(state: state, questions: questions)
+        let temperature = controls.temperature
+        // The joint decider honours every control. The other checkpoints carry
+        // their own calibration and fixed layouts: only Clef applies a
+        // temperature override, and none takes the extended controls.
+        if let decider = modelLock.withLockUnchecked({ $0.jointDeciderModel }) {
+            let pass = try MLXTextDecisions.scoreJoint(decider, request: request, controls: controls)
+            return (pass, pass.inputTokens)
+        }
+        try controls.requireBasic()
+        if let decider = modelLock.withLock({ $0.deciderModel }) {
+            let pass = MLXDecisionPass(try decider.decide(request))
+            return (pass, pass.inputTokens)
+        }
+        if let model = modelLock.withLockUnchecked({ $0.d1Model }) {
+            let pass = try MLXTextDecisions.scoreD1(model, request: request)
+            return (pass, pass.inputTokens)
+        }
+        if let loaded = modelLock.withLockUnchecked({ state -> (D1Omni, any MLXLMCommon.Tokenizer)? in
+            guard let model = state.d1OmniModel, let tokenizer = state.d1OmniTokenizer else {
+                return nil
+            }
+            return (model, tokenizer)
+        }) {
+            let pass = try MLXTextDecisions.scoreOmni(
+                loaded.0, tokenizer: loaded.1, request: request)
+            return (pass, pass.inputTokens)
+        }
+        if let loaded = modelLock.withLockUnchecked({ state -> (GLiNERClassifier, Int)? in
+            guard let model = state.glinerModel, let limit = state.glinerPositionWindow else {
+                return nil
+            }
+            return (model, limit)
+        }) {
+            let pass = try MLXTextDecisions.scoreGLiNER(
+                loaded.0, request: request, maxTokens: loaded.1)
+            return (pass, pass.inputTokens)
+        }
+        guard let decisionModel = modelLock.withLock({ $0.decisionModel }) else {
+            throw MLXRuntimeError.notLoaded(modelID)
+        }
+        let pass = MLXDecisionPass(try decisionModel.decide(request, temperature: temperature))
+        return (pass, pass.inputTokens)
     }
 
     func embedBatch(
@@ -1325,6 +1875,8 @@ private final class MLXSession: @unchecked Sendable {
             return "STT"
         case .tts:
             return "TTS"
+        case .decision:
+            return "decision"
         }
     }
 
@@ -1334,6 +1886,7 @@ private final class MLXSession: @unchecked Sendable {
         cancel()
         modelLock.withLock { models in
             models.generationContainer = nil
+            models.llmChatCache = nil
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             models.sttModel = nil
             models.ttsModel = nil
@@ -1461,6 +2014,22 @@ private final class SyncResultBox<T>: @unchecked Sendable {
     var result: Result<T, Error>?
 }
 
+private final class MLXSendableBox<T>: @unchecked Sendable {
+    private var value: T?
+
+    init(_ value: consuming T) {
+        self.value = consume value
+    }
+
+    consuming func consume() -> T {
+        guard let value else {
+            preconditionFailure("MLX sendable box was already consumed")
+        }
+        self.value = nil
+        return value
+    }
+}
+
 private func generateParameters(from options: MLXLLMOptionsSnapshot) -> GenerateParameters {
     // No early return for the no-options case: the snapshot resolves every field
     // from RAC_LLM_OPTIONS_DEFAULT when the C layer passes no options, so one
@@ -1537,6 +2106,211 @@ private func string(from pointer: UnsafePointer<CChar>?) -> String? {
     guard let pointer else { return nil }
     let value = String(cString: pointer)
     return value.isEmpty ? nil : value
+}
+
+private func requiredString(from pointer: UnsafePointer<CChar>?) throws -> String {
+    guard let pointer else { throw MLXStructuredBridgeError.invalidRequest }
+    return String(cString: pointer)
+}
+
+private func mlxChatRole(from pointer: UnsafePointer<CChar>?) throws -> Chat.Message.Role {
+    switch try requiredString(from: pointer) {
+    case "user":
+        return .user
+    case "assistant":
+        return .assistant
+    case "system", "developer":
+        return .system
+    case "tool":
+        return .tool
+    default:
+        throw MLXStructuredBridgeError.unsupportedMessageRole
+    }
+}
+
+private func copyMLXArray<Element, Result>(
+    _ pointer: UnsafePointer<Element>?,
+    count: Int,
+    transform: (Element) throws -> Result
+) throws -> [Result] {
+    guard count > 0 else { return [] }
+    guard let pointer else { throw MLXStructuredBridgeError.invalidRequest }
+    return try UnsafeBufferPointer(start: pointer, count: count).map(transform)
+}
+
+private func mlxToolCall(
+    from view: ra_mlx_chat_tool_call_view_t
+) throws -> ToolCall {
+    ToolCall(
+        function: .init(
+            name: try requiredString(from: view.name),
+            arguments: try mlxJSONValues(
+                from: try requiredString(from: view.arguments_json))),
+        id: string(from: view.id))
+}
+
+private func mlxToolResult(
+    from view: ra_mlx_chat_tool_result_view_t
+) -> MLXChatToolResultSnapshot {
+    MLXChatToolResultSnapshot(
+        id: string(from: view.tool_call_id) ?? "",
+        name: string(from: view.name) ?? "",
+        resultJSON: string(from: view.result_json) ?? "",
+        error: string(from: view.error) ?? "",
+        isError: view.is_error == RAC_TRUE)
+}
+
+private func mlxChatMessage(
+    from view: ra_mlx_chat_message_view_t
+) throws -> MLXChatMessageSnapshot {
+    let toolCalls = try copyMLXArray(
+        view.tool_calls,
+        count: view.tool_call_count,
+        transform: mlxToolCall)
+    return MLXChatMessageSnapshot(
+        role: try mlxChatRole(from: view.role),
+        content: string(from: view.content) ?? "",
+        name: string(from: view.name) ?? "",
+        toolCallID: string(from: view.tool_call_id) ?? "",
+        toolCalls: toolCalls,
+        toolResult: view.tool_result.map { mlxToolResult(from: $0.pointee) },
+        hasAttachments: view.has_attachments == RAC_TRUE)
+}
+
+private func mlxToolDefinition(
+    from view: ra_mlx_chat_tool_definition_view_t
+) throws -> MLXChatToolDefinitionSnapshot {
+    MLXChatToolDefinitionSnapshot(
+        name: try requiredString(from: view.name),
+        description: string(from: view.description) ?? "",
+        parametersJSON: string(from: view.parameters_json) ?? "{}")
+}
+
+private func mlxStructuredRequest(
+    from view: ra_mlx_chat_request_view_t
+) throws -> MLXStructuredRequestSnapshot {
+    let messages = try copyMLXArray(
+        view.messages,
+        count: view.message_count,
+        transform: mlxChatMessage)
+    guard !messages.isEmpty else { throw MLXStructuredBridgeError.invalidRequest }
+    if messages.contains(where: \.hasAttachments) {
+        throw MLXStructuredBridgeError.unsupportedAttachment
+    }
+    return MLXStructuredRequestSnapshot(
+        modelID: string(from: view.model_id) ?? "",
+        options: MLXLLMOptionsSnapshot(view.options),
+        messages: messages,
+        tools: try copyMLXArray(
+            view.tools,
+            count: view.tool_count,
+            transform: mlxToolDefinition))
+}
+
+private func mlxJSONValues(from json: String) throws -> [String: JSONValue] {
+    let data = Data((json.isEmpty ? "{}" : json).utf8)
+    return try JSONDecoder().decode([String: JSONValue].self, from: data)
+}
+
+private func mlxSendableValue(_ value: JSONValue) -> any Sendable {
+    switch value {
+    case .null:
+        return NSNull()
+    case .bool(let value):
+        return value
+    case .int(let value):
+        return value
+    case .double(let value):
+        return value
+    case .string(let value):
+        return value
+    case .array(let values):
+        return values.map(mlxSendableValue)
+    case .object(let values):
+        return values.mapValues(mlxSendableValue)
+    }
+}
+
+private func mlxToolSpecs(
+    from tools: [MLXChatToolDefinitionSnapshot]
+) throws -> [ToolSpec]? {
+    guard !tools.isEmpty else { return nil }
+    return try tools.map { tool in
+        let parameters = try mlxJSONValues(from: tool.parametersJSON)
+            .mapValues(mlxSendableValue)
+        return [
+            "type": "function",
+            "function": [
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": parameters
+            ] as [String: any Sendable]
+        ] as ToolSpec
+    }
+}
+
+private func mlxChatMessage(from message: MLXChatMessageSnapshot) -> Chat.Message {
+    switch message.role {
+    case .user:
+        return .user(message.content)
+    case .assistant:
+        return .assistant(
+            message.content,
+            toolCalls: message.toolCalls.isEmpty ? nil : message.toolCalls)
+    case .system:
+        return .system(message.content)
+    case .tool:
+        let result = message.toolResult
+        let content: String
+        if !message.content.isEmpty {
+            content = message.content
+        } else if result?.isError == true {
+            content = result?.error ?? ""
+        } else {
+            content = result?.resultJSON ?? ""
+        }
+        return .tool(
+            content,
+            id: message.toolCallID.isEmpty ? result?.id : message.toolCallID,
+            name: message.name.isEmpty ? result?.name : message.name)
+    }
+}
+
+private struct MLXToolCallWireEnvelope: Encodable {
+    let name: String
+    let arguments: [String: JSONValue]
+}
+
+private func mlxToolCallEnvelope(_ call: ToolCall) throws -> String {
+    let encoded = try JSONEncoder().encode(
+        MLXToolCallWireEnvelope(
+            name: call.function.name,
+            arguments: call.function.arguments))
+    guard let json = String(data: encoded, encoding: .utf8) else {
+        throw MLXStructuredBridgeError.invalidRequest
+    }
+    return "<tool_call>\(json)</tool_call>"
+}
+
+private func mlxAssistantSnapshot(
+    text: String,
+    toolCalls: [ToolCall]
+) throws -> MLXChatMessageSnapshot {
+    return MLXChatMessageSnapshot(
+        role: .assistant,
+        content: text,
+        toolCalls: toolCalls)
+}
+
+private func emitLLMText(
+    _ text: String,
+    callback: rac_llm_stream_callback_fn?,
+    userData: MLXCallbackUserData
+) -> Bool {
+    guard !text.isEmpty, let callback else { return true }
+    return text.withCString {
+        callback($0, RAC_FALSE, nil, 0, userData.rawValue) == RAC_TRUE
+    }
 }
 
 /// Architecture evidence read out of the model's own `config.json`.
@@ -1750,6 +2524,8 @@ private let mlxCreate: rac_mlx_create_fn = { kind, modelIDPtr, outHandle, _ in
         sessionKind = .stt
     case RAC_MLX_SESSION_KIND_TTS:
         sessionKind = .tts
+    case RAC_MLX_SESSION_KIND_DECISION:
+        sessionKind = .decision
     default:
         sessionKind = .llm
     }
@@ -1772,6 +2548,19 @@ private let mlxInitialize: rac_mlx_initialize_fn = { handle, modelPathPtr, _ in
     }
 }
 
+private let mlxContextLength: rac_mlx_context_length_fn = { handle, outContextLength, _ in
+    guard let session = session(from: handle), let outContextLength else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let contextLength = session.loadedContextLength
+    guard contextLength > 0, contextLength <= Int(Int32.max) else {
+        outContextLength.pointee = 0
+        return RAC_ERROR_BACKEND_UNAVAILABLE
+    }
+    outContextLength.pointee = Int32(contextLength)
+    return RAC_SUCCESS
+}
+
 private let mlxLLMGenerate: rac_mlx_llm_generate_fn = { handle, promptPtr, options, outResult, _ in
     guard let session = session(from: handle), let promptPtr, let outResult else {
         return RAC_ERROR_INVALID_PARAMETER
@@ -1788,6 +2577,7 @@ private let mlxLLMGenerate: rac_mlx_llm_generate_fn = { handle, promptPtr, optio
         outResult.pointee.tokens_per_second = output.1.tokensPerSecond
         return outResult.pointee.text == nil ? RAC_ERROR_OUT_OF_MEMORY : RAC_SUCCESS
     case .failure(let error):
+        session.invalidateLLMChatCache()
         if error is CancellationError {
             return RAC_ERROR_CANCELLED
         }
@@ -1812,13 +2602,52 @@ private let mlxLLMGenerateStream: rac_mlx_llm_generate_stream_fn = { handle, pro
         )
     }) {
     case .success(let metrics):
-        rac_mlx_note_stream_token_counts(Int32(metrics.promptTokens), Int32(metrics.completionTokens))
+        rac_mlx_note_stream_token_counts(
+            Int32(metrics.promptTokens),
+            Int32(metrics.completionTokens),
+            Int32(metrics.cachedPromptTokens))
         return RAC_SUCCESS
     case .failure(let error):
+        session.invalidateLLMChatCache()
         if error is CancellationError {
             return RAC_ERROR_CANCELLED
         }
         recordMLXFailure("MLX streaming text generation", error: error)
+        return RAC_ERROR_GENERATION_FAILED
+    }
+}
+
+private let mlxLLMGenerateChat: ra_mlx_llm_generate_chat_typed_fn = { handle, requestView, callback, callbackUserData, _ in
+    guard let session = session(from: handle), let requestView else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let request: MLXStructuredRequestSnapshot
+    do {
+        request = try mlxStructuredRequest(from: requestView.pointee)
+    } catch {
+        session.invalidateLLMChatCache()
+        recordMLXFailure("MLX structured request mapping", error: error)
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let callbackUserData = MLXCallbackUserData(rawValue: callbackUserData)
+    switch syncWait({
+        try await session.generateChatStream(
+            request: request,
+            callback: callback,
+            userData: callbackUserData)
+    }) {
+    case .success(let metrics):
+        rac_mlx_note_stream_token_counts(
+            Int32(metrics.promptTokens),
+            Int32(metrics.completionTokens),
+            Int32(metrics.cachedPromptTokens))
+        return RAC_SUCCESS
+    case .failure(let error):
+        session.invalidateLLMChatCache()
+        if error is CancellationError {
+            return RAC_ERROR_CANCELLED
+        }
+        recordMLXFailure("MLX structured streaming text generation", error: error)
         return RAC_ERROR_GENERATION_FAILED
     }
 }
@@ -1928,6 +2757,174 @@ private func fillEmbeddingResult(
         data.initialize(from: vector, count: dimension)
         embeddings[index].data = data
         embeddings[index].dimension = dimension
+    }
+    return RAC_SUCCESS
+}
+
+/// Joint decision scoring callback. Translates the C request into the fork's
+/// decision types, runs one pass, and returns the per-option probabilities
+/// parallel to the request's option order. Canonical-ordering rules (choice
+/// sorted by key, noul true-then-false, score by level index) are applied by
+/// the model; probabilities are re-keyed back onto the request order here.
+private let mlxDecision: rac_mlx_decision_fn = { handle, statePtr, questionsPtr, questionCount, optionsPtr, outResult, _ in
+    guard let session = session(from: handle), let statePtr, let questionsPtr, let outResult else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let state = String(cString: statePtr)
+    let count = Int(questionCount)
+
+    // Snapshot the request C views into owned Swift values up front; the
+    // pointers only stay valid for the duration of this callback.
+    var requestQuestions: [ClefDecisionQuestion] = []
+    requestQuestions.reserveCapacity(count)
+    var requestKeys: [[String]] = []
+    requestKeys.reserveCapacity(count)
+    for index in 0..<count {
+        let question = questionsPtr[index]
+        let optionCount = Int(question.option_count)
+        var options: [ClefDecisionOption] = []
+        options.reserveCapacity(optionCount)
+        var keys: [String] = []
+        keys.reserveCapacity(optionCount)
+        for optionIndex in 0..<optionCount {
+            let option = question.options[optionIndex]
+            let key = option.key.map { String(cString: $0) } ?? ""
+            let description = option.description.map { String(cString: $0) }
+            options.append(ClefDecisionOption(key: key, description: description))
+            keys.append(key)
+        }
+        let id = question.id.map { String(cString: $0) } ?? ""
+        let instructions = question.instructions.map { String(cString: $0) }
+        requestQuestions.append(
+            ClefDecisionQuestion(
+                id: id,
+                kind: decisionKind(from: question.type),
+                instructions: instructions,
+                options: options
+            ))
+        requestKeys.append(keys)
+    }
+    // Copies the borrowed image bytes; the pointers die with this callback.
+    let controls = MLXDecisionControls(optionsPtr?.pointee)
+    // Immutable snapshots for the Sendable closure below.
+    let questions = requestQuestions
+    let keysByQuestion = requestKeys
+    let capturedState = state
+
+    switch syncWait({
+        try await session.decide(
+            state: capturedState, questions: questions, controls: controls)
+    }) {
+    case .success(let output):
+        return fillDecisionResult(
+            output.0, requestKeys: keysByQuestion, inputTokens: output.1, outResult: outResult)
+    case .failure(let error):
+        if error is CancellationError {
+            return RAC_ERROR_CANCELLED
+        }
+        recordMLXFailure("MLX decision scoring", error: error)
+        // Commons copies this into the caller's error message; it is
+        // thread-local and this callback runs on the decide caller's thread.
+        rac_error_set_details((error as? LocalizedError)?.errorDescription ?? String(describing: error))
+        return decisionResultCode(for: error)
+    }
+}
+
+/// A refused control is the caller's to fix, so it is not reported as an
+/// inference failure.
+func decisionResultCode(for error: Error) -> rac_result_t {
+    switch error {
+    case is MLXDecisionUnsupported:
+        return RAC_ERROR_NOT_SUPPORTED
+    case DecisionError.unsupportedCheckpoint:
+        return RAC_ERROR_NOT_SUPPORTED
+    case DecisionError.invalidRequest, DecisionError.tooLong, is MLXDecisionControls.ImageError:
+        return RAC_ERROR_INVALID_PARAMETER
+    default:
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+}
+
+/// Maps the C question kind onto the fork's decision kind.
+private func decisionKind(from type: rac_decision_question_type_t) -> ClefQuestionKind {
+    switch type {
+    case RAC_DECISION_QUESTION_NOUL: return .noul
+    case RAC_DECISION_QUESTION_SCORE: return .score
+    default: return .choice
+    }
+}
+
+/// Maps the model's per-question answers onto the C result, reordering
+/// probabilities to the request's option order and validating arity.
+private func fillDecisionResult(
+    _ result: MLXDecisionPass,
+    requestKeys: [[String]],
+    inputTokens: Int,
+    outResult: UnsafeMutablePointer<rac_decision_result_t>
+) -> rac_result_t {
+    guard result.answers.count == requestKeys.count else {
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+
+    // calloc, not UnsafeMutablePointer.allocate: commons releases this array
+    // (and each probabilities array) with free() in rac_decision_result_free.
+    let answersBytes = requestKeys.count * MemoryLayout<rac_decision_answer_t>.stride
+    guard let answersRaw = calloc(1, answersBytes)?
+        .bindMemory(to: rac_decision_answer_t.self, capacity: requestKeys.count) else {
+        return RAC_ERROR_OUT_OF_MEMORY
+    }
+    outResult.pointee.answers = answersRaw
+    outResult.pointee.answer_count = requestKeys.count
+    outResult.pointee.input_tokens = Int32(inputTokens)
+
+    var failed = false
+    for (index, answer) in result.answers.enumerated() {
+        let keys = requestKeys[index]
+        // A shape mismatch or a genuinely missing key is an error rather than a
+        // silent zero, so a backend mapping bug cannot masquerade as a
+        // confident answer.
+        guard keys.count == answer.optionIds.count else {
+            failed = true
+            break
+        }
+        // malloc, not UnsafeMutablePointer.allocate: commons releases this
+        // array with free() in rac_decision_result_free.
+        guard let probabilitiesRaw = malloc(keys.count * MemoryLayout<Float>.stride) else {
+            failed = true
+            break
+        }
+        let probabilities = probabilitiesRaw.bindMemory(to: Float.self, capacity: keys.count)
+        probabilities.initialize(repeating: 0, count: keys.count)
+        var complete = true
+        for (optionIndex, key) in keys.enumerated() {
+            guard let value = answer.probabilities[key] else {
+                complete = false
+                break
+            }
+            probabilities[optionIndex] = value
+        }
+        guard complete else {
+            free(probabilitiesRaw)
+            failed = true
+            break
+        }
+        var cAnswer = answersRaw[index]
+        cAnswer.probabilities = probabilities
+        cAnswer.probability_count = keys.count
+        answersRaw[index] = cAnswer
+    }
+
+    if failed {
+        // Hand back nothing usable and release whatever was allocated; the
+        // commons caller frees the (now empty) result. free(), not
+        // deinitialize/deallocate: this buffer came from calloc and commons
+        // owns it through free().
+        for index in 0..<requestKeys.count {
+            free(answersRaw[index].probabilities)
+        }
+        free(answersRaw)
+        outResult.pointee = rac_decision_result_t()
+        return RAC_ERROR_INFERENCE_FAILED
     }
     return RAC_SUCCESS
 }

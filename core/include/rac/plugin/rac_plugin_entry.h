@@ -100,8 +100,23 @@ extern "C" {
  *                 Engines compiled against v8 are rejected until rebuilt;
  *                 NULL `get_stream_token_counts` means counts must be marked
  *                 estimated. Engine-vtable reserved_slot_3 is unchanged.
+ *   10u — promoted reserved primitive wire/slot 12 to image embedding
+ *                 (`RAC_PRIMITIVE_EMBED_IMAGE` / `image_embedding_ops`) and
+ *                 extended embedding options for image input.
+ *   11u — promoted reserved primitive wire/slot 13 to OCR
+ *                 (`RAC_PRIMITIVE_OCR` / `ocr_ops`).
+ *   12u — added structured LLM chat streaming through
+ *                 `rac_llm_service_ops_t::generate_chat_stream`; added cached
+ *                 prompt accounting to `rac_llm_token_counts_t`.
+ *   13u — promoted reserved primitive wire/slot 14 to joint decision scoring
+ *                 (`RAC_PRIMITIVE_DECIDE` / `decision_ops`, renamed from
+ *                 reserved_slot_5 at the same binary offset). Engines compiled
+ *                 against v12 are rejected until rebuilt.
+ *   14u — `rac_decision_options_t` gains grouping, max_length, max_pixels,
+ *                 min_pixels and borrowed images. Engines compiled against
+ *                 v13 read a shorter struct and are rejected until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 11u
+#define RAC_PLUGIN_API_VERSION 14u
 
 /* ===========================================================================
  * Plugin entry-point signature

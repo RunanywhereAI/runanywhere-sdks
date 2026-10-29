@@ -5,6 +5,25 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.40] - 2026-10-17
+
+- Version bump to keep the backend package in lockstep with the SDK release.
+
+## [0.20.39] - 2026-10-09
+
+- Text decisions for D1 3B, D1 Omni 600M, and GLiNER 2.5 Decide.
+
+## [0.20.37] - 2026-09-22
+
+### Fixed
+
+- A plugin that is not for this host (`RAC_ERROR_CAPABILITY_UNSUPPORTED`, for example
+  MLX on a C++-only build) is logged at DEBUG. A genuine load failure still warns.
+- The local OpenAI-compatible server forwards context length, thread count, and GPU
+  intent into llama.cpp, and keeps tool-call conversations intact for a coding harness.
+- Llama.cpp streaming reports the decode-loop token count, so a generation that hits
+  the max-token cap is finished as `length` instead of looking like a normal stop.
+
 ## [0.20.36] - 2026-09-02
 
 ### Added
