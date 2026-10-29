@@ -1284,6 +1284,36 @@ TEST(c_abi_yaml_solution_lifecycle) {
     rac_solution_destroy(h);
 }
 
+TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
+    const struct {
+        const char* value;
+        const char* expected;
+        const char* decoded;
+    } cases[] = {
+        {"Don't use markdown  # keep replies short", "Don't use markdown", nullptr},
+        {"Don't use markdown  # don't forget", "Don't use markdown", nullptr},
+        {"\"has # inside\"  # don't forget", "has # inside", nullptr},
+        {"id:'abc # don't", "id:'abc", nullptr},
+        {"a#b  # real comment", "a#b", nullptr},
+        {"Don't use # markdown  # keep replies short", "Don't use", nullptr},
+        {"Don't - 'draft # don't copy", "Don't - 'draft", nullptr},
+        {"'Don''t use # markdown'  # keep replies short", "Don''t use # markdown",
+         "Don't use # markdown"},
+        {"\"say \\\"hi\\\" # inside\"  # real comment", "say \\\"hi\\\" # inside",
+         "say \"hi\" # inside"},
+    };
+    for (const auto& c : cases) {
+        const std::string yaml =
+            std::string("voice_agent:\n  llm_model_id: qwen3-4b\n  system_prompt: ") + c.value +
+            "\n";
+        runanywhere::v1::SolutionConfig cfg;
+        CHECK(rac::solutions::load_solution_from_yaml(yaml.c_str(), &cfg) == RAC_SUCCESS);
+        const std::string prompt = cfg.voice_agent().generation().system_prompt();
+        std::printf("[yaml] %s -> %s\n", c.value, prompt.c_str());
+        CHECK(prompt == c.expected || (c.decoded && prompt == c.decoded));
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 13. C ABI YAML path — raw PipelineSpec shape (top-level `operators`).
 // ---------------------------------------------------------------------------
@@ -1420,6 +1450,7 @@ int main() {
     run_test_c_abi_proto_bytes_lifecycle();
     run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_c_abi_yaml_solution_lifecycle();
+    run_test_yaml_apostrophe_does_not_swallow_a_trailing_comment();
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();
     run_test_null_handle_paths();
