@@ -5,6 +5,13 @@ import type {
   EmbeddingVector,
 } from '@runanywhere/proto-ts/embeddings_options';
 import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import {
+  LLMGenerateRequest,
+  LLMStreamEvent,
+  LLMStreamEventKind,
+} from '@runanywhere/proto-ts/llm_service';
+import { SDKError } from '@runanywhere/proto-ts/errors';
+import { type RAGStreamEvent } from '@runanywhere/proto-ts/rag';
 import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
@@ -13,7 +20,11 @@ import {
   type ModelLoadRequest,
   type ModelLoadResult,
 } from '@runanywhere/proto-ts/model_types';
-import { EmbeddingsProtoAdapter } from '../../../../src/Adapters/ModalityProtoAdapter';
+import {
+  EmbeddingsProtoAdapter,
+  ModalityProtoAdapter,
+  type ModalityProtoModule,
+} from '../../../../src/Adapters/ModalityProtoAdapter';
 import { Embeddings } from '../../../../src/Public/Extensions/RunAnywhere+Embeddings';
 import { TextGeneration } from '../../../../src/Public/Extensions/RunAnywhere+TextGeneration';
 import {
@@ -158,6 +169,32 @@ describe('CrossWasmRAGProvider', () => {
       { id: 'zephyr', name: 'Zephyr Notes', chunkCount: 1 },
       { id: 'maple', name: 'Maple Notes', chunkCount: 1 },
     ]);
+  });
+
+  it('ingests a 140,000-code-point document through ragIngest without RangeError (#1014)', async () => {
+    // splitRAGText alone never reaches the provider's append into its chunk index,
+    // which is where a spread of ~140k chunks used to throw.
+    installBackendSpies();
+    vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
+      async (request: EmbeddingsRequest): Promise<EmbeddingsResult> => embeddingsResult(
+        request.texts.map((text: string, index: number) => vector([1, 0], text, index)),
+      ),
+    );
+    const provider = __testing__.createCrossWasmRAGProvider();
+    await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+      chunkSize: 20,
+      chunkOverlap: 19,
+    }));
+    await provider.ragIngest('中'.repeat(140000), JSON.stringify({
+      docId: 'large-document',
+      docName: 'Large document',
+    }));
+    await expect(provider.ragGetStatistics?.()).resolves.toMatchObject({
+      indexedDocuments: 1,
+      indexedChunks: 139981,
+    });
   });
 
   it('supports typed document removal, clear, and statistics', async () => {
@@ -342,6 +379,201 @@ describe('CrossWasmRAGProvider', () => {
       clearModelOwnedByBackendWorker('onnx-local-llm', 'onnx');
     }
   });
+
+  it('rethrows a mid-stream failure from ragQueryStream without leaking an unhandled rejection', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+
+    try {
+      installBackendSpies();
+      vi.spyOn(Embeddings, 'embedBatch').mockResolvedValue(
+        embeddingsResult([vector([1, 0], 'Persistent Zephyr note', 0)]),
+      );
+      vi.spyOn(Embeddings, 'embed').mockResolvedValue(
+        embeddingsResult([vector([1, 0], 'What is the Zephyr code?', 0)]),
+      );
+
+      const fakeModule = makeFakeLLMStreamModule(
+        (_request, emit) => {
+          emit(streamingTokenEvent('The launch code is '));
+          emit(LLMStreamEvent.fromPartial({
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
+            error: SDKError.fromPartial({ cAbiCode: -42, message: 'forced mid-stream failure' }),
+          }));
+          return 0;
+        },
+      );
+      ModalityProtoAdapter.registerModuleCapabilities(['llm'], fakeModule);
+
+      const provider = __testing__.createCrossWasmRAGProvider();
+      await provider.ragCreatePipeline(createDefaultRAGConfiguration({
+        embeddingModelId: 'all-minilm-l6-v2',
+        llmModelId: 'lfm2-350m-q4_k_m',
+        chunkSize: 64,
+        chunkOverlap: 8,
+        topK: 2,
+      }));
+      await provider.ragIngest('The Zephyr launch code is ORBIT-7.');
+
+      let streamingCancelCalled = false;
+      const originalGenerateStream = TextGeneration.generateStream;
+      vi.spyOn(TextGeneration, 'generateStream').mockImplementation(async (...args) => {
+        const streaming = await originalGenerateStream(...args);
+        const originalCancel = streaming.cancel.bind(streaming);
+        streaming.cancel = () => {
+          streamingCancelCalled = true;
+          originalCancel();
+        };
+        return streaming;
+      });
+
+      const events: RAGStreamEvent[] = [];
+      const consume = async (): Promise<void> => {
+        for await (const event of provider.ragQueryStream('What is the Zephyr code?')) {
+          events.push(event);
+        }
+      };
+
+      await expect(consume()).rejects.toThrow(/forced mid-stream failure/);
+      expect(events.map((event) => event.token)).toEqual(['', 'The launch code is ']);
+      expect(streamingCancelCalled).toBe(false);
+
+      // Node reports unhandled rejections once the current macrotask's
+      // microtasks drain, so yield a full turn before checking.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+    expect(unhandled).toEqual([]);
+  });
+});
+
+describe('renderRAGPrompt', () => {
+  it('fills both placeholder styles in a custom template', () => {
+    expect(__testing__.renderRAGPrompt(
+      'Q: {{query}} / {query}\nC: {{context}} / {context}',
+      'the docs',
+      'why?',
+    )).toBe('Q: why? / why?\nC: the docs / the docs');
+  });
+
+  it('uses the default template when none is configured', () => {
+    expect(__testing__.renderRAGPrompt(undefined, 'the docs', 'why?')).toBe(
+      'Use the context below to answer.\n\nContext:\nthe docs\n\nQuestion: why?',
+    );
+  });
+
+  it('inserts context and query verbatim when they contain $ sequences', () => {
+    const context = "$$E=mc^2$$ costs $& or $' or $1";
+    const query = 'is $$ special?';
+    expect(__testing__.renderRAGPrompt('{context}|{query}', context, query)).toBe(
+      `${context}|${query}`,
+    );
+  });
+
+  it('does not substitute placeholders that appear inside context or query', () => {
+    const context = 'GET /search?q={query} and {{context}}';
+    const query = 'what is {context}?';
+    expect(__testing__.renderRAGPrompt('{{context}}\n{query}', context, query)).toBe(
+      `${context}\n${query}`,
+    );
+  });
+});
+
+describe('splitRAGText (#1014)', () => {
+  it('preserves existing behavior for whitespace-separated English words without cutting mid-word', () => {
+    const text = 'The quick brown fox jumps over the lazy dog';
+    const chunks = __testing__.splitRAGText(text, 4, 0);
+
+    expect(chunks.length).toBe(3);
+    expect(chunks[0]!.text).toBe('The quick brown fox');
+    expect(chunks[0]!.tokenCount).toBe(4);
+    expect(chunks[1]!.text).toBe('jumps over the lazy');
+    expect(chunks[1]!.tokenCount).toBe(4);
+    expect(chunks[2]!.text).toBe('dog');
+    expect(chunks[2]!.tokenCount).toBe(1);
+  });
+
+  it('splits 80-character runs of Thai, Cyrillic, ASCII, and supplementary-plane CJK to character budget', () => {
+    const size = 20;
+    const overlap = 0;
+
+    // Thai (U+0E01)
+    const thaiDoc = 'ก'.repeat(80);
+    const thaiChunks = __testing__.splitRAGText(thaiDoc, size, overlap);
+    expect(thaiChunks.length).toBe(4);
+    for (const c of thaiChunks) {
+      expect(c.text).toBe('ก'.repeat(size));
+      expect([...c.text].length).toBe(size);
+    }
+
+    // Tibetan (U+0F40)
+    const tibetanDoc = 'ཀ'.repeat(80);
+    const tibetanChunks = __testing__.splitRAGText(tibetanDoc, size, overlap);
+    expect(tibetanChunks.length).toBe(4);
+    for (const c of tibetanChunks) {
+      expect(c.text).toBe('ཀ'.repeat(size));
+      expect([...c.text].length).toBe(size);
+    }
+
+    // Cyrillic (U+0416)
+    const cyrDoc = 'Ж'.repeat(80);
+    const cyrChunks = __testing__.splitRAGText(cyrDoc, size, overlap);
+    expect(cyrChunks.length).toBe(4);
+    for (const c of cyrChunks) {
+      expect(c.text).toBe('Ж'.repeat(size));
+      expect([...c.text].length).toBe(size);
+    }
+
+    // ASCII letters (> 40 chars run)
+    const asciiDoc = 'a'.repeat(80);
+    const asciiChunks = __testing__.splitRAGText(asciiDoc, size, overlap);
+    expect(asciiChunks.length).toBe(4);
+    for (const c of asciiChunks) {
+      expect(c.text).toBe('a'.repeat(size));
+      expect([...c.text].length).toBe(size);
+    }
+
+    // Supplementary-plane CJK (U+20000, 2 UTF-16 code units per code point)
+    const supplCjk = String.fromCodePoint(0x20000).repeat(80);
+    const supplChunks = __testing__.splitRAGText(supplCjk, size, overlap);
+    expect(supplChunks.length).toBe(4);
+    for (const c of supplChunks) {
+      expect(c.text).toBe(String.fromCodePoint(0x20000).repeat(size));
+      expect([...c.text].length).toBe(size);
+    }
+  });
+
+  it('keeps 21-40 character spaced-script words atomic, like ordinary words', () => {
+    // Only runs past 40 code points (or space-free scripts) are split; a document
+    // that merely lacks whitespace does not make an ordinary word eligible.
+    expect(__testing__.splitRAGText('a'.repeat(30), 20, 0).map((c) => c.text)).toEqual(['a'.repeat(30)]);
+    expect(__testing__.splitRAGText('Ж'.repeat(30), 20, 0).map((c) => c.text)).toEqual(['Ж'.repeat(30)]);
+  });
+
+  it('handles 140,000-code-point document without throwing RangeError', () => {
+    const largeDoc = '中'.repeat(140000);
+    const chunks = __testing__.splitRAGText(largeDoc, 20, 19);
+    expect(chunks.length).toBe(139981);
+    expect(chunks[0]!.text).toBe('中'.repeat(20));
+  });
+
+  it('keeps a standalone ordinary word atomic whatever the document looks like', () => {
+    expect(__testing__.splitRAGText('hello', 4, 0).map((c) => c.text)).toEqual(['hello']);
+  });
+
+  it('bounds chunks to the code-point budget across many short CJK runs', () => {
+    const doc = `${'中'.repeat(20)}
+${'中'.repeat(20)}`;
+    const chunks = __testing__.splitRAGText(doc, 20, 0);
+    expect(chunks.length).toBe(2);
+    for (const chunk of chunks) {
+      expect([...chunk.text.replace(/\s/g, '')].length).toBeLessThanOrEqual(20);
+    }
+  });
 });
 
 function installBackendSpies() {
@@ -482,3 +714,112 @@ function generationResult(text: string): LLMGenerationResult {
     toolResults: [],
   };
 }
+
+const PROTO_BUFFER_SIZE = 16;
+const OFF_DATA = 0;
+const OFF_SIZE = 4;
+const OFF_STATUS = 8;
+const OFF_ERROR = 12;
+
+function streamingTokenEvent(token: string, isFinal = false): LLMStreamEvent {
+  return LLMStreamEvent.fromPartial({
+    token,
+    eventKind: isFinal
+      ? LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED
+      : LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+    finishReason: isFinal ? FinishReason.FINISH_REASON_STOP : FinishReason.FINISH_REASON_UNSPECIFIED,
+  });
+}
+
+function makeFakeLLMStreamModule(
+  streamHandler: (
+    request: LLMGenerateRequest,
+    emit: (event: LLMStreamEvent) => void,
+  ) => number,
+  onCancel?: () => void,
+): ModalityProtoModule & EmscriptenRunanywhereModule {
+  const heap = new ArrayBuffer(64 * 1024);
+  const heapU8 = new Uint8Array(heap);
+  const heapU32 = new Uint32Array(heap);
+  const heap32 = new Int32Array(heap);
+  let nextPtr = 256;
+
+  const malloc = (size: number): number => {
+    const alignedSize = Math.max(4, (size + 3) & ~3);
+    const ptr = nextPtr;
+    nextPtr += alignedSize;
+    return ptr;
+  };
+
+  const callbackTable = new Map<number, (bytesPtr: number, size: number) => unknown>();
+  let nextCallbackId = 1;
+
+  const module: Partial<ModalityProtoModule & EmscriptenRunanywhereModule> = {
+    HEAPU8: heapU8,
+    HEAPU32: heapU32,
+    HEAP32: heap32,
+    _malloc: malloc,
+    _free: () => undefined,
+    addFunction(fn: (...args: number[]) => unknown, _signature: string): number {
+      const id = nextCallbackId;
+      nextCallbackId += 1;
+      callbackTable.set(id, fn as (bytesPtr: number, size: number) => unknown);
+      return id;
+    },
+    removeFunction(ptr: number): void {
+      callbackTable.delete(ptr);
+    },
+    _rac_proto_buffer_init(bufferPtr: number): void {
+      heapU32[(bufferPtr + OFF_DATA) >>> 2] = 0;
+      heapU32[(bufferPtr + OFF_SIZE) >>> 2] = 0;
+      heap32[(bufferPtr + OFF_STATUS) >>> 2] = 0;
+      heapU32[(bufferPtr + OFF_ERROR) >>> 2] = 0;
+    },
+    _rac_proto_buffer_free: () => undefined,
+    _rac_wasm_sizeof_proto_buffer: () => PROTO_BUFFER_SIZE,
+    _rac_wasm_offsetof_proto_buffer_data: () => OFF_DATA,
+    _rac_wasm_offsetof_proto_buffer_size: () => OFF_SIZE,
+    _rac_wasm_offsetof_proto_buffer_status: () => OFF_STATUS,
+    _rac_wasm_offsetof_proto_buffer_error_message: () => OFF_ERROR,
+    _rac_llm_generate_proto(
+      _requestPtr: number,
+      _requestSize: number,
+      outResult: number,
+    ): number {
+      heapU32[(outResult + OFF_DATA) >>> 2] = 0;
+      heapU32[(outResult + OFF_SIZE) >>> 2] = 0;
+      heap32[(outResult + OFF_STATUS) >>> 2] = 0;
+      return 0;
+    },
+    _rac_llm_generate_stream_proto(
+      requestPtr: number,
+      requestSize: number,
+      callbackPtr: number,
+      _userData: number,
+    ): number {
+      const fn = callbackTable.get(callbackPtr);
+      if (!fn) {
+        throw new Error(`_rac_llm_generate_stream_proto: unknown callback id ${callbackPtr}`);
+      }
+      const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
+      const request = LLMGenerateRequest.decode(requestBytes);
+      const emit = (event: LLMStreamEvent): void => {
+        const eventBytes = LLMStreamEvent.encode(event).finish();
+        const ptr = malloc(eventBytes.byteLength);
+        heapU8.set(eventBytes, ptr);
+        fn(ptr, eventBytes.byteLength);
+      };
+      return streamHandler(request, emit);
+    },
+    _rac_llm_cancel_proto(outEventPtr: number): number {
+      onCancel?.();
+      heapU32[(outEventPtr + OFF_DATA) >>> 2] = 0;
+      heapU32[(outEventPtr + OFF_SIZE) >>> 2] = 0;
+      heap32[(outEventPtr + OFF_STATUS) >>> 2] = 0;
+      return 0;
+    },
+  };
+  return installCurrentModelRegistryExports(module) as
+    ModalityProtoModule & EmscriptenRunanywhereModule;
+}
+

@@ -128,6 +128,14 @@ class VoiceAgentStreamAdapterTest {
                 }
             assertTrue("single C registration must service both collectors", ready)
 
+            // Fire only once both collectors are attached. take(1) detaches a
+            // collector as soon as it is served; if the other has not attached
+            // yet, the last-detach teardown runs and its attach installs a
+            // second C registration.
+            val view = VoiceAgentStreamAdapter.fanOutFor(handle, bridge)
+            val bothAttached = waitFor { view.collectorCount() == 2 }
+            assertTrue("both collectors must attach before the event fires", bothAttached)
+
             // Drive the event until BOTH collectors have observed one, exactly
             // as `last detach tears down the C registration` does below and for
             // the same reason: registerCount hits 1 the instant the FIRST

@@ -11,7 +11,7 @@ import Foundation
 
 /// Carries the opaque native session pointer across a `@Sendable` boundary; the
 /// handle is only ever read and handed straight back to the C ABI.
-private struct RagSessionHandleRef: @unchecked Sendable {
+internal struct RagSessionHandleRef: @unchecked Sendable {
     let handle: rac_handle_t
 }
 
@@ -196,6 +196,15 @@ public actor RagSession {
         guard !isClosed else { return }
         isClosed = true
         CppBridge.RAG.shared.destroySession(handle: handle)
+    }
+
+    /// Borrow the native session token for another in-process commons API.
+    ///
+    /// Used by `SolutionHandle.attachRagSession(_:)`; ownership remains with
+    /// this actor and callers must not destroy the returned handle.
+    internal func nativeHandleForSolution() throws -> RagSessionHandleRef {
+        try requireOpen()
+        return RagSessionHandleRef(handle: handle)
     }
 
     // MARK: - Private
