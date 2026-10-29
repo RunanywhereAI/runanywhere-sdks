@@ -117,6 +117,8 @@ SDKComponent component_for_resource_type(rac_resource_type_t type) {
             return runanywhere::v1::SDK_COMPONENT_RERANK;
         case RAC_RESOURCE_TYPE_OCR_MODEL:
             return runanywhere::v1::SDK_COMPONENT_OCR;
+        case RAC_RESOURCE_TYPE_DECISION_MODEL:
+            return runanywhere::v1::SDK_COMPONENT_DECISION;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -146,6 +148,8 @@ ModelCategory category_for_component(SDKComponent component) {
             return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
         case runanywhere::v1::SDK_COMPONENT_OCR:
             return runanywhere::v1::MODEL_CATEGORY_OCR;
+        case runanywhere::v1::SDK_COMPONENT_DECISION:
+            return runanywhere::v1::MODEL_CATEGORY_DECISION;
         default:
             return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
     }
@@ -216,6 +220,12 @@ void decompose_service(SDKComponent component, rac_handle_t service, detail::Loa
         case runanywhere::v1::SDK_COMPONENT_OCR: {
             auto* s = static_cast<rac_ocr_service_t*>(service);
             entry->ocr_ops = s->ops;
+            entry->impl = s->impl;
+            break;
+        }
+        case runanywhere::v1::SDK_COMPONENT_DECISION: {
+            auto* s = static_cast<rac_decision_service_t*>(service);
+            entry->decision_ops = s->ops;
             entry->impl = s->impl;
             break;
         }
@@ -358,6 +368,21 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
         entry->owner_lifecycle = mgr;
         entry->service_handle = service;
         decompose_service(mgr->component, service, entry.get());
+        if (entry->impl != nullptr) {
+            if (entry->primitive == RAC_PRIMITIVE_GENERATE_TEXT && entry->llm_ops &&
+                entry->llm_ops->get_info) {
+                rac_llm_info_t info{};
+                if (entry->llm_ops->get_info(entry->impl, &info) == RAC_SUCCESS) {
+                    entry->effective_context_length = info.context_length;
+                }
+            } else if (entry->primitive == RAC_PRIMITIVE_VLM && entry->vlm_ops &&
+                       entry->vlm_ops->get_info) {
+                rac_vlm_info_t info{};
+                if (entry->vlm_ops->get_info(entry->impl, &info) == RAC_SUCCESS) {
+                    entry->effective_context_length = info.context_length;
+                }
+            }
+        }
         entry->loaded_at_ms = detail::now_ms();
         entry->updated_at_ms = entry->loaded_at_ms;
         auto destroy_fn = mgr->destroy_fn;
@@ -1048,6 +1073,10 @@ const char* rac_resource_type_name(rac_resource_type_t type) {
             return "segmentationModel";
         case RAC_RESOURCE_TYPE_RERANK_MODEL:
             return "rerankModel";
+        case RAC_RESOURCE_TYPE_OCR_MODEL:
+            return "ocrModel";
+        case RAC_RESOURCE_TYPE_DECISION_MODEL:
+            return "decisionModel";
         default:
             return "unknown";
     }

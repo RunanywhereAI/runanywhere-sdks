@@ -201,6 +201,40 @@ void test_host_handshake_and_reconnect_deduplication() {
     CHECK(refreshed_state.active_client_count() == 1,
           "Reconnect does not inflate connected-device count");
 
+    // A repeat start that changes any descriptor field -- not only model_id -- is rejected
+    // instead of answering success with the stored descriptor.
+    v1::ConnectHostStartRequest changed_context = mac_host;
+    changed_context.mutable_model()->set_context_window(8192);
+    v1::ConnectHostState changed_context_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_context, &changed_context_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed context_window is rejected");
+    v1::ConnectHostStartRequest changed_streaming = mac_host;
+    changed_streaming.mutable_model()->set_supports_streaming(false);
+    v1::ConnectHostState changed_streaming_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_streaming, &changed_streaming_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed supports_streaming is rejected");
+    // display_name and framework are the descriptor fields that read like metadata, so each
+    // gets its own case; removing either term from same_model_descriptor must fail a test.
+    v1::ConnectHostStartRequest changed_display = mac_host;
+    changed_display.mutable_model()->set_display_name("Renamed Model");
+    v1::ConnectHostState changed_display_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_display, &changed_display_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed display_name is rejected");
+    v1::ConnectHostStartRequest changed_framework = mac_host;
+    changed_framework.mutable_model()->set_framework("Other Runtime");
+    v1::ConnectHostState changed_framework_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_framework, &changed_framework_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed framework is rejected");
+    v1::ConnectHostState unchanged_retry_state;
+    CHECK(call_proto(rac_connect_host_start_proto, mac_host, &unchanged_retry_state) ==
+                  RAC_SUCCESS &&
+              unchanged_retry_state.active_client_count() == 1,
+          "An unchanged repeat host start still returns the live host state");
+
     v1::ConnectSessionCloseRequest close_request;
     close_request.set_session_id(reconnect_response.session_id());
     v1::ConnectHostState closed_state;
