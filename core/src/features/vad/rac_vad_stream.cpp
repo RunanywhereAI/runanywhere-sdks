@@ -329,9 +329,6 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.is_cancelled.store(false, std::memory_order_relaxed);
         s.sample_rate =
             positive_or_default(parsed.sample_rate(), RAC_DEFAULT_VAD_OPTIONS_SAMPLE_RATE);
-        // Capture the per-call energy threshold override. Presence decides,
-        // because 0.0 is a legal threshold in the documented [0,1] range and so
-        // cannot double as "unset" (see VADOptions.activation_threshold).
         s.has_threshold_override = parsed.has_activation_threshold();
         s.threshold_override = parsed.activation_threshold();
         s.min_speech_ms = positive_or_default(parsed.min_speech_duration_ms(),

@@ -217,10 +217,6 @@ describe('canonical lifecycle VAD facade', () => {
       sampleRate: 16_000,
       channels: 1,
     });
-    // configureLifecycle applied the real threshold (0.2, asserted above), so
-    // the per-frame request carries no override at all. It used to send a
-    // literal 0 as that sentinel, which commons now reads as an explicit
-    // request for a 0.0 threshold.
     expect(request?.options?.activationThreshold).toBeUndefined();
     const audioBytes = request?.audio?.audioData;
     expect(audioBytes).toBeDefined();
