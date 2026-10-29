@@ -1300,8 +1300,9 @@ TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
         {"\"say \\\"hi\\\" # inside\"  # real comment", "\" # inside", false},
     };
     for (const auto& c : cases) {
-        const std::string yaml = std::string("voice_agent:\n  llm_model_id: qwen3-4b\n  system_prompt: ") +
-                                 c.value + "\n";
+        const std::string yaml =
+            std::string("voice_agent:\n  llm_model_id: qwen3-4b\n  system_prompt: ") + c.value +
+            "\n";
         runanywhere::v1::SolutionConfig cfg;
         CHECK(rac::solutions::load_solution_from_yaml(yaml.c_str(), &cfg) == RAC_SUCCESS);
         const std::string prompt = cfg.voice_agent().generation().system_prompt();
