@@ -1284,99 +1284,30 @@ TEST(c_abi_yaml_solution_lifecycle) {
     rac_solution_destroy(h);
 }
 
-// ---------------------------------------------------------------------------
-// 12b. An apostrophe in an unquoted scalar must not swallow the comment.
-//      The comment stripper tracks quote state so a '#' inside a quoted
-//      string survives. An apostrophe in ordinary prose ("Don't") opens that
-//      state and nothing closes it, so the rest of the line counts as quoted
-//      and the trailing comment is kept as part of the value.
-// ---------------------------------------------------------------------------
 TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
-    const char* yaml =
-        "voice_agent:\n"
-        "  llm_model_id: qwen3-4b\n"
-        "  stt_model_id: whisper\n"
-        "  tts_model_id: kokoro\n"
-        "  vad_model_id: silero\n"
-        "  system_prompt: Don't use markdown  # keep replies short\n";
-
-    runanywhere::v1::SolutionConfig cfg;
-    const rac_result_t rc = rac::solutions::load_solution_from_yaml(yaml, &cfg);
-    CHECK(rc == RAC_SUCCESS);
-
-    const std::string prompt = cfg.voice_agent().generation().system_prompt();
-    std::printf("[yaml] system_prompt = %s\n", prompt.c_str());
-    CHECK(prompt == "Don't use markdown");
-
-    // The other direction, so the fix cannot be "just stop tracking quotes":
-    // a '#' inside a properly quoted scalar is data and must survive, and a
-    // '#' with no leading whitespace is not a comment either.
-    const char* quoted =
-        "voice_agent:\n"
-        "  llm_model_id: qwen3-4b\n"
-        "  system_prompt: \"has # inside\"  # real comment\n";
-    runanywhere::v1::SolutionConfig quoted_cfg;
-    CHECK(rac::solutions::load_solution_from_yaml(quoted, &quoted_cfg) == RAC_SUCCESS);
-    const std::string kept = quoted_cfg.voice_agent().generation().system_prompt();
-    std::printf("[yaml] quoted system_prompt = %s\n", kept.c_str());
-    CHECK(kept == "has # inside");
-
-    // Two apostrophes, one in the value and one in the comment. They balance,
-    // so quote tracking ends the line looking correct and the
-    // unterminated-quote fallback never runs. Only opening a quote at a token
-    // boundary keeps `Don't` from opening one at all.
-    const char* two =
-        "voice_agent:\n"
-        "  llm_model_id: qwen3-4b\n"
-        "  system_prompt: Don't use markdown  # don't forget\n";
-    runanywhere::v1::SolutionConfig two_cfg;
-    CHECK(rac::solutions::load_solution_from_yaml(two, &two_cfg) == RAC_SUCCESS);
-    const std::string two_prompt = two_cfg.voice_agent().generation().system_prompt();
-    std::printf("[yaml] two-apostrophe system_prompt = %s\n", two_prompt.c_str());
-    CHECK(two_prompt == "Don't use markdown");
-
-    // A genuinely unterminated quote must still reach the fallback, and a
-    // quoted scalar whose comment also contains an apostrophe must keep its
-    // own '#'.
-    const char* apos_comment =
-        "voice_agent:\n"
-        "  llm_model_id: qwen3-4b\n"
-        "  system_prompt: \"has # inside\"  # don't forget\n";
-    runanywhere::v1::SolutionConfig apos_cfg;
-    CHECK(rac::solutions::load_solution_from_yaml(apos_comment, &apos_cfg) == RAC_SUCCESS);
-    const std::string apos_kept = apos_cfg.voice_agent().generation().system_prompt();
-    std::printf("[yaml] quoted + apostrophe comment = %s\n", apos_kept.c_str());
-    CHECK(apos_kept == "has # inside");
-
-    const char* escaped_sq =
-        "voice_agent:\n"
-        "  llm_model_id: qwen3-4b\n"
-        "  system_prompt: 'Don''t use # markdown'  # keep replies short\n";
-    runanywhere::v1::SolutionConfig escaped_sq_cfg;
-    CHECK(rac::solutions::load_solution_from_yaml(escaped_sq, &escaped_sq_cfg) == RAC_SUCCESS);
-    const std::string escaped_sq_prompt = escaped_sq_cfg.voice_agent().generation().system_prompt();
-    std::printf("[yaml] escaped single-quote system_prompt = %s\n", escaped_sq_prompt.c_str());
-    CHECK(escaped_sq_prompt.ends_with("t use # markdown"));
-
-    const char* escaped_dq =
-        "voice_agent:\n"
-        "  llm_model_id: qwen3-4b\n"
-        "  system_prompt: \"say \\\"hi\\\" # inside\"  # real comment\n";
-    runanywhere::v1::SolutionConfig escaped_dq_cfg;
-    CHECK(rac::solutions::load_solution_from_yaml(escaped_dq, &escaped_dq_cfg) == RAC_SUCCESS);
-    const std::string escaped_dq_prompt = escaped_dq_cfg.voice_agent().generation().system_prompt();
-    std::printf("[yaml] escaped double-quote system_prompt = %s\n", escaped_dq_prompt.c_str());
-    CHECK(escaped_dq_prompt.ends_with("\" # inside"));
-
-    const char* plain_hash =
-        "voice_agent:\n"
-        "  llm_model_id: qwen3-4b\n"
-        "  system_prompt: Don't use # markdown  # keep replies short\n";
-    runanywhere::v1::SolutionConfig plain_hash_cfg;
-    CHECK(rac::solutions::load_solution_from_yaml(plain_hash, &plain_hash_cfg) == RAC_SUCCESS);
-    const std::string plain_hash_prompt = plain_hash_cfg.voice_agent().generation().system_prompt();
-    std::printf("[yaml] plain scalar with ' #' system_prompt = %s\n", plain_hash_prompt.c_str());
-    CHECK(plain_hash_prompt == "Don't use");
+    const struct {
+        const char* value;
+        const char* expected;
+        bool exact;
+    } cases[] = {
+        {"Don't use markdown  # keep replies short", "Don't use markdown", true},
+        {"Don't use markdown  # don't forget", "Don't use markdown", true},
+        {"\"has # inside\"  # don't forget", "has # inside", true},
+        {"id:'abc # don't", "id:'abc", true},
+        {"a#b  # real comment", "a#b", true},
+        {"Don't use # markdown  # keep replies short", "Don't use", true},
+        {"'Don''t use # markdown'  # keep replies short", "t use # markdown", false},
+        {"\"say \\\"hi\\\" # inside\"  # real comment", "\" # inside", false},
+    };
+    for (const auto& c : cases) {
+        const std::string yaml = std::string("voice_agent:\n  llm_model_id: qwen3-4b\n  system_prompt: ") +
+                                 c.value + "\n";
+        runanywhere::v1::SolutionConfig cfg;
+        CHECK(rac::solutions::load_solution_from_yaml(yaml.c_str(), &cfg) == RAC_SUCCESS);
+        const std::string prompt = cfg.voice_agent().generation().system_prompt();
+        std::printf("[yaml] %s -> %s\n", c.value, prompt.c_str());
+        CHECK(c.exact ? prompt == c.expected : prompt.ends_with(c.expected));
+    }
 }
 
 // ---------------------------------------------------------------------------

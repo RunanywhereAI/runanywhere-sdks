@@ -107,17 +107,19 @@ class YamlParser {
             // keeps us honest for strings containing '#'.
             std::string clean;
             bool in_sq = false, in_dq = false;
+            char last_token_char = '\0';
+            bool after_ws = true;
             for (size_t i = 0; i < line.size(); ++i) {
                 const char c = line[i];
-                // A quote can only OPEN where a YAML token can start: begin of
-                // line, or after whitespace, ':' or '-'. It still CLOSES
-                // anywhere. Without this, the apostrophe in `Don't` opened a
-                // quote, and a second apostrophe later on the line (commonly in
-                // the comment, `# don't forget`) closed it again, leaving the
-                // tracking balanced and wrong so the '#' was never seen.
-                const char prev = i == 0 ? '\0' : line[i - 1];
+                if (i > 0) {
+                    const char prev = line[i - 1];
+                    after_ws = prev == ' ' || prev == '\t';
+                    if (!after_ws)
+                        last_token_char = prev;
+                }
                 const bool can_open =
-                    i == 0 || prev == ' ' || prev == '\t' || prev == ':' || prev == '-';
+                    last_token_char == '\0' ||
+                    (after_ws && (last_token_char == ':' || last_token_char == '-'));
                 if ((in_sq && c == '\'' && i + 1 < line.size() && line[i + 1] == '\'') ||
                     (in_dq && c == '\\' && i + 1 < line.size())) {
                     clean.push_back(c);
@@ -136,24 +138,9 @@ class YamlParser {
                     clean.push_back(c);
                     continue;
                 }
-                if (!in_sq && !in_dq && c == '#')
+                if (!in_sq && !in_dq && c == '#' && after_ws)
                     break;
                 clean.push_back(c);
-            }
-            // An apostrophe in ordinary prose (`Don't use markdown`) opens a
-            // quote state nothing closes, so the loop above treats the rest of
-            // the line as quoted and keeps the trailing comment as part of the
-            // value. An unterminated quote means the tracking was wrong for
-            // this line, so fall back to YAML's own rule: an inline comment is
-            // a '#' preceded by whitespace. That still leaves `a#b` alone and
-            // still protects a balanced "has # inside".
-            if (in_sq || in_dq) {
-                clean.clear();
-                for (size_t i = 0; i < line.size(); ++i) {
-                    if (line[i] == '#' && (i == 0 || line[i - 1] == ' ' || line[i - 1] == '\t'))
-                        break;
-                    clean.push_back(line[i]);
-                }
             }
             // Trim trailing WS.
             while (!clean.empty() &&
