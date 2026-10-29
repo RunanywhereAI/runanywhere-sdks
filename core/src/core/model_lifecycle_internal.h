@@ -43,6 +43,7 @@
 // are part of the C ABI surface and already widely included by the
 // service layer; the internal header is private to the lifecycle TUs.
 #include "rac/features/diarization/rac_diarization_service.h"
+#include "rac/features/decision/rac_decision_service.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -101,6 +102,13 @@ struct LoadedModel {
     std::string fallback_reason;
     runanywhere::v1::ModelCategory category{runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED};
     runanywhere::v1::ModelInfo model;
+    // Context-length intent used to create this resident backend. Zero means
+    // model/default context, matching ModelLoadRequest semantics. This is not
+    // an observation of the context length the engine ultimately allocated.
+    int32_t requested_context_length{0};
+    // Effective context reported by the initialized LLM/VLM backend.
+    // Zero means unavailable; it is never inferred from request intent.
+    int32_t effective_context_length{0};
     int64_t loaded_at_ms{0};
     int64_t updated_at_ms{0};
     std::string error_message;
@@ -127,6 +135,7 @@ struct LoadedModel {
     const rac_diarization_service_ops_t* diarization_ops{nullptr};
     const rac_segmentation_service_ops_t* segmentation_ops{nullptr};
     const rac_ocr_service_ops_t* ocr_ops{nullptr};
+    const rac_decision_service_ops_t* decision_ops{nullptr};
     void* impl{nullptr};
     int active_refs{0};
     std::atomic<bool> cancel_requested{false};

@@ -4,6 +4,7 @@
 
 import {
   ArchiveStructure,
+  InferenceFramework,
   ModelArtifactType,
   ModelCategory,
   ModelGetRequest,
@@ -47,7 +48,11 @@ import type {
   ModelRegistration,
   ModelsState,
 } from './Types';
-import { resolvedBackendPreferences, unsupportedLoadOptionKeys } from './LoadOptionsSupport';
+import {
+  requireValidContextLength,
+  resolvedBackendPreferences,
+  unsupportedLoadOptionKeys,
+} from './LoadOptionsSupport';
 
 const CATEGORIES: ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -328,29 +333,51 @@ export const models = {
   /**
    * Load a model now instead of paying for it on the first generation.
    *
-   * Only `options.backendPreferences[0]` (equivalently the deprecated
-   * `framework`) reaches commons today; `contextLength`, `threads`, and a
-   * real `accelerator` choice are not yet carried by the native load ABI.
+   * `contextLength` and the ordered `backendPreferences` list are forwarded on
+   * `ModelLoadRequest`. A `required` backend preference is rejected because
+   * `backend_preferences` carries framework enums only.
+   * Context length is advisory at the engine boundary; engines may use their
+   * defaults. Native load warnings are exposed through `fallbackReason`.
    *
    * @throws SDKException when the model is unknown, or `options` sets a
    * placement knob the load ABI cannot honor yet.
    */
   async load(id: string, options?: LoadOptions): Promise<LoadedModel> {
+    requireValidContextLength(options?.contextLength);
     const model = await requireModel(id);
     const unsupported = unsupportedLoadOptionKeys(options);
     if (unsupported.length > 0) {
       throw SDKException.invalidInput(
-        `LoadOptions.${unsupported.join(', ')} cannot be carried by the native load ABI yet`
+        `LoadOptions.${unsupported.join(', ')} is not supported by this React Native binding`
       );
     }
-    const requestedBackend = resolvedBackendPreferences(options)[0];
+    if (
+      options?.backendPreferences?.some((preference) => preference.required)
+    ) {
+      throw SDKException.invalidInput(
+        'LoadOptions.backendPreferences.required cannot be carried by ModelLoadRequest ' +
+          'because backend_preferences contains framework enums only. ' +
+          'Remove required or pass one preferred backend.'
+      );
+    }
+    const preferences = resolvedBackendPreferences(options);
+    const requestedBackend = preferences[0];
+    // A lone deprecated UNSPECIFIED choice keeps catalog-based routing. In a
+    // longer list it must not introduce a catalog pin ahead of later choices.
+    const pinRequestedBackend =
+      requestedBackend &&
+      (requestedBackend.backend !==
+        InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED ||
+        preferences.length > 1);
     const result = await loadModel(
       ModelLoadRequest.fromPartial({
         modelId: id,
         category: model.category,
-        ...(requestedBackend ? { framework: requestedBackend.backend } : {}),
+        ...(pinRequestedBackend ? { framework: requestedBackend.backend } : {}),
         forceReload: options?.forceReload ?? false,
         validateAvailability: true,
+        contextLength: options?.contextLength,
+        backendPreferences: preferences.map((preference) => preference.backend),
       })
     );
     if (result.error) {
@@ -360,8 +387,9 @@ export const models = {
       id,
       category: model.category,
       ...(requestedBackend ? { requestedBackend } : {}),
-      actualBackend: requestedBackend?.backend ?? model.framework,
+      actualBackend: result.framework,
       actualDevice: 'unknown',
+      fallbackReason: result.fallbackReason ?? result.warnings[0],
       async close(): Promise<void> {
         await models.unload(id);
       },
