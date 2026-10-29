@@ -27,6 +27,7 @@
 #include <new>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -1453,7 +1454,35 @@ static json parse_lfm2_argument_value(const std::string& raw_value) {
     if (value.size() >= 2 && value.front() == '\'' && value.back() == '\'') {
         return decode_lfm2_single_quoted_string(value);
     }
-    json parsed = json::parse(value, nullptr, false);
+    // Observe decoded keys before insertion: repair and JSON escapes can make
+    // distinct spellings identical. Each object has its own key scope, even
+    // when nested inside an array.
+    std::vector<std::unordered_set<std::string>> object_keys;
+    bool duplicate_key = false;
+    const auto check_keys = [&](int, json::parse_event_t event, json& parsed_value) {
+        switch (event) {
+            case json::parse_event_t::object_start:
+                object_keys.emplace_back();
+                break;
+            case json::parse_event_t::key:
+                if (!object_keys.back().insert(parsed_value.get<std::string>()).second) {
+                    duplicate_key = true;
+                }
+                break;
+            case json::parse_event_t::object_end:
+                object_keys.pop_back();
+                break;
+            default:
+                break;
+        }
+        return true;
+    };
+    json parsed = json::parse(value, check_keys, false);
+    if (duplicate_key) {
+        // Unlike a syntax error, an ambiguous object must reject the call;
+        // falling back to its raw text would hide the lost argument value.
+        return json(json::value_t::discarded);
+    }
     if (!parsed.is_discarded()) {
         return parsed;
     }
@@ -1485,7 +1514,11 @@ static bool lfm2_arguments_to_json(const std::string& args, std::string* out_jso
         if (result.contains(key)) {
             return false;
         }
-        result[key] = parse_lfm2_argument_value(value);
+        json parsed_value = parse_lfm2_argument_value(value);
+        if (parsed_value.is_discarded()) {
+            return false;
+        }
+        result[key] = std::move(parsed_value);
     }
     *out_json = result.dump(-1, ' ', false, json::error_handler_t::replace);
     return true;

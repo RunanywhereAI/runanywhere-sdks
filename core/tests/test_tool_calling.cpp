@@ -526,8 +526,44 @@ int test_pythonic_utf8_nested_values() {
         {"[1,{\"q\":\"\xC3\x28\"},false,null]", "[1,{\"q\":\"\xEF\xBF\xBD(\"},false,null]",
          RAC_TOOL_PARAM_ARRAY},
         {"{\"\xFF\":[\"\xFF\"]}", "{\"\xEF\xBF\xBD\":[\"\xEF\xBF\xBD\"]}", RAC_TOOL_PARAM_OBJECT},
+        {R"({"x":{"x":1},"y":{"x":2}})", R"({"x":{"x":1},"y":{"x":2}})", RAC_TOOL_PARAM_OBJECT},
+        {R"([{"x":1},{"x":2}])", R"([{"x":1},{"x":2}])", RAC_TOOL_PARAM_ARRAY},
+        {"{\"x\xFF\":1,\"x\xC3\x28\":2}", "{\"x\xEF\xBF\xBD\":1,\"x\xEF\xBF\xBD(\":2}",
+         RAC_TOOL_PARAM_OBJECT},
     };
-    return check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0]));
+    ASSERT_EQ_INT(check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0])), 0);
+
+    // Repaired or escaped names may collide at any object depth, including
+    // inside arrays. Reject the entire call rather than returning a partial
+    // object or accepting the ambiguous value as a raw string.
+    const char* collisions[] = {
+        "{\"x\xFF\":1,\"x\xFE\":2}",
+        "{\"outer\":{\"x\xFF\":1,\"x\xEF\xBF\xBD\":2}}",
+        "{\"outer\":{\"x\xEF\xBF\xBD\":1,\"x\xFF\":2}}",
+        "[{\"x\":0},{\"outer\":[{\"x\xFF\":1,\"x\xFE\":2}]}]",
+        "{\"left\":{\"q\":0},\"right\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"x\xFF\":1,\"x\\uFFFD\":2}",
+        R"({"x":1,"\u0078":2})",
+        R"({"outer":{"x":1,"x":2}})",
+        "{\"x\xFF\":{\"a\":1},\"x\xFE\":{\"b\":2}}",
+    };
+    for (const auto format : {RAC_TOOL_FORMAT_LFM2, RAC_TOOL_FORMAT_PYTHONIC}) {
+        for (const char* collision : collisions) {
+            std::string input = std::string("[inspect(value=") + collision + ")]";
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+            }
+            rac_tool_call_t call{};
+            ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
+            ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
+            ASSERT_TRUE(call.tool_name == nullptr);
+            ASSERT_TRUE(call.arguments_json == nullptr);
+            ASSERT_TRUE(call.clean_text != nullptr);
+            ASSERT_EQ_STR(call.clean_text, input.c_str());
+            rac_tool_call_free(&call);
+        }
+    }
+    return 0;
 }
 
 int test_pythonic_utf8_invalid_scalars() {
