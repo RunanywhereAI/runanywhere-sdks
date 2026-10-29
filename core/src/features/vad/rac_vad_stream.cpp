@@ -71,12 +71,6 @@ struct StreamSession {
     std::string request_id;
     std::atomic<bool> is_cancelled{false};
     int32_t sample_rate = RAC_DEFAULT_VAD_OPTIONS_SAMPLE_RATE;
-    // Per-session VAD threshold override
-    // captured from VADOptions.threshold (0.0f = no override → use the
-    // component's configured threshold). Applied per-frame in
-    // rac_vad_stream_feed_audio_proto via the same set/restore pattern that
-    // rac_vad_component_process_proto uses (vad_component.cpp:1019-1041), so
-    // streaming and one-shot proto callers honor the same per-call threshold.
     float threshold_override = 0.0f;
     bool has_threshold_override = false;
     // Session-owned endpointing policy. The detector supplies one speech
