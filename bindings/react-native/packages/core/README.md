@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-npm install @runanywhere/core@0.20.11 react-native-nitro-modules
+npm install @runanywhere/core@0.20.27 react-native-nitro-modules
 ```
 
 ```bash
