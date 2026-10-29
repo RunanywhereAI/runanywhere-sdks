@@ -1664,12 +1664,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
 
-    // Clean up previous adapter
-    if (g_platform_adapter != nullptr) {
-        env->DeleteGlobalRef(g_platform_adapter);
-        g_platform_adapter = nullptr;
-    }
-
     if (adapter == nullptr) {
         LOGw("racSetPlatformAdapter: null adapter provided");
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -1677,27 +1671,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     jclass adapterClass = env->GetObjectClass(adapter);
 
-    // Resolve the nine required ids into locals BEFORE touching any global.
-    // Two reasons, both bugs that existed when this was written inline:
-    //
-    //  1. GetMethodID throws NoSuchMethodError when a lookup misses, so a
-    //     Kotlin-side rename or signature change leaves BOTH a null id and a
-    //     pending exception. Calling the next GetMethodID with that exception
-    //     still pending is undefined, so each lookup clears its own rather
-    //     than one ExceptionCheck covering all nine. A miss on `log` used to
-    //     leave the following eight lookups running under a pending throw.
-    //  2. Committing the global ref and the ids first meant a refusal still
-    //     installed the rejected adapter in g_platform_adapter, and
-    //     racAuthInit only tests that pointer for null, so it treated a
-    //     refused adapter as registered.
-    //
-    // Unlike fileListDirectory / isNonEmptyDirectory below, these nine are
-    // required by the adapter contract in rac_platform_adapter.h, so a miss is
-    // a build mismatch to report, not a capability to degrade.
     const auto resolve_required = [&](const char* name, const char* sig) -> jmethodID {
         const jmethodID id = env->GetMethodID(adapterClass, name, sig);
         if (env->ExceptionCheck() == JNI_TRUE) {
             env->ExceptionClear();
+        }
+        if (id == nullptr) {
+            LOGe("racSetPlatformAdapter: platform adapter is missing required method %s%s", name,
+                 sig);
         }
         return id;
     };
@@ -1717,12 +1698,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     if (m_log == nullptr || m_file_exists == nullptr || m_file_read == nullptr ||
         m_file_write == nullptr || m_file_delete == nullptr || m_secure_get == nullptr ||
         m_secure_set == nullptr || m_secure_delete == nullptr || m_now_ms == nullptr) {
-        LOGe("racSetPlatformAdapter: platform adapter is missing a required method "
-             "(log/fileExists/fileRead/fileWrite/fileDelete/secureGet/secureSet/secureDelete/"
-             "nowMs); refusing to install a partially resolved adapter");
         env->DeleteLocalRef(adapterClass);
-        // g_platform_adapter is still null from the teardown above, so
-        // racAuthInit's null test correctly reports "no adapter registered".
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -1733,7 +1709,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 
-    // Every required id resolved, so commit.
+    if (g_platform_adapter != nullptr) {
+        env->DeleteGlobalRef(g_platform_adapter);
+    }
     g_platform_adapter = adapterRef;
     g_method_log = m_log;
     g_method_file_exists = m_file_exists;
