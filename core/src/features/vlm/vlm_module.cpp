@@ -539,7 +539,6 @@ extern "C" rac_bool_t rac_vlm_component_supports_streaming(rac_handle_t handle) 
 /**
  * Internal structure for VLM streaming context.
  *
- * full_text accumulates raw tokens (including special tokens) for debugging/metrics.
  * cleaned_text accumulates stripped tokens and is used for the final result text.
  */
 struct vlm_stream_context {
@@ -552,7 +551,6 @@ struct vlm_stream_context {
     std::chrono::steady_clock::time_point start_time;
     std::chrono::steady_clock::time_point first_token_time;
     bool first_token_recorded;
-    std::string full_text;
     std::string cleaned_text;
     int32_t prompt_tokens;
     int32_t token_count;
@@ -591,8 +589,6 @@ static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) 
         ctx->first_token_time = std::chrono::steady_clock::now();
     }
 
-    // Accumulate raw text for debugging and cleaned text for the final result
-    ctx->full_text += token;
     ctx->cleaned_text += cleaned;
     ctx->token_count++;
 
@@ -661,7 +657,6 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
 
     // Pre-allocate string capacity to avoid repeated reallocations during streaming.
     // Typical VLM responses are a few hundred tokens (~2KB text).
-    ctx.full_text.reserve(2048);
     ctx.cleaned_text.reserve(2048);
 
     // Perform streaming generation
@@ -687,7 +682,6 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     }
     ctx.cleaned_text.resize(ctx.cleaned_text.size() -
                             rac::tokens::incomplete_utf8_tail(ctx.cleaned_text));
-    ctx.full_text.resize(ctx.full_text.size() - rac::tokens::incomplete_utf8_tail(ctx.full_text));
 
     if (token_callback) {
         std::string deliverable = ctx.utf8.feed(held_tail);
@@ -704,9 +698,7 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     int64_t total_time_ms = total_duration.count();
 
     rac_vlm_result_t final_result = {};
-    // Use cleaned_text (special tokens stripped) for the final result.
-    // Fall back to full_text if no cleaned tokens were produced.
-    const std::string& result_text = ctx.cleaned_text.empty() ? ctx.full_text : ctx.cleaned_text;
+    const std::string& result_text = ctx.cleaned_text;
     final_result.text = strdup(result_text.c_str());
     if (!final_result.text) {
         RAC_LOG_ERROR(LOG_CAT, "Failed to allocate result text");
