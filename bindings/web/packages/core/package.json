@@ -38,7 +38,7 @@
     "dev": "tsc --watch",
     "lint": "eslint src tests --max-warnings 0",
     "lint:ts": "tsc --noEmit",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test:types": "tsd",
     "test:unit": "vitest run",
     "test": "vitest run",

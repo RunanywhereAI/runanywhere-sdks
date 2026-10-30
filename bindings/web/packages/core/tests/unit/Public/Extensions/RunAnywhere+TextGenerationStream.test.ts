@@ -36,10 +36,7 @@ import {
   ModalityProtoAdapter,
   type ModalityProtoModule,
 } from '../../../../src/Adapters/ModalityProtoAdapter';
-import {
-  clearRunanywhereModule,
-  type EmscriptenRunanywhereModule,
-} from '../../../../src/runtime/EmscriptenModule';
+import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
 import { TextGeneration } from '../../../../src/Public/Extensions/RunAnywhere+TextGeneration';
 
 // ---------------------------------------------------------------------------
@@ -78,7 +75,7 @@ interface StreamHandlers {
   onCancel?: () => void;
 }
 
-interface FakeModule extends ModalityProtoModule, EmscriptenRunanywhereModule {
+interface FakeModule extends ModalityProtoModule {
   /**
    * Number of times the in-flight cancellation entry point fired.
    * Asserted by the cancel test.
@@ -462,7 +459,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
   });
 
   it('observes the first token before the terminal event reaches `result`', async () => {
-    let resolveSecondToken: (() => void) | null = null;
+    let resolveSecondToken: (() => void) | undefined;
     const secondTokenGate = new Promise<void>((resolve) => {
       resolveSecondToken = resolve;
     });

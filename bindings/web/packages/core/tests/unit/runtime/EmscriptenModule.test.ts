@@ -29,6 +29,8 @@ function fakeModule(counters?: SolutionCallCounters): EmscriptenRunanywhereModul
     HEAPU8: heapU8,
     HEAP32: new Int32Array(heap),
     HEAPU32: heapU32,
+    getValue: () => 0,
+    setValue: () => undefined,
     addFunction: () => 1,
     removeFunction: () => undefined,
     _malloc(size: number): number {

@@ -38,6 +38,7 @@ interface FakeSTTModule extends ModalityProtoModule {
     modelNamePtr: number,
   ): number;
   _rac_stt_component_destroy(handle: number): void;
+  _rac_audio_float32_to_pcm16(inPtr: number, nSamples: number, outPtr: number): number;
 }
 
 interface FakeSTTHarness {
