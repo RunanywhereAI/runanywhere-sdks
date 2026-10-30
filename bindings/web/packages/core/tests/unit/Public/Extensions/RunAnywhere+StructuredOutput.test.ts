@@ -261,6 +261,8 @@ describe('extractStructuredOutput', () => {
           extractedJson: '{"city":"San Francisco"}',
           validationErrors: [],
           validationTimeMs: 0,
+          repairAttempted: false,
+          repairAttempts: 0,
         },
       };
     });
@@ -408,6 +410,8 @@ describe('generateStructuredStream', () => {
             extractedJson: '{"city":"San Francisco"}',
             validationErrors: [],
             validationTimeMs: 0,
+            repairAttempted: false,
+            repairAttempts: 0,
           },
         };
       },

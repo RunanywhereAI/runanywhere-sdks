@@ -38,7 +38,7 @@ interface TTSCallCounters {
   callbackRemovals: number;
 }
 
-interface FakeTTSModule extends EmscriptenRunanywhereModule, ModalityProtoModule {
+type FakeTTSModule = EmscriptenRunanywhereModule & ModalityProtoModule & {
   _rac_backend_onnx_register(): number;
   _rac_backend_sherpa_register(): number;
   _rac_tts_component_create(outHandlePtr: number): number;
@@ -50,7 +50,7 @@ interface FakeTTSModule extends EmscriptenRunanywhereModule, ModalityProtoModule
   ): number;
   _rac_tts_component_stop(handle: number): number;
   _rac_tts_component_destroy(handle: number): void;
-}
+};
 
 interface FakeTTSHarness {
   module: FakeTTSModule;
@@ -243,7 +243,7 @@ function fakeTTSModule(): FakeTTSHarness {
     callbacks.get(callbackPointer)?.(eventPointer, bytes.byteLength, 0);
   };
 
-  const module: FakeTTSModule = {
+  const partial: Partial<FakeTTSModule> = {
     HEAPU8: heapU8,
     HEAP32: heap32,
     HEAPU32: heapU32,
@@ -262,7 +262,7 @@ function fakeTTSModule(): FakeTTSHarness {
       heapU8[pointer + written] = 0;
       return written;
     },
-    addFunction(callback): number {
+    addFunction(callback: (...args: number[]) => number | void): number {
       const pointer = nextCallback;
       nextCallback += 1;
       callbacks.set(pointer, callback);
@@ -382,7 +382,7 @@ function fakeTTSModule(): FakeTTSHarness {
     },
   };
 
-  installCurrentModelRegistryExports(module);
+  const module = installCurrentModelRegistryExports(partial) as unknown as FakeTTSModule;
 
   return {
     module,

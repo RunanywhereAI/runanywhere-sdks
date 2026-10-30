@@ -170,7 +170,7 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
   let nextCallbackId = 1;
 
   const addFunction = (
-    fn: (...args: never[]) => number | bigint | void,
+    fn: (...args: Array<number | bigint>) => number | bigint | void,
     _signature: string,
   ): number => {
     const id = nextCallbackId++;
@@ -226,7 +226,7 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
     addFunction,
     removeFunction,
     UTF8ToString: () => '',
-    stringToUTF8: () => undefined,
+    stringToUTF8: () => 0,
     lengthBytesUTF8: () => 0,
     capturedCreateRequest: undefined,
     capturedStepRequests: [],

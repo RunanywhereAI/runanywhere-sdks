@@ -432,7 +432,7 @@ describe('CrossWasmRAGProvider', () => {
 
       const events: RAGStreamEvent[] = [];
       const consume = async (): Promise<void> => {
-        for await (const event of provider.ragQueryStream('What is the Zephyr code?')) {
+        for await (const event of provider.ragQueryStream!('What is the Zephyr code?')) {
           events.push(event);
         }
       };
