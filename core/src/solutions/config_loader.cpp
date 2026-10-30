@@ -559,24 +559,36 @@ void populate_voice_agent(const YamlNode& node, runanywhere::v1::VoiceAgentConfi
             to_bool(n->scalar));
 }
 
-runanywhere::v1::VectorStore parse_vector_store(const std::string& s) {
+runanywhere::v1::VectorStore parse_vector_store(const std::string& s, bool* ok) {
     using runanywhere::v1::VectorStore;
-    if (s == "usearch")
+    if (s == "usearch") {
+        if (ok) *ok = true;
         return VectorStore::VECTOR_STORE_USEARCH;
-    if (s == "pgvector")
+    }
+    if (s == "pgvector") {
+        if (ok) *ok = true;
         return VectorStore::VECTOR_STORE_PGVECTOR;
+    }
+    if (ok) *ok = false;
     return VectorStore::VECTOR_STORE_UNSPECIFIED;
 }
 
-void populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg) {
+rac_result_t populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg) {
     if (auto n = node.find("embed_model_id"))
         cfg->set_embed_model_id(n->scalar);
     if (auto n = node.find("rerank_model_id"))
         cfg->set_rerank_model_id(n->scalar);
     if (auto n = node.find("llm_model_id"))
         cfg->set_llm_model_id(n->scalar);
-    if (auto n = node.find("vector_store"))
-        cfg->set_vector_store(parse_vector_store(n->scalar));
+    if (auto n = node.find("vector_store")) {
+        bool ok = true;
+        auto vs = parse_vector_store(n->scalar, &ok);
+        if (!ok) {
+            rac_error_set_details(("rag.vector_store must be one of: usearch, pgvector, got '" + n->scalar + "'").c_str());
+            return RAC_ERROR_INVALID_FORMAT;
+        }
+        cfg->set_vector_store(vs);
+    }
     if (auto n = node.find("vector_store_path"))
         cfg->set_vector_store_path(n->scalar);
     if (auto n = node.find("retrieve_k"))
@@ -591,6 +603,7 @@ void populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg) {
         cfg->set_rrf_k(to_int(n->scalar));
     if (auto n = node.find("prompt_template"))
         cfg->set_prompt_template(n->scalar);
+    return RAC_SUCCESS;
 }
 
 rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionConfig* cfg) {
@@ -603,7 +616,8 @@ rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionCo
         return RAC_SUCCESS;
     }
     if (auto n = root.find("rag"); n && n->kind == YamlNode::Kind::Mapping) {
-        populate_rag(*n, cfg->mutable_rag());
+        auto r = populate_rag(*n, cfg->mutable_rag());
+        if (r != RAC_SUCCESS) return r;
         return RAC_SUCCESS;
     }
     rac_error_set_details("SolutionConfig YAML must declare one of: voice_agent, rag");
