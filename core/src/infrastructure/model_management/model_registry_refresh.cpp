@@ -294,9 +294,69 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
 }
 
 #ifdef RAC_HAVE_PROTOBUF
+// A false result includes inconclusive reads: only confirmed orphans may be cleared.
+static bool model_path_is_orphan(const rac_platform_adapter_t* adapter, const ModelInfo& model) {
+    if (model.local_path().empty() || model_is_built_in(model) ||
+        model.local_path().rfind("builtin:", 0) == 0) {
+        return false;
+    }
+    // Archive and multi-file downloads record a model folder as local_path.
+    const bool is_directory_artifact = model.has_archive() || model.has_multi_file();
+    if (adapter->file_list_directory) {
+        bool has_finished_artifact = false;
+        const rac_result_t probe_rc =
+            folder_has_finished_artifact(adapter, model.local_path(), &has_finished_artifact);
+        if (probe_rc == RAC_SUCCESS) {
+            if (has_finished_artifact) {
+                const bool has_expected_files =
+                    (model.has_single_file() && model.single_file().has_expected_files()) ||
+                    (model.has_archive() && model.archive().has_expected_files());
+                std::error_code ec;
+                if (!(has_expected_files || model.has_multi_file()) ||
+                    !std::filesystem::exists(model.local_path(), ec) ||
+                    model_folder_is_complete(model, model.local_path())) {
+                    return false;
+                }
+            }
+        } else {
+            // Some adapters report a non-directory file as FILE_NOT_FOUND;
+            // desktop reports a storage error. Only regular files may use
+            // file_exists after a failed directory probe.
+            std::error_code ec;
+            const bool is_regular_file = std::filesystem::is_regular_file(model.local_path(), ec);
+            if (!is_directory_artifact &&
+                (is_regular_file || probe_rc == RAC_ERROR_FILE_NOT_FOUND ||
+                 probe_rc == RAC_ERROR_DIRECTORY_NOT_FOUND) &&
+                adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE) {
+                return false;
+            }
+            if (probe_rc != RAC_ERROR_FILE_NOT_FOUND && probe_rc != RAC_ERROR_DIRECTORY_NOT_FOUND) {
+                RAC_LOG_WARNING("ModelRegistry", "Skipping orphan prune for '%s': probe rc=%d",
+                                model.id().c_str(), probe_rc);
+                return false;
+            }
+        }
+    } else {
+        // Without enumeration we cannot distinguish a model folder from
+        // one containing only a manifest or partial download. Preserve it.
+        if (is_directory_artifact ||
+            rac_path_is_non_empty_directory(model.local_path().c_str()) == RAC_TRUE) {
+            RAC_LOG_WARNING("ModelRegistry",
+                            "Skipping orphan prune for '%s': directory listing unavailable",
+                            model.id().c_str());
+            return false;
+        }
+        if (adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool clear_download_status_if_path_matches(rac_model_registry_handle_t handle,
                                            const std::string& model_id,
-                                           const std::string& missing_path) {
+                                           const std::string& missing_path,
+                                           const rac_platform_adapter_t* adapter) {
     std::lock_guard<std::mutex> lock(handle->mutex);
     auto it = handle->models.find(model_id);
     if (it == handle->models.end() || !it->second->local_path ||
@@ -305,10 +365,17 @@ bool clear_download_status_if_path_matches(rac_model_registry_handle_t handle,
     }
 
     ModelInfo snapshot = model_snapshot_locked(handle, model_id, it->second);
-    std::free(it->second->local_path);
-    it->second->local_path = nullptr;
-    it->second->updated_at = rac_get_current_time_ms();
-    overlay_struct_runtime_fields_to_proto(it->second, &snapshot,
+    // The first probe ran without the registry mutex. A download may have
+    // completed at the same path since then, even within the same clock tick.
+    // Recheck current metadata and files while completion updates are excluded.
+    if (!model_path_is_orphan(adapter, snapshot)) {
+        return false;
+    }
+
+    rac_model_info_t cleared = *it->second;
+    cleared.local_path = nullptr;
+    cleared.updated_at = rac_get_current_time_ms();
+    overlay_struct_runtime_fields_to_proto(&cleared, &snapshot,
                                            /*overwrite_registry_state=*/true);
     auto* files =
         snapshot.has_multi_file() ? snapshot.mutable_multi_file()->mutable_files() : nullptr;
@@ -324,7 +391,16 @@ bool clear_download_status_if_path_matches(rac_model_registry_handle_t handle,
             file.clear_local_path();
         }
     }
-    return store_parsed_proto_snapshot_locked(handle, model_id, snapshot) == RAC_SUCCESS;
+    const bool committed =
+        commit_pruned_download_locked(handle, model_id, it->second, cleared.updated_at, snapshot,
+                                      [](const ModelInfo& candidate, std::string* bytes) {
+                                          return candidate.SerializeToString(bytes);
+                                      });
+    if (!committed) {
+        RAC_LOG_WARNING("ModelRegistry", "Failed to persist orphan prune for '%s'; state preserved",
+                        model_id.c_str());
+    }
+    return committed;
 }
 
 // Clear registry state for downloaded models whose recorded artifact path no
@@ -356,66 +432,17 @@ int32_t prune_orphans_via_platform_adapter(rac_model_registry_handle_t handle) {
             continue;
         }
 
-        // Archive and multi-file downloads record a model folder as local_path.
-        const bool is_directory_artifact = model.has_archive() || model.has_multi_file();
-        if (adapter->file_list_directory) {
-            bool has_finished_artifact = false;
-            const rac_result_t probe_rc =
-                folder_has_finished_artifact(adapter, model.local_path(), &has_finished_artifact);
-            if (probe_rc == RAC_SUCCESS) {
-                if (has_finished_artifact) {
-                    const bool has_expected_files =
-                        (model.has_single_file() && model.single_file().has_expected_files()) ||
-                        (model.has_archive() && model.archive().has_expected_files());
-                    std::error_code ec;
-                    if (!(has_expected_files || model.has_multi_file()) ||
-                        !std::filesystem::exists(model.local_path(), ec) ||
-                        model_folder_is_complete(model, model.local_path())) {
-                        continue;
-                    }
-                }
-            } else {
-                // Some adapters report a non-directory file as FILE_NOT_FOUND;
-                // desktop reports a storage error. Only regular files may use
-                // file_exists after a failed directory probe.
-                std::error_code ec;
-                const bool is_regular_file =
-                    std::filesystem::is_regular_file(model.local_path(), ec);
-                if (!is_directory_artifact &&
-                    (is_regular_file || probe_rc == RAC_ERROR_FILE_NOT_FOUND ||
-                     probe_rc == RAC_ERROR_DIRECTORY_NOT_FOUND) &&
-                    adapter->file_exists(model.local_path().c_str(), adapter->user_data) ==
-                        RAC_TRUE) {
-                    continue;
-                }
-                if (probe_rc != RAC_ERROR_FILE_NOT_FOUND &&
-                    probe_rc != RAC_ERROR_DIRECTORY_NOT_FOUND) {
-                    RAC_LOG_WARNING("ModelRegistry", "Skipping orphan prune for '%s': probe rc=%d",
-                                    model.id().c_str(), probe_rc);
-                    continue;
-                }
-            }
-        } else {
-            // Without enumeration we cannot distinguish a model folder from
-            // one containing only a manifest or partial download. Preserve it.
-            if (is_directory_artifact ||
-                rac_path_is_non_empty_directory(model.local_path().c_str()) == RAC_TRUE) {
-                RAC_LOG_WARNING("ModelRegistry",
-                                "Skipping orphan prune for '%s': directory listing unavailable",
-                                model.id().c_str());
-                continue;
-            }
-            if (adapter->file_exists(model.local_path().c_str(), adapter->user_data) == RAC_TRUE) {
-                continue;
-            }
+        if (!model_path_is_orphan(adapter, model)) {
+            continue;
         }
 
-        if (clear_download_status_if_path_matches(handle, model.id(), model.local_path())) {
+        if (clear_download_status_if_path_matches(handle, model.id(), model.local_path(),
+                                                  adapter)) {
             ++pruned;
             RAC_LOG_INFO("ModelRegistry", "Pruned vanished download for '%s'", model.id().c_str());
         } else {
-            RAC_LOG_WARNING("ModelRegistry", "Failed to prune vanished download for '%s'",
-                            model.id().c_str());
+            RAC_LOG_DEBUG("ModelRegistry", "Orphan prune skipped or not committed for '%s'",
+                          model.id().c_str());
         }
     }
     return pruned;
