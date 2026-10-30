@@ -37,8 +37,6 @@ option(
     "Compile the ignored local development_config.cpp (may contain credentials; local development only)"
     OFF
 )
-# Consumed by the root CMakeLists + engines/ (per-engine compilation); this file
-# does not branch on it — RAG is folded into rac_commons independently (see below).
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND RAC_BUILD_BACKENDS)
