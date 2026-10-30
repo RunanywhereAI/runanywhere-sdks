@@ -168,7 +168,7 @@ print(client.chat.completions.create(model="qwen2.5-0.5b",
 
 ## CLI
 
-`pip install runanywhere` also installs a `runanywhere` command with parity to the C++ `rcli`:
+`pip install runanywhere` also installs a `runanywhere` command with parity to the C++ `wally`:
 
 ```bash
 runanywhere run qwen2.5-0.5b "Capital of France?"
