@@ -22,8 +22,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
 # Build with all backends enabled
-cmake -B build -DRAC_BUILD_BACKENDS=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake -S .. -B ../build/backends -DCMAKE_BUILD_TYPE=Release
+cmake --build ../build/backends
 
 # Build with tests
 cmake -B build -DRAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
@@ -276,9 +276,9 @@ ctest --test-dir build --output-on-failure
 ./build/tests/test_engine_vtable
 
 # Tests requiring backends (must enable the backend)
-cmake -B build -DRAC_BUILD_TESTS=ON -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON
-cmake --build build
-./build/tests/test_llm
+cmake -S .. -B ../build/backends -DRAC_BUILD_TESTS=ON -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON
+cmake --build ../build/backends
+../build/backends/core/tests/test_llm
 
 # Plugin loader tests only work in SHARED plugin mode (not iOS/WASM)
 ```

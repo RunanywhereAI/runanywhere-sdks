@@ -37,9 +37,15 @@ option(
     "Compile the ignored local development_config.cpp (may contain credentials; local development only)"
     OFF
 )
-# Consumed by the root CMakeLists + engines/ (per-engine compilation); this file
-# does not branch on it — RAG is folded into rac_commons independently (see below).
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
+
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND RAC_BUILD_BACKENDS)
+    message(WARNING
+        "RAC_BUILD_BACKENDS=ON builds no engines here: engines/ is added by the "
+        "repo-root CMakeLists.txt, not by core/, so this configure only gains the "
+        "RAG test suites. To build llamacpp/onnx/sherpa, configure the repo root "
+        "(from core/: cmake -S .. -B ../build/backends).")
+endif()
 
 # Ensure EMSCRIPTEN is always defined so
 # generator-expression references like $<BOOL:${EMSCRIPTEN}> below do not trip
