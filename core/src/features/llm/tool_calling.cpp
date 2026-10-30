@@ -3024,7 +3024,7 @@ static rac_result_t finalize_tool_validation(rac_tool_call_validation_t* out_val
     }
 
     if (!errors.empty()) {
-        out_validation->error_message = dup_owned_string(errors.front());
+        out_validation->error_message = dup_owned_string(rac::llm::sanitize_utf8(errors.front()));
         if (!out_validation->error_message) {
             rac_tool_call_validation_free(out_validation);
             return RAC_ERROR_OUT_OF_MEMORY;
