@@ -10,11 +10,15 @@
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.11
-  runanywhere_qhexrt: 0.20.11
+  runanywhere: 0.20.37
+  runanywhere_qhexrt: 0.20.37
 ```
 
 See the [Flutter SDK README](../../README.md) for Android setup.
+
+The examples below target this source tree (SDK `0.20.37`). For changes not yet
+released, use local SDK packages and native libraries built from the same
+checkout; a matching version number alone does not include unreleased changes.
 
 ---
 

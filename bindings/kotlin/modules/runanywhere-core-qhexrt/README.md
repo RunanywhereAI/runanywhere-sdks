@@ -12,10 +12,14 @@ Requires the core SDK. Add both to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
-    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.37")
+    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.37")
 }
 ```
+
+The examples below target this source tree (SDK `0.20.37`). For changes not yet
+released, use local SDK packages and native libraries built from the same
+checkout; a matching version number alone does not include unreleased changes.
 
 ---
 
@@ -79,7 +83,7 @@ QHexRT does not seed or select models. Register the exact model URL intended for
 - Android `arm64-v8a` only (no `armeabi-v7a` / `x86_64` package)
 - Qualcomm Snapdragon device with Hexagon **V75**, **V79**, or **V81** NPU
 - Matching model manifests for the device Hexagon arch (a V81-only bundle will not run on V75)
-- Core artifact `runanywhere-sdk:0.20.11`
+- Core artifact `runanywhere-sdk:0.20.37`
 
 ---
 

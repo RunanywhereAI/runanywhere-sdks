@@ -1,9 +1,9 @@
 # QHexRT URL registration migration
 
 The native curated catalog and its `rac_qhexrt_catalog_*` C ABI are removed by
-the explicit URL registration refactor in #685. Flutter's
+the explicit URL registration refactor in #685. Both Flutter and React Native remove
 `QHexRT.modelSupportsArchitecture`, `QHexRT.modelRequiresHfAuth`, and
-`QHexRT.registerModelForDevice` are removed with the catalog facade. Consumers
+`QHexRT.registerModelForDevice` as part of retiring their QHexRT catalog facades. Consumers
 must migrate these calls before upgrading; this is a breaking API removal.
 
 Applications own their curated model list, eligibility restrictions, and any

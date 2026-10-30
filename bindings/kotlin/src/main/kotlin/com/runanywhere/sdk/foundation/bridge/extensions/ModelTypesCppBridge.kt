@@ -106,6 +106,11 @@ internal object ModelTypesCppBridge {
 
     // Proto ABI
 
+    /**
+     * Ask commons to infer [url]'s model format and decode its proto response.
+     * Returns null for unavailable JNI, missing bytes, or malformed responses;
+     * mapped native operation failures propagate to the caller.
+     */
     private fun formatFromUrlProto(url: String): ModelFormatFromUrlResult? {
         val request = ModelFormatFromUrlRequest(url = url)
         val bytes =
@@ -125,6 +130,11 @@ internal object ModelTypesCppBridge {
         }
     }
 
+    /**
+     * Infer artifact metadata for [url] with [modelId] as the native model hint.
+     * Returns null for unavailable JNI, missing bytes, or malformed responses;
+     * mapped native operation failures propagate to the caller.
+     */
     private fun artifactInferFromUrlProto(url: String, modelId: String): ArtifactInferFromUrlResult? {
         val request = ArtifactInferFromUrlRequest(url = url, model_id = modelId)
         val bytes =
@@ -144,6 +154,7 @@ internal object ModelTypesCppBridge {
         }
     }
 
+    /** Run [block], converting unavailable JNI symbols/libraries to null; other failures propagate. */
     private fun callProtoBytes(operation: String, block: () -> ByteArray?): ByteArray? =
         try {
             block()
