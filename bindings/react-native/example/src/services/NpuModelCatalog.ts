@@ -458,6 +458,12 @@ export function toNpuModelRegistration(bundle: NpuBundle): ModelRegistration {
   };
 }
 
+/**
+ * Apply app-owned architecture restrictions before registering a bundle.
+ * Unsupported devices and excluded architectures are rejected even when a pin
+ * matches; an unpinned row accepts any supported, non-excluded architecture.
+ * This check does not perform HF authentication or validate remote manifests.
+ */
 export function isNpuBundleEligible(
   bundle: NpuBundle,
   capability: NpuCapability
@@ -512,6 +518,7 @@ export function isVisibleForNativeNpuCatalog(
   return !usesQHexRT || registeredNpuIds.has(model.id);
 }
 
+/** Return the model only if present and accepted by the current catalog filter. */
 export function visibleNativeNpuCatalogModelOrNull<T extends ModelInfo>(
   model: T | null | undefined,
   registeredNpuIds: ReadonlySet<string> = npuCatalogSnapshot.registeredModelIds

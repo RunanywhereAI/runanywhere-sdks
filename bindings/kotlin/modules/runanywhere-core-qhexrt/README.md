@@ -18,8 +18,10 @@ dependencies {
 ```
 
 The examples below target this source tree (SDK `0.20.37`). For changes not yet
-released, use local SDK packages and native libraries built from the same
-checkout; a matching version number alone does not include unreleased changes.
+released, use local SDK packages and Commons native libraries built from the same
+checkout. The private QHexRT native payload is not in this repository: supply it
+separately from a compatible authorized build and stage it into the local backend
+package. A matching version number alone does not include unreleased changes.
 
 ---
 

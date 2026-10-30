@@ -162,6 +162,11 @@ const privateHfTags = new Set([
   'hugging-face-auth',
 ]);
 
+/**
+ * Detect HF-auth requirements from the model's case-insensitive metadata tags.
+ * The app supplies these tags; this does not query a native QHexRT catalog or
+ * establish whether credentials are present or accepted by Hugging Face.
+ */
 export const modelRequiresHfAuth = (model: ModelInfo): boolean => {
   const tags = model.metadata?.tags?.map((tag) => tag.toLowerCase()) ?? [];
   return tags.some((tag) => privateHfTags.has(tag));
