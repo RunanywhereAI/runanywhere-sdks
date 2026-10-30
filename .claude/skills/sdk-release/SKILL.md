@@ -221,7 +221,7 @@ neurun release (private)
   │                                              ├─ Swift  (Package.swift binary target)
   │                                              ├─ Flutter / React Native (co-vendored
   │                                              │   in the onnx package's podspec)
-  │                                              └─ rcli-macos (stages it, then GREPS
+  │                                              └─ wally-macos (stages it, then GREPS
   │                                                  `backends --json` for neurt)
   ├─ native_android     ──QHexRT arm64-v8a──►  one build stages jniLibs into
   │                                              Kotlin + React Native + Flutter
@@ -236,10 +236,10 @@ neurun release (private)
 | Kotlin (Android) | — | ✅ jniLibs | arm64-v8a only; the only ABI with a Hexagon NPU |
 | Electron macOS | ✅ fetches | — | builds its own natives |
 | Electron win-arm64 | — | ✅ fetches | |
-| rcli macOS | ✅ xcframework | — | **best check in the tree** (below) |
-| rcli linux / windows-x64 | — | — | correct: NeuRT is Apple-only, QHexRT is win-arm64 |
+| wally macOS | ✅ xcframework | — | **best check in the tree** (below) |
+| wally linux / windows-x64 | — | — | correct: NeuRT is Apple-only, QHexRT is win-arm64 |
 
-**`rcli-macos` is the strongest verification that exists here.** It greps
+**`wally-macos` is the strongest verification that exists here.** It greps
 `backends --json` for `"name":"neurt"` — and a non-routable shell *refuses
 registration*, so that grep proves the engine is **routable**, not merely present. Copy
 this pattern when adding an engine rather than checking for a file on disk.
@@ -373,7 +373,7 @@ Measured on the 0.20.25 train (2026-08-21/22). A release train legitimately take
 | `kotlin-android` (pr-build) | ~40 min | |
 | `python-windows` (pr-build) | ~40 min | |
 | `electron (windows-2022)` (electron-sdk-ci) | ~40 min | |
-| `rcli-windows` | ~30 min | |
+| `wally-windows` | ~30 min | |
 | `native_electron / native_win_arm64_qhexrt` | ~28 min | Self-hosted; may sit **queued** for a long time first if the single runner is busy. Queued ≠ hung. |
 | `native_electron / native_win_x64_and_package` | ~35-45 min | |
 | `wasm` (pr-build) | ~12 min | **Do NOT use this as a proxy for `native_web`.** Totally different scope. |

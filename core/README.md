@@ -158,7 +158,7 @@ ANE text generation + image generation (diffusion) on Apple platforms, via Apple
 | Web | Emscripten WASM modules in `runanywhere-web` |
 | Python | pybind11 / scikit-build extension in `runanywhere-python` |
 | Electron | N-API addon in `runanywhere-electron` |
-| CLI | Direct C++ consumer (`rcli`) |
+| CLI | Direct C++ consumer (`wally`) |
 
 Each host implements a `rac_platform_adapter_t` for file I/O, secure storage, logging, and downloads.
 
