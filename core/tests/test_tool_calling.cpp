@@ -431,6 +431,16 @@ int test_pythonic_detect_and_parse() {
     ASSERT_EQ_INT(rac_tool_call_detect_format("[a list, of, things]"), RAC_TOOL_FORMAT_DEFAULT);
     ASSERT_EQ_INT(rac_tool_call_detect_format("[link](https://example.com)"),
                   RAC_TOOL_FORMAT_DEFAULT);
+    const char* invalid_arguments[] = {
+        "[inspect(=2)]",          "[inspect(  =2)]",
+        "[inspect(1x=2)]",        "[inspect(x-y=2)]",
+        "[inspect(x,good=2)]",    "[inspect(x)extra=2)]",
+        "[inspect(\xFF,good=2)]", "[inspect(\xFF)=2)]",
+        "[inspect(\xFF]=2)]",     "[inspect(\xFF(other=2))]",
+    };
+    for (const char* input : invalid_arguments) {
+        ASSERT_EQ_INT(rac_tool_call_detect_format(input), RAC_TOOL_FORMAT_DEFAULT);
+    }
     // Tagged formats win (bare check runs last).
     ASSERT_EQ_INT(rac_tool_call_detect_format("<tool_call>{}</tool_call>"),
                   RAC_TOOL_FORMAT_DEFAULT);
@@ -515,6 +525,13 @@ int test_pythonic_utf8_strings() {
         {"\"quoted \\\"\xFF\\\"\\nline\"", "\"quoted \\\"\xEF\xBF\xBD\\\"\\nline\"",
          RAC_TOOL_PARAM_STRING},
         {"\"\xE2\x82\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        // Broken JSON stays a string even if duplicate keys were observed
+        // before the syntax error. Valid ambiguous objects are tested below.
+        {R"({"x":1,"x":2,})", R"("{\"x\":1,\"x\":2,}")", RAC_TOOL_PARAM_STRING},
+        {R"([{"x":1,"x":2},])", R"("[{\"x\":1,\"x\":2},]")", RAC_TOOL_PARAM_STRING},
+        {R"({"x":1,"x":2} trailing)", R"("{\"x\":1,\"x\":2} trailing")", RAC_TOOL_PARAM_STRING},
+        {"{\"x\xFF\":1,\"x\xFE\":2,}", "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2,}\"",
+         RAC_TOOL_PARAM_STRING},
     };
     return check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0]));
 }
@@ -587,20 +604,36 @@ int test_pythonic_utf8_valid_unicode() {
 }
 
 int test_pythonic_utf8_argument_key() {
+    struct KeyCase {
+        const char* arguments;
+        const char* expected;
+    };
+    const KeyCase cases[] = {
+        {"value=1,bad_\xFF=2", "{\"value\":1,\"bad_\xEF\xBF\xBD\":2}"},
+        {"bad_\xFF=2", "{\"bad_\xEF\xBF\xBD\":2}"},
+        {"\xFF=2", "{\"\xEF\xBF\xBD\":2}"},
+        {"bad_\xC3 =2", "{\"bad_\xEF\xBF\xBD\":2}"},
+        {"\xE6\x9D\xB1\xE4\xBA\xAC=2", "{\"\xE6\x9D\xB1\xE4\xBA\xAC\":2}"},
+    };
     for (const auto format : {RAC_TOOL_FORMAT_LFM2, RAC_TOOL_FORMAT_PYTHONIC}) {
-        std::string input = "[inspect(value=1,bad_\xFF=2)]";
-        if (format == RAC_TOOL_FORMAT_LFM2) {
-            input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+        for (const auto& c : cases) {
+            std::string input = std::string("[inspect(") + c.arguments + ")]";
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+            }
+            ASSERT_EQ_INT(rac_tool_call_detect_format(input.c_str()), format);
+            rac_tool_call_t call{};
+            ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
+            ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+            ASSERT_EQ_INT(call.format, format);
+            ASSERT_TRUE(call.tool_name != nullptr);
+            ASSERT_EQ_STR(call.tool_name, "inspect");
+            ASSERT_TRUE(call.arguments_json != nullptr);
+            const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
+            ASSERT_TRUE(args.is_object());
+            ASSERT_TRUE(args == nlohmann::json::parse(c.expected));
+            rac_tool_call_free(&call);
         }
-        rac_tool_call_t call{};
-        ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
-        ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
-        ASSERT_TRUE(call.arguments_json != nullptr);
-        const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
-        ASSERT_TRUE(args.is_object());
-        ASSERT_TRUE(args["value"] == 1);
-        ASSERT_TRUE(args["bad_\xEF\xBF\xBD"] == 2);
-        rac_tool_call_free(&call);
 
         // Different raw keys can become identical after UTF-8 repair. Reject
         // the whole call rather than silently dropping one argument.
@@ -614,14 +647,21 @@ int test_pythonic_utf8_argument_key() {
             if (format == RAC_TOOL_FORMAT_LFM2) {
                 rejected_input = "<|tool_call_start|>" + rejected_input + "<|tool_call_end|>";
             }
-            rac_tool_call_t rejected{};
-            ASSERT_EQ_INT(rac_tool_call_parse(rejected_input.c_str(), &rejected), RAC_SUCCESS);
-            ASSERT_EQ_INT(rejected.has_tool_call, RAC_FALSE);
-            ASSERT_TRUE(rejected.tool_name == nullptr);
-            ASSERT_TRUE(rejected.arguments_json == nullptr);
-            ASSERT_TRUE(rejected.clean_text != nullptr);
-            ASSERT_EQ_STR(rejected.clean_text, rejected_input.c_str());
-            rac_tool_call_free(&rejected);
+            ASSERT_EQ_INT(rac_tool_call_detect_format(rejected_input.c_str()), format);
+            for (const bool explicit_format : {false, true}) {
+                rac_tool_call_t rejected{};
+                const rac_result_t rc =
+                    explicit_format
+                        ? rac_tool_call_parse_with_format(rejected_input.c_str(), format, &rejected)
+                        : rac_tool_call_parse(rejected_input.c_str(), &rejected);
+                ASSERT_EQ_INT(rc, RAC_SUCCESS);
+                ASSERT_EQ_INT(rejected.has_tool_call, RAC_FALSE);
+                ASSERT_TRUE(rejected.tool_name == nullptr);
+                ASSERT_TRUE(rejected.arguments_json == nullptr);
+                ASSERT_TRUE(rejected.clean_text != nullptr);
+                ASSERT_EQ_STR(rejected.clean_text, rejected_input.c_str());
+                rac_tool_call_free(&rejected);
+            }
         }
     }
     return 0;

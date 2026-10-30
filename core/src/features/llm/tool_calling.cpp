@@ -188,12 +188,16 @@ extern "C" rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_ou
                     if (*a == ')') {
                         return RAC_TOOL_FORMAT_PYTHONIC;  // [name()]
                     }
-                    const bool arg_ident =
-                        (*a >= 'a' && *a <= 'z') || (*a >= 'A' && *a <= 'Z') || *a == '_';
+                    // Non-ASCII bytes, including malformed UTF-8, must reach
+                    // argument-key repair. Keep ASCII identifier boundaries
+                    // strict so punctuation and delimiters do not match.
+                    const bool arg_ident = (*a >= 'a' && *a <= 'z') || (*a >= 'A' && *a <= 'Z') ||
+                                           *a == '_' || static_cast<unsigned char>(*a) >= 0x80;
                     if (arg_ident) {
                         const char* k = a;
                         while ((*k >= 'a' && *k <= 'z') || (*k >= 'A' && *k <= 'Z') ||
-                               (*k >= '0' && *k <= '9') || *k == '_') {
+                               (*k >= '0' && *k <= '9') || *k == '_' ||
+                               static_cast<unsigned char>(*k) >= 0x80) {
                             ++k;
                         }
                         while (*k == ' ') {
@@ -1478,15 +1482,17 @@ static json parse_lfm2_argument_value(const std::string& raw_value) {
         return true;
     };
     json parsed = json::parse(value, check_keys, false);
+    if (parsed.is_discarded()) {
+        // Preserve the existing raw-string fallback for invalid JSON syntax,
+        // even when duplicate keys were observed before the parse failed.
+        return value;
+    }
     if (duplicate_key) {
-        // Unlike a syntax error, an ambiguous object must reject the call;
+        // A successfully parsed ambiguous object must reject the call;
         // falling back to its raw text would hide the lost argument value.
         return json(json::value_t::discarded);
     }
-    if (!parsed.is_discarded()) {
-        return parsed;
-    }
-    return value;
+    return parsed;
 }
 
 static bool lfm2_arguments_to_json(const std::string& args, std::string* out_json) {
