@@ -177,12 +177,51 @@ class YamlParser {
     }
 
     static std::string unquote(const std::string& s) {
+    static std::string unquote(const std::string& s) {
         if (s.size() >= 2 &&
-            ((s.front() == '"' && s.back() == '"') || (s.front() == '\'' && s.back() == '\''))) {
-            return s.substr(1, s.size() - 2);
+            ((s.front() == '"' && s.back() == '"') || (s.front() == ''' && s.back() == '''))) {
+            char quote = s.front();
+            std::string content = s.substr(1, s.size() - 2);
+            if (quote == ''') {
+                // Single-quoted: only '' -> ' is special
+                std::string out;
+                for (size_t i = 0; i < content.size(); ++i) {
+                    if (content[i] == ''' && i + 1 < content.size() && content[i + 1] == ''') {
+                        out.push_back(''');
+                        ++i;
+                    } else {
+                        out.push_back(content[i]);
+                    }
+                }
+                return out;
+            } else {
+                // Double-quoted: handle YAML escape sequences
+                std::string out;
+                for (size_t i = 0; i < content.size(); ++i) {
+                    if (content[i] == '\' && i + 1 < content.size()) {
+                        char next = content[i + 1];
+                        switch (next) {
+                            case '"':  out.push_back('"'); break;
+                            case '\\': out.push_back('\\'); break;
+                            case '/':  out.push_back('/'); break;
+                            case 'n':  out.push_back('\n'); break;
+                            case 't':  out.push_back('\t'); break;
+                            case 'r':  out.push_back('\r'); break;
+                            case 'b':  out.push_back('\b'); break;
+                            case 'f':  out.push_back('\f'); break;
+                            default:   out.push_back(next); break;
+                        }
+                        ++i;
+                    } else {
+                        out.push_back(content[i]);
+                    }
+                }
+                return out;
+            }
         }
         return s;
     }
+
 
     /// Parse the block starting at `idx` whose first line has indent
     /// >= base_indent. Advances idx past the consumed region.
