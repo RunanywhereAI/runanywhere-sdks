@@ -19,7 +19,7 @@ handles a hand-built payload correctly. In order of increasing strength:
 
 1. **Unit test green** (`ctest -R telemetry_extraction_tests`) — proves the JSON builder's
    presence/vocabulary rules are still correct in isolation. Necessary, not sufficient.
-2. **Received request body** — capture the actual JSON `rcli` (or a real binding) put on
+2. **Received request body** — capture the actual JSON `wally` (or a real binding) put on
    the wire and read it: right modality endpoint, right keys, no vocabulary values that
    got through that shouldn't have, measured zeros kept as `0` not `null`.
 3. **Stored row matches, field-for-field** — the backend's own ingest response
@@ -36,7 +36,7 @@ Every binding funnels through the same two C ABI entry points in
 `core/src/infrastructure/telemetry/telemetry_manager.cpp`:
 
 - `rac_telemetry_manager_track` — flat-struct payload (`rac_telemetry_payload_t`), used by
-  `rcli`'s `telemetry emit`/`telemetry blast` and by hand-built events.
+  `wally`'s `telemetry emit`/`telemetry blast` and by hand-built events.
 - `rac_telemetry_manager_track_proto` — the real path every language binding actually uses:
   a binding builds a protobuf `SDKEvent` (`sdk_events.pb.h`) at the real call site (e.g. an
   LLM `generate()` completing), and `proto_event_type_string()` + the per-domain extraction
@@ -51,7 +51,7 @@ Every binding funnels through the same two C ABI entry points in
   serialization (see §2/§3 for the two contracts enforced there).
 - `send_batch_json()` batches by modality and POSTs to `/api/v2/sdk/telemetry/{modality}`
   through whichever `rac_http_transport_ops_t` the binding registered (URLSession/OkHttp/
-  `emscripten_fetch`/curl for `rcli` — see the root `AGENTS.md`'s "HTTP is platform-provided"
+  `emscripten_fetch`/curl for `wally` — see the root `AGENTS.md`'s "HTTP is platform-provided"
   rule). There is no `libcurl` fallback baked into commons itself.
 
 If a field is going missing on the wire, the fix is almost always in
@@ -145,8 +145,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 `telemetry_extraction_tests` and `device_identity_tests` are registered in
-`core/tests/CMakeLists.txt`; `rcli_telemetry_live_tests` is registered separately in
-`rcli/tests/CMakeLists.txt`. All three are hand-rolled assertion runners — `CHECK()` in
+`core/tests/CMakeLists.txt`; `wally_telemetry_live_tests` is registered separately in
+`wally/tests/CMakeLists.txt`. All three are hand-rolled assertion runners — `CHECK()` in
 some files, `ASSERT_EQ`/`ASSERT_TRUE` (from `core/tests/test_common.h`) in others — never
 GoogleTest:
 
@@ -154,13 +154,13 @@ GoogleTest:
 |---|---|---|
 | `telemetry_extraction_tests` | `test_telemetry_extraction` | Full proto→JSON pipeline per modality (LLM token counts/`tokens_per_second`, STT NaN-confidence never leaks as the string `"nan"`, TTS `characters_per_second`, embeddings `total_tokens`/`batch_size`/`embedding_dimension`, LoRA failure-path fields, RAG retrieval counts, VLM image/timing fields, live device-state stamping); the presence/measured-zero contract (§3); the closed-vocabulary drop rule (§2); and an HTTP-retry backoff (a failed batch is re-sent only after >5s, never before). Requires `RAC_HAVE_PROTOBUF` — the test binary itself no-ops with exit 0 if commons wasn't built with protobuf support. |
 | `device_identity_tests` | `test_device_identity` | Every branch of `rac_device_get_or_create_persistent_id()`'s resolution chain (§6) against a mocked platform adapter — cache hit, vendor-ID fallback, fresh-UUID generation, and that a `secure_set` failure doesn't silently drop the ID. |
-| `rcli_telemetry_live_tests` | `test_rcli_telemetry_live` | **Opt-in, always registered but a no-op by default.** Runs only with `--live` *and* `RUNANYWHERE_BASE_URL`/`RUNANYWHERE_API_KEY` set; otherwise prints "skip" and exits 0 — a green ctest run for this target proves nothing by itself. When live, it runs `rcli::bootstrap()` (real API-key → device-register → JWT handshake), sends one real event per modality (LLM, embeddings, RAG, VLM, LoRA-failure) through the real HTTP transport, and fails on any non-2xx response — this is the test that would catch a strict-schema `422 extra_forbidden` from field drift against the real V2 endpoints. |
+| `wally_telemetry_live_tests` | `test_wally_telemetry_live` | **Opt-in, always registered but a no-op by default.** Runs only with `--live` *and* `RUNANYWHERE_BASE_URL`/`RUNANYWHERE_API_KEY` set; otherwise prints "skip" and exits 0 — a green ctest run for this target proves nothing by itself. When live, it runs `wally::bootstrap()` (real API-key → device-register → JWT handshake), sends one real event per modality (LLM, embeddings, RAG, VLM, LoRA-failure) through the real HTTP transport, and fails on any non-2xx response — this is the test that would catch a strict-schema `422 extra_forbidden` from field drift against the real V2 endpoints. |
 
 Run it live (§7 has the full local-backend flow):
 
 ```bash
 RUNANYWHERE_BASE_URL=https://<backend-origin> RUNANYWHERE_API_KEY=<key> \
-  ./build/macos-debug/rcli/tests/test_rcli_telemetry_live --live
+  ./build/macos-debug/wally/tests/test_wally_telemetry_live --live
 ```
 
 `test_platform_bridge` (same `CMakeLists.txt`, adjacent target) is the wider companion
@@ -258,19 +258,19 @@ from a code bug — don't conflate an intentional reinstall's fresh ID with inst
 
 ## 7. Point a local build at a local backend and prove an event landed
 
-`rcli` is the fastest way to exercise the full wire path without a mobile/browser
+`wally` is the fastest way to exercise the full wire path without a mobile/browser
 toolchain — it links `rac_commons` directly and speaks real HTTP via curl.
 
 ```bash
-cmake --preset rcli-macos-release   # or rcli-linux-release on Linux
-cmake --build build/rcli-macos-release --target rcli -j "$(sysctl -n hw.logicalcpu)"
+cmake --preset wally-macos-release   # or wally-linux-release on Linux
+cmake --build build/wally-macos-release --target wally -j "$(sysctl -n hw.logicalcpu)"
 ```
 
 **Keyless (development environment) — no API key, works against any backend that allows
 anonymous V2 telemetry:**
 
 ```bash
-./build/rcli-macos-release/rcli/rcli --environment development \
+./build/wally-macos-release/rcli/wally --environment development \
   --base-url http://127.0.0.1:8000 \
   telemetry blast --processing-ms 42.5 --session-id my-check \
   --input-tokens 128 --output-tokens 256
@@ -293,10 +293,10 @@ didn't recognize — a real bug to chase, not the same failure class at all).
 **Authenticated (production shape) — for exercising the login handshake too:**
 
 ```bash
-./build/rcli-macos-release/rcli/rcli --environment production \
+./build/wally-macos-release/rcli/wally --environment production \
   --base-url https://<backend-origin> --api-key <key> \
   auth login
-./build/rcli-macos-release/rcli/rcli --environment production \
+./build/wally-macos-release/rcli/wally --environment production \
   --base-url https://<backend-origin> --api-key <key> \
   telemetry emit --modality llm --count 3 --input-tokens 128 --output-tokens 256
 ```
@@ -321,10 +321,10 @@ here, just point at it.
 
 ## Evidence bar, restated
 
-- Compiling `rcli` or a binding: **not evidence**.
+- Compiling `wally` or a binding: **not evidence**.
 - `ctest -R telemetry_extraction_tests` green: **not evidence of a real call site** — only
   of the serializer in isolation.
-- `rcli telemetry blast` exiting 0: real signal (its exit code does fold in the backend's
+- `wally telemetry blast` exiting 0: real signal (its exit code does fold in the backend's
   `stored >= count` check, §7) but still worth pairing with the per-modality
   `STORED`/`SKIPPED` table in your report — the exit code can't tell you *which* modality
   or *why* a shortfall happened.
