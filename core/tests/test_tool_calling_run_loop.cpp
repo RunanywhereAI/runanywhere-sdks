@@ -1242,6 +1242,65 @@ int test_executor_result_contract_is_fail_closed() {
         rac_proto_buffer_free(&out);
     }
 
+    struct ErrorCase {
+        const char* raw;
+        const char* expected;
+    };
+    const ErrorCase errors[] = {
+        {"failed_\xFF", "failed_\xEF\xBF\xBD"},
+        {"failed_\xC3(", "failed_\xEF\xBF\xBD("},
+        {"failed_\x80", "failed_\xEF\xBF\xBD"},
+        {"failed_\xC0\xAF", "failed_\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xED\xA0\x80", "failed_\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xF4\x90\x80\x80", "failed_\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xE2\x82", "failed_\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xF0\x9F\x98", "failed_\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_ascii", "failed_ascii"},
+        {"failed_東京_😀", "failed_東京_😀"},
+    };
+    struct ErrorState {
+        const char* message;
+        rac_result_t callback_status;
+        int calls = 0;
+    };
+    const auto error_callback = [](const uint8_t*, size_t, rac_proto_buffer_t* out,
+                                   void* user_data) -> rac_result_t {
+        auto& state = *static_cast<ErrorState*>(user_data);
+        ++state.calls;
+        (void)rac_proto_buffer_set_error(out, RAC_ERROR_INTERNAL, state.message);
+        return state.callback_status;
+    };
+    for (const auto callback_status : {RAC_ERROR_INTERNAL, RAC_SUCCESS}) {
+        for (const auto& error : errors) {
+            set_responses({
+                R"(<tool_call>{"tool":"get_weather","arguments":{"location":"A"}}</tool_call>)",
+            });
+            auto request = make_request("weather");
+            std::vector<uint8_t> bytes;
+            serialize(request, &bytes);
+            ErrorState state{error.raw, callback_status};
+            rac_proto_buffer_t out;
+            rac_proto_buffer_init(&out);
+            const auto rc = run_loop(bytes.data(), bytes.size(), error_callback, &state, &out);
+            CHECK(rc == RAC_SUCCESS, "executor error uses result envelope");
+            CHECK(state.calls == 1, "failing executor invoked once");
+            runanywhere::v1::ToolCallingResult result;
+            const bool decoded =
+                out.data && result.ParseFromArray(out.data, static_cast<int>(out.size));
+            CHECK(decoded, "executor error envelope contains valid UTF-8");
+            CHECK(result.error_code() == RAC_ERROR_INTERNAL, "executor error code preserved");
+            CHECK(!result.is_complete(), "executor failure leaves run incomplete");
+            CHECK(result.error_message() == error.expected, "final error message repaired exactly");
+            CHECK(result.tool_results_size() == 1, "one executor failure recorded");
+            if (result.tool_results_size() == 1) {
+                CHECK(result.tool_results(0).is_error(), "executor failure remains an error");
+                CHECK(result.tool_results(0).error() == error.expected,
+                      "recorded tool error repaired exactly");
+            }
+            rac_proto_buffer_free(&out);
+        }
+    }
+
     cleanup_environment();
     return 0;
 }
