@@ -8,10 +8,13 @@
  * The remote-catalog step flows through whatever transport the caller
  * configured on the native side (typically a fetch-backed assignment
  * callback installed at SDK init); `rescan_local` uses the platform's browser
- * filesystem callback, which sees MEMFS only. Native `prune_orphans` can
- * clear missing-file rows, so this adapter always disables it on Web:
- * persistent OPFS downloads need not have a MEMFS copy. SDKCore's async
- * OPFS hydration handles linking and missing/incomplete-download reconciliation.
+ * filesystem callback.
+ *
+ * Native orphan pruning is being added in #961. This adapter always
+ * disables it on Web, including explicit opt-in, because native probes
+ * see only MEMFS while healthy downloads may exist solely in OPFS.
+ * SDKCore's asynchronous OPFS hydration remains necessary to relink
+ * persistent downloads and reconcile missing or incomplete files.
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
