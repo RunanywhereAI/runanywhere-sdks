@@ -429,6 +429,29 @@ export function asSDKException(error: unknown): SDKException {
   return SDKException.unknown(String(error));
 }
 
+const nativeRacResultPattern = /(?:^|\s)RAC_RESULT=(-?\d+)(?:\s|$)/;
+
+/** Convert a native bridge failure carrying RAC_RESULT into the canonical proto error. */
+export async function asNativeSDKException(
+  error: unknown
+): Promise<SDKException> {
+  if (error instanceof SDKException) return error;
+  if (error instanceof Error) {
+    const match = nativeRacResultPattern.exec(error.message);
+    if (match?.[1]) {
+      const rc = Number.parseInt(match[1], 10);
+      const mapped = await sdkExceptionFromRcResult(rc);
+      if (mapped) {
+        return new SDKException({
+          ...mapped.proto,
+          nestedMessage: error.message,
+        });
+      }
+    }
+  }
+  return asSDKException(error);
+}
+
 // ============================================================================
 // Expected-error classification (Swift RAErrorCode.isExpected)
 // ============================================================================

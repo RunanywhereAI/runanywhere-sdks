@@ -2,7 +2,7 @@
 
 **Optional Qualcomm Hexagon NPU backend for the RunAnywhere Kotlin SDK** — on-device LLM, VLM, STT, TTS, embeddings, and diffusion routed to Snapdragon Hexagon V75/V79/V81 NPUs. Android `arm64-v8a` only.
 
-The AAR is binary-only: it bundles the QHexRT engine, JNI bridge, redistributable Qualcomm QAIRT/QNN host libraries, and Hexagon DSP skels. Model conversion / CoreML / forge tooling is not included — download models at runtime through the SDK catalog.
+The AAR is binary-only: it bundles the QHexRT engine, JNI bridge, redistributable Qualcomm QAIRT/QNN host libraries, and Hexagon DSP skels. Model conversion / CoreML / forge tooling is not included. Register the dedicated model URL supplied by the model publisher through the core SDK.
 
 ---
 
@@ -12,9 +12,39 @@ Requires the core SDK. Add both to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
-    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.37")
+    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.37")
 }
+```
+
+The examples below target this source tree (SDK `0.20.37`). For changes not yet
+released, use local SDK packages and Commons native libraries built from the same
+checkout. The private QHexRT native payload is not in this repository: supply it
+separately from a compatible authorized build. A matching version number alone
+does not include unreleased changes.
+
+For local Kotlin builds, stage the private engine payload under
+`engines/qhexrt/prebuilt/`, preserving its `versions/` layout and `current`
+selection. With the matching QAIRT/QNN runtime available and `ANDROID_NDK_HOME`
+configured, run from the repository root:
+
+```bash
+./scripts/build/build-core-android.sh arm64-v8a
+```
+
+If no private QHexRT prebuilt is selected, the script can complete successfully
+with QHexRT disabled. A successful build alone does not confirm that the private
+engine is included.
+
+The script validates the selected prebuilt and passes its resolved directory to
+CMake as `QHEXRT_ROOT`. It stages the backend libraries into
+`bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs/arm64-v8a/`
+and DSP skels into the module's
+`src/main/assets/runanywhere/qhexrt/skels/arm64-v8a/`. To package those staged
+files as a local Maven bundle, run from the repository root:
+
+```bash
+./bindings/kotlin/scripts/package-qhexrt.sh
 ```
 
 ---
@@ -26,17 +56,36 @@ Probe capability, register once at startup, then use standard RunAnywhere APIs �
 ```kotlin
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.ModelRegistration
+import com.runanywhere.sdk.public.api.models
+import ai.runanywhere.proto.v1.InferenceFramework
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
-val npu = QHexRT.probeNpu() // safe on any device
-if (npu.qhexrt_supported) {
-    QHexRT.register() // also installs DSP skels from AAR assets
+lifecycleScope.launch {
+    RunAnywhere.initialize(context = this@MainActivity)
+
+    val npu = QHexRT.probeNpu() // safe on any device
+    if (npu.supported) {
+        QHexRT.register() // also installs DSP skels from AAR assets
+        if (QHexRT.isRegistered) {
+            RunAnywhere.models.register(
+                ModelRegistration.url(
+                    id = "my-qhexrt-model",
+                    name = "My QHexRT Model",
+                    url = "https://huggingface.co/organization/dedicated-qhexrt-model/model.json",
+                    framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+                ),
+            )
+            // Download, load, and infer via core APIs.
+        }
+    }
 }
-
-RunAnywhere.initialize(context = this, /* ... */)
-// Register, download, load, and infer via core APIs
 ```
 
 See the [Kotlin SDK README](../../README.md) for full setup.
+
+The URL above is a logical bundle reference: Commons selects the device's architecture folder and registers the manifest with its companion files. A direct `/resolve/main/model.json` URL registers only that file. Explicitly pinned bundle references are preserved as supplied; registration does not reject a pin for a different device architecture. Before registration, compare each pinned bundle's required architecture with `QHexRT.probeNpu()` and skip incompatible rows. Catalog eligibility and any required HF-auth preflight are application-owned.
 
 ---
 
@@ -51,7 +100,7 @@ See the [Kotlin SDK README](../../README.md) for full setup.
 | Embeddings | Nemotron Embed, EmbeddingGemma |
 | Diffusion | Cosmos3-Edge / LaMa inpaint |
 
-Exact catalog rows and Hexagon arch support are returned by the runtime model catalog after `QHexRT.register()`.
+QHexRT does not seed or select models. Register the exact model URL intended for the target device. Use `QHexRT.probeNpu()` as an optional preflight when your UI needs to report device support before registration.
 
 ---
 
@@ -60,7 +109,7 @@ Exact catalog rows and Hexagon arch support are returned by the runtime model ca
 - Android `arm64-v8a` only (no `armeabi-v7a` / `x86_64` package)
 - Qualcomm Snapdragon device with Hexagon **V75**, **V79**, or **V81** NPU
 - Matching model manifests for the device Hexagon arch (a V81-only bundle will not run on V75)
-- Core artifact `runanywhere-sdk:0.20.11`
+- Core artifact `runanywhere-sdk:0.20.37`
 
 ---
 

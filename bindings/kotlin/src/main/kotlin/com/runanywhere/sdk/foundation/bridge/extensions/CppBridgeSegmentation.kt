@@ -7,6 +7,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.SegmentationRequest
 import ai.runanywhere.proto.v1.SegmentationResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RASegmentationRequest
@@ -22,7 +23,7 @@ internal fun interface SegmentationLifecycleNativeBridge {
 
 private object JniSegmentationLifecycleNativeBridge : SegmentationLifecycleNativeBridge {
     override fun segment(requestProto: ByteArray): ByteArray? =
-        RunAnywhereBridge.racSegmentationSegmentLifecycleProto(requestProto)
+        withNativeProtoFailure { RunAnywhereBridge.racSegmentationSegmentLifecycleProto(requestProto) }
 }
 
 /** Thin facade over the lifecycle-owned semantic-segmentation proto ABI. */

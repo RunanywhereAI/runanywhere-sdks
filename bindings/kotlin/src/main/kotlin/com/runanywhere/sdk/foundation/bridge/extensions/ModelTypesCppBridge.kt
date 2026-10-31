@@ -20,6 +20,7 @@ import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelFormatFromUrlRequest
 import ai.runanywhere.proto.v1.ModelFormatFromUrlResult
 import ai.runanywhere.proto.v1.SingleFileArtifact
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAModelInfo
 
@@ -105,13 +106,20 @@ internal object ModelTypesCppBridge {
 
     // Proto ABI
 
+    /**
+     * Ask commons to infer [url]'s model format and decode its proto response.
+     * Returns null for unavailable JNI, missing bytes, or malformed responses;
+     * mapped native operation failures propagate to the caller.
+     */
     private fun formatFromUrlProto(url: String): ModelFormatFromUrlResult? {
         val request = ModelFormatFromUrlRequest(url = url)
         val bytes =
             callProtoBytes("racModelFormatFromUrlProto") {
-                RunAnywhereBridge.racModelFormatFromUrlProto(
-                    ModelFormatFromUrlRequest.ADAPTER.encode(request),
-                )
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racModelFormatFromUrlProto(
+                        ModelFormatFromUrlRequest.ADAPTER.encode(request),
+                    )
+                }
             } ?: return null
 
         return try {
@@ -122,13 +130,20 @@ internal object ModelTypesCppBridge {
         }
     }
 
+    /**
+     * Infer artifact metadata for [url] with [modelId] as the native model hint.
+     * Returns null for unavailable JNI, missing bytes, or malformed responses;
+     * mapped native operation failures propagate to the caller.
+     */
     private fun artifactInferFromUrlProto(url: String, modelId: String): ArtifactInferFromUrlResult? {
         val request = ArtifactInferFromUrlRequest(url = url, model_id = modelId)
         val bytes =
             callProtoBytes("racArtifactInferFromUrlProto") {
-                RunAnywhereBridge.racArtifactInferFromUrlProto(
-                    ArtifactInferFromUrlRequest.ADAPTER.encode(request),
-                )
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racArtifactInferFromUrlProto(
+                        ArtifactInferFromUrlRequest.ADAPTER.encode(request),
+                    )
+                }
             } ?: return null
 
         return try {
@@ -139,6 +154,7 @@ internal object ModelTypesCppBridge {
         }
     }
 
+    /** Run [block], converting unavailable JNI symbols/libraries to null; other failures propagate. */
     private fun callProtoBytes(operation: String, block: () -> ByteArray?): ByteArray? =
         try {
             block()

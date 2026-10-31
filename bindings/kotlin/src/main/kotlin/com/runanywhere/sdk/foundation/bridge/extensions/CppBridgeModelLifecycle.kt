@@ -13,6 +13,7 @@ import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.SDKComponent
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
@@ -46,28 +47,28 @@ object CppBridgeModelLifecycle {
     fun load(request: RAModelLoadRequest): RAModelLoadResult? =
         decodeOrNull(
             ModelLoadResult.ADAPTER,
-            RunAnywhereBridge.racModelLifecycleLoadProto(ModelLoadRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racModelLifecycleLoadProto(ModelLoadRequest.ADAPTER.encode(request)) },
             "modelLifecycleLoad",
         )
 
     fun unload(request: ModelUnloadRequest): ModelUnloadResult? =
         decodeOrNull(
             ModelUnloadResult.ADAPTER,
-            RunAnywhereBridge.racModelLifecycleUnloadProto(ModelUnloadRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racModelLifecycleUnloadProto(ModelUnloadRequest.ADAPTER.encode(request)) },
             "modelLifecycleUnload",
         )
 
     fun currentModel(request: CurrentModelRequest): CurrentModelResult? =
         decodeOrNull(
             CurrentModelResult.ADAPTER,
-            RunAnywhereBridge.racModelLifecycleCurrentModelProto(CurrentModelRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racModelLifecycleCurrentModelProto(CurrentModelRequest.ADAPTER.encode(request)) },
             "modelLifecycleCurrentModel",
         )
 
     fun snapshot(component: SDKComponent): ComponentLifecycleSnapshot? =
         decodeOrNull(
             ComponentLifecycleSnapshot.ADAPTER,
-            RunAnywhereBridge.racComponentLifecycleSnapshotProto(component.value),
+            withNativeProtoFailure { RunAnywhereBridge.racComponentLifecycleSnapshotProto(component.value) },
             "componentLifecycleSnapshot",
         )
 

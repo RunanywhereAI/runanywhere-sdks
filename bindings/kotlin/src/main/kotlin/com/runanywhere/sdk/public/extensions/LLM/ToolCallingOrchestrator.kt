@@ -23,6 +23,7 @@ package com.runanywhere.sdk.public.extensions.LLM
 import ai.runanywhere.proto.v1.ToolCallingHistoryTurn
 import ai.runanywhere.proto.v1.ToolCallingRole
 import ai.runanywhere.proto.v1.ToolCallingSessionCreateRequest
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeRunLoopHandleListener
@@ -318,7 +319,9 @@ internal object ToolCallingOrchestrator {
         ToolResult(
             tool_call_id = toolCallId,
             name = name,
-            result_json = RAToolValue.jsonString(from = result),
+            // Failure/cancellation results must not retry a failed native
+            // serializer while constructing the error response.
+            result_json = if (success) RAToolValue.jsonString(from = result) else "{}",
             error = error,
             is_error = !success,
             started_at_ms = startedAtMs,
@@ -424,11 +427,13 @@ internal object ToolCallingOrchestrator {
             try {
                 val resultBytes =
                     withContext(Dispatchers.IO) {
-                        RunAnywhereBridge.racToolCallingRunLoopProto(
-                            ToolCallingSessionCreateRequest.ADAPTER.encode(request),
-                            executor,
-                            onHandle,
-                        )
+                        withNativeProtoFailure {
+                            RunAnywhereBridge.racToolCallingRunLoopProto(
+                                ToolCallingSessionCreateRequest.ADAPTER.encode(request),
+                                executor,
+                                onHandle,
+                            )
+                        }
                     }
                 resultBytes?.let { ToolCallingResult.ADAPTER.decode(it) }
                     ?: ToolCallingResult(

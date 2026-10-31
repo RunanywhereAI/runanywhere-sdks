@@ -22,7 +22,10 @@ import {
   requireInitialized,
 } from '../../../Foundation/Initialization/InitializedGuard';
 import { ensureServicesReady, ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
-import { SDKException } from '../../../Foundation/Errors/SDKException';
+import {
+  asNativeSDKException,
+  SDKException,
+} from '../../../Foundation/Errors/SDKException';
 import {
   ArchiveArtifact,
   ArchiveStructure,
@@ -86,6 +89,11 @@ export interface RegisterModelInput {
   framework: InferenceFramework;
   /** Estimated runtime RAM, used for compatibility checks. */
   memoryRequirement?: number;
+  /** Exact remote artifact bytes, when known. */
+  downloadSize?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   /** Optional model category (Swift shorthand defaults to LANGUAGE). */
   modality?: ModelCategory;
   /** Optional artifact archive type hint. */
@@ -125,6 +133,13 @@ export interface RegisterMultiFileModelInput {
   framework: InferenceFramework;
   modality?: ModelCategory;
   memoryRequirement?: number;
+  /** Exact aggregate artifact bytes, independent from runtime RAM. */
+  downloadSize?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
+  supportsThinking?: boolean;
+  supportsLora?: boolean;
   /**
    * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
    * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
@@ -172,22 +187,34 @@ export async function registerModel(
     name: input.name,
     framework: input.framework,
     category: modality,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
+    ...(input.source !== undefined ? { source: input.source } : {}),
     ...(input.id !== undefined ? { id: input.id } : {}),
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
       : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
+      : {}),
+    ...(input.contextLength !== undefined && input.contextLength > 0
+      ? { contextLength: input.contextLength }
+      : {}),
+    ...(input.description ? { description: input.description } : {}),
     ...(input.supportsThinking ? { supportsThinking: true } : {}),
     ...(input.supportsLora ? { supportsLora: true } : {}),
     ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
   });
 
-  const saved = arrayBufferToBytes(
-    await native.registerModelFromUrlProto(
-      encodeProtoMessage(request, RegisterModelFromUrlRequest),
-    ),
-  );
+  let saved: Uint8Array;
+  try {
+    saved = arrayBufferToBytes(
+      await native.registerModelFromUrlProto(
+        encodeProtoMessage(request, RegisterModelFromUrlRequest),
+      ),
+    );
+  } catch (error) {
+    throw await asNativeSDKException(error);
+  }
   if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,
@@ -231,6 +258,11 @@ export interface RegisterArchiveModelInput {
   /** Caller override; inferred from the URL extension when omitted. */
   archiveType?: ArchiveType;
   memoryRequirement?: number;
+  /** Exact remote archive bytes, independent from runtime RAM. */
+  downloadSize?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   supportsThinking?: boolean;
   supportsLora?: boolean;
   /** Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`). */
@@ -289,7 +321,7 @@ export async function registerArchiveModel(
     preferredFramework: input.framework,
     format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     downloadUrl: input.url,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
+    source: input.source ?? ModelSource.MODEL_SOURCE_REMOTE,
     // `ModelInfo.artifactType` is deleted outright — the oneof arm
     // (`archive` here) is itself the artifact-type signal now.
     archive,
@@ -298,6 +330,13 @@ export async function registerArchiveModel(
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
       : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
+      : {}),
+    ...(input.contextLength !== undefined && input.contextLength > 0
+      ? { contextLength: input.contextLength }
+      : {}),
+    ...(input.description ? { metadata: { description: input.description } } : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     ...(input.supportsThinking
       ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
@@ -346,6 +385,20 @@ export async function registerMultiFileModel(
           memoryRequiredBytes: input.memoryRequirement,
         }
       : {}),
+    ...(input.downloadSize !== undefined && input.downloadSize > 0
+      ? { downloadSizeBytes: input.downloadSize }
+      : {}),
+    ...(input.contextLength !== undefined && input.contextLength > 0
+      ? { contextLength: input.contextLength }
+      : {}),
+    ...(input.source !== undefined ? { source: input.source } : {}),
+    ...(input.description ? { description: input.description } : {}),
+    ...(input.supportsThinking !== undefined
+      ? { supportsThinking: input.supportsThinking }
+      : {}),
+    ...(input.supportsLora !== undefined
+      ? { supportsLora: input.supportsLora }
+      : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     // ModelFileDescriptor.isRequired was renamed isOptional — NOT a bare
     // rename, the boolean polarity inverts too (required=true means
@@ -360,11 +413,16 @@ export async function registerMultiFileModel(
       isOptional: !file.isRequired,
     })),
   });
-  const saved = arrayBufferToBytes(
-    await native.registerMultiFileModelProto(
-      encodeProtoMessage(message, RegisterMultiFileModelRequest),
-    ),
-  );
+  let saved: Uint8Array;
+  try {
+    saved = arrayBufferToBytes(
+      await native.registerMultiFileModelProto(
+        encodeProtoMessage(message, RegisterMultiFileModelRequest),
+      ),
+    );
+  } catch (error) {
+    throw await asNativeSDKException(error);
+  }
   if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,

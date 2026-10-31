@@ -108,14 +108,31 @@ std::shared_ptr<ArrayBuffer> ownedProtoBuffer(uint8_t *protoBytes,
   return buffer;
 }
 
+/**
+ * Copy a successful commons response into JS-owned storage and release the
+ * native buffer. A non-success callStatus takes precedence over buffer status;
+ * native failures free the buffer and throw std::runtime_error with RAC_RESULT,
+ * the operation name, and any native detail. Empty successful payloads return
+ * a zero-length buffer.
+ */
 std::shared_ptr<ArrayBuffer>
-ownedRegistryBuffer(const char *operation, rac_proto_buffer_t &protoBuffer) {
-  if (protoBuffer.status != RAC_SUCCESS) {
+ownedRegistryBuffer(const char *operation, rac_proto_buffer_t &protoBuffer,
+                    rac_result_t callStatus = RAC_SUCCESS) {
+  const rac_result_t status =
+      callStatus != RAC_SUCCESS ? callStatus : protoBuffer.status;
+  if (status != RAC_SUCCESS) {
     if (protoBuffer.error_message) {
       LOGE("%s proto error: %s", operation, protoBuffer.error_message);
     }
+    std::string message =
+        "RAC_RESULT=" + std::to_string(status) + " " + operation;
+    if (protoBuffer.error_message) {
+      message += ": ";
+      message += protoBuffer.error_message;
+    }
+    const std::runtime_error error(message);
     rac_proto_buffer_free(&protoBuffer);
-    return emptyProtoBuffer();
+    throw error;
   }
 
   if (!protoBuffer.data || protoBuffer.size == 0) {
@@ -202,6 +219,11 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerModelProto(
   });
 }
 
+/**
+ * Register a URL request through commons and resolve with copied ModelInfo
+ * bytes. An unavailable registry resolves with an empty buffer. Native
+ * registration failures reject the promise with their result code and detail.
+ */
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::registerModelFromUrlProto(
     const std::shared_ptr<ArrayBuffer> &requestBytes) {
@@ -220,16 +242,15 @@ HybridRunAnywhereCore::registerModelFromUrlProto(
         rac_proto_buffer_init(&out);
         rac_result_t rc = rac_register_model_from_url_proto(
             bytes.data(), bytes.size(), &out);
-        if (rc != RAC_SUCCESS) {
-          LOGE("registerModelFromUrlProto: rc=%d", rc);
-          rac_proto_buffer_free(&out);
-          return emptyProtoBuffer();
-        }
-
-        return ownedRegistryBuffer("registerModelFromUrlProto", out);
+        return ownedRegistryBuffer("registerModelFromUrlProto", out, rc);
       });
 }
 
+/**
+ * Register a multi-file request through commons and resolve with copied
+ * ModelInfo bytes. An unavailable registry resolves with an empty buffer;
+ * native failures reject the promise instead of returning an empty success.
+ */
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::registerMultiFileModelProto(
     const std::shared_ptr<ArrayBuffer> &requestBytes) {
@@ -247,13 +268,7 @@ HybridRunAnywhereCore::registerMultiFileModelProto(
         rac_proto_buffer_init(&out);
         rac_result_t rc = rac_register_multi_file_model_proto(
             bytes.data(), bytes.size(), &out);
-        if (rc != RAC_SUCCESS) {
-          LOGE("registerMultiFileModelProto: rc=%d", rc);
-          rac_proto_buffer_free(&out);
-          return emptyProtoBuffer();
-        }
-
-        return ownedRegistryBuffer("registerMultiFileModelProto", out);
+        return ownedRegistryBuffer("registerMultiFileModelProto", out, rc);
       });
 }
 
