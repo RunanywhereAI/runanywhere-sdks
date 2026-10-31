@@ -19,7 +19,7 @@ Contributor guide for building, integrating, and extending the internal C/C++ co
 | `RAC_ENABLE_SOLUTIONS` | ON desktop, OFF mobile/WASM | Solutions API (needs Protobuf + Abseil); OFF returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` |
 | `RAC_STATIC_PLUGINS` | Forced ON for iOS/WASM | Static plugin linking instead of `dlopen` |
 | `RAC_BUILD_SERVER` | OFF | OpenAI-compatible HTTP server (`src/server/`) |
-| `RAC_DESKTOP_ADAPTER` | OFF | Desktop platform adapter plus libcurl HTTP transport (rcli, server, Playground) |
+| `RAC_DESKTOP_ADAPTER` | OFF | Desktop platform adapter plus libcurl HTTP transport (wally, server, Playground) |
 | `RAC_BUILD_ELECTRON_ADDON` | OFF | The `runanywhere-electron` N-API `.node` addon |
 | `RAC_BUILD_PYTHON_MODULE` | OFF | The `runanywhere-python` pybind11 extension |
 | `RAC_GPU_CUDA` | OFF | Build llama.cpp with the CUDA backend (NVIDIA; needs the CUDA toolkit) |
