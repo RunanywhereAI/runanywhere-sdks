@@ -531,11 +531,13 @@ int test_session_emits_tool_call() {
     return 0;
 }
 
-int test_step_with_result_emits_final() {
+int test_step_with_result_emits_final(const char* location = "Tokyo",
+                                      const char* expected_location = "Tokyo") {
     if (!load_mock_llm())
         return 1;
     set_responses({
-        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        std::string("<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"") +
+            location + "\"}}</tool_call>",
         "The weather in Tokyo is sunny, 25C.",
     });
 
@@ -555,8 +557,13 @@ int test_step_with_result_emits_final() {
     runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
     step.set_session_handle(handle);
     const auto* tool_ev = sink.find_first(EvCase::kToolCall);
-    if (tool_ev)
+    CHECK(tool_ev != nullptr, "validated default call reaches the session host");
+    if (tool_ev) {
+        CHECK(tool_ev->tool_call().arguments_json() ==
+                  std::string("{\"location\":\"") + expected_location + "\"}",
+              "session host receives the exact repaired argument");
         step.set_tool_call_id(tool_ev->tool_call().id());
+    }
     step.set_result_json(R"({"temp":25,"condition":"sunny"})");
     std::vector<uint8_t> step_bytes;
     serialize(step, &step_bytes);
@@ -1460,6 +1467,7 @@ int main() {
 #else
         test_session_emits_tool_call();
         test_step_with_result_emits_final();
+        test_step_with_result_emits_final("\xC3\x28", "\xEF\xBF\xBD(");
         test_auto_execute_unset_defaults_to_true_and_pauses_for_tool_execution();
         test_auto_execute_false_in_session_completes_without_pausing();
         test_max_tool_calls_allows_final_synthesis();
