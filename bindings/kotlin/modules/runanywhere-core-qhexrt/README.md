@@ -20,8 +20,28 @@ dependencies {
 The examples below target this source tree (SDK `0.20.37`). For changes not yet
 released, use local SDK packages and Commons native libraries built from the same
 checkout. The private QHexRT native payload is not in this repository: supply it
-separately from a compatible authorized build and stage it into the local backend
-package. A matching version number alone does not include unreleased changes.
+separately from a compatible authorized build. A matching version number alone
+does not include unreleased changes.
+
+For local Kotlin builds, stage the private engine payload under
+`engines/qhexrt/prebuilt/`, preserving its `versions/` layout and `current`
+selection. With the matching QAIRT/QNN runtime available and `ANDROID_NDK_HOME`
+configured, run from the repository root:
+
+```bash
+./scripts/build/build-core-android.sh arm64-v8a
+```
+
+The script validates the selected prebuilt and passes its resolved directory to
+CMake as `QHEXRT_ROOT`. It stages the backend libraries into
+`bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs/arm64-v8a/`
+and DSP skels into the module's
+`src/main/assets/runanywhere/qhexrt/skels/arm64-v8a/`. To package those staged
+files as a local Maven bundle, run from the repository root:
+
+```bash
+./bindings/kotlin/scripts/package-qhexrt.sh
+```
 
 ---
 
