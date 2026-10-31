@@ -67,7 +67,7 @@ class CppBridgePlatformAdapterDirectoryTest {
     }
 
     @Test
-    fun `permission denial propagates to the JNI boundary`() {
+    fun `permission denial is rethrown from directory listing`() {
         val failure = SecurityException("directory access denied")
         val directory = Directory(children = { throw failure })
 
@@ -80,7 +80,7 @@ class CppBridgePlatformAdapterDirectoryTest {
     }
 
     @Test
-    fun `enumeration exception propagates to the JNI boundary`() {
+    fun `enumeration exception is rethrown from directory listing`() {
         val failure = IOException("directory read failed")
         val directory = Directory(children = { throw failure })
 
