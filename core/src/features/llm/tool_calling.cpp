@@ -930,6 +930,11 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
     }
     *out_normalized = nullptr;
 
+    // Repair before the fast parse as well as unquoted-key normalization, so
+    // malformed model bytes do not make otherwise valid JSON take the scanner path.
+    const std::string sanitized = rac::llm::sanitize_utf8(json_str);
+    json_str = sanitized.c_str();
+
     // Valid JSON needs no repair. Parsing and re-serializing it first avoids
     // the permissive unquoted-key scanner ever mistaking array elements after
     // a comma for candidate object keys (which could otherwise drop values).

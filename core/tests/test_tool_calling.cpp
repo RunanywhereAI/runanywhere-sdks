@@ -90,6 +90,67 @@ int test_parse_default_structured() {
     return 0;
 }
 
+// Default-format calls need valid UTF-8 before schema validation, including
+// when the normalizer also repairs unquoted keys.
+int test_parse_default_invalid_utf8() {
+    const char* inputs[] = {
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"\xC3\x28\"}}</"
+        "tool_call>",
+        "<tool_call>{tool:\"get_weather\",arguments:{location:\"\xC3\x28\"}}</tool_call>",
+    };
+    const char* tools_json =
+        R"([{"name":"get_weather","parameters":[{"name":"location","type":"string","required":true}]}])";
+    for (const char* input : inputs) {
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(input, &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+        ASSERT_EQ_INT(call.format, RAC_TOOL_FORMAT_DEFAULT);
+        ASSERT_TRUE(call.tool_name != nullptr);
+        ASSERT_EQ_STR(call.tool_name, "get_weather");
+        ASSERT_TRUE(call.arguments_json != nullptr);
+        const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
+        ASSERT_TRUE(args.is_object());
+        ASSERT_TRUE(args["location"] == "\xEF\xBF\xBD(");
+        rac_tool_call_validation_t validation{};
+        ASSERT_EQ_INT(rac_tool_call_validate_json(&call, tools_json, &validation), RAC_SUCCESS);
+        ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
+        ASSERT_TRUE(validation.normalized_arguments_json != nullptr);
+        ASSERT_EQ_STR(validation.normalized_arguments_json, "{\"location\":\"\xEF\xBF\xBD(\"}");
+        rac_tool_call_validation_free(&validation);
+        rac_tool_call_free(&call);
+    }
+    return 0;
+}
+
+int test_normalize_json_utf8_preserves_values() {
+    struct Case {
+        const char* input;
+        const char* expected;
+    };
+    const Case cases[] = {
+        {"{\"location\":\"\xC3\x28\"}", "{\"location\":\"\xEF\xBF\xBD(\"}"},
+        {"{filters:{q:\"\xFF\",values:[1,2,true,null]}}",
+         "{\"filters\":{\"q\":\"\xEF\xBF\xBD\",\"values\":[1,2,true,null]}}"},
+        // Sanitize before the fast JSON parse so a string ending in an escaped
+        // backslash does not send otherwise valid JSON through key repair.
+        {"{\"path\":\"C:\\\\\",\"location\":\"\xFF\",\"values\":[1,2]}",
+         "{\"path\":\"C:\\\\\",\"location\":\"\xEF\xBF\xBD\",\"values\":[1,2]}"},
+        {"{\"location\":\"\xE2\x82\"}", "{\"location\":\"\xEF\xBF\xBD\xEF\xBF\xBD\"}"},
+        {"{\"location\":\"\xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80\"}",
+         "{\"location\":\"\xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80\"}"},
+    };
+    for (const auto& c : cases) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(c.input, &normalized), RAC_SUCCESS);
+        ASSERT_TRUE(normalized != nullptr);
+        const auto parsed = nlohmann::json::parse(normalized, nullptr, false);
+        ASSERT_TRUE(parsed.is_object());
+        ASSERT_TRUE(parsed == nlohmann::json::parse(c.expected));
+        rac_free(normalized);
+    }
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // 1b. parse: an argument that shares a name with a tool-name key
 //     ("name", "tool", "input", ...) must not be taken for the call's own key.
@@ -1291,6 +1352,9 @@ int main(int argc, char** argv) {
 
     TestCase cases[] = {
         {.name = "parse_default_structured", .fn = test_parse_default_structured},
+        {.name = "parse_default_invalid_utf8", .fn = test_parse_default_invalid_utf8},
+        {.name = "normalize_json_utf8_preserves_values",
+         .fn = test_normalize_json_utf8_preserves_values},
         {.name = "parse_default_nested_keys_stay_arguments",
          .fn = test_parse_default_nested_keys_stay_arguments},
         {.name = "parse_lfm2_structured", .fn = test_parse_lfm2_structured},
