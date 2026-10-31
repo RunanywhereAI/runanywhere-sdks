@@ -32,6 +32,10 @@ configured, run from the repository root:
 ./scripts/build/build-core-android.sh arm64-v8a
 ```
 
+If no private QHexRT prebuilt is selected, the script can complete successfully
+with QHexRT disabled. A successful build alone does not confirm that the private
+engine is included.
+
 The script validates the selected prebuilt and passes its resolved directory to
 CMake as `QHEXRT_ROOT`. It stages the backend libraries into
 `bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs/arm64-v8a/`
