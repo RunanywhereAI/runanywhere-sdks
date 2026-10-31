@@ -728,45 +728,68 @@ int test_pythonic_utf8_argument_key() {
     return 0;
 }
 
-// An unknown model-generated name must produce a validation failure, even if
-// its bytes are malformed; it must never throw while serializing the error.
+struct Utf8ToolNameCase {
+    const char* name;
+    const char* repaired_name;
+};
+
+constexpr Utf8ToolNameCase kUtf8ToolNameCases[] = {
+    {"unknown_\xFF", "unknown_\xEF\xBF\xBD"},
+    {"unknown_\xC3\x28", "unknown_\xEF\xBF\xBD("},
+    {"unknown_ascii", "unknown_ascii"},
+    {"unknown_\xE6\x9D\xB1\xE4\xBA\xAC_\xF0\x9F\x98\x80",
+     "unknown_\xE6\x9D\xB1\xE4\xBA\xAC_\xF0\x9F\x98\x80"},
+};
+
+int check_invalid_utf8_tool_name_validation(const rac_tool_call_t& call,
+                                            const std::string& expected_error) {
+    for (const bool json_definitions : {false, true}) {
+        rac_tool_call_validation_t validation{};
+        const rac_result_t rc = json_definitions
+                                    ? rac_tool_call_validate_json(&call, "[]", &validation)
+                                    : rac_tool_call_validate(&call, nullptr, 0, &validation);
+        ASSERT_EQ_INT(rc, RAC_SUCCESS);
+        ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
+        ASSERT_EQ_INT(validation.error_code, RAC_ERROR_VALIDATION_FAILED);
+        ASSERT_TRUE(validation.validation_errors_json != nullptr);
+        const auto errors =
+            nlohmann::json::parse(validation.validation_errors_json, nullptr, false);
+        ASSERT_TRUE(errors.is_array());
+        ASSERT_EQ_INT(errors.size(), 1);
+        ASSERT_TRUE(errors[0] == expected_error);
+        ASSERT_TRUE(validation.error_message != nullptr);
+        ASSERT_EQ_STR(validation.error_message, expected_error.c_str());
+        rac_tool_call_validation_free(&validation);
+    }
+    return 0;
+}
+
+// Parsing repairs the malformed name before validation reports an unknown tool.
 int test_validate_invalid_utf8_tool_name() {
-    const struct {
-        const char* name;
-        const char* repaired_name;
-    } cases[] = {
-        {"unknown_\xFF", "unknown_\xEF\xBF\xBD"},
-        {"unknown_\xC3\x28", "unknown_\xEF\xBF\xBD("},
-        {"unknown_ascii", "unknown_ascii"},
-        {"unknown_\xE6\x9D\xB1\xE4\xBA\xAC_\xF0\x9F\x98\x80",
-         "unknown_\xE6\x9D\xB1\xE4\xBA\xAC_\xF0\x9F\x98\x80"},
-    };
-    for (const auto& test_case : cases) {
+    for (const auto& test_case : kUtf8ToolNameCases) {
         const std::string input = std::string("<tool_call>{\"tool\":\"") + test_case.name +
                                   "\",\"arguments\":{}}</tool_call>";
         const std::string expected_error = std::string("Unknown tool: ") + test_case.repaired_name;
         rac_tool_call_t call{};
         ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
         ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
-        for (const bool json_definitions : {false, true}) {
-            rac_tool_call_validation_t validation{};
-            const rac_result_t rc = json_definitions
-                                        ? rac_tool_call_validate_json(&call, "[]", &validation)
-                                        : rac_tool_call_validate(&call, nullptr, 0, &validation);
-            ASSERT_EQ_INT(rc, RAC_SUCCESS);
-            ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
-            ASSERT_EQ_INT(validation.error_code, RAC_ERROR_VALIDATION_FAILED);
-            ASSERT_TRUE(validation.validation_errors_json != nullptr);
-            const auto errors =
-                nlohmann::json::parse(validation.validation_errors_json, nullptr, false);
-            ASSERT_TRUE(errors.is_array());
-            ASSERT_EQ_INT(errors.size(), 1);
-            ASSERT_TRUE(errors[0] == expected_error);
-            ASSERT_TRUE(validation.error_message != nullptr);
-            ASSERT_EQ_STR(validation.error_message, expected_error.c_str());
-            rac_tool_call_validation_free(&validation);
-        }
+        const int rc = check_invalid_utf8_tool_name_validation(call, expected_error);
         rac_tool_call_free(&call);
+        ASSERT_EQ_INT(rc, 0);
+    }
+    return 0;
+}
+
+// Hosts can bypass parsing and pass malformed bytes directly to either validator.
+// Check both error fields while the caller-owned name remains alive.
+int test_validate_raw_invalid_utf8_tool_name() {
+    for (const auto& test_case : kUtf8ToolNameCases) {
+        std::string raw_name = test_case.name;
+        const std::string expected_error = std::string("Unknown tool: ") + test_case.repaired_name;
+        rac_tool_call_t call{};
+        call.has_tool_call = RAC_TRUE;
+        call.tool_name = raw_name.data();
+        ASSERT_EQ_INT(check_invalid_utf8_tool_name_validation(call, expected_error), 0);
     }
     return 0;
 }
@@ -1376,6 +1399,8 @@ int main(int argc, char** argv) {
         {.name = "pythonic_utf8_valid_unicode", .fn = test_pythonic_utf8_valid_unicode},
         {.name = "pythonic_utf8_argument_key", .fn = test_pythonic_utf8_argument_key},
         {.name = "validate_invalid_utf8_tool_name", .fn = test_validate_invalid_utf8_tool_name},
+        {.name = "validate_raw_invalid_utf8_tool_name",
+         .fn = test_validate_raw_invalid_utf8_tool_name},
 #if defined(RAC_HAVE_PROTOBUF)
         {.name = "tool_result_utf8_error_payload", .fn = test_tool_result_utf8_error_payload},
 #endif
