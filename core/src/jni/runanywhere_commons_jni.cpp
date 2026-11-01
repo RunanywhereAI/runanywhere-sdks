@@ -1664,12 +1664,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
 
-    // Clean up previous adapter
-    if (g_platform_adapter != nullptr) {
-        env->DeleteGlobalRef(g_platform_adapter);
-        g_platform_adapter = nullptr;
-    }
-
     if (adapter == nullptr) {
         LOGw("racSetPlatformAdapter: null adapter provided");
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -1729,6 +1723,37 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 
+    // Optional Kotlin-side directory probes. Method lookup is
+    // best-effort — older host apps that haven't been recompiled against the
+    // new adapter surface will miss these IDs and commons will fall through
+    // to its NULL-callback branches (rescan_local emits a warning,
+    // is_downloaded for multi-file artifacts reports false). New builds
+    // expose CppBridgePlatformAdapter.fileListDirectory / isNonEmptyDirectory
+    // so the model-registry and is_downloaded paths match the Web/Swift
+    // behaviour documented in rac_platform_adapter.h.
+    jmethodID m_file_list_directory =
+        env->GetMethodID(adapterClass, "fileListDirectory",
+                         "(Ljava/lang/String;)[Lcom/runanywhere/sdk/foundation/bridge/extensions/"
+                         "RacDirectoryEntry;");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        m_file_list_directory = nullptr;
+    }
+    jmethodID m_is_non_empty_directory =
+        env->GetMethodID(adapterClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        m_is_non_empty_directory = nullptr;
+    }
+
+    env->DeleteLocalRef(adapterClass);
+
+    // Only commit when all method IDs and global ref succeeded.
+    // Clean up previous adapter last so a refused adapter preserves the working one.
+    if (g_platform_adapter != nullptr) {
+        env->DeleteGlobalRef(g_platform_adapter);
+    }
+
     g_platform_adapter = adapterRef;
     g_method_log = m_log;
     g_method_file_exists = m_file_exists;
@@ -1739,31 +1764,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_method_secure_set = m_secure_set;
     g_method_secure_delete = m_secure_delete;
     g_method_now_ms = m_now_ms;
-
-    // Optional Kotlin-side directory probes. Method lookup is
-    // best-effort — older host apps that haven't been recompiled against the
-    // new adapter surface will miss these IDs and commons will fall through
-    // to its NULL-callback branches (rescan_local emits a warning,
-    // is_downloaded for multi-file artifacts reports false). New builds
-    // expose CppBridgePlatformAdapter.fileListDirectory / isNonEmptyDirectory
-    // so the model-registry and is_downloaded paths match the Web/Swift
-    // behaviour documented in rac_platform_adapter.h.
-    g_method_file_list_directory =
-        env->GetMethodID(adapterClass, "fileListDirectory",
-                         "(Ljava/lang/String;)[Lcom/runanywhere/sdk/foundation/bridge/extensions/"
-                         "RacDirectoryEntry;");
-    if (env->ExceptionCheck() == JNI_TRUE) {
-        env->ExceptionClear();
-        g_method_file_list_directory = nullptr;
-    }
-    g_method_is_non_empty_directory =
-        env->GetMethodID(adapterClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
-    if (env->ExceptionCheck() == JNI_TRUE) {
-        env->ExceptionClear();
-        g_method_is_non_empty_directory = nullptr;
-    }
-
-    env->DeleteLocalRef(adapterClass);
+    g_method_file_list_directory = m_file_list_directory;
+    g_method_is_non_empty_directory = m_is_non_empty_directory;
 
     // Initialize the C adapter struct with our JNI callbacks
     memset(&g_c_adapter, 0, sizeof(g_c_adapter));
@@ -4617,9 +4619,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadSetProgressP
         LOGe("racDownloadSetProgressProtoCallback: failed to create global reference");
         return RAC_ERROR_OUT_OF_MEMORY;
     }
+    const rac_result_t rc =
+        rac_download_set_progress_proto_callback(download_proto_jni_callback, nullptr);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(listenerRef);
+        return static_cast<jint>(rc);
+    }
     g_download_proto_listener = listenerRef;
-    return static_cast<jint>(
-        rac_download_set_progress_proto_callback(download_proto_jni_callback, nullptr));
+    return static_cast<jint>(RAC_SUCCESS);
 }
 
 JNIEXPORT jbyteArray JNICALL
