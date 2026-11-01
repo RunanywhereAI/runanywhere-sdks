@@ -172,6 +172,22 @@ int test_parse_lfm2_structured() {
     return 0;
 }
 
+int test_parse_lfm2_invalid_utf8() {
+    const char* input =
+        "<|tool_call_start|>[get_weather(location='\xC3\x28')]<|tool_call_end|>";
+    rac_tool_call_t result{};
+    const rac_result_t rc = rac_tool_call_parse(input, &result);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result.has_tool_call, RAC_TRUE);
+    ASSERT_TRUE(result.tool_name != nullptr);
+    ASSERT_EQ_STR(result.tool_name, "get_weather");
+    ASSERT_TRUE(result.arguments_json != nullptr);
+    ASSERT_EQ_STR(result.arguments_json, "{\"location\":\"\xEF\xBF\xBD(\"}");
+    ASSERT_EQ_INT(result.format, RAC_TOOL_FORMAT_LFM2);
+    rac_tool_call_free(&result);
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // 3. parse: free-form text -> parsed=false, no tool_name, clean_text = input
 // ---------------------------------------------------------------------------
@@ -459,6 +475,21 @@ int test_pythonic_detect_and_parse() {
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(call3.has_tool_call, RAC_FALSE);
     rac_tool_call_free(&call3);
+    return 0;
+}
+
+int test_parse_pythonic_invalid_utf8() {
+    const char* input = "[get_weather(location='\xC3\x28')]";
+    rac_tool_call_t result{};
+    const rac_result_t rc = rac_tool_call_parse(input, &result);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result.has_tool_call, RAC_TRUE);
+    ASSERT_TRUE(result.tool_name != nullptr);
+    ASSERT_EQ_STR(result.tool_name, "get_weather");
+    ASSERT_TRUE(result.arguments_json != nullptr);
+    ASSERT_EQ_STR(result.arguments_json, "{\"location\":\"\xEF\xBF\xBD(\"}");
+    ASSERT_EQ_INT(result.format, RAC_TOOL_FORMAT_PYTHONIC);
+    rac_tool_call_free(&result);
     return 0;
 }
 
@@ -1024,6 +1055,7 @@ int main(int argc, char** argv) {
         {.name = "parse_default_nested_keys_stay_arguments",
          .fn = test_parse_default_nested_keys_stay_arguments},
         {.name = "parse_lfm2_structured", .fn = test_parse_lfm2_structured},
+        {.name = "parse_lfm2_invalid_utf8", .fn = test_parse_lfm2_invalid_utf8},
         {.name = "parse_free_form_returns_false", .fn = test_parse_free_form_returns_false},
         {.name = "format_prompt_default_two_tools", .fn = test_format_prompt_default_two_tools},
         {.name = "format_prompt_json_lfm2", .fn = test_format_prompt_json_lfm2},
@@ -1036,6 +1068,7 @@ int main(int argc, char** argv) {
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},
         {.name = "tool_call_format_per_family", .fn = test_tool_call_format_per_family},
         {.name = "pythonic_detect_and_parse", .fn = test_pythonic_detect_and_parse},
+        {.name = "parse_pythonic_invalid_utf8", .fn = test_parse_pythonic_invalid_utf8},
         {.name = "pythonic_multibracket_and_special_args",
          .fn = test_pythonic_multibracket_and_special_args},
         {.name = "pythonic_prompt_render", .fn = test_pythonic_prompt_render},
