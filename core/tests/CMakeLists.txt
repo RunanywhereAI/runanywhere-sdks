@@ -973,6 +973,14 @@ target_link_libraries(test_nonllm_lifecycle_proto_abi PRIVATE rac_commons)
 rac_link_archive_deps(test_nonllm_lifecycle_proto_abi)
 target_compile_features(test_nonllm_lifecycle_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_nonllm_lifecycle_proto_abi)
+# A static rac_commons lets the test supply its own rac_alloc/rac_free/rac_strdup
+# (rac_memory.cpp's archive member is then never pulled in) to inject allocation
+# failures; a shared library would keep binding its own copies.
+get_target_property(_rac_commons_type rac_commons TYPE)
+if(_rac_commons_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_nonllm_lifecycle_proto_abi PRIVATE
+        RAC_TEST_INTERPOSE_RAC_MEMORY=1)
+endif()
 add_test(NAME nonllm_lifecycle_proto_abi_tests COMMAND test_nonllm_lifecycle_proto_abi)
 
 # --- Standalone speaker-diarization proto/lifecycle/stream ABI tests --------
