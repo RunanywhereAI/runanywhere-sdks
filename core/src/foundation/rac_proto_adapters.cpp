@@ -15,7 +15,7 @@
  *     owns memory (char `*`, uint8_t `*` with size, T `*` with count), the
  *     adapter uses rac_alloc / rac_strdup so the caller can release with the
  *     matching `_free` helper (or rac_free + rac_free per element).
- *   - NULL inputs return false. We do NOT clear the destination on failure.
+ *   - NULL inputs return false. Destinations are cleared/zeroed on failure.
  */
 
 // Pull in <cstddef> (and friends) BEFORE the protobuf-bearing header so newer

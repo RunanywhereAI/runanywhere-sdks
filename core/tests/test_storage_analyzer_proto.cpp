@@ -651,7 +651,7 @@ int test_model_storage_metrics_proto_adapter() {
     ASSERT_TRUE(metrics.model_id != nullptr);
     ASSERT_STREQ(metrics.model_id, "model-xyz");
     ASSERT_EQ(metrics.size_on_disk, 1048576);
-    rac_free(metrics.model_id);
+    rac_free(const_cast<char*>(metrics.model_id));
 
     runanywhere::v1::ModelStorageMetrics empty_proto;
     empty_proto.set_size_on_disk_bytes(4096);

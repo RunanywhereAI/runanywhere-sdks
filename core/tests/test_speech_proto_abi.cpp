@@ -1128,7 +1128,7 @@ int test_stt_proto_adapters_mapping() {
           "stt word text matches");
     CHECK(word.start_ms == 100 && word.end_ms == 250 && word.confidence == 0.95f,
           "stt word timings and confidence match");
-    rac_free(word.text);
+    rac_free(const_cast<char*>(word.text));
 
     // Empty word still allocates valid non-null empty C-string
     runanywhere::v1::WordTimestamp empty_word_proto;
@@ -1137,7 +1137,7 @@ int test_stt_proto_adapters_mapping() {
           "stt word adapter maps empty word proto");
     CHECK(word.text != nullptr && word.text[0] == '\0',
           "stt word adapter provides non-null empty string");
-    rac_free(word.text);
+    rac_free(const_cast<char*>(word.text));
 
     // 2. rac_transcription_metadata_from_proto
     runanywhere::v1::TranscriptionMetadata meta_proto;
@@ -1154,7 +1154,7 @@ int test_stt_proto_adapters_mapping() {
           "transcription metadata model_id matches");
     CHECK(meta.processing_time_ms == 120 && meta.audio_length_ms == 0,
           "transcription metadata processing_time_ms matches and audio_length_ms is 0");
-    rac_free(meta.model_id);
+    rac_free(const_cast<char*>(meta.model_id));
 
     // Empty model_id leaves model_id as nullptr
     runanywhere::v1::TranscriptionMetadata empty_meta_proto;
@@ -1179,7 +1179,7 @@ int test_stt_proto_adapters_mapping() {
           "transcription alternative text matches");
     CHECK(alt.confidence == 0.88f,
           "transcription alternative confidence matches");
-    rac_free(alt.text);
+    rac_free(const_cast<char*>(alt.text));
 
     return 0;
 }
