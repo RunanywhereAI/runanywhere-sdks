@@ -1,4 +1,5 @@
 import { LogLevel } from '../../src/Foundation/Logging/Models/LogLevel';
+import { LoggingConfiguration } from '../../src/Foundation/Logging/Models/LoggingConfiguration';
 import {
   LoggingManager,
   setCommonsLogLevelSink,
@@ -44,10 +45,12 @@ describe('LoggingParity (React Native)', () => {
   });
 
   test('LoggingManager configure synchronizes with native commons logger', () => {
-    LoggingManager.shared.configure({
-      enableLocalLogging: true,
-      minLogLevel: LogLevel.LOG_LEVEL_WARNING,
-    });
+    LoggingManager.shared.configure(
+      LoggingConfiguration.fromPartial({
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_WARNING,
+      })
+    );
     expect(LoggingManager.shared.configuration.minLogLevel).toBe(LogLevel.LOG_LEVEL_WARNING);
     expect(mockSetMinLevel).toHaveBeenCalledWith(LogLevel.LOG_LEVEL_WARNING);
   });
@@ -69,10 +72,12 @@ describe('LoggingParity (React Native)', () => {
     expect(LoggingManager.shared.configuration.minLogLevel).toBe(LogLevel.LOG_LEVEL_INFO);
     expect(mockSetMinLevel).toHaveBeenCalledWith(LogLevel.LOG_LEVEL_INFO);
 
-    configureLogging({
-      enableLocalLogging: true,
-      minLogLevel: LogLevel.LOG_LEVEL_FATAL,
-    });
+    configureLogging(
+      LoggingConfiguration.fromPartial({
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_FATAL,
+      })
+    );
     expect(LoggingManager.shared.configuration.minLogLevel).toBe(LogLevel.LOG_LEVEL_FATAL);
     expect(mockSetMinLevel).toHaveBeenCalledWith(LogLevel.LOG_LEVEL_FATAL);
   });
