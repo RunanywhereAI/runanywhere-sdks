@@ -1,32 +1,27 @@
 import { LogLevel } from '../../src/Foundation/Logging/Models/LogLevel';
-import { LoggingManager } from '../../src/Foundation/Logging/Services/LoggingManager';
+import {
+  LoggingManager,
+  setCommonsLogLevelSink,
+} from '../../src/Foundation/Logging/Services/LoggingManager';
 import {
   configureLogging,
   setLogLevel,
   setDebugMode,
 } from '../../src/Public/Extensions/RunAnywhere+Logging';
-import * as NativeCore from '../../src/native/NativeRunAnywhereCore';
 
 describe('LoggingParity (React Native)', () => {
   let previousConfig: any;
   let mockSetMinLevel: jest.Mock;
-  let mockGetMinLevel: jest.Mock;
 
   beforeEach(() => {
     previousConfig = { ...LoggingManager.shared.configuration };
-    mockSetMinLevel = jest.fn().mockResolvedValue(undefined);
-    mockGetMinLevel = jest.fn().mockResolvedValue(LogLevel.LOG_LEVEL_INFO);
-
-    jest.spyOn(NativeCore, 'isNativeModuleAvailable').mockReturnValue(true);
-    jest.spyOn(NativeCore, 'requireNativeModule').mockReturnValue({
-      loggerSetMinLevel: mockSetMinLevel,
-      loggerGetMinLevel: mockGetMinLevel,
-    } as any);
+    mockSetMinLevel = jest.fn();
+    setCommonsLogLevelSink(mockSetMinLevel);
   });
 
   afterEach(() => {
+    setCommonsLogLevelSink(null);
     LoggingManager.shared.configure(previousConfig);
-    jest.restoreAllMocks();
   });
 
   test('LogLevel enum values match C-ABI integers', () => {

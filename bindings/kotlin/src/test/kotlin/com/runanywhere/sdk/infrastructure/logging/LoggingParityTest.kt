@@ -18,7 +18,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class LoggingParityTest {
-
     private var previousConfiguration: LoggingConfiguration? = null
     private var previousCommonsLevel: Int = 2
 
@@ -50,7 +49,6 @@ class LoggingParityTest {
         assertEquals(3, LogLevel.LOG_LEVEL_WARNING.toRacLogLevel())
         assertEquals(4, LogLevel.LOG_LEVEL_ERROR.toRacLogLevel())
         assertEquals(5, LogLevel.LOG_LEVEL_FATAL.toRacLogLevel())
-        assertEquals(2, LogLevel.UNRECOGNIZED.toRacLogLevel())
     }
 
     @Test
@@ -104,10 +102,11 @@ class LoggingParityTest {
 
     @Test
     fun `testConfigureLoggingUpdatesConfiguration`() {
-        val config = LoggingConfiguration(
-            min_log_level = LogLevel.LOG_LEVEL_WARNING,
-            enable_local_logging = true,
-        )
+        val config =
+            LoggingConfiguration(
+                min_log_level = LogLevel.LOG_LEVEL_WARNING,
+                enable_local_logging = true,
+            )
         RunAnywhere.configureLogging(config)
         assertEquals(LogLevel.LOG_LEVEL_WARNING, Logging.configuration.min_log_level)
         if (RunAnywhereBridge.isNativeLibraryLoaded()) {

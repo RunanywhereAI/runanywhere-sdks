@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   SDKLogger,
   LogLevel,
-  LOG_LEVEL_TO_RAC,
   toRacLogLevel,
   racLogLevelToProto,
 } from '../../../src/Foundation/SDKLogger.js';

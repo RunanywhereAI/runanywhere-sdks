@@ -14,10 +14,17 @@ import {
   getConfigurationForEnvironment,
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-import {
-  isNativeModuleAvailable,
-  requireNativeModule,
-} from '../../../native/NativeRunAnywhereCore';
+
+export type CommonsLogLevelSink = (level: LogLevel) => void;
+let _commonsLogLevelSink: CommonsLogLevelSink | null = null;
+
+/** Register a sink that receives C-ABI minimum log level changes. */
+export function setCommonsLogLevelSink(sink: CommonsLogLevelSink | null): void {
+  _commonsLogLevelSink = sink;
+  if (sink) {
+    sink(LoggingManager.shared.configuration.minLogLevel);
+  }
+}
 
 export interface LogEntry {
   level: LogLevel;
@@ -123,12 +130,11 @@ export class LoggingManager {
   }
 
   private syncCommonsLogLevel(level: LogLevel): void {
-    if (isNativeModuleAvailable()) {
+    if (_commonsLogLevelSink) {
       try {
-        const nativeModule = requireNativeModule();
-        void nativeModule.loggerSetMinLevel(level);
+        _commonsLogLevelSink(level);
       } catch {
-        // Native module not initialized or call failed
+        // Sink call failed
       }
     }
   }

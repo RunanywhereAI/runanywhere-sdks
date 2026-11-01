@@ -11,6 +11,11 @@ import { initializeNitroModulesGlobally } from '../native/NitroModulesGlobalInit
 import { ensureProtoTextEncoding } from '../services/ProtoWire';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+import {
+  LoggingManager,
+  LogLevel,
+  setCommonsLogLevelSink,
+} from '../Foundation/Logging';
 import { SDKConstants } from '../Foundation/Constants/SDKConstants';
 import {
   DEFAULT_BASE_URL,
@@ -350,6 +355,18 @@ async function initializeCore(options: InitializeOptions): Promise<void> {
         if (initialized === false) {
           throw SDKException.notInitialized('Native SDK initialization failed');
         }
+
+        LoggingManager.shared.applyEnvironmentConfiguration(environment);
+        setCommonsLogLevelSink((lvl: LogLevel) => {
+          if (isNativeModuleAvailable()) {
+            try {
+              const nativeModule = requireNativeModule();
+              void nativeModule.loggerSetMinLevel(lvl);
+            } catch {
+              // Native logger setup failure is non-fatal
+            }
+          }
+        });
 
         try {
           await native.loggerSetMinLevel(LoggingManager.shared.configuration.minLogLevel);

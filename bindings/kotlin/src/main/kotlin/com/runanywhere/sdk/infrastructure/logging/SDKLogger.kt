@@ -134,7 +134,7 @@ object Logging {
     var configuration: LoggingConfiguration
         get() = _configuration
         set(value) {
-            _configuration = value
+            configure(value)
         }
 
     /**
