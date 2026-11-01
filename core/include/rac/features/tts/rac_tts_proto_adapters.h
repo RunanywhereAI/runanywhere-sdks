@@ -30,9 +30,12 @@ class TTSSpeakResult;
 namespace rac::foundation {
 
 // Non-null output strings are owned and must be released with rac_free, including
-// the default language when language_code is empty. On failure with non-null out,
-// both string fields are null and all other fields retain their default values.
-bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out);
+// the default language when language_code is empty. Returns RAC_ERROR_NULL_POINTER
+// for a null out and RAC_ERROR_OUT_OF_MEMORY when a string copy fails. On failure
+// with non-null out, both string fields are null and all other fields retain their
+// default values.
+rac_result_t rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in,
+                                        rac_tts_options_t* out);
 
 // rac_tts_phoneme_timestamp_to_proto / _from_proto deleted along with
 // TTSPhonemeTimestamp (idl/tts_options.proto) -- never produced, wrong
