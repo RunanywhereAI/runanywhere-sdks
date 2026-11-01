@@ -126,6 +126,8 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     memoryRequirementBytes: 10_929_816_419,
+    // The V79 bundle requires QAIRT 2.48; Android currently ships 2.47.
+    pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
   },
   {
     id: 'gemma4_e2b',
