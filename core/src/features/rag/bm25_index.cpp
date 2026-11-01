@@ -194,11 +194,15 @@ size_t BM25Index::size() const {
 // =============================================================================
 
 std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& query,
-                                                             size_t top_k) const {
+                                                             size_t top_k, float k1,
+                                                             float b) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (total_chunks_ == 0)
         return {};
+
+    const double effective_k1 = k1 > 0.0f ? static_cast<double>(k1) : static_cast<double>(kDefaultK1_);
+    const double effective_b = b >= 0.0f ? static_cast<double>(b) : static_cast<double>(kDefaultB_);
 
     auto query_tokens = tokenize(query);
     if (query_tokens.empty())
@@ -251,10 +255,10 @@ std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& 
             double tf = static_cast<double>(term_it->second);
 
             // BM25 term score
-            double numerator = tf * (static_cast<double>(k1_) + 1.0);
-            double denominator = tf + static_cast<double>(k1_) *
-                                          (1.0 - static_cast<double>(b_) +
-                                           static_cast<double>(b_) * doc_len / avg_chunk_length_);
+            double numerator = tf * (effective_k1 + 1.0);
+            double denominator = tf + effective_k1 *
+                                          (1.0 - effective_b +
+                                           effective_b * doc_len / avg_chunk_length_);
 
             score += idf * (numerator / denominator);
         }

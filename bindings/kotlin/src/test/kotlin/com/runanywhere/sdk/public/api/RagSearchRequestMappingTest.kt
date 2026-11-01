@@ -17,6 +17,7 @@ import ai.runanywhere.proto.v1.RAGRetrievalOptions
 import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGSearchResponse
 import ai.runanywhere.proto.v1.RAGSearchResult
+import ai.runanywhere.proto.v1.VectorStore
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -36,6 +37,29 @@ class RagSearchRequestMappingTest {
         assertEquals("where is rag", decoded.query)
         assertEquals(3, decoded.retrieval?.top_k)
         assertEquals(false, decoded.retrieval?.enable_multi_query)
+    }
+
+    @Test
+    fun queryProtoCarriesBm25RrfAndVectorStoreOverrides() {
+        val proto =
+            ragQueryProto(
+                question = "where is rag",
+                config = RagConfig(),
+                options =
+                    RagQueryOptions(
+                        retrieval =
+                            RagRetrievalOptions(
+                                bm25K1 = 1.5f,
+                                bm25B = 0.8f,
+                                rrfK = 30,
+                                vectorStore = RagVectorStore.USEARCH,
+                            ),
+                    ),
+            )
+        assertEquals(1.5f, proto.retrieval?.bm25_k1)
+        assertEquals(0.8f, proto.retrieval?.bm25_b)
+        assertEquals(30, proto.retrieval?.rrf_k)
+        assertEquals(VectorStore.VECTOR_STORE_USEARCH, proto.retrieval?.vector_store)
     }
 
     @Test

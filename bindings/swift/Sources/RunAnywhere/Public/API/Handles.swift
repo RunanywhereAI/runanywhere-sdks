@@ -316,20 +316,41 @@ public enum StructuredEnforcementMode: Sendable, Equatable {
     case repair
 }
 
+/// Vector store backing RAG retrieval. Only the in-process store is available on-device.
+public enum RagVectorStore: Sendable, Equatable {
+    /// In-process HNSW index.
+    case usearch
+}
+
 /// Retrieval + generation options for one RAG query.
 public struct RagQueryOptions: Sendable {
     public var retrievalTopK: Int?
     public var similarityThreshold: Float?
     public var generation: LlmOptions?
+    /// BM25 term-frequency saturation; finite and `> 0` (0 is rejected). Unset uses the session default.
+    public var bm25K1: Float?
+    /// BM25 document-length normalization in `0...1`. Unset uses the session default.
+    public var bm25B: Float?
+    /// Reciprocal-rank-fusion constant, `> 0` (0 is rejected). Unset uses the session default.
+    public var rrfK: Int?
+    public var vectorStore: RagVectorStore?
 
     public init(
         retrievalTopK: Int? = nil,
         similarityThreshold: Float? = nil,
-        generation: LlmOptions? = nil
+        generation: LlmOptions? = nil,
+        bm25K1: Float? = nil,
+        bm25B: Float? = nil,
+        rrfK: Int? = nil,
+        vectorStore: RagVectorStore? = nil
     ) {
         self.retrievalTopK = retrievalTopK
         self.similarityThreshold = similarityThreshold
         self.generation = generation
+        self.bm25K1 = bm25K1
+        self.bm25B = bm25B
+        self.rrfK = rrfK
+        self.vectorStore = vectorStore
     }
 }
 

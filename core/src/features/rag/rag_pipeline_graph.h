@@ -84,6 +84,11 @@ struct RAGGraphInputs {
     // are eligible. Empty = whole index.
     std::string scope_prefix;
 
+    // BM25 and RRF retrieval tuning parameters.
+    float bm25_k1 = 1.2f;
+    float bm25_b = 0.75f;
+    int32_t rrf_k = 60;
+
     // Borrowed from RAGBackend. Checked between phases and by the streaming
     // token callback in addition to the provider's native cancel hook.
     const std::atomic<bool>* cancel_requested = nullptr;

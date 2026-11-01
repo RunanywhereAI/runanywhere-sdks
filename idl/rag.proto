@@ -22,6 +22,12 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
+enum VectorStore {
+    VECTOR_STORE_UNSPECIFIED = 0;
+    VECTOR_STORE_USEARCH     = 1;  // in-process HNSW
+    VECTOR_STORE_PGVECTOR    = 2;  // server deployments only, no on-device path
+}
+
 message RAGConfiguration {
     string embedding_model_id    = 1;
     string llm_model_id          = 2;
@@ -56,6 +62,16 @@ message RAGConfiguration {
 
     // Pointwise rerank of the retrieved chunks using the session LLM.
     bool rerank_results = 11;
+
+    // Vector store backend selection (e.g. VECTOR_STORE_USEARCH).
+    optional VectorStore vector_store = 12;
+
+    // BM25 term-saturation and length-normalization parameters.
+    optional float bm25_k1 = 13;
+    optional float bm25_b = 14;
+
+    // Reciprocal-rank-fusion smoothing constant.
+    optional int32 rrf_k = 15;
 }
 
 message RAGDocument {
@@ -106,6 +122,12 @@ message RAGRetrievalOptions {
 
     // Keep only chunks whose document id starts with this prefix.
     optional string scope_prefix = 5;
+
+    // Optional per-query retrieval overrides for BM25, RRF, and vector store.
+    optional float bm25_k1 = 6;
+    optional float bm25_b = 7;
+    optional int32 rrf_k = 8;
+    optional VectorStore vector_store = 9;
 }
 
 message RAGQueryOptions {

@@ -258,10 +258,23 @@ public data class TurnHandlingOptions(
     val interruption: Interruption = Interruption(),
 )
 
+/** Vector store backing RAG retrieval. Only the in-process store is available on-device. */
+public enum class RagVectorStore {
+    /** In-process HNSW index. */
+    USEARCH,
+}
+
 /** Per-query retrieval overrides for `RagSession.query`/`queryStream`. */
 public data class RagRetrievalOptions(
     val topK: Int? = null,
     val similarityThreshold: Float? = null,
+    /** BM25 term-frequency saturation; finite and `> 0` (0 is rejected). Null uses the session default. */
+    val bm25K1: Float? = null,
+    /** BM25 document-length normalization in `0..1`. Null uses the session default. */
+    val bm25B: Float? = null,
+    /** Reciprocal-rank-fusion constant, `> 0` (0 is rejected). Null uses the session default. */
+    val rrfK: Int? = null,
+    val vectorStore: RagVectorStore? = null,
 )
 
 /** Per-query knobs for `RagSession.query`/`queryStream`. */
