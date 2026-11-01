@@ -11,6 +11,7 @@ import {
   ModelRegistryStatus,
   type InferenceFramework,
   type ModelInfo,
+  type ModelLoadResult,
 } from '@runanywhere/proto-ts/model_types';
 import { DownloadState, type DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import { SDKException } from '../../../Foundation/SDKException.js';
@@ -182,6 +183,7 @@ function toLoadedModel(
   category: ModelCategory,
   resolved: ResolvedLoadOptions,
   framework?: InferenceFramework,
+  result?: ModelLoadResult | null,
 ): LoadedModel {
   return {
     id,
@@ -191,7 +193,8 @@ function toLoadedModel(
     actualDevice: Runtime.active === 'webgpu' ? 'gpu' : 'cpu',
     runtimeVersion: undefined,
     abiVersion: undefined,
-    fallbackReason: Runtime.degradedReason ?? undefined,
+    fallbackReason:
+      result?.fallbackReason ?? result?.warnings?.[0] ?? Runtime.degradedReason ?? undefined,
     close(): Promise<void> {
       return models.unload(id);
     },
@@ -412,7 +415,7 @@ export const models = {
         ? new SDKException(result.error)
         : SDKException.processingFailed(`Loading '${id}' failed.`);
     }
-    return toLoadedModel(id, result.category, resolved, result.framework);
+    return toLoadedModel(id, result.category, resolved, result.framework, result);
   },
 
   /**
@@ -561,6 +564,7 @@ function toProgressEvent(progress: DownloadProgress, operationId: string, sequen
 /** Test seam for download progress mapping and platform probes. */
 export const __testing__ = {
   toProgressEvent,
+  toLoadedModel,
   probeAvailableRamBytes,
   probeAvailableStorageBytes,
   KNOWN_EXHAUSTED_BYTES_SENTINEL,
