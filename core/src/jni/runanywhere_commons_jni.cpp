@@ -58,6 +58,7 @@
 #endif
 
 // Include runanywhere-commons C API headers
+#include "directory_probe_internal.h"
 #include "request_cancellation_relay.h"
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
@@ -1315,10 +1316,11 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
         env->ExceptionClear();
         return RAC_ERROR_INTERNAL;
     }
-    // Kotlin returns null to signal "directory does not exist" per the C ABI
-    // contract; any other error is mapped to a structured Throwable above.
+    // Java's boolean existence/type probes also return false on stat errors.
+    // Confirm absence before mapping null to NOT_FOUND; access/I/O failures
+    // must remain inconclusive so orphan pruning preserves the download.
     if (result == nullptr) {
-        return RAC_ERROR_FILE_NOT_FOUND;
+        return rac::jni::classify_null_directory_listing(dir_path ? dir_path : "");
     }
 
     const jsize total = env->GetArrayLength(result);

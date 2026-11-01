@@ -98,6 +98,16 @@ set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 # subdirectory of the top-level project.
 include_directories(${CMAKE_CURRENT_LIST_DIR}/../src)
 
+# --- Kotlin JNI directory probe errors -------------------------------------
+# Java's null result must not turn a denied filesystem probe into NOT_FOUND.
+add_executable(test_jni_directory_probe test_jni_directory_probe.cpp)
+target_include_directories(test_jni_directory_probe PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../include
+)
+target_compile_features(test_jni_directory_probe PRIVATE cxx_std_20)
+add_test(NAME jni_directory_probe_tests COMMAND test_jni_directory_probe)
+set_tests_properties(jni_directory_probe_tests PROPERTIES SKIP_RETURN_CODE 77)
+
 # --- Kotlin JNI request cancellation admission ----------------------
 # Header-only relay used by request-scoped VLM/RAG JNI wrappers. Covers
 # cancel-before-entry ownership, backend-publication retry, and the completion

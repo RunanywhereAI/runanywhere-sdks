@@ -357,11 +357,11 @@ object CppBridgePlatformAdapter {
     /**
      * Enumerate the entries in [dirPath] for the commons platform adapter.
      *
-     * Returns null when the directory does not exist (mapped to
-     * RAC_ERROR_FILE_NOT_FOUND in the JNI layer). Other failures propagate
-     * to JNI, which logs the exception and returns RAC_ERROR_INTERNAL so
-     * commons preserves the registered download path. A successful empty
-     * listing remains an empty array.
+     * Returns null when Java's existence/type probe does not find a directory.
+     * JNI confirms missing/non-directory paths with an error-aware native probe
+     * before returning RAC_ERROR_FILE_NOT_FOUND; denied or inconclusive probes
+     * preserve the registered download path. Thrown failures propagate to JNI
+     * as RAC_ERROR_INTERNAL. A successful empty listing remains an empty array.
      *
      * Truncation contract (per `rac_directory_entry_t::name`): entries
      * whose UTF-8 byte length plus the trailing NUL exceed
@@ -381,7 +381,7 @@ object CppBridgePlatformAdapter {
      */
     internal fun readDirectoryEntries(dir: File): Array<RacDirectoryEntry>? {
         if (!dir.exists() || !dir.isDirectory) {
-            // Mirror the C ABI contract: null signals RAC_ERROR_FILE_NOT_FOUND.
+            // JNI rechecks null because Java can hide stat errors behind false.
             return null
         }
         // A null listing means I/O failure, not a successful empty directory.

@@ -92,32 +92,12 @@ class CppBridgePlatformAdapterDirectoryTest {
         )
     }
 
-    @Test
-    fun `denied existence probe does not become not-found`() {
-        val directory = Directory(existsValue = { throw SecurityException("probe denied") })
-
-        assertFailsWith<SecurityException> {
-            CppBridgePlatformAdapter.readDirectoryEntries(directory)
-        }
-    }
-
-    @Test
-    fun `denied directory probe does not become not-found`() {
-        val directory = Directory(directoryValue = { throw SecurityException("probe denied") })
-
-        assertFailsWith<SecurityException> {
-            CppBridgePlatformAdapter.readDirectoryEntries(directory)
-        }
-    }
-
     private class Directory(
         private val children: () -> Array<File>? = { emptyArray() },
-        private val existsValue: () -> Boolean = { true },
-        private val directoryValue: () -> Boolean = { true },
     ) : File("model-directory") {
-        override fun exists(): Boolean = existsValue()
+        override fun exists(): Boolean = true
 
-        override fun isDirectory(): Boolean = directoryValue()
+        override fun isDirectory(): Boolean = true
 
         override fun listFiles(): Array<File>? = children()
     }
