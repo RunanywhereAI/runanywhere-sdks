@@ -104,8 +104,26 @@ message RAGRetrievalOptions {
         (runanywhere.v1.rac_max) = 8
     ];
 
+    // BM25 parameters for hybrid retrieval (dense + sparse fusion via RRF).
+    // k1 controls term frequency saturation; b controls length normalization (0 = none, 1 = full).
+    optional float bm25_k1 = 6 [
+        (runanywhere.v1.rac_default) = "1.2",
+        (runanywhere.v1.rac_min_float) = 0.0
+    ];
+    optional float bm25_b = 7 [
+        (runanywhere.v1.rac_default) = "0.75",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
+
+    // RRF fusion constant for combining dense and sparse scores.
+    optional int32 rrf_k = 8 [
+        (runanywhere.v1.rac_default) = "60",
+        (runanywhere.v1.rac_min) = 1
+    ];
+
     // Keep only chunks whose document id starts with this prefix.
-    optional string scope_prefix = 5;
+    optional string scope_prefix = 9;
 }
 
 message RAGQueryOptions {
