@@ -24,6 +24,7 @@ import com.margelo.nitro.NitroModules
 import com.runanywhere.sdk.generated.RADefaults
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
@@ -710,6 +711,8 @@ object PlatformAdapterBridge {
      *         is not a directory. Oversized names (UTF-8 + NUL > 512) are
      *         filtered out with a single WARN summary; the C++ layer enforces
      *         the same contract defensively.
+     * @throws IOException if an existing directory cannot be enumerated; the
+     *         JNI caller reports any thrown failure as RAC_ERROR_INTERNAL.
      */
     @JvmStatic
     fun fileListDirectory(dirPath: String): Array<RacDirectoryEntry>? {
@@ -717,7 +720,8 @@ object PlatformAdapterBridge {
         if (!dir.exists() || !dir.isDirectory) {
             return null
         }
-        val children = dir.listFiles() ?: return emptyArray()
+        // A null listing means I/O failure, not a successful empty directory.
+        val children = dir.listFiles() ?: throw IOException("Unable to enumerate directory '$dirPath'")
 
         var skipped = 0
         val entries = ArrayList<RacDirectoryEntry>(children.size)
