@@ -31,7 +31,8 @@ defaults and best-effort failure behavior follow Swift's `models.refresh` implem
 All SDKs call `rac_model_registry_refresh_proto` with serialized
 `ModelRegistryRefreshRequest` bytes. Some bindings use generated protobuf codecs; React Native
 hand-encodes the wire bytes because its native bridge does not link the protobuf runtime. None
-should return the refreshed model rows as the result of this operation. The current commons
-refresh implementation reports `prune_orphans` as unsupported and leaves missing-file rows
-unchanged; adapters log the returned warning where available. Python's local catalog remains
+should return the refreshed model rows as the result of this operation. With `prune_orphans`,
+commons clears download state for models whose recorded path no longer exists (never deleting
+files) and returns a warning only when the platform adapter lacks `file_exists`; Web forces it
+off because native probes see only MEMFS, not OPFS. Python's local catalog remains
 process-local; refresh reconciles the shared native registry and does not rebuild that catalog.

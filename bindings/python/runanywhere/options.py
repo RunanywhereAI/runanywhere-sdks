@@ -181,8 +181,9 @@ class VadOptions:
 class ModelRefreshOptions:
     """Controls reconciliation of the native model registry.
 
-    The current native refresh API reports orphan pruning as unsupported; setting
-    ``prune_orphans`` to ``True`` does not clear missing-file rows.
+    Setting ``prune_orphans`` to ``True`` clears download state for models whose
+    recorded path no longer exists. It never deletes files, and only warns if the
+    platform adapter lacks ``file_exists``.
     """
 
     rescan_local: bool = True

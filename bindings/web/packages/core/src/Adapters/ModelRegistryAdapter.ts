@@ -10,8 +10,8 @@
  * callback installed at SDK init); `rescan_local` uses the platform's browser
  * filesystem callback.
  *
- * Native orphan pruning is being added in #961. This adapter always
- * disables it on Web, including explicit opt-in, because native probes
+ * Native orphan pruning clears download state for vanished paths, but this
+ * adapter always disables it on Web, including explicit opt-in, because native probes
  * see only MEMFS while healthy downloads may exist solely in OPFS.
  * SDKCore's asynchronous OPFS hydration remains necessary to relink
  * persistent downloads and reconcile missing or incomplete files.
