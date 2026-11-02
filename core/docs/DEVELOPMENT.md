@@ -119,7 +119,7 @@ Platform SDKs must provide a `rac_platform_adapter_t` with file I/O, secure stor
 | nlohmann/json | JSON parsing |
 | libarchive | Model archive extraction |
 
-Exact version pins live in the `VERSIONS` file and the repo-root `VERSION` file (currently **0.20.11**).
+Exact version pins live in the `VERSIONS` file and the repo-root `VERSION` file (currently **0.20.37**).
 
 Load versions in scripts:
 

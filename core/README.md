@@ -4,7 +4,7 @@
 
 Commons provides the shared infrastructure, engine plugin registry, model lifecycle, download orchestration, and ML backend integrations that power on-device AI across iOS, Android, macOS, Linux, Windows, and WebAssembly.
 
-**Version:** tracks the repo `VERSION` file (currently **0.20.11**).
+**Version:** tracks the repo `VERSION` file (currently **0.20.37**).
 
 ## What commons provides
 

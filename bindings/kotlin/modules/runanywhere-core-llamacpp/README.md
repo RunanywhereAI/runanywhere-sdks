@@ -12,8 +12,8 @@ Requires the core SDK. Add both to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.37")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.37")
 }
 ```
 
