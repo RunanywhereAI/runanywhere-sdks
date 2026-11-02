@@ -52,9 +52,11 @@ extern "C" {
  * bit in both its manifest and its metadata, and registers a wrapper struct whose
  * first member is the unchanged manifest. A host reads the wrapper only after
  * seeing the bit, then validates its size, version and operation table. Use a
- * wrapper when the addition is optional and every existing layout stays intact;
- * use a new vtable slot plus a bump when an existing struct, ops table or slot
- * changes layout, or when the host needs the new entry point from every engine.
+ * wrapper when the addition is optional and every existing layout stays intact.
+ * Bump (per the rules above) when an existing struct, ops table or slot changes
+ * layout; that does not by itself need a new vtable slot. Add a new slot
+ * (promoting a reserved one, with a bump) only for a new primitive or an entry
+ * point every engine must provide.
  *
  * Version history:
  *   1u — initial release. 8 primitive slots + 10 reserved slots.
