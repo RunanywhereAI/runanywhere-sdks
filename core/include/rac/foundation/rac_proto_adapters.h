@@ -185,10 +185,10 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
 rac_error_category_t rac_proto_to_category(::runanywhere::v1::ErrorCategory category);
 
 // Map a rac_result_t error code directly to the proto ErrorCategory bucket
-// (canonical -100..-329 ranges). Non-negative codes -> UNSPECIFIED; any other
-// negative code -> INTERNAL. Single source of truth for the duplicated mappers
-// that previously lived (and drifted on out-of-range codes) in
-// rac_error_proto.cpp and event_publisher.cpp.
+// (canonical 100-999 ranges, 18 buckets). Non-negative codes -> UNSPECIFIED;
+// any unmapped negative code -> UNSPECIFIED. Single source of truth for the
+// duplicated mappers that previously lived (and drifted on out-of-range codes)
+// in rac_error_proto.cpp and event_publisher.cpp.
 ::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code);
 
 // Populate a `SDKError` submessage in place from a rac_result_t error code:
