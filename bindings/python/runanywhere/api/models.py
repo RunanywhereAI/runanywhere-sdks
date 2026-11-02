@@ -70,7 +70,7 @@ class Models:
         This best-effort operation is a no-op before initialization and logs refresh
         failures instead of raising, except that a native extension missing the refresh
         ABI raises ``SDKException`` with ``NOT_IMPLEMENTED``. ``prune_orphans`` clears
-        download state for vanished paths without deleting files.
+        download state for vanished or unfinished downloads without deleting files.
         Protobuf-backed refresh requires the optional ``runanywhere[rag]`` extra.
         """
         refresh_model_registry(options or ModelRefreshOptions())

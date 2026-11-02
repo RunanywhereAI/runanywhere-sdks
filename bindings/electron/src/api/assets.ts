@@ -147,8 +147,9 @@ export interface RefreshOptions {
   /** Rescan the model store for artifacts on disk. On by default. */
   rescanLocal?: boolean;
   /**
-   * Clear download state for models whose recorded path no longer exists. Never deletes
-   * files; warns only if the platform adapter lacks `file_exists`. Off by default.
+   * Clear download state for models whose recorded path no longer exists, or still exists
+   * but holds no finished artifact or fails the completeness check. Never deletes files;
+   * warns if the platform adapter lacks `file_exists`. Off by default.
    */
   pruneOrphans?: boolean;
 }
@@ -191,7 +192,7 @@ export interface ModelsNamespace {
   /**
    * Re-read the registry and rescan the model store for artifacts that arrived
    * outside the SDK. With `pruneOrphans`, also clear download state for models
-   * whose files have vanished.
+   * whose files have vanished or are unfinished.
    */
   refresh(options?: RefreshOptions): Promise<void>;
   /**
