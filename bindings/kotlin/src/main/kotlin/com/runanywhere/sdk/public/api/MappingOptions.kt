@@ -49,7 +49,7 @@ internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLM
         max_output_tokens = maxOutputTokens,
         temperature = temperature,
         top_p = topP,
-        top_k = topK ?: 0,
+        top_k = topK ?: LLMGenerationOptions.defaults().top_k ?: 40,
         // Left absent when unset: an explicit 0.0 reads as "min-p sampling off",
         // while absent lets commons apply the IDL default (0.05).
         min_p = minP,
