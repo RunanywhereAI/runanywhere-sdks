@@ -453,6 +453,91 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     expect(owner.loadRequests).toHaveLength(loadPath === 'retry' ? 2 : 1);
   });
 
+  it.each([
+    { from: 'onnx' as const, to: 'llamacpp' as const, toPath: 'worker' },
+    { from: 'onnx' as const, to: 'llamacpp' as const, toPath: 'sync' },
+    { from: 'llamacpp' as const, to: 'onnx' as const, toPath: 'async' },
+  ])('releases the previous $from worker copy when a $toPath load moves the model', async ({
+    from, to, toPath,
+  }) => {
+    const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+    const onnx = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX });
+    registerBackends(llama.module, onnx.module);
+    const category = ModelCategory.MODEL_CATEGORY_EMBEDDING;
+    const frameworkOf = (id: 'llamacpp' | 'onnx') => (id === 'onnx'
+      ? InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+      : InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP);
+    installRegistrySnapshots([modelSnapshot('moving', category, frameworkOf(from))]);
+    vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+    const workerHost = (id: 'llamacpp' | 'onnx') => ({
+      loadModel: vi.fn(async () => ({ resultBytes: ModelLoadResult.encode(ModelLoadResult.create({
+        modelId: 'moving', category, framework: frameworkOf(id),
+      })).finish() })),
+      unloadModel: vi.fn(async () => undefined),
+    });
+    const hosts = { llamacpp: workerHost('llamacpp'), onnx: workerHost('onnx') };
+    const active = new Set<'llamacpp' | 'onnx'>([from]);
+    vi.mocked(getActiveBackendWorkerHost).mockImplementation((id = 'llamacpp') => (
+      active.has(id) ? hosts[id] as unknown as BackendWorkerHost : null
+    ));
+    await WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+      modelId: 'moving', category, framework: frameworkOf(from),
+    }));
+    expect(getBackendWorkerOwner('moving')).toBe(from);
+    if (toPath === 'worker') active.add(to);
+
+    const request = ModelLoadRequest.create({
+      modelId: 'moving', category, framework: frameworkOf(to), forceReload: true,
+    });
+    const result = toPath === 'sync'
+      ? WebModelLifecycle.loadModel(request)
+      : await WebModelLifecycle.loadModelAsync(request);
+    await Promise.resolve();
+
+    expect(result?.framework).toBe(frameworkOf(to));
+    expect(hosts[from].unloadModel).toHaveBeenCalledTimes(1);
+    const [modality, payload] = hosts[from].unloadModel.mock.calls[0] as unknown as [
+      string, { requestBytes: Uint8Array },
+    ];
+    expect(modality).toBe(from === 'onnx' ? 'stt' : 'llm');
+    expect(ModelUnloadRequest.decode(payload.requestBytes)).toMatchObject({
+      modelId: 'moving', unloadAll: false,
+    });
+    expect(getBackendWorkerOwner('moving')).toBe(toPath === 'worker' ? to : null);
+  });
+
+  it('releases the main-thread copy when a model moves into a BackendWorker', async () => {
+    const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+    const onnx = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX });
+    registerBackends(llama.module, onnx.module);
+    const category = ModelCategory.MODEL_CATEGORY_EMBEDDING;
+    installRegistrySnapshots([
+      modelSnapshot('moving', category, InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP),
+    ]);
+    vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+    vi.mocked(getActiveBackendWorkerHost).mockReturnValue(null);
+    await WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+      modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    }));
+    expect(llama.loadedModelIds()).toEqual(['moving']);
+
+    const host = {
+      loadModel: vi.fn(async () => ({ resultBytes: ModelLoadResult.encode(ModelLoadResult.create({
+        modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      })).finish() })),
+    } as unknown as BackendWorkerHost;
+    vi.mocked(getActiveBackendWorkerHost).mockImplementation((id) => id === 'onnx' ? host : null);
+    await WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+      modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    }));
+
+    expect(llama.unloadRequests).toEqual([
+      expect.objectContaining({ modelId: 'moving', unloadAll: false }),
+    ]);
+    expect(llama.loadedModelIds()).toEqual([]);
+    expect(getBackendWorkerOwner('moving')).toBe('onnx');
+  });
+
   it('routes framework-scoped current-model queries to the owning WASM', () => {
     const llama = fakeLifecycleRuntime([
       { id: 'llama-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },

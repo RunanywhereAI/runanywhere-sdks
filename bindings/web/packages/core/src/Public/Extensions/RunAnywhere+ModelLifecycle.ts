@@ -43,6 +43,7 @@ import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import type { BackendWorkerModality } from '../../runtime/BackendWorkerProtocol.js';
 import {
   clearModelOwnedByBackendWorker,
+  getBackendWorkerOwner,
   isModelOwnedByBackendWorker,
   listBackendWorkerOwnedModels,
   markModelOwnedByBackendWorker,
@@ -289,6 +290,39 @@ function currentModelFromBackendWorker(
   return null;
 }
 
+/**
+ * Release the copy of `modelId` held by its previous owner after it loaded
+ * successfully elsewhere. `nextBackendId` names the BackendWorker that now
+ * owns it (undefined = main thread), and `nextModule` the main-thread WASM
+ * that now owns it (undefined = a worker). Ownership bookkeeping is updated
+ * synchronously so callers can record the new owner immediately afterwards.
+ */
+async function releasePreviousModelOwner(
+  modelId: string,
+  nextBackendId?: 'llamacpp' | 'onnx',
+  nextModule?: EmscriptenRunanywhereModule,
+): Promise<void> {
+  if (!modelId) return;
+  const request: ModelUnloadRequest = { modelId, unloadAll: false };
+  const workerOwner = getBackendWorkerOwner(modelId);
+  const previousModule = workerOwner ? null : getModuleForModel(modelId);
+  if (workerOwner === nextBackendId || (!workerOwner && previousModule === nextModule)) return;
+  if (workerOwner) clearModelOwnedByBackendWorker(modelId, workerOwner);
+  if (previousModule) recordModelLifecycle(modelId, previousModule, false);
+  // Best effort: the new load already succeeded, so a failed release must not fail it.
+  try {
+    if (workerOwner) {
+      const host = getActiveBackendWorkerHost(workerOwner);
+      const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
+      await host?.unloadModel(workerOwner === 'onnx' ? 'stt' : 'llm', { requestBytes });
+    } else if (previousModule) {
+      await ModelLifecycleAdapter.fromModule(
+        previousModule as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
+      ).unloadAsync(request);
+    }
+  } catch { /* ignore */ }
+}
+
 async function loadModelViaBackendWorker(
   request: ModelLoadRequest,
   model: ModelInfo | null,
@@ -333,6 +367,7 @@ async function loadModelViaBackendWorker(
   }
   const result = ModelLoadResultCodec.decode(response.resultBytes);
   if (!result.error) {
+    await releasePreviousModelOwner(request.modelId, backendId);
     markModelOwnedByBackendWorker(
       request.modelId,
       backendId,
@@ -610,8 +645,11 @@ export const WebModelLifecycle = {
     const { adapter } = selectModelLoadRoute(request, snapshot);
     const result = adapter.load(request);
     if (result && !result.error) {
-      clearModelOwnedByBackendWorker(request.modelId, 'llamacpp');
-      clearModelOwnedByBackendWorker(request.modelId, 'onnx');
+      void releasePreviousModelOwner(
+        request.modelId,
+        undefined,
+        lifecycleModuleAsEmscripten(adapter),
+      );
       recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
     }
     return result;
@@ -721,8 +759,11 @@ export const WebModelLifecycle = {
 
       const result = await adapter.loadAsync(request);
       if (result && !result.error) {
-        clearModelOwnedByBackendWorker(request.modelId, 'llamacpp');
-        clearModelOwnedByBackendWorker(request.modelId, 'onnx');
+        await releasePreviousModelOwner(
+          request.modelId,
+          undefined,
+          lifecycleModuleAsEmscripten(adapter),
+        );
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
       }
       return result;
@@ -752,8 +793,11 @@ export const WebModelLifecycle = {
       if (workerResult) return workerResult;
       const result = await retryAdapter.loadAsync(request);
       if (result && !result.error) {
-        clearModelOwnedByBackendWorker(request.modelId, 'llamacpp');
-        clearModelOwnedByBackendWorker(request.modelId, 'onnx');
+        await releasePreviousModelOwner(
+          request.modelId,
+          undefined,
+          lifecycleModuleAsEmscripten(retryAdapter),
+        );
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(retryAdapter), true);
       }
       return result;
