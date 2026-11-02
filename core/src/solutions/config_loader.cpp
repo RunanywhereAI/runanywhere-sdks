@@ -112,7 +112,6 @@ class YamlParser {
             size_t last_token_pos = 0;
             const size_t first_token_pos = line.find_first_not_of(" \t");
             bool after_ws = true;
-<<<<<<< HEAD
             bool escape_next = false;
             for (size_t i = 0; i < line.size(); ++i) {
                 const char c = line[i];
@@ -121,10 +120,6 @@ class YamlParser {
                     escape_next = false;
                     continue;
                 }
-=======
-            for (size_t i = 0; i < line.size(); ++i) {
-                const char c = line[i];
->>>>>>> origin/main
                 if (i > 0) {
                     const char prev = line[i - 1];
                     after_ws = prev == ' ' || prev == '\t';
@@ -143,16 +138,6 @@ class YamlParser {
                     clean.push_back(line[++i]);
                     continue;
                 }
-<<<<<<< HEAD
-                if (!in_dq && c == '"') {
-                    if (in_dq || can_open)
-                        in_dq = !in_dq;
-                    clean.push_back(c);
-                    continue;
-                }
-                if (in_dq && c == '\\') {
-                    escape_next = true;
-=======
                 if (!in_dq && c == '\'') {
                     if (in_sq || can_open)
                         in_sq = !in_sq;
@@ -162,7 +147,11 @@ class YamlParser {
                 if (!in_sq && c == '"') {
                     if (in_dq || can_open)
                         in_dq = !in_dq;
->>>>>>> origin/main
+                    clean.push_back(c);
+                    continue;
+                }
+                if (in_dq && c == '\\') {
+                    escape_next = true;
                     clean.push_back(c);
                     continue;
                 }
