@@ -122,6 +122,17 @@ from `reserved_slot_2` at the same binary offset) was revived as a first-class c
 reranking primitive in ABI v8. The original rerank slot (wire value 6, retired in ABI v4) stays
 permanently retired — the revived primitive is a new wire value, never reuse 6.
 
+Optional extensions without an ABI bump use a capability bit and a manifest wrapper. Capability
+bit 40 (`RAC_ENGINE_CAP_SEGMENTATION_CONFIDENCE_V1`, in
+`include/rac/features/segmentation/rac_segmentation_confidence.h`) reserves the
+`rac_segmentation_confidence_manifest_v1_t` wrapper for per-pixel segmentation confidence on
+ABI 14: the engine advertises the bit in its manifest and metadata, the unchanged manifest is the
+wrapper's first member, and `acquire_provider()` casts to the wrapper only when the bit is set,
+then checks its size, version and ops table. Older hosts ignore the unknown bit. Use a wrapper for
+an optional addition that leaves every existing layout unchanged; use a new vtable slot plus an
+ABI bump when an existing struct, ops table or slot changes layout or every engine must provide
+the entry point. Contract details: `docs/reference/segmentation-confidence-abi.md`.
+
 Primitive enum → vtable field → who implements it today:
 
 | Primitive | vtable field | Backends |
