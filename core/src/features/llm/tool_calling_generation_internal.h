@@ -9,6 +9,7 @@
 #include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/utf8_internal.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_llm_types.h"
@@ -460,7 +461,9 @@ inline bool run_generate_once(GenerationState& generation,
     }
 
     if (out_response) {
-        *out_response = raw.text ? raw.text : "";
+        // Both orchestration paths serialize model output into ToolParseRequest
+        // string fields before parsing; repair bytes before that strict boundary.
+        *out_response = rac::llm::sanitize_utf8(raw.text ? raw.text : "");
     }
 #if defined(RAC_HAVE_PROTOBUF)
     if (out_finish_reason) {
