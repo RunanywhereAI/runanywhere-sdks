@@ -245,6 +245,7 @@ export interface DiarizationOptions {
 /** Image-segmentation knobs. */
 export interface SegmentationOptions {
   includeDiagnosticImage?: boolean;
+  includeConfidence?: boolean;
 }
 
 /** When a user's turn is considered over, and whether the agent can be cut off. */
@@ -497,6 +498,12 @@ export interface SegmentationResult {
   classes: ClassInfo[];
   /** RGBA overlay, present only when `includeDiagnosticImage` was set. */
   diagnosticImage?: Uint8Array;
+  /**
+   * Chosen-class probabilities as one byte per source pixel (0..255),
+   * row-major like `classMask`, with `width * height` bytes when provided.
+   * Undefined when confidence was not requested.
+   */
+  confidenceMask?: Uint8Array;
 }
 
 /** A retrieved chunk with its similarity score. */
