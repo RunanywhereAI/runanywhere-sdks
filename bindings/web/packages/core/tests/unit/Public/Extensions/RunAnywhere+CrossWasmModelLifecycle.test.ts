@@ -36,6 +36,7 @@ import {
   markModelOwnedByBackendWorker,
 } from '../../../../src/runtime/BackendWorkerModelOwnership';
 import { ModelRegistryAdapter } from '../../../../src/Adapters/ModelRegistryAdapter';
+import { EmbeddingsProtoAdapter } from '../../../../src/Adapters/EmbeddingsProtoAdapter';
 import { setModelLoadFailureRecovery } from '../../../../src/Foundation/RuntimeConfig';
 
 vi.mock('../../../../src/runtime/BackendWorkerHost.js', async () => {
@@ -332,6 +333,37 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     expect(WebModelLifecycle.currentModel({
       category: snapshot.category, framework: actual, includeModelMetadata: false,
     })?.found).toBe(false);
+  });
+
+  it.each([
+    { backendId: 'llamacpp', actual: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      catalog: InferenceFramework.INFERENCE_FRAMEWORK_ONNX },
+    { backendId: 'onnx', actual: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      catalog: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP },
+  ])('reuses a main-thread $backendId embedding owner without a worker', async ({ actual, catalog }) => {
+    const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+    const onnx = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX });
+    registerBackends(llama.module, onnx.module);
+    const snapshot = modelSnapshot('portable-embedding', ModelCategory.MODEL_CATEGORY_EMBEDDING, catalog);
+    installRegistrySnapshots([snapshot]);
+    vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+    vi.spyOn(WebModelLifecycle, 'supportsNativeLifecycle').mockReturnValue(true);
+    vi.spyOn(EmbeddingsProtoAdapter.prototype, 'supportsLifecycleProtoEmbeddings').mockReturnValue(true);
+    const embedBatch = vi.spyOn(EmbeddingsProtoAdapter.prototype, 'embedBatchLifecycle')
+      .mockResolvedValue(EmbeddingsResult.create({ modelId: snapshot.id }));
+    await WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+      modelId: snapshot.id, category: snapshot.category, framework: actual,
+      backendPreferences: [actual, catalog],
+    }));
+    const owner = actual === InferenceFramework.INFERENCE_FRAMEWORK_ONNX ? onnx : llama;
+    const other = owner === onnx ? llama : onnx;
+    expect(owner.loadRequests).toHaveLength(1);
+
+    await expect(Embeddings.embed('hello', snapshot.id)).resolves.toMatchObject({ modelId: snapshot.id });
+    await expect(Embeddings.embed('again', snapshot.id)).resolves.toMatchObject({ modelId: snapshot.id });
+    expect(owner.loadRequests).toHaveLength(1);
+    expect(other.loadRequests).toEqual([]);
+    expect(embedBatch).toHaveBeenCalledTimes(2);
   });
 
   it.each([
