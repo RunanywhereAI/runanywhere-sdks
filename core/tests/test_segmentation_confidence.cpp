@@ -13,13 +13,16 @@
  * RAC_ERROR_ENCODING_ERROR and must release every output they allocated. The
  * proto path additionally rejects a diagnostic buffer that is present when it
  * was not requested (and absent when it was), plus malformed class masks and
- * class summaries.
+ * class summaries. The legacy rac_segmentation_segment path validates class-mask
+ * and diagnostic payloads and releases the entire result on failure.
  */
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -60,9 +63,21 @@ enum class PayloadMode {
     kConfidenceLong,
     kConfidenceZero,
     kInferenceFailed,
+    kInferenceThrows,
+    kAllocationThrows,
     kConfidenceInferenceFailed,
     kWrongDimensions,
+    kOverflowSizes,
     kShortClassMask,
+    kNullClassMask,
+    kLongClassMask,
+    kZeroClassMask,
+    kNullDiagnostic,
+    kShortDiagnostic,
+    kLongDiagnostic,
+    kZeroDiagnostic,
+    kUnexpectedDiagnosticPointer,
+    kUnexpectedDiagnosticSize,
     kMissingDiagnostic,
     kUnexpectedDiagnostic,
     kSummaryMismatch,
@@ -120,6 +135,7 @@ rac_result_t fake_segment(void* impl, const rac_segmentation_image_t* image,
 
     const bool diagnostic_requested =
         g_mode == PayloadMode::kUnexpectedDiagnostic ||
+        g_mode == PayloadMode::kUnexpectedDiagnosticPointer ||
         (g_mode != PayloadMode::kMissingDiagnostic && options->include_diagnostic_rgba == RAC_TRUE);
     if (diagnostic_requested) {
         out_result->diagnostic_rgba_size = kPixels * 4;
@@ -134,6 +150,48 @@ rac_result_t fake_segment(void* impl, const rac_segmentation_image_t* image,
             out_result->diagnostic_rgba[i * 4 + 1] = 20;
             out_result->diagnostic_rgba[i * 4 + 2] = 30;
             out_result->diagnostic_rgba[i * 4 + 3] = 255;
+        }
+    }
+
+    // Corrupt metadata only after initializing the allocated storage, so the
+    // fake engine itself never writes beyond a deliberately short payload.
+    switch (g_mode) {
+        case PayloadMode::kNullClassMask:
+            std::free(out_result->class_mask);
+            out_result->class_mask = nullptr;
+            break;
+        case PayloadMode::kLongClassMask:
+            out_result->class_mask_count = kPixels + 1;
+            break;
+        case PayloadMode::kZeroClassMask:
+            out_result->class_mask_count = 0;
+            break;
+        case PayloadMode::kNullDiagnostic:
+            std::free(out_result->diagnostic_rgba);
+            out_result->diagnostic_rgba = nullptr;
+            break;
+        case PayloadMode::kShortDiagnostic:
+            out_result->diagnostic_rgba_size = kPixels * 4 - 1;
+            break;
+        case PayloadMode::kLongDiagnostic:
+            out_result->diagnostic_rgba_size = kPixels * 4 + 1;
+            break;
+        case PayloadMode::kZeroDiagnostic:
+        case PayloadMode::kUnexpectedDiagnosticPointer:
+            out_result->diagnostic_rgba_size = 0;
+            break;
+        case PayloadMode::kUnexpectedDiagnosticSize:
+            out_result->diagnostic_rgba_size = kPixels * 4;
+            break;
+        default:
+            break;
+    }
+
+    if (g_mode == PayloadMode::kOverflowSizes) {
+        // Report huge dimensions without allocating or accessing a huge image.
+        out_result->class_mask_count = static_cast<size_t>(image->width) * image->height;
+        if (options->include_diagnostic_rgba == RAC_TRUE) {
+            out_result->diagnostic_rgba_size = out_result->class_mask_count * 4;
         }
     }
 
@@ -154,6 +212,14 @@ rac_result_t fake_segment(void* impl, const rac_segmentation_image_t* image,
         summary.fraction = 1.0f;
     }
     summary.label = strdup("fake");
+    out_result->model_id = strdup("fake-model");
+
+    if (g_mode == PayloadMode::kInferenceThrows) {
+        throw 1;
+    }
+    if (g_mode == PayloadMode::kAllocationThrows) {
+        throw std::bad_alloc{};
+    }
 
     if (g_mode == PayloadMode::kInferenceFailed) {
         return RAC_ERROR_INFERENCE_FAILED;
@@ -417,6 +483,109 @@ void run_entry_validation(rac_handle_t handle, const std::vector<uint8_t>& rgb) 
           "entry validation rejects before the engine is called");
 }
 
+void run_legacy_cases(rac_handle_t handle, const std::vector<uint8_t>& rgb) {
+    const auto image = make_image(rgb);
+    const auto empty_confidence = RAC_SEGMENTATION_CONFIDENCE_MASK_DEFAULT;
+    const int confidence_calls_before = g_confidence_calls;
+
+    auto expect_error = [&](PayloadMode mode, bool diagnostic, rac_result_t expected) {
+        g_mode = mode;
+        auto options = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+        options.include_diagnostic_rgba = diagnostic ? RAC_TRUE : RAC_FALSE;
+        rac_segmentation_result_t result{};
+        const auto rc = rac_segmentation_segment(handle, &image, &options, &result);
+        if (rc != expected) {
+            std::fprintf(stderr, "legacy mode %d: expected %d, got %d\n", static_cast<int>(mode),
+                         expected, rc);
+        }
+        check(rc == expected, "legacy path rejects malformed buffers/preserves engine errors");
+        check(outputs_cleared(result, empty_confidence) && result.model_id == nullptr &&
+                  result.processing_time_ms == 0,
+              "legacy failure frees and resets the entire result");
+        rac_segmentation_result_free(&result);
+        check(outputs_cleared(result, empty_confidence), "free after legacy failure is safe");
+    };
+
+    for (const auto mode :
+         {PayloadMode::kWrongDimensions, PayloadMode::kNullClassMask, PayloadMode::kShortClassMask,
+          PayloadMode::kLongClassMask, PayloadMode::kZeroClassMask}) {
+        expect_error(mode, false, RAC_ERROR_ENCODING_ERROR);
+        expect_error(mode, true, RAC_ERROR_ENCODING_ERROR);
+    }
+    for (const auto mode : {PayloadMode::kMissingDiagnostic, PayloadMode::kNullDiagnostic,
+                            PayloadMode::kShortDiagnostic, PayloadMode::kLongDiagnostic,
+                            PayloadMode::kZeroDiagnostic}) {
+        expect_error(mode, true, RAC_ERROR_ENCODING_ERROR);
+    }
+    for (const auto mode :
+         {PayloadMode::kUnexpectedDiagnostic, PayloadMode::kUnexpectedDiagnosticPointer,
+          PayloadMode::kUnexpectedDiagnosticSize}) {
+        expect_error(mode, false, RAC_ERROR_ENCODING_ERROR);
+    }
+    expect_error(PayloadMode::kInferenceFailed, false, RAC_ERROR_INFERENCE_FAILED);
+    expect_error(PayloadMode::kInferenceFailed, true, RAC_ERROR_INFERENCE_FAILED);
+
+    expect_error(PayloadMode::kInferenceThrows, true, RAC_ERROR_INFERENCE_FAILED);
+    expect_error(PayloadMode::kAllocationThrows, true, RAC_ERROR_OUT_OF_MEMORY);
+
+    g_mode = PayloadMode::kValid;
+    for (int option_mode = 0; option_mode < 3; ++option_mode) {
+        auto options = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+        options.include_diagnostic_rgba = option_mode == 1 ? RAC_TRUE : RAC_FALSE;
+        const auto* requested = option_mode == 2 ? nullptr : &options;
+        const auto defaults = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+        const bool diagnostic =
+            (requested ? requested : &defaults)->include_diagnostic_rgba == RAC_TRUE;
+        rac_segmentation_result_t result{};
+        check(rac_segmentation_segment(handle, &image, requested, &result) == RAC_SUCCESS,
+              "valid legacy call succeeds with explicit or default options");
+        bool mask_ok = result.class_mask && result.class_mask_count == kPixels &&
+                       result.width == kWidth && result.height == kHeight;
+        for (size_t i = 0; i < kPixels && mask_ok; ++i) {
+            mask_ok = result.class_mask[i] == i % 3U;
+        }
+        check(mask_ok, "legacy call preserves class-mask values and order");
+        if (diagnostic) {
+            bool rgba_ok = result.diagnostic_rgba && result.diagnostic_rgba_size == kPixels * 4;
+            for (size_t i = 0; i < kPixels && rgba_ok; ++i) {
+                rgba_ok = result.diagnostic_rgba[i * 4] == 10 &&
+                          result.diagnostic_rgba[i * 4 + 1] == 20 &&
+                          result.diagnostic_rgba[i * 4 + 2] == 30 &&
+                          result.diagnostic_rgba[i * 4 + 3] == 255;
+            }
+            check(rgba_ok, "legacy call preserves diagnostic bytes");
+        } else {
+            check(!result.diagnostic_rgba && result.diagnostic_rgba_size == 0,
+                  "legacy call omits unrequested diagnostics");
+        }
+        rac_segmentation_result_free(&result);
+        check(outputs_cleared(result, empty_confidence), "valid legacy result can be released");
+    }
+    if constexpr (sizeof(size_t) == sizeof(uint64_t)) {
+        // On 64-bit hosts, pixel counts can fit size_t while their byte sizes
+        // overflow. On 32-bit hosts the entry guard rejects these dimensions.
+        g_mode = PayloadMode::kOverflowSizes;
+        for (const bool diagnostic : {false, true}) {
+            auto huge_image = image;
+            huge_image.width = std::numeric_limits<uint32_t>::max();
+            huge_image.height = diagnostic ? std::numeric_limits<uint32_t>::max() / 2
+                                           : std::numeric_limits<uint32_t>::max();
+            auto options = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+            options.include_diagnostic_rgba = diagnostic ? RAC_TRUE : RAC_FALSE;
+            rac_segmentation_result_t result{};
+            check(rac_segmentation_segment(handle, &huge_image, &options, &result) ==
+                      RAC_ERROR_ENCODING_ERROR,
+                  "legacy path rejects overflowing class-mask/diagnostic byte sizes");
+            check(outputs_cleared(result, empty_confidence),
+                  "overflowing legacy result is released and reset");
+            rac_segmentation_result_free(&result);
+        }
+        g_mode = PayloadMode::kValid;
+    }
+    check(g_confidence_calls == confidence_calls_before,
+          "legacy entry point never invokes the confidence extension");
+}
+
 void run_direct_cases(rac_handle_t handle, const std::vector<uint8_t>& rgb) {
     const auto image = make_image(rgb);
     rac_segmentation_options_t options = RAC_SEGMENTATION_OPTIONS_DEFAULT;
@@ -603,6 +772,7 @@ int main() {
     if (legacy) {
         check(rac_segmentation_initialize(legacy, "fake-legacy-model") == RAC_SUCCESS,
               "legacy service initializes");
+        run_legacy_cases(legacy, rgb);
         rac_segmentation_result_t legacy_result{};
         check(rac_segmentation_segment(legacy, &image, &options, &legacy_result) == RAC_SUCCESS,
               "legacy segment succeeds without the confidence extension");
@@ -656,6 +826,7 @@ int main() {
     if (handle) {
         check(rac_segmentation_initialize(handle, "fake-confidence-model") == RAC_SUCCESS,
               "confidence service initializes");
+        run_legacy_cases(handle, rgb);
         run_entry_validation(handle, rgb);
         run_direct_cases(handle, rgb);
         (void)rac_segmentation_cleanup(handle);

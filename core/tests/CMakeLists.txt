@@ -580,11 +580,10 @@ target_compile_features(test_engine_vtable PRIVATE cxx_std_17)
 add_test(NAME engine_vtable_tests COMMAND test_engine_vtable)
 
 # --- Segmentation confidence payload validation ----------------------------
-# Backend-neutral fake engine: the direct and proto entry points must reject a
-# requested confidence mask that is null or not exactly width * height, release
-# both outputs, and keep the diagnostic direction checks. No ONNX model or
-# backend linkage is required; the proto half compiles only when protobuf is
-# enabled.
+# Backend-neutral fake engine: confidence direct/proto paths reject malformed
+# confidence masks. Legacy direct/proto paths validate class-mask and diagnostic
+# payloads; failures release allocated outputs. No ONNX model or backend linkage
+# is required; proto cases compile only when protobuf is enabled.
 add_executable(test_segmentation_confidence test_segmentation_confidence.cpp)
 target_include_directories(test_segmentation_confidence PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
