@@ -197,9 +197,10 @@ await RunAnywhere.models.refresh();
 ```
 
 Refresh rescans local files by default, does not fetch a remote catalog or prune missing files
-by default, and logs failures instead of rejecting. It resolves to `void`. The current native
-refresh API does not implement orphan pruning; setting `pruneOrphans: true` reports a warning
-and leaves missing-file rows unchanged.
+by default, and logs failures instead of rejecting. It resolves to `void`. Setting
+`pruneOrphans: true` clears download state for models whose recorded path no longer exists, or
+still exists but holds no finished artifact or fails the completeness check; it never deletes
+files, and warns if the platform adapter lacks `file_exists`.
 
 ## Example application
 

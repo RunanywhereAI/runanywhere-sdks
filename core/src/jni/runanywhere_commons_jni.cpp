@@ -515,8 +515,8 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
         jmethodID constructor = env->GetMethodID(exClass, "<init>", "(ILjava/lang/String;)V");
         jstring javaMessage = constructor != nullptr ? env->NewStringUTF(formatted) : nullptr;
         if (!env->ExceptionCheck() && javaMessage != nullptr) {
-            jobject exception = env->NewObject(exClass, constructor, static_cast<jint>(status),
-                                               javaMessage);
+            jobject exception =
+                env->NewObject(exClass, constructor, static_cast<jint>(status), javaMessage);
             if (!env->ExceptionCheck() && exception != nullptr) {
                 env->Throw(static_cast<jthrowable>(exception));
                 env->DeleteLocalRef(exception);
@@ -545,7 +545,7 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
 }
 
 static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buffer,
-                                            const char* operation) {
+                                           const char* operation) {
     if (buffer == nullptr) {
         return nullptr;
     }

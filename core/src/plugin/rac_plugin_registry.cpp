@@ -360,15 +360,30 @@ size_t rac_engine_manifest_count(void) noexcept {
     }
 }
 
+/**
+ * register_plugin: admit a plugin into the engine registry.
+ *
+ * Admits `vtable` under `vtable->metadata.name`. Refusal results: NULL/invalid
+ * input, ABI mismatch, failed capability_check or manifest validation, an incoming
+ * plugin with lower priority than the same-name active plugin
+ * (RAC_ERROR_PLUGIN_DUPLICATE), or a same-name plugin still
+ * serving a leased model (RAC_ERROR_PLUGIN_BUSY) — the busy path also removes
+ * the pending manifest of a genuinely-new replacement while leaving the active
+ * plugin's own manifest intact. An incoming plugin with equal or higher priority
+ * replaces the idle existing plugin. On success, dynamic registration returns the
+ * previous OS handle (if any) through `out_previous_handle` for the loader to close
+ * after the unload callback. Static registration has no output handle.
+ *
+ * C ABI boundary: noexcept. Propagating a C++ exception past this
+ * boundary is undefined behavior per ISO C++ [except.handle]/9 — every
+ * SDK (Swift, Kotlin/JNI, Dart/FFI, NitroModules, WASM) calls this from
+ * a non-C++ stack unwinder. std::string / std::unordered_map /
+ * std::vector ops below can throw std::bad_alloc, and the third-party
+ * `capability_check` callback can throw anything; both are coerced to
+ * structured rac_result_t error codes.
+ */
 static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_handle,
                                     void** out_previous_handle) noexcept {
-    /* C ABI boundary: noexcept. Propagating a C++ exception past this
-     * boundary is undefined behavior per ISO C++ [except.handle]/9 — every
-     * SDK (Swift, Kotlin/JNI, Dart/FFI, NitroModules, WASM) calls this from
-     * a non-C++ stack unwinder. std::string / std::unordered_map /
-     * std::vector ops below can throw std::bad_alloc, and the third-party
-     * `capability_check` callback can throw anything; both are coerced to
-     * structured rac_result_t error codes. */
     try {
         if (vtable == nullptr) {
             RAC_LOG_ERROR(LOG_CAT, "rac_plugin_register: NULL vtable");
@@ -452,16 +467,14 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 }
             }
 
-            // Allocate handle bookkeeping before changing the accepted plugin.
-            // Publishing its handle below is then a non-throwing assignment.
-            auto dl_entry = s.dl_handles.end();
-            if (dl_handle) {
-                dl_entry = s.dl_handles.try_emplace(name, nullptr).first;
-            }
             auto dup = s.by_name.find(name);
             const bool replacing_existing = dup != s.by_name.end();
             if (replacing_existing) {
                 if (s.model_leases.contains(dup->second)) {
+                    // An identical vtable is still the active plugin, not a pending replacement.
+                    if (vtable != dup->second) {
+                        s.manifests_by_vtable.erase(vtable);
+                    }
                     return RAC_ERROR_PLUGIN_BUSY;
                 }
                 // Duplicate by name: replace only if incoming priority >= existing.
@@ -473,6 +486,15 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                     s.manifests_by_vtable.erase(vtable);
                     return RAC_ERROR_PLUGIN_DUPLICATE;
                 }
+            }
+
+            // Allocate before changing the accepted plugin so handle publication
+            // below is non-throwing, but only after all refusal checks.
+            auto dl_entry = s.dl_handles.end();
+            if (dl_handle) {
+                dl_entry = s.dl_handles.try_emplace(name, nullptr).first;
+            }
+            if (replacing_existing) {
                 // Steal the evicted vtable into a local so `on_unload` runs
                 // AFTER the lock is released: the evicted plugin's teardown
                 // is then free to call back into rac_plugin_find /

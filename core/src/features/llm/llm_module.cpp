@@ -1613,19 +1613,27 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     // Thread the remaining sampling knobs the proto exposes
     // (idl/llm_options.proto) into the C ABI so they reach the engine vtable.
     // repetition_penalty was renamed repeat_penalty (same tag, mechanical
-    // rename). For every field except repeat_penalty the proto3 zero IS the
-    // documented "disabled" sentinel, so passing it through is identical to the
-    // struct default. repeat_penalty uses 1.0 = "no penalty"; proto3 zero
-    // means unset, so only override when positive (mirrors Swift's
-    // RALLMTypes+CppBridge defaults, which carry repeatPenalty=1.0).
-    options.top_k = has_options ? opts.top_k() : 0;
+    // rename). For every field except repeat_penalty, top_k and min_p the
+    // proto3 zero IS the documented "disabled" sentinel, so passing it through
+    // is identical to the struct default. repeat_penalty uses 1.0 = "no
+    // penalty"; proto3 zero means unset, so only override when positive
+    // (mirrors Swift's RALLMTypes+CppBridge defaults, which carry
+    // repeatPenalty=1.0).
+    // top_k and min_p are `optional` with IDL defaults (40 / 0.05) that are ON,
+    // so an absent field keeps RAC_LLM_OPTIONS_DEFAULT while an explicit 0 still
+    // disables the sampler (matches the RAG and VLM adapters).
+    if (has_options && opts.has_top_k()) {
+        options.top_k = opts.top_k();
+    }
     const float repeat_penalty = has_options ? opts.repeat_penalty() : 0.0f;
     if (repeat_penalty > 0.0f) {
         options.repetition_penalty = repeat_penalty;
     }
     options.frequency_penalty = has_options ? opts.frequency_penalty() : 0.0f;
     options.presence_penalty = has_options ? opts.presence_penalty() : 0.0f;
-    options.min_p = has_options ? opts.min_p() : 0.0f;
+    if (has_options && opts.has_min_p()) {
+        options.min_p = opts.min_p();
+    }
     options.seed = has_options ? opts.seed() : 0;
     // n_threads was deleted from LLMGenerationOptions (idl/llm_options.proto):
     // thread count is now a load-time-only decision the engine makes when it

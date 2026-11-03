@@ -440,7 +440,9 @@ export async function asNativeSDKException(
     if (match?.[1]) {
       const rc = Number.parseInt(match[1], 10);
       const mapped = await sdkExceptionFromRcResult(rc);
-      if (mapped) return mapped;
+      if (mapped) {
+        return new SDKException({ ...mapped.proto, message: error.message });
+      }
     }
   }
   return asSDKException(error);

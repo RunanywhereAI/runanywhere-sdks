@@ -79,9 +79,9 @@ await RunAnywhere.models.refresh();
 ```
 
 Refresh rescans local files by default, does not fetch a remote catalog or prune missing files
-by default, and logs failures instead of rejecting. It is a no-op before initialization. The
-current native refresh API does not implement orphan pruning; setting `pruneOrphans: true`
-reports a warning and leaves missing-file rows unchanged.
+by default, and logs failures instead of rejecting. It is a no-op before initialization. Web
+ignores `pruneOrphans: true` with a warning: native probes see only MEMFS, so the SDK's OPFS
+hydration reconciles missing downloads instead.
 
 ## Public entrypoints
 

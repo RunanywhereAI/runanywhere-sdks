@@ -12,7 +12,7 @@
  */
 
 import {
-  type InferenceFramework,
+  InferenceFramework,
   ModelCategory,
   type ModelLoadResult,
   type ModelUnloadResult,
@@ -26,8 +26,10 @@ import type {
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { EmbeddingsProtoAdapter } from '../../Adapters/EmbeddingsProtoAdapter.js';
+import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
 import {
   getModuleForCapability,
+  getModuleForModel,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
@@ -83,6 +85,26 @@ function requireInitialized(): void {
   }
 }
 
+/**
+ * Framework of the main-thread WASM that holds `modelID`'s lifecycle, if any.
+ * A backend preference can place the model in a different WASM than the
+ * catalog framework names.
+ */
+function mainThreadOwnerFramework(
+  modelID: string,
+  catalogFramework?: InferenceFramework,
+): InferenceFramework | undefined {
+  const owner: unknown = getModuleForModel(modelID);
+  if (!owner) return undefined;
+  const owns = (framework: InferenceFramework): boolean => (
+    ModelLifecycleAdapter.moduleForFramework(framework) === owner
+  );
+  if (catalogFramework !== undefined && owns(catalogFramework)) return catalogFramework;
+  return Object.values(InferenceFramework).find(
+    (framework): framework is InferenceFramework => typeof framework === 'number' && owns(framework),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // ensureLoaded — mirrors Swift private func ensureLoaded(modelID:)
 // ---------------------------------------------------------------------------
@@ -96,9 +118,12 @@ async function ensureLoaded(modelID: string): Promise<InferenceFramework | undef
   } catch {
     requestedFramework = undefined;
   }
-  // A backend preference can load this model into a different worker than
-  // the catalog suggests. Reuse that live owner instead of reloading it.
-  requestedFramework = getBackendWorkerModelFramework(modelID) ?? requestedFramework;
+  // A backend preference can load this model into a different worker or
+  // main-thread WASM than the catalog suggests. Reuse that live owner instead
+  // of reloading it.
+  requestedFramework = getBackendWorkerModelFramework(modelID)
+    ?? mainThreadOwnerFramework(modelID, requestedFramework)
+    ?? requestedFramework;
   const current = WebModelLifecycle.currentModel({
     category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     framework: requestedFramework,
