@@ -9,6 +9,7 @@
 #include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/tool_calling_key_repair_internal.h"
 #include "features/llm/utf8_internal.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_thinking.h"
@@ -456,6 +457,15 @@ inline bool run_generate_once(GenerationState& generation,
         release_lifecycle_llm(&ref);
         if (out_rc) {
             *out_rc = rc;
+        }
+        return false;
+    }
+
+    if (raw.text && default_call_has_repaired_key_collision(raw.text)) {
+        rac_llm_result_free(&raw);
+        release_lifecycle_llm(&ref);
+        if (out_rc) {
+            *out_rc = RAC_ERROR_INVALID_ARGUMENT;
         }
         return false;
     }

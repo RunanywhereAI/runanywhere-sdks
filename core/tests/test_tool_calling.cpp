@@ -122,6 +122,51 @@ int test_parse_default_invalid_utf8() {
     return 0;
 }
 
+int test_default_repaired_key_collisions() {
+    const char* collisions[] = {
+        "{\"x\xFF\":1,\"x\xFE\":2}",
+        "{\"nested\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"items\":[{\"x\xFF\":1,\"x\xFE\":2}]}",
+        "{\"x\xFF\":1,\"x\uFFFD\":2}",
+        "{\"x\uFFFD\":1,\"x\xFF\":2}",
+        "{\"x\\uFFFD\":1,\"x\xFF\":2}",
+        "{\"\\u0078\xFF\":1,\"x\xFE\":2}",
+        "{nested:{\"x\xFF\":1,\"x\xFE\":2}}",
+    };
+    for (const char* input : collisions) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(input, &normalized), RAC_ERROR_INVALID_ARGUMENT);
+        ASSERT_TRUE(normalized == nullptr);
+        const std::string call_text =
+            std::string("<tool_call>{\"tool\":\"lookup\",\"arguments\":") + input + "}</tool_call>";
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(call_text.c_str(), &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
+        ASSERT_TRUE(call.arguments_json == nullptr);
+        rac_tool_call_free(&call);
+    }
+    const char* allowed[] = {
+        "{\"x\":1,\"x\":2,\"value\":\"\xFF\"}",
+        "{\"x\uFFFD\":1,\"x\uFFFD\":2}",
+        "{\"a\":{\"x\xFF\":1},\"b\":{\"x\xFE\":2}}",
+        "{\"items\":[{\"x\xFF\":1},{\"x\xFE\":2}]}",
+        "{\"x\xFF\":1,\"y\xFE\":2}",
+        "{\"path\":\"C:\\\\\",\"x\xFF\":1,\"text\":\"{}\\\"x:\"}",
+    };
+    for (const char* input : allowed) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(input, &normalized), RAC_SUCCESS);
+        ASSERT_TRUE(normalized != nullptr);
+        const auto parsed = nlohmann::json::parse(normalized, nullptr, false);
+        ASSERT_TRUE(parsed.is_object());
+        if (parsed.contains("x")) {
+            ASSERT_TRUE(parsed["x"] == 2);
+        }
+        rac_free(normalized);
+    }
+    return 0;
+}
+
 int test_normalize_json_utf8_preserves_values() {
     struct Case {
         const char* input;
@@ -1382,6 +1427,7 @@ int main(int argc, char** argv) {
     (void)argv;
 
     TestCase cases[] = {
+        {.name = "default_repaired_key_collisions", .fn = test_default_repaired_key_collisions},
         {.name = "parse_default_structured", .fn = test_parse_default_structured},
         {.name = "parse_default_invalid_utf8", .fn = test_parse_default_invalid_utf8},
         {.name = "normalize_json_utf8_preserves_values",

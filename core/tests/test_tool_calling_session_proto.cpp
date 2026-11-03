@@ -491,6 +491,33 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
     return request;
 }
 
+int test_session_repaired_key_collision_never_emits_call() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"items\":[{\"x\xFF\":1,\"x\xFE\":2}]}"
+        "}</tool_call>",
+    });
+    EventSink sink;
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "collision session request serializes");
+    uint64_t handle = 0;
+    sink.published_handle = &handle;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 0, "ambiguous session never emits a tool call");
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT || sink.count_kind(EvCase::kErrorBytes) > 0,
+          "ambiguous session reports an error");
+    if (handle) {
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+    cleanup_environment();
+    return 0;
+}
+
 int test_session_emits_tool_call() {
     if (!load_mock_llm()) {
         std::fprintf(stderr, "FAIL: mock LLM load\n");
@@ -1466,6 +1493,7 @@ int main() {
         return 0;
 #else
         test_session_emits_tool_call();
+        test_session_repaired_key_collision_never_emits_call();
         test_step_with_result_emits_final();
         test_step_with_result_emits_final("\xC3\x28", "\xEF\xBF\xBD(");
         test_auto_execute_unset_defaults_to_true_and_pauses_for_tool_execution();

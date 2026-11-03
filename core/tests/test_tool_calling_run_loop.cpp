@@ -587,6 +587,36 @@ int test_one_tool_call_then_final_text() {
     return 0;
 }
 
+int test_default_repaired_key_collision_never_executes() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}</tool_call>",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "collision request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(exec.invocation_count == 0, "ambiguous call never reaches executor");
+    CHECK(generate_calls() == 1, "ambiguous call does not synthesize a result");
+    if (rc == RAC_SUCCESS) {
+        runanywhere::v1::ToolCallingResult result;
+        CHECK(out.data && result.ParseFromArray(out.data, static_cast<int>(out.size)),
+              "collision error result decodes");
+        CHECK(result.error_code() == RAC_ERROR_INVALID_ARGUMENT,
+              "collision reports invalid argument");
+    } else {
+        CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "collision returns invalid argument");
+    }
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 int test_default_invalid_utf8_reaches_executor() {
     if (!load_mock_llm())
         return 1;
@@ -2289,6 +2319,7 @@ int main() {
         test_no_tool_call_completes_immediately();
         test_one_tool_call_then_final_text();
         test_default_invalid_utf8_reaches_executor();
+        test_default_repaired_key_collision_never_executes();
         test_forced_tool_name_only_is_narrowed_and_independently_budgeted();
         test_none_vetoes_forced_tool_name();
         test_none_blocks_hallucinated_call_when_validation_disabled();

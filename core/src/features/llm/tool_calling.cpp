@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "features/llm/tool_calling_internal.h"
+#include "features/llm/tool_calling_key_repair_internal.h"
 #include "features/llm/utf8_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
@@ -929,6 +930,10 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     *out_normalized = nullptr;
+
+    if (rac::llm::tool_calling::has_repaired_key_collision(json_str)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
     // Repair before the fast parse as well as unquoted-key normalization, so
     // malformed model bytes do not make otherwise valid JSON take the scanner path.
