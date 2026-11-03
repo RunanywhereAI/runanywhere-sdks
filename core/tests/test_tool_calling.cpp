@@ -132,11 +132,29 @@ int test_default_repaired_key_collisions() {
         "{\"x\\uFFFD\":1,\"x\xFF\":2}",
         "{\"\\u0078\xFF\":1,\"x\xFE\":2}",
         "{nested:{\"x\xFF\":1,\"x\xFE\":2}}",
+        // OpenAI-style envelope: the whole argument object is one JSON-encoded
+        // string token, so its keys only become visible after decoding.
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
+        "{\"tool\":\"lookup\",\"arguments\":"
+        "\"{\\\"nested\\\":{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}}\"}",
     };
     for (const char* input : collisions) {
         char* normalized = nullptr;
         ASSERT_EQ_INT(rac_tool_call_normalize_json(input, &normalized), RAC_ERROR_INVALID_ARGUMENT);
         ASSERT_TRUE(normalized == nullptr);
+        const std::string call_text = std::string("<tool_call>") + input + "</tool_call>";
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(call_text.c_str(), &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
+        ASSERT_TRUE(call.arguments_json == nullptr);
+        rac_tool_call_free(&call);
+    }
+    // The object form still rejects through the arguments key of a default call.
+    const char* object_collisions[] = {
+        "{\"x\xFF\":1,\"x\xFE\":2}",
+    };
+    for (const char* input : object_collisions) {
         const std::string call_text =
             std::string("<tool_call>{\"tool\":\"lookup\",\"arguments\":") + input + "}</tool_call>";
         rac_tool_call_t call{};
@@ -145,23 +163,38 @@ int test_default_repaired_key_collisions() {
         ASSERT_TRUE(call.arguments_json == nullptr);
         rac_tool_call_free(&call);
     }
-    const char* allowed[] = {
-        "{\"x\":1,\"x\":2,\"value\":\"\xFF\"}",
-        "{\"x\uFFFD\":1,\"x\uFFFD\":2}",
-        "{\"a\":{\"x\xFF\":1},\"b\":{\"x\xFE\":2}}",
-        "{\"items\":[{\"x\xFF\":1},{\"x\xFE\":2}]}",
-        "{\"x\xFF\":1,\"y\xFE\":2}",
-        "{\"path\":\"C:\\\\\",\"x\xFF\":1,\"text\":\"{}\\\"x:\"}",
+    // Each allowed case pins its exact normalized output, so a silently wrong
+    // value cannot pass by only proving normalization succeeded.
+    struct AllowedCase {
+        const char* input;
+        const char* expected;
     };
-    for (const char* input : allowed) {
+    const AllowedCase allowed[] = {
+        {"{\"x\":1,\"x\":2,\"value\":\"\xFF\"}", "{\"x\":2,\"value\":\"\xEF\xBF\xBD\"}"},
+        {"{\"x\uFFFD\":1,\"x\uFFFD\":2}", "{\"x\uFFFD\":2}"},
+        {"{\"a\":{\"x\xFF\":1},\"b\":{\"x\xFE\":2}}",
+         "{\"a\":{\"x\uFFFD\":1},\"b\":{\"x\uFFFD\":2}}"},
+        {"{\"items\":[{\"x\xFF\":1},{\"x\xFE\":2}]}",
+         "{\"items\":[{\"x\uFFFD\":1},{\"x\uFFFD\":2}]}"},
+        {"{\"x\xFF\":1,\"y\xFE\":2}", "{\"x\uFFFD\":1,\"y\uFFFD\":2}"},
+        {"{\"path\":\"C:\\\\\",\"x\xFF\":1,\"text\":\"{}\\\"x:\"}",
+         "{\"path\":\"C:\\\\\",\"x\uFFFD\":1,\"text\":\"{}\\\"x:\"}"},
+        // Valid duplicate keys keep last-wins, including inside a decoded
+        // arguments string.
+        {"{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\\\":1,\\\"x\\\":2}\"}}",
+         "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\\\":1,\\\"x\\\":2}\"}}"},
+        // A non-arguments string value is data, not keys: never rejected, and
+        // its bytes are repaired like any other value.
+        {"{\"note\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
+         "{\"note\":\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}"},
+    };
+    for (const AllowedCase& test : allowed) {
         char* normalized = nullptr;
-        ASSERT_EQ_INT(rac_tool_call_normalize_json(input, &normalized), RAC_SUCCESS);
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(test.input, &normalized), RAC_SUCCESS);
         ASSERT_TRUE(normalized != nullptr);
         const auto parsed = nlohmann::json::parse(normalized, nullptr, false);
         ASSERT_TRUE(parsed.is_object());
-        if (parsed.contains("x")) {
-            ASSERT_TRUE(parsed["x"] == 2);
-        }
+        ASSERT_TRUE(parsed == nlohmann::json::parse(test.expected, nullptr, false));
         rac_free(normalized);
     }
     return 0;

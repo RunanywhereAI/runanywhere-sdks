@@ -461,13 +461,27 @@ inline bool run_generate_once(GenerationState& generation,
         return false;
     }
 
-    if (raw.text && default_call_has_repaired_key_collision(raw.text)) {
-        rac_llm_result_free(&raw);
-        release_lifecycle_llm(&ref);
-        if (out_rc) {
-            *out_rc = RAC_ERROR_INVALID_ARGUMENT;
+    if (raw.text) {
+        // Grammar backends strip closed thinking blocks before parsing, so a
+        // collision that only exists inside a think block can never reach a
+        // parser or an executor. Every other backend parses the whole raw
+        // output, so it keeps the full check.
+        std::string body;
+        const std::string full(raw.text);
+        const std::string* check_text = &full;
+        if (ref.supports_grammar) {
+            std::string thinking;
+            split_display_text_and_thinking(full, &body, &thinking, generation);
+            check_text = &body;
         }
-        return false;
+        if (default_call_has_repaired_key_collision(*check_text)) {
+            rac_llm_result_free(&raw);
+            release_lifecycle_llm(&ref);
+            if (out_rc) {
+                *out_rc = RAC_ERROR_INVALID_ARGUMENT;
+            }
+            return false;
+        }
     }
 
     if (out_response) {

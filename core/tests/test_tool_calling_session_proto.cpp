@@ -509,8 +509,12 @@ int test_session_repaired_key_collision_never_emits_call() {
         bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
     CHECK(sink.count_kind(EvCase::kToolCall) == 0, "ambiguous session never emits a tool call");
-    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT || sink.count_kind(EvCase::kErrorBytes) > 0,
-          "ambiguous session reports an error");
+    CHECK(rc == RAC_SUCCESS, "ambiguous session create succeeds and reports via events");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 1, "ambiguous session emits exactly one error");
+    runanywhere::v1::SDKError error;
+    CHECK(parse_first_error(sink, &error), "ambiguous session error decodes");
+    CHECK(error.c_abi_code() == RAC_ERROR_INVALID_ARGUMENT,
+          "ambiguous session error is invalid argument");
     if (handle) {
         rac_tool_calling_session_destroy_proto(handle);
     }
