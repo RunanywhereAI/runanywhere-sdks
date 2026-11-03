@@ -170,11 +170,11 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
   let nextCallbackId = 1;
 
   const addFunction = (
-    fn: (...args: Array<number | bigint>) => number | bigint | void,
+    fn: (...args: never[]) => number | bigint | void,
     _signature: string,
   ): number => {
     const id = nextCallbackId++;
-    callbackTable.set(id, fn);
+    callbackTable.set(id, fn as (...args: Array<number | bigint>) => unknown);
     liveCallbackIds.add(id);
     return id;
   };

@@ -108,10 +108,10 @@ function fakeVADModule(): FakeVADHarness {
       return ptr;
     },
     _free: () => undefined,
-    addFunction(callback: (...args: number[]) => void | number): number {
+    addFunction(callback: (...args: never[]) => number | bigint | void): number {
       const ptr = nextCallback;
       nextCallback += 1;
-      callbacks.set(ptr, callback);
+      callbacks.set(ptr, callback as (...args: number[]) => void | number);
       return ptr;
     },
     removeFunction(ptr: number): void {

@@ -1006,7 +1006,7 @@ function makeFakeLLMStreamModule(
     HEAP32: heap32,
     _malloc: malloc,
     _free: () => undefined,
-    addFunction(fn: (...args: number[]) => unknown, _signature: string): number {
+    addFunction(fn: (...args: never[]) => number | bigint | void, _signature: string): number {
       const id = nextCallbackId;
       nextCallbackId += 1;
       callbackTable.set(id, fn as (bytesPtr: number, size: number) => unknown);

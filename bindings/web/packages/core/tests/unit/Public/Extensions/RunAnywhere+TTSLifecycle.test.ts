@@ -262,10 +262,10 @@ function fakeTTSModule(): FakeTTSHarness {
       heapU8[pointer + written] = 0;
       return written;
     },
-    addFunction(callback: (...args: number[]) => number | void): number {
+    addFunction(callback: (...args: never[]) => number | bigint | void): number {
       const pointer = nextCallback;
       nextCallback += 1;
-      callbacks.set(pointer, callback);
+      callbacks.set(pointer, callback as (...args: number[]) => number | void);
       return pointer;
     },
     removeFunction(pointer): void {
