@@ -491,6 +491,7 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
     return request;
 }
 
+/** @brief An ambiguous call fails the session with INVALID_ARGUMENT and emits no tool call. */
 int test_session_repaired_key_collision_never_emits_call() {
     if (!load_mock_llm())
         return 1;

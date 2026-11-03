@@ -122,8 +122,13 @@ int test_parse_default_invalid_utf8() {
     return 0;
 }
 
+/** @brief Collisions are rejected at normalization and parse level; valid
+ *         duplicates and non-key JSON text stay accepted. */
 int test_default_repaired_key_collisions() {
-    const char* collisions[] = {
+    // Normalization-level rejections. Bare objects carry no tool name, so a
+    // parse-level assertion on them would hold with or without the guard; the
+    // parse contract is covered by `call_collisions` below.
+    const char* normalize_collisions[] = {
         "{\"x\xFF\":1,\"x\xFE\":2}",
         "{\"nested\":{\"x\xFF\":1,\"x\xFE\":2}}",
         "{\"items\":[{\"x\xFF\":1,\"x\xFE\":2}]}",
@@ -132,31 +137,32 @@ int test_default_repaired_key_collisions() {
         "{\"x\\uFFFD\":1,\"x\xFF\":2}",
         "{\"\\u0078\xFF\":1,\"x\xFE\":2}",
         "{nested:{\"x\xFF\":1,\"x\xFE\":2}}",
-        // OpenAI-style envelope: the whole argument object is one JSON-encoded
-        // string token, so its keys only become visible after decoding.
+        "{\"tool\":\"lookup\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        // Wrapper shapes whose string-encoded arguments the parser decodes.
         "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
-        "{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
-        "{\"tool\":\"lookup\",\"arguments\":"
-        "\"{\\\"nested\\\":{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}}\"}",
+        "{\"function\":{\"name\":\"lookup\",\"Arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":"
+        "\"\\u007B\\\"x\xFF\\\":1,\\\"x\xFE\\\":2\\u007D\"}}",
+        "{\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"lookup\","
+        "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}]}",
     };
-    for (const char* input : collisions) {
+    for (const char* input : normalize_collisions) {
         char* normalized = nullptr;
         ASSERT_EQ_INT(rac_tool_call_normalize_json(input, &normalized), RAC_ERROR_INVALID_ARGUMENT);
         ASSERT_TRUE(normalized == nullptr);
-        const std::string call_text = std::string("<tool_call>") + input + "</tool_call>";
-        rac_tool_call_t call{};
-        ASSERT_EQ_INT(rac_tool_call_parse(call_text.c_str(), &call), RAC_SUCCESS);
-        ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
-        ASSERT_TRUE(call.arguments_json == nullptr);
-        rac_tool_call_free(&call);
     }
-    // The object form still rejects through the arguments key of a default call.
-    const char* object_collisions[] = {
-        "{\"x\xFF\":1,\"x\xFE\":2}",
+    // The same ambiguity through a full default call must parse to no call.
+    const char* call_collisions[] = {
+        "{\"tool\":\"lookup\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"Arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":"
+        "\"\\u007B\\\"x\xFF\\\":1,\\\"x\xFE\\\":2\\u007D\"}}",
+        "{\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"lookup\","
+        "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}]}",
     };
-    for (const char* input : object_collisions) {
-        const std::string call_text =
-            std::string("<tool_call>{\"tool\":\"lookup\",\"arguments\":") + input + "}</tool_call>";
+    for (const char* input : call_collisions) {
+        const std::string call_text = std::string("<tool_call>") + input + "</tool_call>";
         rac_tool_call_t call{};
         ASSERT_EQ_INT(rac_tool_call_parse(call_text.c_str(), &call), RAC_SUCCESS);
         ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
@@ -187,6 +193,17 @@ int test_default_repaired_key_collisions() {
         // its bytes are repaired like any other value.
         {"{\"note\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
          "{\"note\":\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}"},
+        // The parser wraps top-level string arguments as {"input": ...}; it
+        // never expands them into keys, so this is not ambiguous.
+        {"{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
+         "{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xEF\xBF\xBD\\\":1,"
+         "\\\"x\xEF\xBF\xBD\\\":2}\"}"},
+        // Object-valued arguments are passed through unchanged, so JSON text in
+        // ordinary tool data is data, not keys.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"metadata\":{\"arguments\":"
+         "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"metadata\":{\"arguments\":"
+         "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}}}"},
     };
     for (const AllowedCase& test : allowed) {
         char* normalized = nullptr;

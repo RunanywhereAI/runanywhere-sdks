@@ -924,6 +924,18 @@ static std::string validation_errors_to_json(const std::vector<std::string>& err
 // JSON NORMALIZATION
 // =============================================================================
 
+/**
+ * @brief Normalize a tool-call JSON payload, repairing malformed UTF-8.
+ *
+ * Rejects payloads whose distinct raw keys decode to the same key after repair
+ * (`RAC_ERROR_INVALID_ARGUMENT`), then repairs bytes and re-serializes valid
+ * JSON, falling back to the unquoted-key normalizer when the fast parse fails.
+ *
+ * @param json_str Raw JSON payload (must not be null).
+ * @param out_normalized Receives the owned normalized string on success.
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT for ambiguous keys, or an
+ *         allocation/parse error code.
+ */
 extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
                                                        char** out_normalized) try {
     if (!json_str || !out_normalized) {

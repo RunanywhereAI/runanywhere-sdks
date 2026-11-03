@@ -319,6 +319,24 @@ inline runanywhere::v1::FinishReason finish_reason_from_raw(const rac_llm_result
 }
 #endif
 
+/**
+ * @brief Runs one constrained generation step for the tool-calling loop.
+ *
+ * Applies the per-step sampling, grammar dialect, and history overrides on
+ * @p generation, drives the loaded engine, and either copies the sanitized
+ * output into @p out_response or reports the failure code through @p out_rc.
+ * Ambiguous repaired-key collisions are rejected here, before the output is
+ * copied or measured, so they can never reach a parser or an executor.
+ *
+ * @param generation Step options and cached thinking-tag state (in/out).
+ * @param cancel_binding Handles exposed to rac_*_cancel while generating.
+ * @param prompt Fully formatted prompt for this step.
+ * @param out_response Sanitized model output on success (may be null).
+ * @param out_rc Receives RAC_SUCCESS or the failure code.
+ * @param agg Optional telemetry accumulator for this loop.
+ * @param out_finish_reason Optional finish-reason output (protobuf builds).
+ * @return true on success; false when the step failed (see @p out_rc).
+ */
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
