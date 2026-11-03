@@ -57,6 +57,14 @@ private fun requireStorageInitialized(sdk: RunAnywhere) {
 
 // MARK: - Model Registration
 
+/**
+ * Register a URL through commons and return its persisted model metadata.
+ *
+ * [memoryRequirement] describes runtime RAM; [downloadSize] describes artifact
+ * bytes. Optional context, source, description, and capability metadata are
+ * forwarded to the native URL factory. Native failures propagate as
+ * [SDKException]; an unavailable proto response raises a storage exception.
+ */
 @Deprecated("Use RunAnywhere.models.register(ModelRegistration.url(...)).")
 suspend fun RunAnywhere.registerModel(
     id: String? = null,
@@ -66,13 +74,13 @@ suspend fun RunAnywhere.registerModel(
     modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     artifactType: ModelArtifactType? = null,
     memoryRequirement: Long? = null,
-    contextLength: Int? = null,
-    source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
-    description: String? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
     downloadSize: Long? = null,
     cuaProfile: String? = null,
+    contextLength: Int? = null,
+    source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+    description: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -111,6 +119,14 @@ suspend fun RunAnywhere.registerModel(
     return saved
 }
 
+/**
+ * Register [archiveUrl], preserve its explicit [structure], and save the result.
+ *
+ * Uses URL registration for metadata and artifact inference, then persists the
+ * caller's archive layout even when the URL suffix does not reveal an archive.
+ * [downloadSize] remains independent from [memoryRequirement]. Native or
+ * storage failures propagate to the caller.
+ */
 @Deprecated("Use RunAnywhere.models.register(ModelRegistration.archive(...)).")
 suspend fun RunAnywhere.registerModel(
     archiveUrl: String,
@@ -121,13 +137,13 @@ suspend fun RunAnywhere.registerModel(
     modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     archiveType: ArchiveType? = null,
     memoryRequirement: Long? = null,
+    supportsThinking: Boolean = false,
+    supportsLora: Boolean = false,
+    cuaProfile: String? = null,
     downloadSize: Long? = null,
     contextLength: Int? = null,
     source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
     description: String? = null,
-    supportsThinking: Boolean = false,
-    supportsLora: Boolean = false,
-    cuaProfile: String? = null,
 ): RAModelInfo {
     val resolvedArtifactType: ModelArtifactType? =
         archiveType?.let { type ->
@@ -176,6 +192,14 @@ suspend fun RunAnywhere.registerModel(
     return model
 }
 
+/**
+ * Register [multiFile] under [id] through the canonical native bundle factory.
+ *
+ * Forwards file descriptors, capability flags, and optional catalog metadata.
+ * [downloadSize] is the aggregate artifact size, not the runtime RAM hint in
+ * [memoryRequirement]. Returns the persisted model or throws [SDKException]
+ * when registration fails or the native proto response is unavailable.
+ */
 @Deprecated("Use RunAnywhere.models.register(ModelRegistration.multiFile(...)).")
 suspend fun RunAnywhere.registerModel(
     multiFile: List<ModelFileDescriptor>,
@@ -186,11 +210,11 @@ suspend fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     contextLength: Int? = null,
     supportsThinking: Boolean = false,
-    supportsLora: Boolean = false,
     source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
     downloadSize: Long? = null,
-    description: String? = null,
     cuaProfile: String? = null,
+    supportsLora: Boolean = false,
+    description: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -224,6 +248,96 @@ suspend fun RunAnywhere.registerModel(
             )
     return saved
 }
+
+/** Retains the pre-metadata JVM overload and its default-argument bridge. */
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.url(...)).", level = DeprecationLevel.HIDDEN)
+suspend fun RunAnywhere.registerModel(
+    id: String? = null,
+    name: String,
+    url: String,
+    framework: InferenceFramework,
+    modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    artifactType: ModelArtifactType? = null,
+    memoryRequirement: Long? = null,
+    supportsThinking: Boolean = false,
+    supportsLora: Boolean = false,
+    downloadSize: Long? = null,
+    cuaProfile: String? = null,
+): RAModelInfo =
+    registerModel(
+        id = id,
+        name = name,
+        url = url,
+        framework = framework,
+        modality = modality,
+        artifactType = artifactType,
+        memoryRequirement = memoryRequirement,
+        supportsThinking = supportsThinking,
+        supportsLora = supportsLora,
+        downloadSize = downloadSize,
+        cuaProfile = cuaProfile,
+        contextLength = null,
+    )
+
+/** Retains the pre-metadata JVM overload and its default-argument bridge. */
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.archive(...)).", level = DeprecationLevel.HIDDEN)
+suspend fun RunAnywhere.registerModel(
+    archiveUrl: String,
+    structure: ArchiveStructure,
+    id: String? = null,
+    name: String,
+    framework: InferenceFramework,
+    modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    archiveType: ArchiveType? = null,
+    memoryRequirement: Long? = null,
+    supportsThinking: Boolean = false,
+    supportsLora: Boolean = false,
+    cuaProfile: String? = null,
+): RAModelInfo =
+    registerModel(
+        archiveUrl = archiveUrl,
+        structure = structure,
+        id = id,
+        name = name,
+        framework = framework,
+        modality = modality,
+        archiveType = archiveType,
+        memoryRequirement = memoryRequirement,
+        supportsThinking = supportsThinking,
+        supportsLora = supportsLora,
+        cuaProfile = cuaProfile,
+        downloadSize = null,
+    )
+
+/** Retains the pre-metadata JVM overload and its default-argument bridge. */
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.multiFile(...)).", level = DeprecationLevel.HIDDEN)
+suspend fun RunAnywhere.registerModel(
+    multiFile: List<ModelFileDescriptor>,
+    id: String,
+    name: String,
+    framework: InferenceFramework,
+    modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    memoryRequirement: Long? = null,
+    contextLength: Int? = null,
+    supportsThinking: Boolean = false,
+    source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+    downloadSize: Long? = null,
+    cuaProfile: String? = null,
+): RAModelInfo =
+    registerModel(
+        multiFile = multiFile,
+        id = id,
+        name = name,
+        framework = framework,
+        modality = modality,
+        memoryRequirement = memoryRequirement,
+        contextLength = contextLength,
+        supportsThinking = supportsThinking,
+        source = source,
+        downloadSize = downloadSize,
+        cuaProfile = cuaProfile,
+        supportsLora = false,
+    )
 
 // MARK: - Model Import
 

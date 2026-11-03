@@ -111,8 +111,8 @@ object CppBridgeTTS {
      * synthesis is asked to stop.
      */
     suspend fun stop() {
-        // racTtsStopLifecycleProto is safe to call even when no voice is
-        // loaded: the C ABI returns RAC_ERROR_INVALID_STATE in that case.
+        // With no voice loaded the C ABI returns RAC_ERROR_INVALID_STATE;
+        // withNativeProtoFailure surfaces it as an SDKException.
         withNativeProtoFailure { RunAnywhereBridge.racTtsStopLifecycleProto() }
     }
 

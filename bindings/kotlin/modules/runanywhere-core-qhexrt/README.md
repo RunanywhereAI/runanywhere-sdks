@@ -12,9 +12,39 @@ Requires the core SDK. Add both to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
-    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.37")
+    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.37")
 }
+```
+
+The examples below target this source tree (SDK `0.20.37`). For changes not yet
+released, use local SDK packages and Commons native libraries built from the same
+checkout. The private QHexRT native payload is not in this repository: supply it
+separately from a compatible authorized build. A matching version number alone
+does not include unreleased changes.
+
+For local Kotlin builds, stage the private engine payload under
+`engines/qhexrt/prebuilt/`, preserving its `versions/` layout and `current`
+selection. With the matching QAIRT/QNN runtime available and `ANDROID_NDK_HOME`
+configured, run from the repository root:
+
+```bash
+./scripts/build/build-core-android.sh arm64-v8a
+```
+
+If no private QHexRT prebuilt is selected, the script can complete successfully
+with QHexRT disabled. A successful build alone does not confirm that the private
+engine is included.
+
+The script validates the selected prebuilt and passes its resolved directory to
+CMake as `QHEXRT_ROOT`. It stages the backend libraries into
+`bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs/arm64-v8a/`
+and DSP skels into the module's
+`src/main/assets/runanywhere/qhexrt/skels/arm64-v8a/`. To package those staged
+files as a local Maven bundle, run from the repository root:
+
+```bash
+./bindings/kotlin/scripts/package-qhexrt.sh
 ```
 
 ---
@@ -67,6 +97,8 @@ A known architecture pin in the first repository folder, such as `/v79` or `/v79
 
 Direct `/resolve/` or `/blob/` URLs register a single file and do not receive this bundle-folder check.
 
+Catalog eligibility and any required HF-auth preflight remain application-owned.
+
 ---
 
 ## Modalities
@@ -89,7 +121,7 @@ QHexRT does not seed or select models. Register the exact model URL intended for
 - Android `arm64-v8a` only (no `armeabi-v7a` / `x86_64` package)
 - Qualcomm Snapdragon device with Hexagon **V75**, **V79**, or **V81** NPU
 - Matching model manifests for the device Hexagon arch (a V81-only bundle will not run on V75)
-- Core artifact `runanywhere-sdk:0.20.11`
+- Core artifact `runanywhere-sdk:0.20.37`
 
 ---
 

@@ -138,6 +138,8 @@ export interface RegisterMultiFileModelInput {
   contextLength?: number;
   source?: ModelSource;
   description?: string;
+  supportsThinking?: boolean;
+  supportsLora?: boolean;
   /**
    * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
    * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
@@ -256,7 +258,7 @@ export interface RegisterArchiveModelInput {
   /** Caller override; inferred from the URL extension when omitted. */
   archiveType?: ArchiveType;
   memoryRequirement?: number;
-  /** Exact remote artifact bytes, independent from runtime RAM. */
+  /** Exact remote archive bytes, independent from runtime RAM. */
   downloadSize?: number;
   contextLength?: number;
   source?: ModelSource;
@@ -393,6 +395,12 @@ export async function registerMultiFileModel(
       : {}),
     ...(input.source !== undefined ? { source: input.source } : {}),
     ...(input.description !== undefined ? { description: input.description } : {}),
+    ...(input.supportsThinking !== undefined
+      ? { supportsThinking: input.supportsThinking }
+      : {}),
+    ...(input.supportsLora !== undefined
+      ? { supportsLora: input.supportsLora }
+      : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     // ModelFileDescriptor.isRequired was renamed isOptional — NOT a bare
     // rename, the boolean polarity inverts too (required=true means

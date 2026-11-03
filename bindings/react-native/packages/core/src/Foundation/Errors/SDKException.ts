@@ -435,13 +435,17 @@ const nativeRacResultPattern = /(?:^|\s)RAC_RESULT=(-?\d+)(?:\s|$)/;
 export async function asNativeSDKException(
   error: unknown
 ): Promise<SDKException> {
+  if (error instanceof SDKException) return error;
   if (error instanceof Error) {
     const match = nativeRacResultPattern.exec(error.message);
     if (match?.[1]) {
       const rc = Number.parseInt(match[1], 10);
       const mapped = await sdkExceptionFromRcResult(rc);
       if (mapped) {
-        return new SDKException({ ...mapped.proto, message: error.message });
+        return new SDKException({
+          ...mapped.proto,
+          nestedMessage: error.message,
+        });
       }
     }
   }

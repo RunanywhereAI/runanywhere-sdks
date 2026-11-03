@@ -55,7 +55,8 @@ class DartBridgeProtoUtils {
       ffi.Pointer<ffi.Uint8>,
       int,
       ffi.Pointer<RacProtoBuffer>,
-    ) invoke,
+    )
+    invoke,
     required T Function(List<int>) decode,
     required String symbol,
     bool preserveNativeError = false,
@@ -68,7 +69,12 @@ class DartBridgeProtoUtils {
     try {
       bindings.rac_proto_buffer_init(out);
       final code = invoke(requestPtr, bytes.length, out);
-      ensureSuccess(out, code, symbol, preserveNativeError: preserveNativeError);
+      ensureSuccess(
+        out,
+        code,
+        symbol,
+        preserveNativeError: preserveNativeError,
+      );
       return decodeBuffer(out, decode);
     } finally {
       bindings.rac_proto_buffer_free(out);
@@ -85,7 +91,8 @@ class DartBridgeProtoUtils {
       ffi.Pointer<ffi.Uint8>,
       int,
       ffi.Pointer<RacProtoBuffer>,
-    ) invoke,
+    )
+    invoke,
     required T Function(List<int>) decode,
     required String symbol,
   }) {
@@ -123,8 +130,9 @@ class DartBridgeProtoUtils {
     if (out.ref.data == ffi.nullptr || out.ref.size == 0) {
       return decode(const <int>[]);
     }
-    final bytes =
-        out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+    final bytes = out.ref.data
+        .asTypedList(out.ref.size)
+        .toList(growable: false);
     return decode(bytes);
   }
 
@@ -143,7 +151,8 @@ class DartBridgeProtoUtils {
       final result = code != RacResultCodes.success ? code : out.ref.status;
       // The canonical mapper uses callOut's default failure handling.
       final exception = SDKException.fromResult(result)!;
-      exception.error.message = message;
+      exception.error.message =
+          '$symbol failed: ${exception.message} (${protoBufferError(out, code)})';
       throw exception;
     }
     throw SDKException.make(
