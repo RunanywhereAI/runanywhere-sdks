@@ -300,7 +300,6 @@ Key test categories: core infrastructure, plugin registry/routing, graph schedul
 
 ## CI/CD
 
-This directory carries its own `.github/workflows/` (distinct from the repo-root ones):
-- Build: `build-commons.yml` runs macOS, iOS, and Android builds in parallel plus lint
-- Release: `release.yml` is triggered by `commons-v*` tags and publishes to `RunanywhereAI/runanywhere-binaries`
-- Size check: `size-check.yml` holds the xcframework under 3 MB
+GitHub only runs the repo-root `.github/workflows/`, so `core/` has none of its own:
+- Build: `pr-build.yml` builds the native core for macOS, Linux, Windows, iOS, Android and WASM on PRs targeting `main`, `dev` or `feat/v2-architecture`
+- Release: `release.yml` builds the full artifact matrix on `v*.*.*` tags
