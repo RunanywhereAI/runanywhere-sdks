@@ -23,7 +23,7 @@ import type {
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
-import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
+import { Runtime, prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
@@ -234,6 +234,122 @@ function backendWorkerLoadRoute(
     };
   }
   return null;
+}
+
+/**
+ * Resolved route snapshot for one load — the same id space
+ * `BackendWorkerLoadRoute` uses, or `null` when no registered backend serves it.
+ */
+export interface ModelLoadBackendRoute {
+  /** Owning backend id, or `null` when unknown/unregistered. */
+  backendId: 'llamacpp' | 'onnx' | null;
+  /** Serving framework the router picked, when resolvable. */
+  framework?: InferenceFramework;
+}
+
+function backendIdForFramework(
+  framework: InferenceFramework | null | undefined,
+): ModelLoadBackendRoute['backendId'] {
+  if (framework === InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP) return 'llamacpp';
+  if (
+    framework === InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+    || framework === InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+    || framework === InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS
+  ) {
+    return 'onnx';
+  }
+  return null;
+}
+
+/**
+ * Which backend a load will execute through, without running it.
+ *
+ * Reuses the exact routing machinery the load itself uses
+ * (`selectModelLoadRoute` + `backendWorkerLoadRoute` + the serving module's
+ * recorded backend kind) — mirroring the ordered preferences/capability
+ * selection here would drift and misname the owner. Public API callers use
+ * this to scope per-load settings (e.g. the llama.cpp-only acceleration
+ * switcher) to the backend that will actually serve the request.
+ */
+export function describeModelLoadBackend(
+  request: ModelLoadRequest,
+  model: ModelInfo | null,
+): ModelLoadBackendRoute {
+  let route: ModelLoadRoute | null;
+  try {
+    route = selectModelLoadRoute(request, model);
+  } catch {
+    route = null;
+  }
+  if (route) {
+    const workerRoute = backendWorkerLoadRoute(model, request, route.framework);
+    // Prefer the module that will execute the load: a health fallback can
+    // resolve a framework to a module outside that framework's owner (e.g. an
+    // ONNX framework falling back to the llama module), and only llama.cpp
+    // must ever receive `Runtime.setAcceleration`. Falls back through the
+    // worker route and the framework when the record is not a backend kind.
+    const record = getWasmModuleRecord(lifecycleModuleAsEmscripten(route.adapter));
+    const recordBackend = record?.backend === 'llamacpp'
+      ? 'llamacpp'
+      : record?.backend === 'onnx-sherpa'
+        ? 'onnx'
+        : null;
+    return {
+      backendId: recordBackend ?? workerRoute?.backendId ?? null,
+      framework: route.framework,
+    };
+  }
+  const fallbackFramework = request.framework ?? model?.framework;
+  return { backendId: backendIdForFramework(fallbackFramework), framework: fallbackFramework };
+}
+
+/** Where a successfully loaded model actually runs, as its owner reports it. */
+export interface LoadedModelPlacement {
+  /** Owning backend id, or `null` when the owner cannot be determined. */
+  backendId: ModelLoadBackendRoute['backendId'];
+  /**
+   * Device the owner reports (`'cpu'` | `'webgpu'`), or `null` when it
+   * publishes no device diagnostics — never a fabricated default.
+   */
+  device: 'cpu' | 'webgpu' | null;
+}
+
+/**
+ * Report where `modelId` runs right now, from the runtime that owns it.
+ *
+ * Worker-owned models are asked via `host.health()` — `Runtime.active` tracks
+ * the main-thread llama bridge and drifts from the worker's device after a
+ * bridge-side acceleration switch. Main-thread llama reads `Runtime.active`
+ * (that IS the bridge's device); main-thread ONNX/Sherpa reads
+ * `Runtime.speech.acceleration`, fixed at `ONNX.register()`. Everything else
+ * reports `null` so callers say "unknown" instead of a fake CPU claim.
+ */
+export async function resolveLoadedModelPlacement(
+  modelId: string,
+  framework: InferenceFramework | null | undefined,
+): Promise<LoadedModelPlacement> {
+  for (const backendId of ['llamacpp', 'onnx'] as const) {
+    if (isModelOwnedByBackendWorker(modelId, backendId)) {
+      const host = getActiveBackendWorkerHost(backendId);
+      if (!host) return { backendId, device: null };
+      try {
+        const health = await host.health();
+        const details = (health.details ?? {}) as { acceleration?: string };
+        const device = details.acceleration === 'webgpu' || details.acceleration === 'cpu'
+          ? details.acceleration
+          : null;
+        return { backendId, device };
+      } catch {
+        // Device is a diagnostic, not a load contract: a failed health probe
+        // reports unknown rather than a stale mode.
+        return { backendId, device: null };
+      }
+    }
+  }
+  const backendId = backendIdForFramework(framework);
+  if (backendId === 'llamacpp') return { backendId, device: Runtime.active };
+  if (backendId === 'onnx') return { backendId, device: Runtime.speech.acceleration };
+  return { backendId: null, device: null };
 }
 
 function hydratePathsForModel(model: ModelInfo | null): string[] {

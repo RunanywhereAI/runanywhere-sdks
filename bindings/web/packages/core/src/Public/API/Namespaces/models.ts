@@ -19,7 +19,12 @@ import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { Runtime } from '../../../Foundation/RuntimeConfig.js';
 import { ModelRegistry } from '../../Extensions/RunAnywhere+ModelRegistry.js';
 import type { RefreshOptions } from '../../../Adapters/ModelRegistryAdapter.js';
-import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
+import {
+  WebModelLifecycle,
+  describeModelLoadBackend,
+  resolveLoadedModelPlacement,
+  type LoadedModelPlacement,
+} from '../../Extensions/RunAnywhere+ModelLifecycle.js';
 import {
   registerModelArchive,
   registerModelFromUrl,
@@ -226,21 +231,82 @@ function isModelResident(id: string): boolean {
   });
 }
 
-function toLoadedModel(
+/** Public `actualDevice` vocabulary: WebGPU reports as 'gpu', absence of diagnostics as 'unknown'. */
+function deviceToPublicDevice(device: 'cpu' | 'webgpu' | null): 'cpu' | 'gpu' | 'unknown' {
+  if (device === 'webgpu') return 'gpu';
+  return device ?? 'unknown';
+}
+
+/** Map an `AcceleratorPolicy` onto the runtime mode it asks `Runtime.setAcceleration` for. */
+function requestedRuntimeMode(
+  accelerator: AcceleratorPolicy | undefined,
+): 'cpu' | 'webgpu' | undefined {
+  if (accelerator === undefined || accelerator === 'auto') return undefined;
+  return accelerator === 'gpu' ? 'webgpu' : 'cpu';
+}
+
+/** Short printed name for the device the owner reports. */
+function deviceLabel(device: 'cpu' | 'webgpu'): string {
+  return device === 'webgpu' ? 'WebGPU' : 'CPU';
+}
+
+/**
+ * Why one explicit `LoadOptions.accelerator` request ended unmet. Warns are
+ * derived from the device the *serving* backend reports — never from the
+ * global llama flag, and never carried from an unrelated runtime degradation.
+ */
+function acceleratorMissReason(
+  accelerator: AcceleratorPolicy,
+  placement: LoadedModelPlacement,
+  framework: InferenceFramework | undefined,
+): string {
+  const backendName = placement.backendId === 'llamacpp'
+    ? 'llama.cpp'
+    : placement.backendId === 'onnx'
+      ? 'ONNX/Sherpa'
+      : frameworkToBackend(framework);
+  if (placement.device === null) {
+    return `accelerator "${accelerator}" could not be confirmed: the ${backendName} backend `
+      + 'reports no device diagnostics.';
+  }
+  if (placement.backendId === 'onnx') {
+    return `accelerator "${accelerator}" was not honored: the ONNX/Sherpa backend is running on ${deviceLabel(placement.device)}; `
+      + 'speech acceleration is fixed at ONNX.register({ acceleration }) and does not switch per load.';
+  }
+  if (placement.backendId === 'llamacpp') {
+    return `accelerator "${accelerator}" was not honored: llama.cpp resolved to and is running on ${deviceLabel(placement.device)}.`;
+  }
+  return `accelerator "${accelerator}" was not honored: the ${backendName} backend is running on ${deviceLabel(placement.device)}.`;
+}
+
+async function toLoadedModel(
   id: string,
   category: ModelCategory,
   resolved: ResolvedLoadOptions,
   framework?: InferenceFramework,
-): LoadedModel {
+): Promise<LoadedModel> {
+  // Report the device of the backend that actually serves this model — llama
+  // reads its runtime mode (worker health when the worker owns the load),
+  // speech reads ONNX/Sherpa diagnostics — never the global llama flag alone.
+  const placement = await resolveLoadedModelPlacement(id, framework);
+  const actualDevice = deviceToPublicDevice(placement.device);
+  const mode = requestedRuntimeMode(resolved.accelerator);
+  let fallbackReason: string | undefined;
+  const accelerator = resolved.accelerator;
+  if (accelerator && mode && (placement.device === null || placement.device !== mode)) {
+    const reason = acceleratorMissReason(accelerator, placement, framework);
+    modelsLogger.warning(`models.load('${id}'): ${reason}`);
+    fallbackReason = reason;
+  }
   return {
     id,
     category,
     requestedBackend: resolved.requestedBackend,
     actualBackend: frameworkToBackend(framework),
-    actualDevice: Runtime.active === 'webgpu' ? 'gpu' : 'cpu',
+    actualDevice,
     runtimeVersion: undefined,
     abiVersion: undefined,
-    fallbackReason: Runtime.degradedReason ?? undefined,
+    fallbackReason,
     close(): Promise<void> {
       return models.unload(id);
     },
@@ -423,6 +489,16 @@ export const models = {
   /**
    * Load a model now instead of paying the cost on the first generation.
    * contextLength and optional backendPreferences are forwarded on ModelLoadRequest.
+   *
+   * Accelerator contract: the runtime switcher belongs to llama.cpp, so a
+   * llama-served load switches acceleration before loading; a speech
+   * (ONNX/Sherpa) route never touches it — its acceleration is fixed at
+   * `ONNX.register({ acceleration })`. An explicit accelerator the serving
+   * backend did not honor (GPU or CPU, either direction) is logged and
+   * reported through `fallbackReason` rather than dropping silently.
+   * `actualDevice` is the backend-reported device: `'cpu'`, `'gpu'`, or
+   * `'unknown'` when the owner publishes no device diagnostics.
+   *
    * @throws SDKException when the model is absent; accelerator npu, threads, an invalid
    *   context length, or a required backend preference is requested; or the backend rejects
    *   the load.
@@ -437,11 +513,22 @@ export const models = {
       );
     }
     const resolved = resolveLoadOptions(options);
-    if (resolved.accelerator && resolved.accelerator !== 'auto') {
-      await Runtime.setAcceleration(resolved.accelerator === 'gpu' ? 'webgpu' : 'cpu');
-    }
+    const requestedMode = requestedRuntimeMode(resolved.accelerator);
     const model = ModelRegistry.getModel(id);
-    const result = await SDKCore.loadModel(makeModelLoadRequest(id, model, options, resolved));
+    const request = makeModelLoadRequest(id, model, options, resolved);
+    // Scope the global switcher to llama.cpp: the lifecycle router decides
+    // which backend serves this load (ordered preferences, registered modules,
+    // capabilities), and re-routing an unrelated speech load through the llama
+    // switcher would rebuild the llama WASM module mid-flight. Routes cores
+    // cannot resolve (null) keep the previous global behavior — preference
+    // recorded, no switcher side effect unless llama.cpp serves it.
+    if (requestedMode) {
+      const route = describeModelLoadBackend(request, model);
+      if (route.backendId !== 'onnx') {
+        await Runtime.setAcceleration(requestedMode);
+      }
+    }
+    const result = await SDKCore.loadModel(request);
     if (!result || result.error) {
       throw result?.error
         ? new SDKException(result.error)
