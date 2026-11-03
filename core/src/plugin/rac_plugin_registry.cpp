@@ -364,21 +364,24 @@ size_t rac_engine_manifest_count(void) noexcept {
  * register_plugin: admit a plugin into the engine registry.
  *
  * Admits `vtable` under `vtable->metadata.name`. Refusal results: NULL/invalid
- * input, ABI mismatch, failed declaration capability_check, a same-name plugin
- * of higher priority (RAC_ERROR_PLUGIN_DUPLICATE), or a same-name plugin still
+ * input, ABI mismatch, failed capability_check or manifest validation, an incoming
+ * plugin with lower priority than the same-name active plugin
+ * (RAC_ERROR_PLUGIN_DUPLICATE), or a same-name plugin still
  * serving a leased model (RAC_ERROR_PLUGIN_BUSY) — the busy path also removes
  * the pending manifest of a genuinely-new replacement while leaving the active
- * plugin's own manifest intact. A lower/equal-priority duplicate replaces the
- * existing plugin and yields its vtable via `out_previous_handle` (static
- * form) / evicted dl handle (dynamic form).
+ * plugin's own manifest intact. An incoming plugin with equal or higher priority
+ * replaces the idle existing plugin. On success, dynamic registration returns the
+ * previous OS handle (if any) through `out_previous_handle` for the loader to close
+ * after the unload callback. Static registration has no output handle.
  *
  * C ABI boundary: noexcept. Propagating a C++ exception past this
-     * boundary is undefined behavior per ISO C++ [except.handle]/9 — every
-     * SDK (Swift, Kotlin/JNI, Dart/FFI, NitroModules, WASM) calls this from
-     * a non-C++ stack unwinder. std::string / std::unordered_map /
-     * std::vector ops below can throw std::bad_alloc, and the third-party
-     * `capability_check` callback can throw anything; both are coerced to
-     * structured rac_result_t error codes. */
+ * boundary is undefined behavior per ISO C++ [except.handle]/9 — every
+ * SDK (Swift, Kotlin/JNI, Dart/FFI, NitroModules, WASM) calls this from
+ * a non-C++ stack unwinder. std::string / std::unordered_map /
+ * std::vector ops below can throw std::bad_alloc, and the third-party
+ * `capability_check` callback can throw anything; both are coerced to
+ * structured rac_result_t error codes.
+ */
 static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_handle,
                                     void** out_previous_handle) noexcept {
     try {
