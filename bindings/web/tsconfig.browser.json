@@ -9,6 +9,7 @@
   },
   "include": [
     "playwright.config.ts",
+    "tests/browser/opfs-reload-persistence.spec.ts",
     "tests/browser/release-app.e2e.spec.ts",
     "tests/browser/support/**/*.ts"
   ],
