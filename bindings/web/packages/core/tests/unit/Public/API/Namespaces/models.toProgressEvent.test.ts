@@ -1,6 +1,67 @@
 import { describe, expect, it } from 'vitest';
 import { DownloadState, type DownloadProgress } from '@runanywhere/proto-ts/download_service';
+import {
+  InferenceFramework,
+  ModelCategory,
+  ModelInfo,
+  ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
 import { __testing__ } from '../../../../../src/Public/API/Namespaces/models';
+import type { LoadOptions } from '../../../../../src/Public/API/Options';
+
+describe('models.load options', () => {
+  it('encodes context length and ordered backend preferences on ModelLoadRequest', () => {
+    const options: LoadOptions = {
+      contextLength: 8_192,
+      forceReload: true,
+      backendPreferences: [
+        { backend: 'onnx' },
+        { backend: 'llamaCpp' },
+      ],
+    };
+    const resolved = __testing__.resolveLoadOptions(options);
+    const request = __testing__.makeModelLoadRequest(
+      'portable-model',
+      ModelInfo.create({
+        id: 'portable-model',
+        category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      }),
+      options,
+      resolved,
+    );
+    const roundTrip = ModelLoadRequest.decode(ModelLoadRequest.encode(request).finish());
+
+    expect(roundTrip).toMatchObject({
+      modelId: 'portable-model',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      forceReload: true,
+      validateAvailability: true,
+      contextLength: 8_192,
+      backendPreferences: [
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      ],
+    });
+  });
+
+  it('folds the deprecated framework alias into backend preferences', () => {
+    const resolved = __testing__.resolveLoadOptions({
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    });
+
+    expect(resolved.backendPreferences).toEqual([{ backend: 'llamaCpp' }]);
+    expect(resolved.requestedBackend).toEqual({ backend: 'llamaCpp' });
+  });
+
+  it('rejects load options the Web request cannot carry honestly', () => {
+    expect(() => __testing__.validateLoadOptions({ threads: 4 })).toThrow(/threads was retired/);
+    expect(() => __testing__.validateLoadOptions({
+      backendPreferences: [{ backend: 'onnx', required: true }],
+    })).toThrow(/required cannot be carried/);
+  });
+});
 
 function progress(partial: Partial<DownloadProgress> = {}): DownloadProgress {
   return {

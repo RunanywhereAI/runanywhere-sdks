@@ -261,6 +261,7 @@ class SegmentationResult:
     width: int = 0
     height: int = 0
     classes: List[ClassInfo] = field(default_factory=list)
+    confidence_mask: Optional[bytes] = None
 
 
 @dataclass

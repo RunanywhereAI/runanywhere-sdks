@@ -8,8 +8,13 @@
  * The remote-catalog step flows through whatever transport the caller
  * configured on the native side (typically a fetch-backed assignment
  * callback installed at SDK init); `rescan_local` uses the platform's browser
- * filesystem callback. The current native refresh implementation reports
- * `prune_orphans` as unsupported and leaves missing-file rows unchanged.
+ * filesystem callback.
+ *
+ * Native orphan pruning is being added in #961. This adapter always
+ * disables it on Web, including explicit opt-in, because native probes
+ * see only MEMFS while healthy downloads may exist solely in OPFS.
+ * SDKCore's asynchronous OPFS hydration remains necessary to relink
+ * persistent downloads and reconcile missing or incomplete files.
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
@@ -149,8 +154,8 @@ export interface RefreshOptions {
   /** Rescan managed model files; on by default. */
   rescanLocal?: boolean;
   /**
-   * Request orphan pruning. The current native refresh API reports this as
-   * unsupported and leaves missing-file rows unchanged.
+   * Ignored on Web, with a warning when true. Native orphan pruning probes
+   * only MEMFS and cannot safely reconcile persistent OPFS downloads.
    */
   pruneOrphans?: boolean;
 }
@@ -270,6 +275,12 @@ export class ModelRegistryAdapter {
    * encode → withHeapBytes → readOwnedProtoResult pattern used by `query`.
    */
   refresh(options: RefreshOptions = {}): boolean {
+    if (options.pruneOrphans) {
+      logger.warning(
+        'refresh: ignoring pruneOrphans=true on Web because native filesystem probes see only '
+          + 'MEMFS, not persistent OPFS downloads; async OPFS hydration handles reconciliation.',
+      );
+    }
     const primary = this.module;
     const siblings = [...knownModules].filter((mod) => mod !== primary);
     const primarySucceeded = this.refreshCurrent(options);
@@ -317,7 +328,8 @@ export class ModelRegistryAdapter {
     const reqBytes = ProtoModelRegistryRefreshRequestCodec.encode({
       includeRemoteCatalog: options.includeRemoteCatalog ?? false,
       rescanLocal: options.rescanLocal ?? true,
-      pruneOrphans: options.pruneOrphans ?? false,
+      // OPFS is async and invisible to native's synchronous MEMFS probes.
+      pruneOrphans: false,
       catalogUri: '',
       forceRefresh: false,
       includeDownloadedState: true,

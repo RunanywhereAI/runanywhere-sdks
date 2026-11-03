@@ -73,7 +73,7 @@ jobs:
 
   macos-arm64:
     if: ${{ inputs.only == '' || inputs.only == 'macos-arm64' }}
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -274,7 +274,7 @@ jobs:
 
   macos-arm64-neurt-private:
     if: ${{ (inputs.only == '' || inputs.only == 'macos-arm64-neurt-private') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

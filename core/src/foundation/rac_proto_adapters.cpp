@@ -293,19 +293,20 @@ bool rac_stt_result_to_proto(const rac_stt_result_t* in, ::runanywhere::v1::STTO
 // TTS
 // ===========================================================================
 
-bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out) {
+rac_result_t rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in,
+                                        rac_tts_options_t* out) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     *out = RAC_TTS_OPTIONS_DEFAULT;
     out->language = nullptr;
     char* voice = copy_string(in.voice());
     if (!in.voice().empty() && !voice)
-        return false;
+        return RAC_ERROR_OUT_OF_MEMORY;
     char* language = rac_strdup(in.language_code().empty() ? RAC_TTS_OPTIONS_DEFAULT.language
                                                            : in.language_code().c_str());
     if (!language) {
         rac_free(voice);
-        return false;
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
     out->voice = voice;
     out->language = language;
@@ -319,7 +320,7 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts
     // enable_ssml deleted from TTSOptions -- no backend parses SSML. use_ssml
     // stays at RAC_TTS_OPTIONS_DEFAULT's value (false).
     // sample_rate has no proto field on TTSOptions; keep default.
-    return true;
+    return RAC_SUCCESS;
 }
 
 // rac_tts_phoneme_timestamp_to_proto / _from_proto deleted: TTSPhonemeTimestamp
@@ -1143,27 +1144,16 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
 // ===========================================================================
 
 ::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code) {
-    // Non-negative codes (success / invalid) carry no error category.
     if (code >= 0)
         return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
-    if (code <= -150 && code >= -179)
-        return ::runanywhere::v1::ERROR_CATEGORY_NETWORK;
-    if (code <= -250 && code >= -279)
-        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
-    if (code <= -110 && code >= -129)
-        return ::runanywhere::v1::ERROR_CATEGORY_MODEL;
-    if ((code <= -180 && code >= -219) || (code <= -280 && code >= -299))
-        return ::runanywhere::v1::ERROR_CATEGORY_IO;
-    if (code <= -320 && code >= -329)
-        return ::runanywhere::v1::ERROR_CATEGORY_AUTH;
-    if (code <= -100 && code >= -109)
-        return ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
-    if ((code <= -230 && code >= -249) || (code <= -300 && code >= -319))
-        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
-    // Any other negative code is an unmapped error -> INTERNAL (canonical
-    // fallback; rac_error_proto.cpp previously returned UNSPECIFIED here, the
-    // drift this consolidation fixes).
-    return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
+
+    const int64_t magnitude = -static_cast<int64_t>(code);
+#define RAC_ERROR_CATEGORY_RANGE(first, last, category) \
+    if (magnitude >= first && magnitude <= last)        \
+        return ::runanywhere::v1::ERROR_CATEGORY_##category;
+#include "rac/core/rac_error_categories.def"
+#undef RAC_ERROR_CATEGORY_RANGE
+    return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
 }
 
 ::runanywhere::v1::ErrorCategory rac_category_to_proto(rac_error_category_t category) {

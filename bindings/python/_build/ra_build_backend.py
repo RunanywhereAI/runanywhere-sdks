@@ -136,7 +136,10 @@ def _generate() -> None:
 def _newest_input_mtime() -> float:
     """Newest mtime across everything the three Python generators read."""
     newest = 0.0
-    for pattern in ("idl/*.proto", "idl/codegen/*.py", "idl/codegen/*.sh"):
+    for pattern in (
+        "idl/*.proto", "idl/codegen/*.py", "idl/codegen/*.sh",
+        "core/include/rac/core/rac_error_categories.def",
+    ):
         for path in _REPO_ROOT.glob(pattern):
             try:
                 newest = max(newest, path.stat().st_mtime)

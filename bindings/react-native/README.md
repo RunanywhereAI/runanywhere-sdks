@@ -34,10 +34,10 @@ Apple Silicon devices and Android phones with 6 GB+ RAM are recommended for 3B+ 
 
 ## Installation
 
-Install the core package plus the backends you need. Pin to **0.20.11**:
+Install the core package plus the backends you need. Pin to **0.20.27**:
 
 ```bash
-npm install @runanywhere/core@0.20.11 @runanywhere/llamacpp@0.20.11
+npm install @runanywhere/core@0.20.27 @runanywhere/llamacpp@0.20.27
 ```
 
 | Package | Purpose |
