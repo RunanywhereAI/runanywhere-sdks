@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-npm install @runanywhere/web@0.20.11
+npm install @runanywhere/web@0.20.27
 ```
 
 Add `@runanywhere/web-llamacpp` and/or `@runanywhere/web-onnx` for inference backends. See the [Web SDK README](../../README.md) for COOP/COEP headers, Vite config, and bundler setup.
