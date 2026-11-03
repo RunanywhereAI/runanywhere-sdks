@@ -50,6 +50,7 @@
 #include "features/llm/llm_thinking_stream_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
 #include "features/llm/structured_output_internal.h"
+#include "features/llm/utf8_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_logger.h"
@@ -1344,11 +1345,7 @@ using runanywhere::v1::LLMGenerationResult;
 using runanywhere::v1::SDKEvent;
 using runanywhere::v1::TokenKind;
 
-// Defined below; replaces invalid UTF-8 with U+FFFD so model output is safe to
-// store in proto `string` fields (llama.cpp can cut a multibyte char at
-// max_tokens). Forward-declared so the emit helpers above its definition can
-// use it.
-std::string sanitize_utf8(const std::string& in);
+using rac::llm::sanitize_utf8;
 
 int64_t now_ms() {
     using namespace std::chrono;
@@ -1735,46 +1732,6 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     options.history = history_ptrs.empty() ? nullptr : history_ptrs.data();
     options.n_history = static_cast<int32_t>(history_ptrs.size());
     return options;
-}
-
-// Replace any invalid UTF-8 byte sequence with U+FFFD so the value is safe to
-// store in a proto `string` field. llama.cpp can emit an incomplete trailing
-// multibyte sequence when generation is cut at max_tokens; without this,
-// protobuf serialization of LLMGenerationResult.text fails and the whole
-// unary result is unparseable by the caller.
-std::string sanitize_utf8(const std::string& in) {
-    std::string out;
-    out.reserve(in.size());
-    const size_t n = in.size();
-    size_t i = 0;
-    auto is_cont = [&](size_t k) {
-        return k < n && (static_cast<unsigned char>(in[k]) & 0xC0) == 0x80;
-    };
-    while (i < n) {
-        const unsigned char c = static_cast<unsigned char>(in[i]);
-        size_t len = 0;
-        if (c < 0x80) {
-            len = 1;
-        } else if ((c & 0xE0) == 0xC0 && c >= 0xC2) {
-            len = 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            len = 3;
-        } else if ((c & 0xF8) == 0xF0 && c <= 0xF4) {
-            len = 4;
-        }
-        bool ok = len > 0;
-        for (size_t k = 1; ok && k < len; ++k) {
-            ok = is_cont(i + k);
-        }
-        if (ok) {
-            out.append(in, i, len);
-            i += len;
-        } else {
-            out.append("\xEF\xBF\xBD");  // U+FFFD replacement character
-            i += 1;
-        }
-    }
-    return out;
 }
 
 void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_result_t& raw,

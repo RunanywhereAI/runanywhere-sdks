@@ -335,6 +335,129 @@ def test_segmentation_returns_mask_and_classes(sdk, tmp_path) -> None:
     assert result.width == 8 and result.height == 8
     assert len(result.class_mask) == 8 * 8 * 2  # uint16 LE
     assert [c.label for c in result.classes] == ["bg", "fg"]
+    assert result.confidence_mask is None
+
+
+def test_segmentation_preserves_positional_model(sdk, tmp_path) -> None:
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    options = SegmentationOptions(False, str(model_dir))
+    assert options.model == str(model_dir)
+    assert options.include_confidence is False
+
+    result = ra.segmentation.segment(ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3), options)
+    assert result.width == 2 and result.height == 3
+    assert sdk.args_of("load_segmentation_model")[0] == str(model_dir)
+    assert result.confidence_mask is None
+
+
+def test_segmentation_forwards_confidence_and_preserves_bytes(sdk, tmp_path) -> None:
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    result = ra.segmentation.segment(
+        ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3),
+        SegmentationOptions(False, str(model_dir), include_confidence=True),
+    )
+    assert sdk.args_of("segment")[-1] is True
+    assert result.confidence_mask == bytes([192]) * 6
+
+
+@pytest.mark.parametrize("include_confidence", [False, True])
+def test_segmentation_with_legacy_extension(
+    sdk, monkeypatch, tmp_path, include_confidence
+) -> None:
+    original_segment = sdk.segment
+    calls = []
+
+    def segment(
+        handle,
+        data,
+        width,
+        height,
+        pixel_format=None,
+        stride_bytes=None,
+        include_diagnostic_rgba=None,
+    ):
+        calls.append(handle)
+        return original_segment(
+            handle, data, width, height, pixel_format, stride_bytes, include_diagnostic_rgba
+        )
+
+    monkeypatch.setattr(sdk, "segment", segment)
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    image = ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3)
+    options = SegmentationOptions(model=str(model_dir), include_confidence=include_confidence)
+    if include_confidence:
+        with pytest.raises(SDKException) as error:
+            ra.segmentation.segment(image, options)
+        assert error.value.code == ErrorCode.FEATURE_NOT_AVAILABLE
+        assert "include_confidence" in str(error.value)
+        assert "rebuild the native extension" in str(error.value)
+        assert isinstance(error.value.__cause__, TypeError)
+        assert calls == []
+    else:
+        result = ra.segmentation.segment(image, options)
+        assert result.confidence_mask is None
+        assert len(calls) == 1
+
+
+@pytest.mark.parametrize("include_confidence", [False, True])
+def test_segmentation_with_legacy_pybind_signature(
+    sdk, monkeypatch, tmp_path, include_confidence
+) -> None:
+    native_error = TypeError(
+        "segment(): incompatible function arguments. The following argument types are supported:\n"
+        "    1. (handle: int, data: object, width: int, height: int, pixel_format: object = None, "
+        "stride_bytes: object = None, include_diagnostic_rgba: object = None) -> dict\n\n"
+        "Invoked with: 1, b'', 2, 3; kwargs: include_confidence=True"
+    )
+
+    def segment(*args, **kwargs):
+        raise native_error
+
+    monkeypatch.setattr(sdk, "segment", segment)
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    expected_error = SDKException if include_confidence else TypeError
+    with pytest.raises(expected_error) as error:
+        ra.segmentation.segment(
+            ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3),
+            SegmentationOptions(model=str(model_dir), include_confidence=include_confidence),
+        )
+    if include_confidence:
+        assert error.value.code == ErrorCode.FEATURE_NOT_AVAILABLE
+        assert error.value.__cause__ is native_error
+    else:
+        assert error.value is native_error
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "invalid pixel input",
+        "decoder() got an unexpected keyword argument 'include_confidence'",
+        "segment(): incompatible function arguments. The following argument types are supported:\n"
+        "    1. (handle: int, data: object, width: int, height: int, "
+        "include_confidence: object = None) -> dict\n\n"
+        "Invoked with: 1, b'', 2, 3; kwargs: include_confidence=True",
+    ],
+)
+def test_segmentation_preserves_unrelated_type_errors(sdk, monkeypatch, tmp_path, message) -> None:
+    native_error = TypeError(message)
+
+    def segment(*args, **kwargs):
+        raise native_error
+
+    monkeypatch.setattr(sdk, "segment", segment)
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    with pytest.raises(TypeError) as error:
+        ra.segmentation.segment(
+            ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3),
+            SegmentationOptions(model=str(model_dir), include_confidence=True),
+        )
+    assert error.value is native_error
 
 
 def test_segmentation_requires_raw_rgb(sdk, tmp_path) -> None:

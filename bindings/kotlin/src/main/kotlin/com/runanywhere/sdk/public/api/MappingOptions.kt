@@ -49,8 +49,10 @@ internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLM
         max_output_tokens = maxOutputTokens,
         temperature = temperature,
         top_p = topP,
-        top_k = topK ?: 0,
-        min_p = minP ?: 0f,
+        top_k = topK ?: LLMGenerationOptions.defaults().top_k ?: 40,
+        // Left absent when unset: an explicit 0.0 reads as "min-p sampling off",
+        // while absent lets commons apply the IDL default (0.05).
+        min_p = minP,
         frequency_penalty = frequencyPenalty ?: 0f,
         presence_penalty = presencePenalty ?: 0f,
         repeat_penalty = repetitionPenalty ?: NEUTRAL_REPETITION_PENALTY,
@@ -193,7 +195,10 @@ internal fun DiarizationOptions.toProto(): ProtoDiarizationOptions =
 internal fun SegmentationOptions?.orDefault(): SegmentationOptions = this ?: SegmentationOptions()
 
 internal fun SegmentationOptions.toProto(): ProtoSegmentationOptions =
-    ProtoSegmentationOptions(include_diagnostic_rgba = includeDiagnosticImage)
+    ProtoSegmentationOptions(
+        include_diagnostic_rgba = includeDiagnosticImage,
+        include_confidence = includeConfidence,
+    )
 
 internal fun ImageOptions?.orDefault(): ImageOptions = this ?: ImageOptions()
 

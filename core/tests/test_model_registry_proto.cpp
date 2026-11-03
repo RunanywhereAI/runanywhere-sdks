@@ -3,10 +3,17 @@
  * @brief Tests for the model registry proto-byte C ABI.
  */
 
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -15,6 +22,8 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "model_types.pb.h"
+
+#include "infrastructure/model_management/model_registry_internal.h"
 #endif
 
 namespace {
@@ -685,7 +694,8 @@ int test_canonical_result_shapes_and_typed_errors() {
     auto* imported_file = import_request.add_files();
     imported_file->set_filename("weights.gguf");
     imported_file->set_size_bytes(55);
-    imported_file->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
+    imported_file->set_is_optional(
+        false);  // required (is_required polarity inverted to is_optional)
 
     std::vector<uint8_t> import_bytes;
     ASSERT_TRUE(serialize_message(import_request, &import_bytes));
@@ -805,6 +815,371 @@ int test_canonical_result_shapes_and_typed_errors() {
     return 0;
 }
 
+// Real filesystem callbacks deliberately model Flutter's directory-blind
+// file_exists. Only the failure tests below substitute serialization itself.
+struct PruneFixture {
+    const rac_platform_adapter_t* previous = rac_get_platform_adapter();
+    rac_platform_adapter_t adapter{};
+    rac_model_registry_handle_t registry = create_registry();
+    std::filesystem::path root =
+        std::filesystem::temp_directory_path() /
+        ("rac-prune-" +
+         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::string probe_hook_path;
+    std::function<void()> probe_hook;
+    std::string unreadable_path;
+    size_t probes = 0;
+
+    PruneFixture() {
+        std::filesystem::create_directories(root);
+        adapter.user_data = this;
+        adapter.now_ms = [](void*) -> int64_t { return 2000; };
+        adapter.file_exists = [](const char* path, void* data) -> rac_bool_t {
+            auto& self = *static_cast<PruneFixture*>(data);
+            ++self.probes;
+            std::error_code ec;
+            const bool exists = std::filesystem::is_regular_file(path, ec);
+            self.after_probe(path);
+            return exists ? RAC_TRUE : RAC_FALSE;
+        };
+        adapter.is_non_empty_directory = [](const char* path, void*) -> rac_bool_t {
+            std::error_code ec;
+            if (!std::filesystem::is_directory(path, ec)) {
+                return RAC_FALSE;
+            }
+            return !std::filesystem::is_empty(path, ec) && !ec ? RAC_TRUE : RAC_FALSE;
+        };
+        adapter.file_list_directory = [](const char* path, rac_directory_entry_t* out,
+                                         size_t* count, void* data) -> rac_result_t {
+            auto& self = *static_cast<PruneFixture*>(data);
+            ++self.probes;
+            if (self.unreadable_path == path) {
+                return RAC_ERROR_FILE_READ_FAILED;
+            }
+            std::error_code ec;
+            std::filesystem::directory_iterator entries(path, ec);
+            if (ec) {
+                self.after_probe(path);
+                return RAC_ERROR_FILE_NOT_FOUND;
+            }
+            std::vector<rac_directory_entry_t> listed;
+            for (const auto& entry : entries) {
+                rac_directory_entry_t item{};
+                std::snprintf(item.name, sizeof(item.name), "%s",
+                              entry.path().filename().string().c_str());
+                item.is_dir = entry.is_directory() ? RAC_TRUE : RAC_FALSE;
+                listed.push_back(item);
+            }
+            const size_t capacity = *count;
+            *count = out ? std::min(capacity, listed.size()) : listed.size();
+            if (out) {
+                std::copy_n(listed.begin(), *count, out);
+            }
+            return RAC_SUCCESS;
+        };
+        rac_set_platform_adapter(&adapter);
+    }
+
+    ~PruneFixture() {
+        rac_model_registry_destroy(registry);
+        // The adapter API disallows nullptr. Keep a process-lifetime empty
+        // adapter when the test entered without one, never a dangling fixture.
+        static const rac_platform_adapter_t empty{};
+        rac_set_platform_adapter(previous ? previous : &empty);
+        std::error_code ec;
+        std::filesystem::remove_all(root, ec);
+    }
+
+    void after_probe(const char* path) {
+        if (probe_hook && probe_hook_path == path) {
+            auto callback = std::move(probe_hook);
+            probe_hook = nullptr;
+            callback();
+        }
+    }
+
+    std::string path(const std::string& name) const { return (root / name).generic_string(); }
+
+    static void write_file(const std::string& path, size_t size = 42) {
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path());
+        std::ofstream file(path, std::ios::binary);
+        file << std::string(size, 'x');
+        if (!file) {
+            throw std::runtime_error("failed to create prune test artifact");
+        }
+    }
+
+    bool refresh(runanywhere::v1::ModelRegistryRefreshResult* out) {
+        runanywhere::v1::ModelRegistryRefreshRequest request;
+        request.set_prune_orphans(true);
+        std::vector<uint8_t> bytes;
+        if (!serialize_message(request, &bytes)) {
+            return false;
+        }
+        rac_proto_buffer_t buffer{};
+        rac_proto_buffer_init(&buffer);
+        if (rac_model_registry_refresh_proto(registry, bytes.data(), bytes.size(), &buffer) !=
+            RAC_SUCCESS) {
+            rac_proto_buffer_free(&buffer);
+            return false;
+        }
+        return parse_and_free_buffer(&buffer, out);
+    }
+};
+
+runanywhere::v1::ModelInfo prune_model(const std::string& id, const std::string& path) {
+    auto model = build_full_model_proto(id, id, path);
+    model.clear_artifact();
+    model.mutable_single_file();
+    return model;
+}
+
+int test_prune_missing_and_existing_single_files() {
+    PruneFixture fixture;
+    auto missing = prune_model("missing", fixture.path("missing.gguf"));
+    auto existing = prune_model("existing", fixture.path("existing.gguf"));
+    PruneFixture::write_file(existing.local_path());
+    ASSERT_TRUE(register_model_proto(fixture.registry, missing));
+    ASSERT_TRUE(register_model_proto(fixture.registry, existing));
+    runanywhere::v1::ModelRegistryRefreshResult result;
+    ASSERT_TRUE(fixture.refresh(&result));
+    ASSERT_EQ(result.models().models_size(), 2);
+    for (const auto& model : result.models().models()) {
+        if (model.id() == missing.id()) {
+            ASSERT_TRUE(model.local_path().empty());
+            ASSERT_EQ(model.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+            ASSERT_TRUE(!model.is_available());
+            ASSERT_EQ(model.checksum_sha256(), missing.checksum_sha256());
+        } else {
+            ASSERT_EQ(model.local_path(), existing.local_path());
+            ASSERT_EQ(model.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+        }
+    }
+    rac_model_info_t* runtime = nullptr;
+    ASSERT_EQ(rac_model_registry_get(fixture.registry, "missing", &runtime), RAC_SUCCESS);
+    ASSERT_TRUE(runtime->local_path == nullptr);
+    rac_model_info_free(runtime);
+    ASSERT_TRUE(std::filesystem::is_regular_file(existing.local_path()));
+    return 0;
+}
+
+int test_prune_preserves_builtin_models() {
+    PruneFixture fixture;
+    auto uri = prune_model("builtin-uri", "builtin://system");
+    auto source = prune_model("builtin-source", fixture.path("source"));
+    source.set_source(runanywhere::v1::MODEL_SOURCE_BUILT_IN);
+    auto artifact = prune_model("builtin-artifact", fixture.path("artifact"));
+    artifact.set_built_in(true);
+    for (const auto& model : {uri, source, artifact}) {
+        ASSERT_TRUE(register_model_proto(fixture.registry, model));
+    }
+    fixture.probes = 0;
+    runanywhere::v1::ModelRegistryRefreshResult result;
+    ASSERT_TRUE(fixture.refresh(&result));
+    ASSERT_EQ(fixture.probes, 0U);
+    ASSERT_EQ(result.models().models_size(), 3);
+    for (const auto& model : result.models().models()) {
+        ASSERT_TRUE(!model.local_path().empty());
+        ASSERT_EQ(model.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+    }
+    return 0;
+}
+
+int test_prune_preserves_directory_downloads_with_directory_blind_adapter() {
+    PruneFixture fixture;
+    auto model = prune_model("directory", fixture.path("directory"));
+    model.mutable_archive();
+    PruneFixture::write_file(model.local_path() + "/weights.bin");
+    ASSERT_TRUE(register_model_proto(fixture.registry, model));
+    auto legacy = prune_model("legacy-directory", fixture.path("legacy-directory"));
+    legacy.clear_artifact();
+    PruneFixture::write_file(legacy.local_path() + "/weights.bin");
+    ASSERT_TRUE(register_model_proto(fixture.registry, legacy));
+    ASSERT_EQ(fixture.adapter.file_exists(model.local_path().c_str(), &fixture), RAC_FALSE);
+    for (bool listing_available : {true, false}) {
+        if (!listing_available) {
+            fixture.adapter.file_list_directory = nullptr;
+        }
+        runanywhere::v1::ModelRegistryRefreshResult result;
+        ASSERT_TRUE(fixture.refresh(&result));
+        ASSERT_EQ(result.models().models_size(), 2);
+        for (const auto& refreshed : result.models().models()) {
+            ASSERT_TRUE(refreshed.local_path() == model.local_path() ||
+                        refreshed.local_path() == legacy.local_path());
+            ASSERT_EQ(refreshed.registry_status(),
+                      runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+        }
+    }
+    return 0;
+}
+
+int test_prune_preserves_nested_artifacts_and_inconclusive_reads() {
+    PruneFixture fixture;
+    auto model = build_full_model_proto("nested", "Nested", fixture.path("nested"));
+    auto* file = model.mutable_multi_file()->mutable_files(0);
+    const std::string relative = "weights/layers/part-0001.gguf";
+    file->set_relative_path(relative);
+    file->set_destination_path(relative);
+    file->set_local_path(model.local_path() + "/" + relative);
+    PruneFixture::write_file(file->local_path());
+    ASSERT_TRUE(register_model_proto(fixture.registry, model));
+    for (const std::string& unreadable :
+         {std::string(), model.local_path(), model.local_path() + "/weights"}) {
+        fixture.unreadable_path = unreadable;
+        runanywhere::v1::ModelRegistryRefreshResult result;
+        ASSERT_TRUE(fixture.refresh(&result));
+        const auto& refreshed = result.models().models(0);
+        ASSERT_EQ(refreshed.local_path(), model.local_path());
+        ASSERT_EQ(refreshed.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+        ASSERT_EQ(refreshed.multi_file().files(0).local_path(), file->local_path());
+    }
+    return 0;
+}
+
+int test_prune_incomplete_folders_and_stale_descriptor_paths() {
+    PruneFixture fixture;
+    for (int kind = 0; kind < 4; ++kind) {
+        const std::string id = "incomplete-" + std::to_string(kind);
+        auto model = build_full_model_proto(id, id, fixture.path(id));
+        auto descriptors = model.multi_file().files();
+        // Keep a finished companion, but required weights are missing or short.
+        PruneFixture::write_file(model.local_path() + "/tokenizer.json");
+        PruneFixture::write_file(model.local_path() + "/weights/part-0001.gguf.part");
+        PruneFixture::write_file(model.local_path() + "/.rac-manifest.binpb");
+        if (kind == 1) {
+            *model.mutable_single_file()->mutable_expected_files()->mutable_files() = descriptors;
+        } else if (kind == 2) {
+            *model.mutable_archive()->mutable_expected_files()->mutable_files() = descriptors;
+        } else if (kind == 3) {
+            PruneFixture::write_file(model.local_path() + "/part-0001.gguf", 3);
+        }
+        ASSERT_TRUE(register_model_proto(fixture.registry, model));
+        runanywhere::v1::ModelInfo before;
+        ASSERT_TRUE(get_model_proto(fixture.registry, id.c_str(), &before));
+        runanywhere::v1::ModelRegistryRefreshResult result;
+        ASSERT_TRUE(fixture.refresh(&result));
+        runanywhere::v1::ModelInfo after;
+        ASSERT_TRUE(get_model_proto(fixture.registry, id.c_str(), &after));
+        ASSERT_TRUE(after.local_path().empty());
+        ASSERT_EQ(after.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+        auto expected = before;
+        expected.clear_local_path();
+        expected.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+        expected.set_is_available(false);
+        expected.set_updated_at_unix_ms(after.updated_at_unix_ms());
+        auto* files =
+            expected.has_multi_file() ? expected.mutable_multi_file()->mutable_files()
+            : expected.has_single_file()
+                ? expected.mutable_single_file()->mutable_expected_files()->mutable_files()
+                : expected.mutable_archive()->mutable_expected_files()->mutable_files();
+        for (auto& descriptor : *files) {
+            descriptor.clear_local_path();
+        }
+        ASSERT_EQ(after.SerializeAsString(), expected.SerializeAsString());
+        ASSERT_TRUE(std::filesystem::is_regular_file(model.local_path() + "/tokenizer.json"));
+    }
+    return 0;
+}
+
+int test_prune_empty_and_partial_only_directories() {
+    PruneFixture fixture;
+    for (bool partial : {false, true}) {
+        const std::string id = partial ? "partial" : "empty";
+        auto model = prune_model(id, fixture.path(id));
+        model.mutable_archive();
+        std::filesystem::create_directories(model.local_path());
+        if (partial) {
+            PruneFixture::write_file(model.local_path() + "/nested/weights.bin.part");
+            PruneFixture::write_file(model.local_path() + "/.manifest");
+        }
+        ASSERT_TRUE(register_model_proto(fixture.registry, model));
+    }
+    runanywhere::v1::ModelRegistryRefreshResult result;
+    ASSERT_TRUE(fixture.refresh(&result));
+    ASSERT_EQ(result.models().models_size(), 2);
+    for (const auto& model : result.models().models()) {
+        ASSERT_TRUE(model.local_path().empty());
+        ASSERT_EQ(model.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    }
+    return 0;
+}
+
+int test_prune_serialization_failure_preserves_runtime_and_snapshot() {
+    PruneFixture fixture;
+    auto model = build_full_model_proto("failure", "Failure", fixture.path("failure"));
+    ASSERT_TRUE(register_model_proto(fixture.registry, model));
+    // Inspect raw storage: get_proto overlays the live struct and could hide
+    // divergence between the two copies this transaction must keep in sync.
+    std::lock_guard<std::mutex> lock(fixture.registry->mutex);
+    auto* live = fixture.registry->models.at(model.id());
+    const char* previous_path = live->local_path;
+    const int64_t previous_time = live->updated_at;
+    const std::string previous_bytes = fixture.registry->model_proto_bytes.at(model.id());
+    auto cleared = model;
+    cleared.clear_local_path();
+    cleared.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    for (bool allocation_failure : {false, true}) {
+        bool called = false;
+        const bool committed = rac::infra::model_registry::detail::commit_pruned_download_locked(
+            fixture.registry, model.id(), live, previous_time + 1, cleared,
+            [&](const auto&, std::string* bytes) -> bool {
+                called = true;
+                *bytes = "partial serialization";
+                if (allocation_failure) {
+                    throw std::bad_alloc();
+                }
+                return false;
+            });
+        ASSERT_TRUE(called);
+        ASSERT_TRUE(!committed);
+        ASSERT_TRUE(live->local_path == previous_path);
+        ASSERT_EQ(std::string(live->local_path), model.local_path());
+        ASSERT_EQ(live->updated_at, previous_time);
+        ASSERT_EQ(fixture.registry->model_proto_bytes.at(model.id()), previous_bytes);
+    }
+    return 0;
+}
+
+int test_prune_rechecks_same_path_concurrent_completion() {
+    for (bool directory : {false, true}) {
+        PruneFixture fixture;
+        if (!directory) {
+            fixture.adapter.file_list_directory = nullptr;
+        }
+        auto model = directory
+                         ? build_full_model_proto("complete", "Complete", fixture.path("complete"))
+                         : prune_model("complete", fixture.path("complete.gguf"));
+        ASSERT_TRUE(register_model_proto(fixture.registry, model));
+        fixture.probe_hook_path = model.local_path();
+        rac_result_t completion = RAC_ERROR_UNKNOWN;
+        fixture.probe_hook = [&] {
+            // Complete after the initial probe observed a missing path, then
+            // return its stale result. No sleeps or scheduler timing required.
+            std::thread download([&] {
+                PruneFixture::write_file(directory ? model.local_path() + "/part-0001.gguf"
+                                                   : model.local_path());
+                completion = rac_model_registry_update_download_status(
+                    fixture.registry, model.id().c_str(), model.local_path().c_str());
+            });
+            download.join();
+        };
+        runanywhere::v1::ModelRegistryRefreshResult result;
+        ASSERT_TRUE(fixture.refresh(&result));
+        ASSERT_EQ(completion, RAC_SUCCESS);
+        ASSERT_EQ(result.models().models_size(), 1);
+        const auto& refreshed = result.models().models(0);
+        ASSERT_EQ(refreshed.local_path(), model.local_path());
+        ASSERT_EQ(refreshed.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+        ASSERT_EQ(refreshed.updated_at_unix_ms(), 2000);
+        ASSERT_EQ(refreshed.checksum_sha256(), model.checksum_sha256());
+        if (directory) {
+            ASSERT_EQ(refreshed.multi_file().files(0).local_path(),
+                      model.multi_file().files(0).local_path());
+        }
+    }
+    return 0;
+}
+
 int test_update_missing_and_invalid_bytes() {
     rac_model_registry_handle_t registry = create_registry();
     ASSERT_TRUE(registry != nullptr);
@@ -897,6 +1272,14 @@ int main() {
         RUN(test_unknown_probe_values_do_not_block_compatibility);
         RUN(test_canonical_result_shapes_and_typed_errors);
         RUN(test_update_missing_and_invalid_bytes);
+        RUN(test_prune_missing_and_existing_single_files);
+        RUN(test_prune_preserves_builtin_models);
+        RUN(test_prune_preserves_directory_downloads_with_directory_blind_adapter);
+        RUN(test_prune_preserves_nested_artifacts_and_inconclusive_reads);
+        RUN(test_prune_incomplete_folders_and_stale_descriptor_paths);
+        RUN(test_prune_empty_and_partial_only_directories);
+        RUN(test_prune_serialization_failure_preserves_runtime_and_snapshot);
+        RUN(test_prune_rechecks_same_path_concurrent_completion);
 #else
         RUN(test_proto_abi_reports_unavailable_without_protobuf);
 #endif

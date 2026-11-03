@@ -2,12 +2,12 @@
 
 On-device AI for Python — LLM, VLM, STT, TTS, embeddings, and voice pipelines run entirely on the host. Inference needs no network; the network is used only to download models.
 
-**Current release:** `0.20.11`
+**Current release:** `0.20.37`
 
 ## Install
 
 ```bash
-pip install runanywhere==0.20.11
+pip install runanywhere==0.20.37
 ```
 
 Wheels bundle the compiled native runtime and dependent libraries on Windows, macOS, and Linux. Python **3.9+** and `numpy >= 1.21` are required.
@@ -15,8 +15,8 @@ Wheels bundle the compiled native runtime and dependent libraries on Windows, ma
 Optional extras:
 
 ```bash
-pip install "runanywhere[rag]==0.20.11"      # RAG / document Q&A
-pip install "runanywhere[server]==0.20.11"   # OpenAI-compatible local server
+pip install "runanywhere[rag]==0.20.37"      # RAG / document Q&A
+pip install "runanywhere[server]==0.20.37"   # OpenAI-compatible local server
 ```
 
 ## Quick start
@@ -150,7 +150,7 @@ unchanged.
 ## Local OpenAI-compatible server
 
 ```bash
-pip install "runanywhere[server]==0.20.11"
+pip install "runanywhere[server]==0.20.37"
 runanywhere serve          # http://127.0.0.1:8000
 runanywhere models         # list catalog + download state
 ```

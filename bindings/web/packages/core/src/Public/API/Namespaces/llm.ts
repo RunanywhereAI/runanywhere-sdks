@@ -317,7 +317,7 @@ export const llm = {
         'This Web WASM build does not export rac_structured_output_parse_proto.',
       );
     }
-    const parsed = adapter.parse({
+    const parsed = await adapter.parseAsync({
       requestId: generation.requestId,
       text: generation.text,
       options: structuredOutput,

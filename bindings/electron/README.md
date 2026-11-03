@@ -47,6 +47,11 @@ Prerequisites: a C++ toolchain (MSVC on Windows), Node.js, and a `runanywhere-co
 build with backends enabled. See the `electron-*` presets in `CMakePresets.json` for CUDA
 builds, integration tests, and contributor details.
 
+To build the addon with an `electron-*` preset, run `npm install` in `bindings/electron/native`
+first. It installs `node-addon-api` and `node-api-headers`, and CMake configure stops with
+"node deps missing" without them. `.github/workflows/electron-sdk-ci.yml` is the reference
+for the full per-platform sequence, including the Windows-only steps.
+
 ## Quick start (Node)
 
 One `initialize` brings up the native runtime, the model store, and the secure

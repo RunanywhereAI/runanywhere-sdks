@@ -66,6 +66,7 @@
 #include "rac/features/rag/rac_rag.h"
 #include "rac/features/rerank/rac_rerank_service.h"
 #include "rac/features/rerank/rac_rerank_types.h"
+#include "rac/features/segmentation/rac_segmentation_confidence.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/features/stt/rac_stt_component.h"
@@ -3456,12 +3457,12 @@ Napi::Value LoadSegmentationModel(const Napi::CallbackInfo& info) {
 
 struct SegmentationResultBox {
     rac_segmentation_result_t value;
-    bool filled = false;
+    rac_segmentation_confidence_mask_v1_t confidence = RAC_SEGMENTATION_CONFIDENCE_MASK_DEFAULT;
 
     SegmentationResultBox() { std::memset(&value, 0, sizeof(value)); }
     ~SegmentationResultBox() {
-        if (filled)
-            rac_segmentation_result_free(&value);
+        rac_segmentation_result_free(&value);
+        rac_segmentation_confidence_mask_free(&confidence);
     }
     SegmentationResultBox(const SegmentationResultBox&) = delete;
     SegmentationResultBox& operator=(const SegmentationResultBox&) = delete;
@@ -3469,7 +3470,7 @@ struct SegmentationResultBox {
 
 // segment(handleId, { data, width, height, pixelFormat, strideBytes },
 // options?) ->
-//   { width, height, classMask: Uint16Array, classes, diagnosticRgba? }.
+//   { width, height, classMask: Uint16Array, classes, diagnosticRgba?, confidenceMask? }.
 Napi::Value Segment(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsObject()) {
@@ -3502,18 +3503,23 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     rac_segmentation_options_t opts = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+    bool include_confidence = false;
     if (info.Length() > 2 && info[2].IsObject()) {
         Napi::Object o = info[2].As<Napi::Object>();
         if (o.Has("includeDiagnosticImage")) {
             opts.include_diagnostic_rgba =
                 o.Get("includeDiagnosticImage").ToBoolean().Value() ? RAC_TRUE : RAC_FALSE;
         }
+        if (o.Has("includeConfidence")) {
+            include_confidence = o.Get("includeConfidence").ToBoolean().Value();
+        }
     }
     auto pixels = std::make_shared<std::vector<uint8_t>>(data, data + data_size);
     auto box = std::make_shared<SegmentationResultBox>();
     return RunNativeCall(
         env, "segment",
-        [h, gate, pixels, width, height, pixel_format, stride_bytes, opts, box]() {
+        [h, gate, pixels, width, height, pixel_format, stride_bytes, opts, include_confidence,
+         box]() {
             std::lock_guard<std::mutex> serialize(*gate);
             rac_segmentation_image_t image;
             std::memset(&image, 0, sizeof(image));
@@ -3524,8 +3530,10 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
             image.pixel_format = pixel_format;
             image.stride_bytes = stride_bytes;
             rac_segmentation_options_t local = opts;
-            const rac_result_t rc = rac_segmentation_segment(h, &image, &local, &box->value);
-            box->filled = rc == RAC_SUCCESS;
+            const rac_result_t rc = include_confidence
+                                        ? rac_segmentation_segment_with_confidence(
+                                              h, &image, &local, &box->value, &box->confidence)
+                                        : rac_segmentation_segment(h, &image, &local, &box->value);
             return rc;
         },
         [box](Napi::Env e) {
@@ -3556,6 +3564,10 @@ Napi::Value Segment(const Napi::CallbackInfo& info) {
             if (result.diagnostic_rgba && result.diagnostic_rgba_size) {
                 out.Set("diagnosticRgba", Napi::Buffer<uint8_t>::Copy(e, result.diagnostic_rgba,
                                                                       result.diagnostic_rgba_size));
+            }
+            if (box->confidence.data && box->confidence.size) {
+                out.Set("confidenceMask",
+                        Napi::Buffer<uint8_t>::Copy(e, box->confidence.data, box->confidence.size));
             }
             return out;
         },
