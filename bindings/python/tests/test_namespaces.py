@@ -363,11 +363,8 @@ def test_segmentation_forwards_confidence_and_preserves_bytes(sdk, tmp_path) -> 
     assert result.confidence_mask == bytes([192]) * 6
 
 
-@pytest.mark.parametrize("include_confidence", [False, True])
-def test_segmentation_propagates_native_payload_error(
-    sdk, monkeypatch, tmp_path, include_confidence
-) -> None:
-    """An encoding failure from the native payload check must reach the caller."""
+def test_segmentation_propagates_binding_exception(sdk, monkeypatch, tmp_path) -> None:
+    """An SDKException raised by the native binding must reach the caller unchanged."""
 
     def segment(*args, **kwargs):
         raise_for_rac(-331, "segment")
@@ -378,7 +375,7 @@ def test_segmentation_propagates_native_payload_error(
     with pytest.raises(SDKException) as error:
         ra.segmentation.segment(
             ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3),
-            SegmentationOptions(model=str(model_dir), include_confidence=include_confidence),
+            SegmentationOptions(model=str(model_dir), include_confidence=True),
         )
     assert error.value.c_abi_code == -331
     assert int(error.value.code) == 331

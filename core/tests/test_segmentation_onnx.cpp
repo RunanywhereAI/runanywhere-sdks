@@ -392,7 +392,8 @@ int main() {
             }
             rac_segmentation_result_free(&result);
             rac_segmentation_confidence_mask_free(&confidence);
-            (void)rac_segmentation_cleanup(direct);
+            CHECK(rac_segmentation_cleanup(direct) == RAC_SUCCESS,
+                  "direct segmentation service cleans up the fixture session");
             rac_segmentation_destroy(direct);
         }
     }

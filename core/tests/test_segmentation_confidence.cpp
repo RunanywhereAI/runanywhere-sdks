@@ -70,6 +70,9 @@ enum class PayloadMode {
 
 PayloadMode g_mode = PayloadMode::kValid;
 int g_confidence_calls = 0;
+std::vector<uint8_t> g_valid_class_mask;
+std::vector<uint8_t> g_valid_diagnostic;
+std::vector<uint8_t> g_valid_confidence;
 
 struct FakeSegmentationImpl {
     std::string model_path;
@@ -357,11 +360,15 @@ rac_result_t segment_proto(rac_handle_t component, const std::string& request_by
     const rac_result_t rc = rac_segmentation_component_segment_proto(
         component, reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
         &buffer);
+    bool parsed = true;
     if (rc == RAC_SUCCESS && out_result) {
-        out_result->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
+        parsed = out_result->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
     }
     rac_proto_buffer_free(&buffer);
-    return rc;
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return parsed ? RAC_SUCCESS : RAC_ERROR_DECODING_ERROR;
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -437,6 +444,19 @@ void run_direct_cases(rac_handle_t handle, const std::vector<uint8_t>& rgb) {
                                                                          &result, &confidence);
         check(rc == RAC_SUCCESS, "direct valid payload succeeds");
         check_valid_result(result, confidence);
+        g_valid_class_mask.resize(kPixels * sizeof(uint16_t));
+        for (size_t i = 0; i < kPixels; ++i) {
+            const uint16_t value = result.class_mask[i];
+            g_valid_class_mask[i * 2] = static_cast<uint8_t>(value & 0xffU);
+            g_valid_class_mask[i * 2 + 1] = static_cast<uint8_t>((value >> 8U) & 0xffU);
+        }
+        if (result.diagnostic_rgba && result.diagnostic_rgba_size > 0) {
+            g_valid_diagnostic.assign(result.diagnostic_rgba,
+                                      result.diagnostic_rgba + result.diagnostic_rgba_size);
+        }
+        if (confidence.data && confidence.size > 0) {
+            g_valid_confidence.assign(confidence.data, confidence.data + confidence.size);
+        }
         rac_segmentation_result_free(&result);
         rac_segmentation_confidence_mask_free(&confidence);
         check(result.class_mask == nullptr && confidence.data == nullptr,
@@ -501,6 +521,18 @@ void run_proto_cases(rac_handle_t component) {
         check(pattern_ok, "proto confidence bytes preserve order and values");
         check(result.diagnostic_rgba().size() == kPixels * 4,
               "proto diagnostic is present when requested");
+        const std::vector<uint8_t> proto_confidence(result.confidence_mask_u8().begin(),
+                                                    result.confidence_mask_u8().end());
+        const std::vector<uint8_t> proto_class_mask(result.class_mask_u16_le().begin(),
+                                                    result.class_mask_u16_le().end());
+        const std::vector<uint8_t> proto_diagnostic(result.diagnostic_rgba().begin(),
+                                                    result.diagnostic_rgba().end());
+        check(proto_confidence == g_valid_confidence,
+              "direct and proto paths return identical confidence bytes");
+        check(proto_class_mask == g_valid_class_mask,
+              "direct and proto paths return identical class-mask bytes");
+        check(proto_diagnostic == g_valid_diagnostic,
+              "direct and proto paths return identical diagnostic bytes");
     }
 
     {

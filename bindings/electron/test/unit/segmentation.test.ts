@@ -20,9 +20,34 @@ function fakeDeps(segmentProto: () => Promise<Uint8Array>): AssetDeps {
   };
 }
 
-test('segmentation surfaces a native encoding failure unchanged', async () => {
+test('segmentation preserves a typed SDKException from the native boundary', async () => {
   const deps = fakeDeps(async () => {
     raiseForRac(-331, 'backend returned an invalid segmentation result');
+  });
+  const namespace = createSegmentationNamespace(deps);
+
+  await assert.rejects(
+    () =>
+      namespace.segment(image.rawRgb(new Uint8Array(2 * 2 * 3), 2, 2), {
+        includeConfidence: true,
+      }),
+    (error: unknown) => {
+      assert.ok(isSDKException(error));
+      assert.equal(error.code, ErrorCodes.ENCODING_ERROR);
+      assert.equal(error.cAbiCode, -331);
+      assert.match(error.message, /invalid segmentation result/);
+      return true;
+    }
+  );
+});
+
+test('segmentation converts a plain native-shaped rejection into an SDKException', async () => {
+  const deps = fakeDeps(async () => {
+    throw {
+      code: ErrorCodes.ENCODING_ERROR,
+      cAbiCode: -331,
+      message: 'backend returned an invalid segmentation result',
+    };
   });
   const namespace = createSegmentationNamespace(deps);
 

@@ -323,10 +323,11 @@ void run_generic_end_to_end() {
         rac_segmentation_result_free(&result);
 
         // Confidence values. The fixture's class bias is known, so the winning
-        // class probability is exact: 255 on even columns and 253 on odd ones.
-        // A 64x64 source maps 1:1 onto the 64x64 logits grid, so there is no
-        // interpolation between columns. A shifted buffer swaps the parity and
-        // a wrong quantization base changes both values.
+        // class probability is exact: 255 when there is no runner-up bias and
+        // 253 where the row/column phase puts the +5 bias on class 1. A 64x64
+        // source maps 1:1 onto the 64x64 logits grid, so there is no
+        // interpolation. The asymmetric pattern detects a shifted, reversed, or
+        // transposed buffer, and a wrong quantization base changes both values.
         const uint32_t confidence_width = 64;
         const uint32_t confidence_height = 64;
         const auto confidence_rgb = make_solid_rgb_bytes(confidence_width, confidence_height);
@@ -356,7 +357,9 @@ void run_generic_end_to_end() {
             for (uint32_t x = 0; x < confidence_width; ++x) {
                 const size_t index = static_cast<size_t>(y) * confidence_width + x;
                 if (confidence_pattern_ok) {
-                    const uint8_t expected = (x % 2U == 0U) ? 255U : 253U;
+                    const bool row_phase = (y % 4U) == 0U;
+                    const bool column_phase = (x % 2U) == 1U;
+                    const uint8_t expected = (row_phase != column_phase) ? 253U : 255U;
                     confidence_pattern_ok = confidence.data[index] == expected;
                 }
                 if (confidence_class_mask_ok) {
