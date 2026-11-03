@@ -222,6 +222,10 @@ export interface LoadedModel {
   /** The backend preference that was requested, when one was given. */
   readonly requestedBackend?: BackendPreference;
   readonly actualBackend: Backend;
+  /**
+   * Hardware class the serving backend reports: `'cpu'`, `'gpu'` (WebGPU), or
+   * `'unknown'` when the owner exposes no device diagnostics.
+   */
   readonly actualDevice: string;
   readonly runtimeVersion?: string;
   readonly abiVersion?: string;
