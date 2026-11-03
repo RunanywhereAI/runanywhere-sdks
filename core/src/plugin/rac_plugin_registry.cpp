@@ -360,15 +360,27 @@ size_t rac_engine_manifest_count(void) noexcept {
     }
 }
 
-static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_handle,
-                                    void** out_previous_handle) noexcept {
-    /* C ABI boundary: noexcept. Propagating a C++ exception past this
+/**
+ * register_plugin: admit a plugin into the engine registry.
+ *
+ * Admits `vtable` under `vtable->metadata.name`. Refusal results: NULL/invalid
+ * input, ABI mismatch, failed declaration capability_check, a same-name plugin
+ * of higher priority (RAC_ERROR_PLUGIN_DUPLICATE), or a same-name plugin still
+ * serving a leased model (RAC_ERROR_PLUGIN_BUSY) — the busy path also removes
+ * the pending manifest of a genuinely-new replacement while leaving the active
+ * plugin's own manifest intact. A lower/equal-priority duplicate replaces the
+ * existing plugin and yields its vtable via `out_previous_handle` (static
+ * form) / evicted dl handle (dynamic form).
+ *
+ * C ABI boundary: noexcept. Propagating a C++ exception past this
      * boundary is undefined behavior per ISO C++ [except.handle]/9 — every
      * SDK (Swift, Kotlin/JNI, Dart/FFI, NitroModules, WASM) calls this from
      * a non-C++ stack unwinder. std::string / std::unordered_map /
      * std::vector ops below can throw std::bad_alloc, and the third-party
      * `capability_check` callback can throw anything; both are coerced to
      * structured rac_result_t error codes. */
+static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_handle,
+                                    void** out_previous_handle) noexcept {
     try {
         if (vtable == nullptr) {
             RAC_LOG_ERROR(LOG_CAT, "rac_plugin_register: NULL vtable");

@@ -497,6 +497,14 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
             // working backend on the unavailability ledger and make
             // capabilities() report it as missing.
             // BUSY also means an existing plugin is serving a leased model.
+            /**
+             * try_register: handle one backend's registration result from the
+             * Electron addon bootstrap. SUCCESS, PLUGIN_DUPLICATE,
+             * PLUGIN_BUSY and MODULE_ALREADY_REGISTERED all leave the backend
+             * registered and serving (the active plugin owns any leased
+             * model), so none is recorded as unavailability; every other
+             * result is logged onto the availability ledger under `name`.
+             */
             const auto try_register = [](const char* name, rac_result_t result) {
                 if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
                     result == RAC_ERROR_PLUGIN_BUSY ||
