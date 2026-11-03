@@ -78,11 +78,12 @@ typedef struct rac_llm_service_ops {
 
 Each backend ships a single `rac_engine_vtable_t` (see
 `include/rac/plugin/rac_engine_vtable.h`) whose `metadata.abi_version`
-must match `RAC_PLUGIN_API_VERSION` (`9u`, in
-`include/rac/plugin/rac_plugin_entry.h`). The vtable carries exactly 10 active
+must match `RAC_PLUGIN_API_VERSION` (`14u`, in
+`include/rac/plugin/rac_plugin_entry.h`). The vtable carries exactly 13 active
 per-primitive op-struct slots (LLM / STT / TTS / VAD / embeddings / VLM /
-diffusion / diarization / segmentation / reranking), one optional terminal
-token-count callback, and 6 reserved slots;
+diffusion / diarization / segmentation / reranking / image embedding / OCR /
+decision) and 4 reserved slots (the optional token-count callback is on
+`rac_llm_service_ops_t`);
 primitives the engine does not serve are left `NULL`.
 
 ```c
@@ -149,7 +150,7 @@ rac_registry_unload_plugin("llamacpp");
 │          │                  │                  │                │       │
 │  ┌───────▼──────────────────▼──────────────────▼────────────────▼─────┐ │
 │  │                      Plugin Registry                               │ │
-│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 9u)   │ │
+│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 14u)  │ │
 │  │   priority-order primitive op-struct dispatch (rac_plugin_find)     │ │
 │  └────────────────────────────────┬────────────────────────────────────┘ │
 └───────────────────────────────────│─────────────────────────────────────┘

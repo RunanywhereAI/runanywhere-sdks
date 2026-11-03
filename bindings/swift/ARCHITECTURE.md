@@ -2203,16 +2203,17 @@ Swift manages this in `NativeProtoABI`:
 
 NULL fields cause C++ to fall back or return `RAC_ERROR_NOT_SUPPORTED`. See §6.5.19 for the Swift implementation of each slot.
 
-### §13.4 Plugin ABI v9 — `rac_engine_vtable_t`
+### §13.4 Plugin ABI v14 — `rac_engine_vtable_t`
 
 Every backend publishes a single `rac_engine_vtable_t`:
 
 - `rac_engine_metadata_t metadata` — `abi_version` (must equal `RAC_PLUGIN_API_VERSION`), `name`, `display_name`, `engine_version`, `priority`, `capability_flags`, optional `runtimes[]` + `formats[]`.
 - `rac_result_t (*capability_check)(void)` — called once after ABI version validation.
 - `void (*on_unload)(void)` — called on unload.
-- 10 active primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`, `rerank_ops`. NULL means the engine does not serve that primitive. (`rerank_ops` was revived at wire value 11 in ABI v8; the original wire value 6 remains retired.)
-- One optional `get_stream_token_counts` callback. NULL means commons estimates token totals and marks them as estimated.
-- 6 `const void* reserved_slot_N` fields.
+- 13 active primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`, `rerank_ops`, `image_embedding_ops`, `ocr_ops`, `decision_ops`. NULL means the engine does not serve that primitive. (`rerank_ops` was revived at wire value 11 in ABI v8; the original wire value 6 remains retired.)
+- 4 `const void* reserved_slot_N` fields (`reserved_slot_6`–`reserved_slot_9`).
+
+The optional `get_stream_token_counts` callback is on `rac_llm_service_ops_t`, not the vtable. NULL means commons estimates token totals and marks them as estimated.
 
 `metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `9u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
 

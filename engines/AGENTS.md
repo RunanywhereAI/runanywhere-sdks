@@ -109,8 +109,8 @@ initializer is what keeps the ABI from drifting silently.
    model file, e.g. cloud); `availability` (PUBLIC/PRIVATE), `priority`,
    package owner/name.
 2. **A `rac_engine_vtable_t`**: served-primitive slots non-NULL, **every other
-   slot explicit NULL** (10 primitive slots + the optional
-   `get_stream_token_counts` callback + **7 reserved slots**). Lives in
+   slot explicit NULL** (13 primitive slots + **4 reserved slots**; the optional
+   `get_stream_token_counts` callback lives on `rac_llm_service_ops_t`). Lives in
    `.rodata`; a future reserved-slot promotion turns the aggregate initializer
    into a compile error — the intended tripwire.
 3. **The uniform MODEL LIFECYCLE** on each served op-table:
