@@ -81,7 +81,7 @@ The full option set (per-backend `RAC_BACKEND_<NAME>` flags, `RAC_DESKTOP_ADAPTE
 `runanywhere-commons` (this directory) is a unified C/C++ library (C++20 internals, pure C API
 surface) that sits between platform SDKs and ML inference backends (`../engines/`). It is the
 single source of truth for business logic; platform SDKs are thin bridges. The repo-root
-`AGENTS.md` covers the cross-platform layer diagram and the `rac_engine_vtable_t` v9 ABI at the
+`AGENTS.md` covers the cross-platform layer diagram and the `rac_engine_vtable_t` v14 ABI at the
 level every SDK needs; what follows here is `core/`-internal detail that needs multiple files
 to piece together.
 
