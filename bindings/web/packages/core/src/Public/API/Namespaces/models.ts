@@ -8,6 +8,7 @@ import {
   ModelCompatibilityRequest,
   ModelCompatibilityResult,
   ModelFileRole,
+  type ModelLoadRequest,
   ModelRegistryStatus,
   type InferenceFramework,
   type ModelInfo,
@@ -18,7 +19,12 @@ import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { Runtime } from '../../../Foundation/RuntimeConfig.js';
 import { ModelRegistry } from '../../Extensions/RunAnywhere+ModelRegistry.js';
 import type { RefreshOptions } from '../../../Adapters/ModelRegistryAdapter.js';
-import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
+import {
+  WebModelLifecycle,
+  describeModelLoadBackend,
+  resolveLoadedModelPlacement,
+  type LoadedModelPlacement,
+} from '../../Extensions/RunAnywhere+ModelLifecycle.js';
 import {
   registerModelArchive,
   registerModelFromUrl,
@@ -151,6 +157,7 @@ function toRegisterFiles(files: readonly NonNullable<ModelRegistration['files']>
 
 interface ResolvedLoadOptions {
   requestedBackend?: BackendPreference;
+  backendPreferences?: BackendPreference[];
   accelerator?: AcceleratorPolicy;
 }
 
@@ -165,7 +172,54 @@ function resolveLoadOptions(options?: LoadOptions): ResolvedLoadOptions {
     ?? (options?.useGpu !== undefined ? (options.useGpu ? 'gpu' : 'cpu') : undefined);
   return {
     requestedBackend: backendPreferences?.[0],
+    backendPreferences,
     accelerator,
+  };
+}
+
+function validateLoadOptions(options?: LoadOptions): void {
+  if (options?.threads !== undefined) {
+    throw SDKException.invalidConfiguration(
+      'LoadOptions.threads was retired from the load ABI (ModelLoadRequest reserved tag 7) '
+        + 'and is not a hard runtime guarantee. Remove it.',
+    );
+  }
+  if (options?.contextLength !== undefined
+      && (!Number.isInteger(options.contextLength)
+        || options.contextLength < 0
+        || options.contextLength > 2_147_483_647)) {
+    throw SDKException.invalidConfiguration(
+      'LoadOptions.contextLength must be an integer between 0 and 2147483647.',
+    );
+  }
+  if (options?.backendPreferences?.some((preference) => preference.required)) {
+    throw SDKException.invalidConfiguration(
+      'LoadOptions.backendPreferences.required cannot be carried by ModelLoadRequest because '
+        + 'backend_preferences contains framework enums only. Remove required or pass one '
+        + 'preferred backend.',
+    );
+  }
+}
+
+function makeModelLoadRequest(
+  id: string,
+  model: ModelInfo | null,
+  options: LoadOptions | undefined,
+  resolved: ResolvedLoadOptions,
+): ModelLoadRequest {
+  const framework = resolved.requestedBackend
+    ? backendToFramework(resolved.requestedBackend.backend)
+    : model?.framework;
+  return {
+    modelId: id,
+    category: model?.category,
+    framework,
+    forceReload: options?.forceReload ?? false,
+    validateAvailability: true,
+    contextLength: options?.contextLength,
+    backendPreferences: resolved.backendPreferences?.map(
+      (preference) => backendToFramework(preference.backend),
+    ) ?? [],
   };
 }
 
@@ -177,21 +231,82 @@ function isModelResident(id: string): boolean {
   });
 }
 
-function toLoadedModel(
+/** Public `actualDevice` vocabulary: WebGPU reports as 'gpu', absence of diagnostics as 'unknown'. */
+function deviceToPublicDevice(device: 'cpu' | 'webgpu' | null): 'cpu' | 'gpu' | 'unknown' {
+  if (device === 'webgpu') return 'gpu';
+  return device ?? 'unknown';
+}
+
+/** Map an `AcceleratorPolicy` onto the runtime mode it asks `Runtime.setAcceleration` for. */
+function requestedRuntimeMode(
+  accelerator: AcceleratorPolicy | undefined,
+): 'cpu' | 'webgpu' | undefined {
+  if (accelerator === undefined || accelerator === 'auto') return undefined;
+  return accelerator === 'gpu' ? 'webgpu' : 'cpu';
+}
+
+/** Short printed name for the device the owner reports. */
+function deviceLabel(device: 'cpu' | 'webgpu'): string {
+  return device === 'webgpu' ? 'WebGPU' : 'CPU';
+}
+
+/**
+ * Why one explicit `LoadOptions.accelerator` request ended unmet. Warns are
+ * derived from the device the *serving* backend reports — never from the
+ * global llama flag, and never carried from an unrelated runtime degradation.
+ */
+function acceleratorMissReason(
+  accelerator: AcceleratorPolicy,
+  placement: LoadedModelPlacement,
+  framework: InferenceFramework | undefined,
+): string {
+  const backendName = placement.backendId === 'llamacpp'
+    ? 'llama.cpp'
+    : placement.backendId === 'onnx'
+      ? 'ONNX/Sherpa'
+      : frameworkToBackend(framework);
+  if (placement.device === null) {
+    return `accelerator "${accelerator}" could not be confirmed: the ${backendName} backend `
+      + 'reports no device diagnostics.';
+  }
+  if (placement.backendId === 'onnx') {
+    return `accelerator "${accelerator}" was not honored: the ONNX/Sherpa backend is running on ${deviceLabel(placement.device)}; `
+      + 'speech acceleration is fixed at ONNX.register({ acceleration }) and does not switch per load.';
+  }
+  if (placement.backendId === 'llamacpp') {
+    return `accelerator "${accelerator}" was not honored: llama.cpp resolved to and is running on ${deviceLabel(placement.device)}.`;
+  }
+  return `accelerator "${accelerator}" was not honored: the ${backendName} backend is running on ${deviceLabel(placement.device)}.`;
+}
+
+async function toLoadedModel(
   id: string,
   category: ModelCategory,
   resolved: ResolvedLoadOptions,
   framework?: InferenceFramework,
-): LoadedModel {
+): Promise<LoadedModel> {
+  // Report the device of the backend that actually serves this model — llama
+  // reads its runtime mode (worker health when the worker owns the load),
+  // speech reads ONNX/Sherpa diagnostics — never the global llama flag alone.
+  const placement = await resolveLoadedModelPlacement(id, framework);
+  const actualDevice = deviceToPublicDevice(placement.device);
+  const mode = requestedRuntimeMode(resolved.accelerator);
+  let fallbackReason: string | undefined;
+  const accelerator = resolved.accelerator;
+  if (accelerator && mode && (placement.device === null || placement.device !== mode)) {
+    const reason = acceleratorMissReason(accelerator, placement, framework);
+    modelsLogger.warning(`models.load('${id}'): ${reason}`);
+    fallbackReason = reason;
+  }
   return {
     id,
     category,
     requestedBackend: resolved.requestedBackend,
     actualBackend: frameworkToBackend(framework),
-    actualDevice: Runtime.active === 'webgpu' ? 'gpu' : 'cpu',
+    actualDevice,
     runtimeVersion: undefined,
     abiVersion: undefined,
-    fallbackReason: Runtime.degradedReason ?? undefined,
+    fallbackReason,
     close(): Promise<void> {
       return models.unload(id);
     },
@@ -373,18 +488,24 @@ export const models = {
 
   /**
    * Load a model now instead of paying the cost on the first generation.
+   * contextLength and optional backendPreferences are forwarded on ModelLoadRequest.
    *
-   * @throws SDKException when the model is absent, `accelerator: 'npu'` is
-   *   requested (unsupported on Web), or the backend rejects the load.
+   * Accelerator contract: the runtime switcher belongs to llama.cpp, so a
+   * llama-served load switches acceleration before loading; a speech
+   * (ONNX/Sherpa) route never touches it — its acceleration is fixed at
+   * `ONNX.register({ acceleration })`. An explicit accelerator the serving
+   * backend did not honor (GPU or CPU, either direction) is logged and
+   * reported through `fallbackReason` rather than dropping silently.
+   * `actualDevice` is the backend-reported device: `'cpu'`, `'gpu'`, or
+   * `'unknown'` when the owner publishes no device diagnostics.
+   *
+   * @throws SDKException when the model is absent; accelerator npu, threads, an invalid
+   *   context length, or a required backend preference is requested; or the backend rejects
+   *   the load.
    */
   async load(id: string, options?: LoadOptions): Promise<LoadedModel> {
     await ensureReady();
-    if (options?.contextLength !== undefined || options?.threads !== undefined) {
-      throw SDKException.invalidConfiguration(
-        'contextLength and threads have no field on ModelLoadRequest in the IDL, so the Web SDK '
-          + 'cannot honor them. Remove them or set them on the backend register() call.',
-      );
-    }
+    validateLoadOptions(options);
     if (options?.accelerator === 'npu') {
       throw SDKException.unsupportedCapability(
         'LoadOptions.accelerator = npu',
@@ -392,21 +513,22 @@ export const models = {
       );
     }
     const resolved = resolveLoadOptions(options);
-    if (resolved.accelerator && resolved.accelerator !== 'auto') {
-      await Runtime.setAcceleration(resolved.accelerator === 'gpu' ? 'webgpu' : 'cpu');
-    }
+    const requestedMode = requestedRuntimeMode(resolved.accelerator);
     const model = ModelRegistry.getModel(id);
-    const framework = resolved.requestedBackend
-      ? backendToFramework(resolved.requestedBackend.backend)
-      : model?.framework;
-    const result = await SDKCore.loadModel({
-      modelId: id,
-      category: model?.category,
-      framework,
-      forceReload: options?.forceReload ?? false,
-      validateAvailability: true,
-      backendPreferences: [],
-    });
+    const request = makeModelLoadRequest(id, model, options, resolved);
+    // Scope the global switcher to llama.cpp: the lifecycle router decides
+    // which backend serves this load (ordered preferences, registered modules,
+    // capabilities), and re-routing an unrelated speech load through the llama
+    // switcher would rebuild the llama WASM module mid-flight. Routes cores
+    // cannot resolve (null) keep the previous global behavior — preference
+    // recorded, no switcher side effect unless llama.cpp serves it.
+    if (requestedMode) {
+      const route = describeModelLoadBackend(request, model);
+      if (route.backendId !== 'onnx') {
+        await Runtime.setAcceleration(requestedMode);
+      }
+    }
+    const result = await SDKCore.loadModel(request);
     if (!result || result.error) {
       throw result?.error
         ? new SDKException(result.error)
@@ -558,9 +680,17 @@ function toProgressEvent(progress: DownloadProgress, operationId: string, sequen
   };
 }
 
-/** Test seam for download progress mapping and platform probes. */
+/**
+ * Test seam for request construction, download progress mapping and platform
+ * probes. Both halves matter: the probe exports are consumed by
+ * models.probes.test.ts, the request helpers by the load-path tests, so a
+ * merge that keeps only one side breaks the other set.
+ */
 export const __testing__ = {
+  makeModelLoadRequest,
+  resolveLoadOptions,
   toProgressEvent,
+  validateLoadOptions,
   probeAvailableRamBytes,
   probeAvailableStorageBytes,
   KNOWN_EXHAUSTED_BYTES_SENTINEL,

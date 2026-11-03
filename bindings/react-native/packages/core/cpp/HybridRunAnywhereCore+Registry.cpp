@@ -126,7 +126,7 @@ ownedRegistryBuffer(const char *operation, rac_proto_buffer_t &protoBuffer,
     }
     std::string message =
         "RAC_RESULT=" + std::to_string(status) + " " + operation;
-    if (protoBuffer.error_message) {
+    if (protoBuffer.error_message && protoBuffer.error_message[0]) {
       message += ": ";
       message += protoBuffer.error_message;
     }

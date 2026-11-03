@@ -12,6 +12,7 @@ import {
   isSDKException,
   asSDKException,
   asNativeSDKException,
+  sdkExceptionFromRcResult,
 } from '../../src/Foundation/Errors/SDKException';
 
 describe('SDKException', () => {
@@ -174,5 +175,13 @@ describe('SDKException', () => {
       const exception = SDKException.authenticationFailed();
       expect(exception.category).toBe(ErrorCategory.ERROR_CATEGORY_AUTH);
     });
+  });
+
+  it('keeps an unmapped raw rac code UNSPECIFIED when the proto code is unknown', async () => {
+    const exception = await sdkExceptionFromRcResult(-12345);
+
+    expect(exception?.code).toBe(ErrorCode.ERROR_CODE_UNKNOWN);
+    expect(exception?.cAbiCode).toBe(-12345);
+    expect(exception?.category).toBe(ErrorCategory.ERROR_CATEGORY_UNSPECIFIED);
   });
 });

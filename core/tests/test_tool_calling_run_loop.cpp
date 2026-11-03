@@ -587,6 +587,211 @@ int test_one_tool_call_then_final_text() {
     return 0;
 }
 
+int test_default_repaired_key_collision_never_executes() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}</tool_call>",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "collision request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(exec.invocation_count == 0, "ambiguous call never reaches executor");
+    CHECK(generate_calls() == 1, "ambiguous call does not synthesize a result");
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "collision returns invalid argument");
+    runanywhere::v1::ToolCallingResult result;
+    CHECK(out.data && result.ParseFromArray(out.data, static_cast<int>(out.size)),
+          "collision error result decodes");
+    CHECK(result.error_code() == RAC_ERROR_INVALID_ARGUMENT,
+          "collision reports invalid argument");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+/** @brief A collision in a later envelope (parallel_tool_calls) never dispatches. */
+int test_second_default_envelope_collision_never_executes() {
+    if (!load_mock_llm())
+        return 1;
+    // With parallel_tool_calls every envelope is dispatched, so a colliding key
+    // in a later envelope must fail the turn exactly like one in the first.
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Paris\"}}</tool_call>"
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}</tool_call>",
+    });
+    auto request = make_request("Look up the weather twice.");
+    request.mutable_options()->set_validate_calls(false);
+    request.mutable_options()->set_parallel_tool_calls(true);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "parallel collision request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(exec.invocation_count == 0, "parallel ambiguous call never reaches executor");
+    CHECK(generate_calls() == 1, "parallel ambiguous call does not synthesize a result");
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "parallel collision returns invalid argument");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+/** @brief A collision inside encoded function.arguments never dispatches. */
+int test_envelope_string_arguments_collision_never_executes() {
+    if (!load_mock_llm())
+        return 1;
+    // OpenAI-style envelope: the whole argument object is one JSON-encoded
+    // string. Its colliding keys must be rejected before dispatch, not repaired
+    // into a silently last-wins value.
+    set_responses({
+        "<tool_call>{\"function\":{\"name\":\"get_weather\",\"arguments\":"
+        "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}</tool_call>",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "encoded-arguments collision request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(exec.invocation_count == 0, "encoded-arguments collision never reaches executor");
+    CHECK(generate_calls() == 1, "encoded-arguments collision does not synthesize a result");
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT,
+          "encoded-arguments collision returns invalid argument");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+/** @brief \u-escaped braces must not hide an encoded argument collision. */
+int test_envelope_unicode_escaped_arguments_collision_never_executes() {
+    if (!load_mock_llm())
+        return 1;
+    // Braces written as \u007B/\u007D survive normalization as real braces, so
+    // the parser expands this object and would dispatch it last-wins unless the
+    // scan decodes the escapes first.
+    set_responses({
+        "<tool_call>{\"function\":{\"name\":\"get_weather\",\"arguments\":"
+        "\"\\u007B\\\"x\xFF\\\":1,\\\"x\xFE\\\":2\\u007D\"}}</tool_call>",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "escaped-brace collision request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(exec.invocation_count == 0, "escaped-brace collision never reaches executor");
+    CHECK(generate_calls() == 1, "escaped-brace collision does not synthesize a result");
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "escaped-brace collision returns invalid argument");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+/** @brief JSON text inside object-valued arguments is data, not keys. */
+int test_nested_tool_data_arguments_string_still_executes() {
+    if (!load_mock_llm())
+        return 1;
+    // Object-valued arguments pass through untouched, so an "arguments" key
+    // buried in tool data is data: it must not be rejected as a collision —
+    // including when it sits under a nested tool-alias object or a nested
+    // tool_calls array, neither of which the parser unwraps.
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Paris\","
+        "\"metadata\":{\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"},"
+        "\"tool\":{\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"},"
+        "\"tool_calls\":[{\"type\":\"function\",\"arguments\":"
+        "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}]}}</tool_call>",
+        "The weather lookup completed.",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "nested tool-data request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "nested tool-data arguments string does not fail the turn");
+    CHECK(exec.invocation_count == 1, "nested tool-data call still executes once");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+/** @brief Grammar backends strip think blocks, so a collision inside one is not a failure. */
+int test_grammar_backend_ignores_collision_inside_think_block() {
+    // Grammar backends strip closed thinking blocks before parsing, so a
+    // colliding example that only lives inside one can never reach the parser
+    // or the executor; the turn must not fail on it.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        "<think>Example: <tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"x\xFF\":1,"
+        "\"x\xFE\":2}}</tool_call> is malformed.</think>"
+        "[get_weather(location=\"Paris\")]",
+        "The weather lookup completed.",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "grammar think-block request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "think-block collision does not fail the grammar turn");
+    CHECK(exec.invocation_count == 1, "post-thinking call still executes once");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_default_invalid_utf8_reaches_executor() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"\xC3\x28\"}}</"
+        "tool_call>",
+        "The weather lookup completed.",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(true);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "UTF-8 execution request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "malformed model output returns a successful run-loop result");
+    runanywhere::v1::ToolCallingResult result;
+    CHECK(out.data && result.ParseFromArray(out.data, static_cast<int>(out.size)),
+          "repaired UTF-8 result decodes");
+    CHECK(result.is_complete(), "repaired default call completes");
+    CHECK(result.error_code() == RAC_SUCCESS, "repaired default call has no validation error");
+    CHECK(result.tool_calls_size() == 1, "one repaired default call recorded");
+    CHECK(result.tool_results_size() == 1, "one repaired default call result recorded");
+    CHECK(exec.invocation_count == 1, "validation permits repaired argument to execute once");
+    if (!exec.received_calls.empty()) {
+        CHECK(exec.received_calls[0].name() == "get_weather", "executor receives correct tool");
+        CHECK(exec.received_calls[0].arguments_json() == "{\"location\":\"\xEF\xBF\xBD(\"}",
+              "executor receives repaired value without extra quotes");
+    }
+    CHECK(generate_calls() == 2, "repaired call proceeds to final synthesis");
+    CHECK(result.text() == "The weather lookup completed.", "final synthesis is returned");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 int test_forced_tool_name_only_is_narrowed_and_independently_budgeted() {
     if (!load_mock_llm())
         return 1;
@@ -1240,6 +1445,65 @@ int test_executor_result_contract_is_fail_closed() {
                   "failed executor result has a deterministic error");
         }
         rac_proto_buffer_free(&out);
+    }
+
+    struct ErrorCase {
+        const char* raw;
+        const char* expected;
+    };
+    const ErrorCase errors[] = {
+        {"failed_\xFF", "failed_\xEF\xBF\xBD"},
+        {"failed_\xC3(", "failed_\xEF\xBF\xBD("},
+        {"failed_\x80", "failed_\xEF\xBF\xBD"},
+        {"failed_\xC0\xAF", "failed_\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xED\xA0\x80", "failed_\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xF4\x90\x80\x80", "failed_\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xE2\x82", "failed_\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_\xF0\x9F\x98", "failed_\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD"},
+        {"failed_ascii", "failed_ascii"},
+        {"failed_東京_😀", "failed_東京_😀"},
+    };
+    struct ErrorState {
+        const char* message;
+        rac_result_t callback_status;
+        int calls = 0;
+    };
+    const auto error_callback = [](const uint8_t*, size_t, rac_proto_buffer_t* out,
+                                   void* user_data) -> rac_result_t {
+        auto& state = *static_cast<ErrorState*>(user_data);
+        ++state.calls;
+        (void)rac_proto_buffer_set_error(out, RAC_ERROR_INTERNAL, state.message);
+        return state.callback_status;
+    };
+    for (const auto callback_status : {RAC_ERROR_INTERNAL, RAC_SUCCESS}) {
+        for (const auto& error : errors) {
+            set_responses({
+                R"(<tool_call>{"tool":"get_weather","arguments":{"location":"A"}}</tool_call>)",
+            });
+            auto request = make_request("weather");
+            std::vector<uint8_t> bytes;
+            serialize(request, &bytes);
+            ErrorState state{error.raw, callback_status};
+            rac_proto_buffer_t out;
+            rac_proto_buffer_init(&out);
+            const auto rc = run_loop(bytes.data(), bytes.size(), error_callback, &state, &out);
+            CHECK(rc == RAC_SUCCESS, "executor error uses result envelope");
+            CHECK(state.calls == 1, "failing executor invoked once");
+            runanywhere::v1::ToolCallingResult result;
+            const bool decoded =
+                out.data && result.ParseFromArray(out.data, static_cast<int>(out.size));
+            CHECK(decoded, "executor error envelope contains valid UTF-8");
+            CHECK(result.error_code() == RAC_ERROR_INTERNAL, "executor error code preserved");
+            CHECK(!result.is_complete(), "executor failure leaves run incomplete");
+            CHECK(result.error_message() == error.expected, "final error message repaired exactly");
+            CHECK(result.tool_results_size() == 1, "one executor failure recorded");
+            if (result.tool_results_size() == 1) {
+                CHECK(result.tool_results(0).is_error(), "executor failure remains an error");
+                CHECK(result.tool_results(0).error() == error.expected,
+                      "recorded tool error repaired exactly");
+            }
+            rac_proto_buffer_free(&out);
+        }
     }
 
     cleanup_environment();
@@ -2192,6 +2456,13 @@ int main() {
         test_null_arguments_return_null_pointer();
         test_no_tool_call_completes_immediately();
         test_one_tool_call_then_final_text();
+        test_default_invalid_utf8_reaches_executor();
+        test_default_repaired_key_collision_never_executes();
+        test_second_default_envelope_collision_never_executes();
+        test_envelope_string_arguments_collision_never_executes();
+        test_envelope_unicode_escaped_arguments_collision_never_executes();
+        test_nested_tool_data_arguments_string_still_executes();
+        test_grammar_backend_ignores_collision_inside_think_block();
         test_forced_tool_name_only_is_narrowed_and_independently_budgeted();
         test_none_vetoes_forced_tool_name();
         test_none_blocks_hallucinated_call_when_validation_disabled();

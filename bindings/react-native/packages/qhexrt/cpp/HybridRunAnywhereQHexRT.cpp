@@ -13,6 +13,8 @@
 
 #include "HybridRunAnywhereQHexRT.hpp"
 
+#include "rac/plugin/rac_plugin_registration.h"
+
 #include "rac/core/rac_error.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/qhexrt/rac_qhexrt.h"
@@ -49,12 +51,6 @@ rac_result_t rac_backend_qhexrt_unregister(void);
 namespace margelo::nitro::runanywhere::qhexrt {
 
 namespace {
-
-bool isRegistrationSuccess(rac_result_t result) {
-  return result == RAC_SUCCESS ||
-         result == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
-         result == RAC_ERROR_PLUGIN_DUPLICATE;
-}
 
 bool isBackendUnavailable(rac_result_t result) {
   return result == RAC_ERROR_BACKEND_UNAVAILABLE ||
@@ -122,7 +118,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::registerBackend() {
       isRegistered_ = false;
       return false;
     }
-    if (!isRegistrationSuccess(result)) {
+    if (!rac_plugin_registration_succeeded(result)) {
       RAC_LOG_ERROR(LOG_CATEGORY, "QHexRT registration failed with code: %d",
                     result);
       throw std::runtime_error("QHexRT registration failed with error: " +

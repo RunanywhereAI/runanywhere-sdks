@@ -336,7 +336,9 @@ export async function registerArchiveModel(
     ...(input.contextLength !== undefined && input.contextLength > 0
       ? { contextLength: input.contextLength }
       : {}),
-    ...(input.description ? { metadata: { description: input.description } } : {}),
+    ...(input.description !== undefined
+      ? { metadata: { description: input.description } }
+      : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     ...(input.supportsThinking
       ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
@@ -392,7 +394,7 @@ export async function registerMultiFileModel(
       ? { contextLength: input.contextLength }
       : {}),
     ...(input.source !== undefined ? { source: input.source } : {}),
-    ...(input.description ? { description: input.description } : {}),
+    ...(input.description !== undefined ? { description: input.description } : {}),
     ...(input.supportsThinking !== undefined
       ? { supportsThinking: input.supportsThinking }
       : {}),

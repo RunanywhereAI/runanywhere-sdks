@@ -511,7 +511,7 @@ export async function sdkExceptionFromRcResult(
       ? (absCode as ErrorCodeProto)
       : ErrorCodeProto.ERROR_CODE_UNKNOWN,
     `Error code: ${rcResult}`,
-    { cAbiCode: rcResult }
+    { cAbiCode: rcResult, category: categoryForCode(rcResult) }
   );
 }
 

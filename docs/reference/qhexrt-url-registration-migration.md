@@ -11,9 +11,13 @@ HF-auth preflight. Probe the device with `QHexRT.probeNpu()`, filter the list,
 and submit eligible models through `RunAnywhere.models.register()`.
 
 Commons and the engine still resolve logical bundle references, register model
-metadata, and manage downloads and inference. Explicitly pinned variant URLs
-are preserved; registration does not validate a pinned architecture against the
-current device. Callers must reject incompatible pins before registration.
+metadata, and manage downloads and inference. For logical bundle references,
+registration validates known architecture pins in the first repository folder
+(such as `/v79` or `/v79/model.json`) against the current device before network
+resolution or registry changes. Matching pins are preserved; mismatches return
+`RAC_ERROR_INVALID_ARGUMENT`. Direct `/resolve/` or `/blob/` URLs register a single
+file and do not receive this bundle-folder check, so callers must filter any
+incompatible direct URLs before registration.
 
 Kotlin's `ModelRegistration.url`, `ModelRegistration.archive`, and
 `ModelRegistration.multiFile` factories, and the deprecated URL, archive, and

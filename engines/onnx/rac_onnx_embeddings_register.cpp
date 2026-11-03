@@ -39,6 +39,10 @@ struct onnx_embeddings_handle {
 
 namespace {
 
+bool wants_l2(const rac_embeddings_options_t* options) {
+    return options == nullptr || options->normalize != RAC_EMBEDDINGS_NORMALIZE_NONE;
+}
+
 static rac_result_t onnx_embed_vtable_initialize(void* impl, const char* model_path) {
     (void)impl;
     (void)model_path;
@@ -48,7 +52,6 @@ static rac_result_t onnx_embed_vtable_initialize(void* impl, const char* model_p
 static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
                                             const rac_embeddings_options_t* options,
                                             rac_embeddings_result_t* out_result) {
-    (void)options;
     if (!impl || !text || !out_result)
         return RAC_ERROR_NULL_POINTER;
 
@@ -58,7 +61,7 @@ static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
 
     try {
         size_t total_tokens = 0;
-        auto embedding = h->provider->embed(text, &total_tokens);
+        auto embedding = h->provider->embed(text, &total_tokens, wants_l2(options));
         // The provider uses an empty vector as its failure sentinel
         // (onnx_embedding_provider.cpp:591-633 — model run / dtype mismatch /
         // exception all return {}). Treat that as RAC_ERROR_INFERENCE_FAILED so
@@ -100,7 +103,6 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
                                                   size_t num_texts,
                                                   const rac_embeddings_options_t* options,
                                                   rac_embeddings_result_t* out_result) {
-    (void)options;
     if (!impl || !texts || !out_result)
         return RAC_ERROR_NULL_POINTER;
 
@@ -116,7 +118,7 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
         }
 
         size_t total_tokens = 0;
-        auto batch_results = h->provider->embed_batch(texts_vec, &total_tokens);
+        auto batch_results = h->provider->embed_batch(texts_vec, &total_tokens, wants_l2(options));
         if (batch_results.size() != num_texts) {
             RAC_LOG_ERROR(LOG_CAT, "Batch embedding returned %zu results, expected %zu",
                           batch_results.size(), num_texts);

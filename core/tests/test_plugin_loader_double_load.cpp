@@ -8,7 +8,9 @@
 #include <cstdio>
 #include <cstring>
 
+#include "../src/plugin/plugin_registry_internal.h"
 #include "rac/core/rac_error.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_loader.h"
 #include "rac/plugin/rac_primitive.h"
@@ -52,6 +54,65 @@ int main() {
                      count_after_first, count_after_second);
         return 1;
     }
+
+    // An attached manifest must survive a reload while the active vtable is leased.
+    const auto* active = rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT);
+    const rac_primitive_t primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+    rac_engine_manifest_t manifest{};
+    manifest.name = active->metadata.name;
+    manifest.display_name = active->metadata.display_name;
+    manifest.version = active->metadata.engine_version;
+    manifest.package_owner = "tests";
+    manifest.package_name = "test_plugin";
+    manifest.availability = RAC_ENGINE_AVAILABILITY_PUBLIC;
+    manifest.priority = active->metadata.priority;
+    manifest.primitives = &primitive;
+    manifest.primitives_count = 1;
+    const rac_engine_manifest_t* leased_manifest = nullptr;
+    if (rac_engine_manifest_attach_vtable(&manifest, active) != RAC_SUCCESS ||
+        rac_registry_load_plugin(RAC_TEST_PLUGIN_PATH) != RAC_SUCCESS ||
+        rac_plugin_registry_acquire(active, &leased_manifest) != RAC_SUCCESS ||
+        leased_manifest != &manifest) {
+        std::fprintf(stderr, "could not attach/acquire fixture manifest\n");
+        return 1;
+    }
+    // Low-level load/unload still expose BUSY; only registration consumers normalize it.
+    if (rac_registry_load_plugin(RAC_TEST_PLUGIN_PATH) != RAC_ERROR_PLUGIN_BUSY ||
+        rac_registry_unload_plugin("test_plugin") != RAC_ERROR_PLUGIN_BUSY) {
+        std::fprintf(stderr, "leased plugin did not refuse replacement/unload\n");
+        return 1;
+    }
+    const char* paths[] = {nullptr, "", RAC_TEST_PLUGIN_PATH, RAC_TEST_PLUGIN_PATH};
+    size_t loaded = 0;
+    if (rac_registry_load_plugins(paths, 4, &loaded) != RAC_SUCCESS || loaded != 2 ||
+        rac_registry_plugin_count() != count_after_first ||
+        rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) != active ||
+        rac_engine_manifest_find("test_plugin") != &manifest) {
+        std::fprintf(stderr, "busy batch did not preserve availability, count or manifest\n");
+        return 1;
+    }
+    rac_plugin_unavailable_t* unavailable = nullptr;
+    size_t unavailable_count = 0;
+    if (rac_registry_list_unavailable_plugins(&unavailable, &unavailable_count) != RAC_SUCCESS ||
+        unavailable_count != 0) {
+        std::fprintf(stderr, "busy backend was recorded as unavailable\n");
+        return 1;
+    }
+    rac_registry_free_unavailable_plugins(unavailable, unavailable_count);
+    // A genuinely missing plugin is still isolated, counted as a failure and reported.
+    const char* mixed_paths[] = {"runanywhere_registration_missing_backend.invalid",
+                                 RAC_TEST_PLUGIN_PATH};
+    if (rac_registry_load_plugins(mixed_paths, 2, &loaded) != RAC_SUCCESS || loaded != 1 ||
+        rac_registry_list_unavailable_plugins(&unavailable, &unavailable_count) != RAC_SUCCESS ||
+        unavailable_count != 1 ||
+        std::strcmp(unavailable[0].name, "registration_missing_backend") != 0 ||
+        unavailable[0].status != RAC_ERROR_PLUGIN_LOAD_FAILED ||
+        rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) != active) {
+        std::fprintf(stderr, "mixed batch swallowed failure or lost busy backend\n");
+        return 1;
+    }
+    rac_registry_free_unavailable_plugins(unavailable, unavailable_count);
+    rac_plugin_registry_release(active);
 
     /* (3) Single unregister suffices to remove the entry. */
     rc = rac_registry_unload_plugin("test_plugin");

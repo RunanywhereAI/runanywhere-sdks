@@ -177,6 +177,9 @@ struct PluginServiceCreateSpec {
     const char* model_id_for_service;
     const char* config_json;
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    // Optional commons-only admission hook, before dereferencing plugin data.
+    rac_result_t (*admit_provider)(const rac_engine_vtable_t*, void*) = nullptr;
+    void* admission_context = nullptr;
 };
 
 /**
@@ -289,6 +292,12 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     }
     if (vt == nullptr) {
         vt = rac_plugin_find(spec.primitive);
+    }
+    if (vt && spec.admit_provider) {
+        const rac_result_t admission = spec.admit_provider(vt, spec.admission_context);
+        if (admission != RAC_SUCCESS) {
+            return admission;
+        }
     }
     const OpsT* ops = (vt && spec.select_ops) ? spec.select_ops(vt) : nullptr;
     if (!vt || !ops || !ops->create) {

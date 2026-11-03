@@ -47,7 +47,19 @@ if (!npu.supported) {
 
 See the [React Native SDK README](../../README.md) for full examples.
 
-The URL above is a logical bundle reference: Commons selects the device's architecture folder and registers the manifest with its companion files. A direct `/resolve/main/model.json` URL registers only that file. Explicitly pinned bundle references are preserved as supplied; registration does not reject a pin for a different device architecture. Before registration, compare each pinned bundle's required architecture with `QHexRT.probeNpu()` and skip incompatible rows. Catalog eligibility and any required HF-auth preflight are application-owned.
+The URL above is a logical bundle reference: Commons selects the device's architecture folder and registers the manifest with its companion files. A direct `/resolve/main/model.json` URL registers only that file. Explicitly pinned bundle references must match the device architecture.
+
+---
+
+## Explicit bundle registration
+
+When registering a bundle URL through the core model-registration API with the QHexRT backend registered, Commons selects the device's architecture folder for logical references such as `https://huggingface.co/organization/model-repository/model.json` and includes the manifest's companion files.
+
+A known architecture pin in the first repository folder, such as `/v79` or `/v79/model.json`, is checked before network resolution or registry changes. A mismatched pin returns `RAC_ERROR_INVALID_ARGUMENT` with a message naming the bundle and device architectures; a matching pin is kept unchanged. Probe failures and unsupported devices return the same errors as logical references.
+
+Direct `/resolve/` or `/blob/` URLs register a single file and do not receive this bundle-folder check.
+
+Catalog eligibility and any required HF-auth preflight remain application-owned.
 
 ---
 

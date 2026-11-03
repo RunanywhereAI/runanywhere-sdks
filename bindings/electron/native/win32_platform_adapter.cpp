@@ -279,6 +279,8 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
         }
         ++written;
     }
+    // A failed open/advance is an I/O error, not an empty or shorter listing.
+    if (ec) return RAC_ERROR_FILE_READ_FAILED;
     *in_out_count = out_entries ? written : total;
     return RAC_SUCCESS;
 }
