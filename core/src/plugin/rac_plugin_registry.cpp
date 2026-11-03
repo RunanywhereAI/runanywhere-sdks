@@ -452,16 +452,14 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 }
             }
 
-            // Allocate handle bookkeeping before changing the accepted plugin.
-            // Publishing its handle below is then a non-throwing assignment.
-            auto dl_entry = s.dl_handles.end();
-            if (dl_handle) {
-                dl_entry = s.dl_handles.try_emplace(name, nullptr).first;
-            }
             auto dup = s.by_name.find(name);
             const bool replacing_existing = dup != s.by_name.end();
             if (replacing_existing) {
                 if (s.model_leases.contains(dup->second)) {
+                    // An identical vtable is still the active plugin, not a pending replacement.
+                    if (vtable != dup->second) {
+                        s.manifests_by_vtable.erase(vtable);
+                    }
                     return RAC_ERROR_PLUGIN_BUSY;
                 }
                 // Duplicate by name: replace only if incoming priority >= existing.
@@ -473,6 +471,15 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                     s.manifests_by_vtable.erase(vtable);
                     return RAC_ERROR_PLUGIN_DUPLICATE;
                 }
+            }
+
+            // Allocate before changing the accepted plugin so handle publication
+            // below is non-throwing, but only after all refusal checks.
+            auto dl_entry = s.dl_handles.end();
+            if (dl_handle) {
+                dl_entry = s.dl_handles.try_emplace(name, nullptr).first;
+            }
+            if (replacing_existing) {
                 // Steal the evicted vtable into a local so `on_unload` runs
                 // AFTER the lock is released: the evicted plugin's teardown
                 // is then free to call back into rac_plugin_find /

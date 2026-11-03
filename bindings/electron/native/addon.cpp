@@ -496,8 +496,10 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
             // (rac_registry_load_plugins), so recording either here would put a
             // working backend on the unavailability ledger and make
             // capabilities() report it as missing.
+            // BUSY also means an existing plugin is serving a leased model.
             const auto try_register = [](const char* name, rac_result_t result) {
                 if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
+                    result == RAC_ERROR_PLUGIN_BUSY ||
                     result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
                     return;
                 rac_registry_record_plugin_unavailable(name, nullptr, result);

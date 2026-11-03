@@ -404,8 +404,10 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
         // simply got there first. Commons' own batch loader counts DUPLICATE as
         // loaded (rac_registry_load_plugins), so recording either here would put
         // a working backend on the unavailability ledger.
+        // BUSY also means an existing plugin is serving a leased model.
         const auto try_register = [](const char* name, rac_result_t result) {
             if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
+                result == RAC_ERROR_PLUGIN_BUSY ||
                 result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
                 return;
             rac_registry_record_plugin_unavailable(name, nullptr, result);
