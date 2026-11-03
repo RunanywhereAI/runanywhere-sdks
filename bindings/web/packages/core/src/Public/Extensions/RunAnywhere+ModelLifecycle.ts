@@ -295,7 +295,8 @@ function currentModelFromBackendWorker(
  * successfully elsewhere. `nextBackendId` names the BackendWorker that now
  * owns it (undefined = main thread), and `nextModule` the main-thread WASM
  * that now owns it (undefined = a worker). Ownership bookkeeping is updated
- * synchronously so callers can record the new owner immediately afterwards.
+ * synchronously, so callers start this without awaiting and record the new
+ * owner immediately afterwards; the unload itself completes in the background.
  */
 async function releasePreviousModelOwner(
   modelId: string,
@@ -367,7 +368,7 @@ async function loadModelViaBackendWorker(
   }
   const result = ModelLoadResultCodec.decode(response.resultBytes);
   if (!result.error) {
-    await releasePreviousModelOwner(request.modelId, backendId);
+    void releasePreviousModelOwner(request.modelId, backendId);
     markModelOwnedByBackendWorker(
       request.modelId,
       backendId,
@@ -759,7 +760,7 @@ export const WebModelLifecycle = {
 
       const result = await adapter.loadAsync(request);
       if (result && !result.error) {
-        await releasePreviousModelOwner(
+        void releasePreviousModelOwner(
           request.modelId,
           undefined,
           lifecycleModuleAsEmscripten(adapter),
@@ -793,7 +794,7 @@ export const WebModelLifecycle = {
       if (workerResult) return workerResult;
       const result = await retryAdapter.loadAsync(request);
       if (result && !result.error) {
-        await releasePreviousModelOwner(
+        void releasePreviousModelOwner(
           request.modelId,
           undefined,
           lifecycleModuleAsEmscripten(retryAdapter),
