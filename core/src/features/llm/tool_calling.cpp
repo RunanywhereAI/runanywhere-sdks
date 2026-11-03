@@ -933,8 +933,11 @@ static std::string validation_errors_to_json(const std::vector<std::string>& err
  *
  * @param json_str Raw JSON payload (must not be null).
  * @param out_normalized Receives the owned normalized string on success.
- * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT for ambiguous keys, or an
- *         allocation/parse error code.
+ * @return RAC_SUCCESS (repaired on the fast path, or via the unquoted-key
+ *         scanner when the fast parser rejects the payload),
+ *         RAC_ERROR_INVALID_ARGUMENT for ambiguous keys,
+ *         RAC_ERROR_OUT_OF_MEMORY on allocation failure, or RAC_ERROR_INTERNAL
+ *         for an unexpected exception.
  */
 extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
                                                        char** out_normalized) try {
