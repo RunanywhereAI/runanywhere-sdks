@@ -108,19 +108,32 @@ Feature-family classification, because not every capability fits one mold:
 - Composed pipelines (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
 - VAD is a dual-backend special case: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
-### Plugin ABI v9 (full history — the root `AGENTS.md` links here for this)
+### Plugin ABI v14 (full history — the root `AGENTS.md` links here for this)
 
-All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10
-active primitive slots and 7 reserved slots (the single source of truth for primitive slots is
+All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 13
+active primitive slots and 4 reserved slots (the single source of truth for primitive slots is
 the `RAC_PRIMITIVE_TABLE` X-macro in that header). A NULL primitive slot means not supported. An
 ABI version mismatch (`metadata.abi_version != RAC_PLUGIN_API_VERSION`) is rejected at
-registration. The current handshake is `RAC_PLUGIN_API_VERSION = 9u`: ABI v9 widened
+registration. The current handshake is `RAC_PLUGIN_API_VERSION = 14u`; the full per-version history
+is in `include/rac/plugin/rac_plugin_entry.h`. ABI v9 widened
 `rac_llm_stream_callback_fn` with `tokens_in_delta` and added `get_stream_token_counts` on
 `rac_llm_service_ops_t` (a NULL callback makes commons estimate counts and set
 `TokenUsage.counts_estimated`). `RAC_PRIMITIVE_RERANK` (wire value 11, `rerank_ops`, promoted
 from `reserved_slot_2` at the same binary offset) was revived as a first-class cross-encoder
 reranking primitive in ABI v8. The original rerank slot (wire value 6, retired in ABI v4) stays
 permanently retired — the revived primitive is a new wire value, never reuse 6.
+
+Optional extensions without an ABI bump use a capability bit and a manifest wrapper. Capability
+bit 40 (`RAC_ENGINE_CAP_SEGMENTATION_CONFIDENCE_V1`, in
+`include/rac/features/segmentation/rac_segmentation_confidence.h`) reserves the
+`rac_segmentation_confidence_manifest_v1_t` wrapper for per-pixel segmentation confidence on
+ABI 14: the engine advertises the bit in its manifest and metadata, the unchanged manifest is the
+wrapper's first member, and `acquire_provider()` casts to the wrapper only when the bit is set,
+then checks its size, version and ops table. Older hosts ignore the unknown bit. Use a wrapper for
+an optional addition that leaves every existing layout unchanged. Bump the ABI when any existing
+struct, ops table or slot changes layout; that alone does not need a new vtable slot. Add a new
+slot (promoting a reserved one, with a bump) only for a new primitive or a required entry point.
+Contract details: [segmentation-confidence-abi.md](../docs/reference/segmentation-confidence-abi.md).
 
 Primitive enum → vtable field → who implements it today:
 
