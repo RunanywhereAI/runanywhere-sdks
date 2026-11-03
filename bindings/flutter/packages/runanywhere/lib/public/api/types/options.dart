@@ -652,14 +652,21 @@ class DiarizationOptions {
 /// Diagnostic controls for `segmentation`.
 class SegmentationOptions {
   /// Ask for the human-viewable class-colour overlay alongside the mask.
-  const SegmentationOptions({this.includeDiagnosticImage = false});
+  const SegmentationOptions({
+    this.includeDiagnosticImage = false,
+    this.includeConfidence = false,
+  });
 
   /// True also returns a deterministic class-colour RGBA image.
   final bool includeDiagnosticImage;
 
+  /// True also returns the chosen class probability for each source pixel.
+  final bool includeConfidence;
+
   /// Build the generated segmentation options.
   seg_pb.SegmentationOptions toProto() => seg_pb.SegmentationOptions(
     includeDiagnosticRgba: includeDiagnosticImage,
+    includeConfidence: includeConfidence,
   );
 }
 

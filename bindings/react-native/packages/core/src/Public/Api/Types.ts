@@ -17,7 +17,12 @@ import type {
   VoiceEvent as CanonicalVoiceEvent,
 } from '@runanywhere/proto-ts/events/public_events';
 import type { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-import type { ModelCategory, InferenceFramework, ModelInfo } from '@runanywhere/proto-ts/model_types';
+import type {
+  ModelCategory,
+  InferenceFramework,
+  ModelInfo,
+  ModelSource,
+} from '@runanywhere/proto-ts/model_types';
 import type { ToolCall, ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 
 export type { ModelCategory, InferenceFramework, ModelInfo };
@@ -245,6 +250,7 @@ export interface DiarizationOptions {
 /** Image-segmentation knobs. */
 export interface SegmentationOptions {
   includeDiagnosticImage?: boolean;
+  includeConfidence?: boolean;
 }
 
 /** When a user's turn is considered over, and whether the agent can be cut off. */
@@ -329,6 +335,11 @@ export interface ModelRegistration {
   category?: ModelCategory;
   framework?: InferenceFramework;
   memoryRequirementBytes?: number;
+  /** Exact remote artifact bytes; intentionally independent from runtime RAM. */
+  downloadSizeBytes?: number;
+  contextLength?: number;
+  source?: ModelSource;
+  description?: string;
   supportsThinking?: boolean;
   supportsLora?: boolean;
   /** Single-file download url. */
@@ -497,6 +508,12 @@ export interface SegmentationResult {
   classes: ClassInfo[];
   /** RGBA overlay, present only when `includeDiagnosticImage` was set. */
   diagnosticImage?: Uint8Array;
+  /**
+   * Chosen-class probabilities as one byte per source pixel (0..255),
+   * row-major like `classMask`, with `width * height` bytes when provided.
+   * Undefined when confidence was not requested.
+   */
+  confidenceMask?: Uint8Array;
 }
 
 /** A retrieved chunk with its similarity score. */

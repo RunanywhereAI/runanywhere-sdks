@@ -58,6 +58,7 @@
 #endif
 
 // Include runanywhere-commons C API headers
+#include "directory_probe_internal.h"
 #include "request_cancellation_relay.h"
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
@@ -497,6 +498,8 @@ static jbyteArray makeModelRegistryProtoByteArray(JNIEnv* env, uint8_t* bytes, s
     return env->ExceptionCheck() ? nullptr : result;
 }
 
+static bool jniClearPendingException(JNIEnv* env);
+
 static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_result_t status,
                                     const char* message) {
     if (env == nullptr || env->ExceptionCheck()) {
@@ -507,11 +510,38 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
     char formatted[512];
     std::snprintf(formatted, sizeof(formatted), "%s failed with code %d: %s", operation, status,
                   detail);
-    jclass exClass = env->FindClass("java/lang/IllegalStateException");
+    jclass exClass = env->FindClass("com/runanywhere/sdk/native/bridge/NativeProtoException");
     if (exClass != nullptr) {
-        env->ThrowNew(exClass, formatted);
+        jmethodID constructor = env->GetMethodID(exClass, "<init>", "(ILjava/lang/String;)V");
+        jstring javaMessage = constructor != nullptr ? env->NewStringUTF(formatted) : nullptr;
+        if (!env->ExceptionCheck() && javaMessage != nullptr) {
+            jobject exception =
+                env->NewObject(exClass, constructor, static_cast<jint>(status), javaMessage);
+            if (!env->ExceptionCheck() && exception != nullptr) {
+                env->Throw(static_cast<jthrowable>(exception));
+                env->DeleteLocalRef(exception);
+                env->DeleteLocalRef(javaMessage);
+                env->DeleteLocalRef(exClass);
+                return;
+            }
+            if (exception != nullptr) {
+                env->DeleteLocalRef(exception);
+            }
+        }
+        if (javaMessage != nullptr) {
+            env->DeleteLocalRef(javaMessage);
+        }
         env->DeleteLocalRef(exClass);
     }
+
+    jniClearPendingException(env);
+    jclass fallbackClass = env->FindClass("java/lang/RuntimeException");
+    if (fallbackClass == nullptr) {
+        jniClearPendingException(env);
+        return;
+    }
+    env->ThrowNew(fallbackClass, formatted);
+    env->DeleteLocalRef(fallbackClass);
 }
 
 static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buffer,
@@ -522,10 +552,8 @@ static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buff
     if (RAC_FAILED(buffer->status)) {
         LOGe("%s: native proto API failed with code %d (%s)", operation, buffer->status,
              buffer->error_message ? buffer->error_message : "");
-        const rac_result_t status = buffer->status;
-        const char* message = buffer->error_message;
+        throwNativeProtoFailure(env, operation, buffer->status, buffer->error_message);
         rac_proto_buffer_free(buffer);
-        throwNativeProtoFailure(env, operation, status, message);
         return nullptr;
     }
     if (buffer->size > 0 && buffer->data == nullptr) {
@@ -1325,10 +1353,11 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
         env->ExceptionClear();
         return RAC_ERROR_INTERNAL;
     }
-    // Kotlin returns null to signal "directory does not exist" per the C ABI
-    // contract; any other error is mapped to a structured Throwable above.
+    // Java's boolean existence/type probes also return false on stat errors.
+    // Confirm absence before mapping null to NOT_FOUND; access/I/O failures
+    // must remain inconclusive so orphan pruning preserves the download.
     if (result == nullptr) {
-        return RAC_ERROR_FILE_NOT_FOUND;
+        return rac::jni::classify_null_directory_listing(dir_path ? dir_path : "");
     }
 
     const jsize total = env->GetArrayLength(result);
@@ -1707,7 +1736,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Cache method IDs
     jclass adapterClass = env->GetObjectClass(adapter);
     if (adapterClass == nullptr) {
         if (env->ExceptionCheck() == JNI_TRUE) {
@@ -1717,17 +1745,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Resolve the nine required ids into locals BEFORE touching any global.
     const auto resolve_required = [&](const char* name, const char* sig) -> jmethodID {
         const jmethodID id = env->GetMethodID(adapterClass, name, sig);
         if (env->ExceptionCheck() == JNI_TRUE) {
             env->ExceptionClear();
         }
+        if (id == nullptr) {
+            LOGe("racSetPlatformAdapter: platform adapter is missing required method %s%s", name,
+                 sig);
+        }
         return id;
     };
 
-    const jmethodID m_log =
-        resolve_required("log", "(ILjava/lang/String;Ljava/lang/String;)V");
+    const jmethodID m_log = resolve_required("log", "(ILjava/lang/String;Ljava/lang/String;)V");
     const jmethodID m_file_exists = resolve_required("fileExists", "(Ljava/lang/String;)Z");
     const jmethodID m_file_read = resolve_required("fileRead", "(Ljava/lang/String;)[B");
     const jmethodID m_file_write = resolve_required("fileWrite", "(Ljava/lang/String;[B)Z");
@@ -1736,21 +1766,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         resolve_required("secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
     const jmethodID m_secure_set =
         resolve_required("secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
-    const jmethodID m_secure_delete =
-        resolve_required("secureDelete", "(Ljava/lang/String;)Z");
+    const jmethodID m_secure_delete = resolve_required("secureDelete", "(Ljava/lang/String;)Z");
     const jmethodID m_now_ms = resolve_required("nowMs", "()J");
 
     if (m_log == nullptr || m_file_exists == nullptr || m_file_read == nullptr ||
         m_file_write == nullptr || m_file_delete == nullptr || m_secure_get == nullptr ||
         m_secure_set == nullptr || m_secure_delete == nullptr || m_now_ms == nullptr) {
-        LOGe("racSetPlatformAdapter: platform adapter is missing a required method "
-             "(log/fileExists/fileRead/fileWrite/fileDelete/secureGet/secureSet/secureDelete/"
-             "nowMs); refusing to install a partially resolved adapter");
         env->DeleteLocalRef(adapterClass);
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 
-    // Create global reference to adapter and verify
     jobject adapterRef = env->NewGlobalRef(adapter);
     if (adapterRef == nullptr) {
         if (env->ExceptionCheck() == JNI_TRUE) {
@@ -1761,37 +1786,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 
-    // Optional Kotlin-side directory probes. Method lookup is
-    // best-effort — older host apps that haven't been recompiled against the
-    // new adapter surface will miss these IDs and commons will fall through
-    // to its NULL-callback branches (rescan_local emits a warning,
-    // is_downloaded for multi-file artifacts reports false). New builds
-    // expose CppBridgePlatformAdapter.fileListDirectory / isNonEmptyDirectory
-    // so the model-registry and is_downloaded paths match the Web/Swift
-    // behaviour documented in rac_platform_adapter.h.
-    jmethodID m_file_list_directory =
-        env->GetMethodID(adapterClass, "fileListDirectory",
-                         "(Ljava/lang/String;)[Lcom/runanywhere/sdk/foundation/bridge/extensions/"
-                         "RacDirectoryEntry;");
-    if (env->ExceptionCheck() == JNI_TRUE) {
-        env->ExceptionClear();
-        m_file_list_directory = nullptr;
-    }
-    jmethodID m_is_non_empty_directory =
-        env->GetMethodID(adapterClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
-    if (env->ExceptionCheck() == JNI_TRUE) {
-        env->ExceptionClear();
-        m_is_non_empty_directory = nullptr;
-    }
-
-    env->DeleteLocalRef(adapterClass);
-
-    // Only commit when all method IDs and global ref succeeded.
-    // Clean up previous adapter last so a refused adapter preserves the working one.
     if (g_platform_adapter != nullptr) {
         env->DeleteGlobalRef(g_platform_adapter);
     }
-
     g_platform_adapter = adapterRef;
     g_method_log = m_log;
     g_method_file_exists = m_file_exists;
@@ -1802,8 +1799,31 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_method_secure_set = m_secure_set;
     g_method_secure_delete = m_secure_delete;
     g_method_now_ms = m_now_ms;
-    g_method_file_list_directory = m_file_list_directory;
-    g_method_is_non_empty_directory = m_is_non_empty_directory;
+
+    // Optional Kotlin-side directory probes. Method lookup is
+    // best-effort — older host apps that haven't been recompiled against the
+    // new adapter surface will miss these IDs and commons will fall through
+    // to its NULL-callback branches (rescan_local emits a warning,
+    // is_downloaded for multi-file artifacts reports false). New builds
+    // expose CppBridgePlatformAdapter.fileListDirectory / isNonEmptyDirectory
+    // so the model-registry and is_downloaded paths match the Web/Swift
+    // behaviour documented in rac_platform_adapter.h.
+    g_method_file_list_directory =
+        env->GetMethodID(adapterClass, "fileListDirectory",
+                         "(Ljava/lang/String;)[Lcom/runanywhere/sdk/foundation/bridge/extensions/"
+                         "RacDirectoryEntry;");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        g_method_file_list_directory = nullptr;
+    }
+    g_method_is_non_empty_directory =
+        env->GetMethodID(adapterClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+        g_method_is_non_empty_directory = nullptr;
+    }
+
+    env->DeleteLocalRef(adapterClass);
 
     // Initialize the C adapter struct with our JNI callbacks
     memset(&g_c_adapter, 0, sizeof(g_c_adapter));

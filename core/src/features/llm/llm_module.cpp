@@ -50,6 +50,7 @@
 #include "features/llm/llm_thinking_stream_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
 #include "features/llm/structured_output_internal.h"
+#include "features/llm/utf8_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_logger.h"
@@ -1344,11 +1345,7 @@ using runanywhere::v1::LLMGenerationResult;
 using runanywhere::v1::SDKEvent;
 using runanywhere::v1::TokenKind;
 
-// Defined below; replaces invalid UTF-8 with U+FFFD so model output is safe to
-// store in proto `string` fields (llama.cpp can cut a multibyte char at
-// max_tokens). Forward-declared so the emit helpers above its definition can
-// use it.
-std::string sanitize_utf8(const std::string& in);
+using rac::llm::sanitize_utf8;
 
 int64_t now_ms() {
     using namespace std::chrono;
@@ -1616,19 +1613,27 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     // Thread the remaining sampling knobs the proto exposes
     // (idl/llm_options.proto) into the C ABI so they reach the engine vtable.
     // repetition_penalty was renamed repeat_penalty (same tag, mechanical
-    // rename). For every field except repeat_penalty the proto3 zero IS the
-    // documented "disabled" sentinel, so passing it through is identical to the
-    // struct default. repeat_penalty uses 1.0 = "no penalty"; proto3 zero
-    // means unset, so only override when positive (mirrors Swift's
-    // RALLMTypes+CppBridge defaults, which carry repeatPenalty=1.0).
-    options.top_k = has_options ? opts.top_k() : 0;
+    // rename). For every field except repeat_penalty, top_k and min_p the
+    // proto3 zero IS the documented "disabled" sentinel, so passing it through
+    // is identical to the struct default. repeat_penalty uses 1.0 = "no
+    // penalty"; proto3 zero means unset, so only override when positive
+    // (mirrors Swift's RALLMTypes+CppBridge defaults, which carry
+    // repeatPenalty=1.0).
+    // top_k and min_p are `optional` with IDL defaults (40 / 0.05) that are ON,
+    // so an absent field keeps RAC_LLM_OPTIONS_DEFAULT while an explicit 0 still
+    // disables the sampler (matches the RAG and VLM adapters).
+    if (has_options && opts.has_top_k()) {
+        options.top_k = opts.top_k();
+    }
     const float repeat_penalty = has_options ? opts.repeat_penalty() : 0.0f;
     if (repeat_penalty > 0.0f) {
         options.repetition_penalty = repeat_penalty;
     }
     options.frequency_penalty = has_options ? opts.frequency_penalty() : 0.0f;
     options.presence_penalty = has_options ? opts.presence_penalty() : 0.0f;
-    options.min_p = has_options ? opts.min_p() : 0.0f;
+    if (has_options && opts.has_min_p()) {
+        options.min_p = opts.min_p();
+    }
     options.seed = has_options ? opts.seed() : 0;
     // n_threads was deleted from LLMGenerationOptions (idl/llm_options.proto):
     // thread count is now a load-time-only decision the engine makes when it
@@ -1735,46 +1740,6 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     options.history = history_ptrs.empty() ? nullptr : history_ptrs.data();
     options.n_history = static_cast<int32_t>(history_ptrs.size());
     return options;
-}
-
-// Replace any invalid UTF-8 byte sequence with U+FFFD so the value is safe to
-// store in a proto `string` field. llama.cpp can emit an incomplete trailing
-// multibyte sequence when generation is cut at max_tokens; without this,
-// protobuf serialization of LLMGenerationResult.text fails and the whole
-// unary result is unparseable by the caller.
-std::string sanitize_utf8(const std::string& in) {
-    std::string out;
-    out.reserve(in.size());
-    const size_t n = in.size();
-    size_t i = 0;
-    auto is_cont = [&](size_t k) {
-        return k < n && (static_cast<unsigned char>(in[k]) & 0xC0) == 0x80;
-    };
-    while (i < n) {
-        const unsigned char c = static_cast<unsigned char>(in[i]);
-        size_t len = 0;
-        if (c < 0x80) {
-            len = 1;
-        } else if ((c & 0xE0) == 0xC0 && c >= 0xC2) {
-            len = 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            len = 3;
-        } else if ((c & 0xF8) == 0xF0 && c <= 0xF4) {
-            len = 4;
-        }
-        bool ok = len > 0;
-        for (size_t k = 1; ok && k < len; ++k) {
-            ok = is_cont(i + k);
-        }
-        if (ok) {
-            out.append(in, i, len);
-            i += len;
-        } else {
-            out.append("\xEF\xBF\xBD");  // U+FFFD replacement character
-            i += 1;
-        }
-    }
-    return out;
 }
 
 void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_result_t& raw,

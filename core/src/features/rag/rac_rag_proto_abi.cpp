@@ -13,6 +13,7 @@
 
 #include "rag_backend.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -419,21 +420,53 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     const auto& gen = query_proto.generation();
     const std::string system_prompt = gen.has_system_prompt() ? gen.system_prompt() : std::string();
 
+    // std::clamp passes NaN straight through, so a non-finite top_p has to be
+    // rejected before it reaches the clamp below rather than after.
+    if (gen.has_top_p() && !std::isfinite(gen.top_p())) {
+        if (out_error)
+            *out_error = "RAGQueryOptions.generation.top_p must be a finite number";
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
     // Base off RAC_LLM_OPTIONS_DEFAULT, then apply the embedded generation
     // knobs with the RAG pipeline defaults (max 512 tokens, top_p 0.9) when
     // unset.
     //
-    // temperature and top_k are `optional` in llm_options.proto, so presence
+    // Every sampling knob below is `optional` in llm_options.proto, so presence
     // is what "unset" means: reading the value instead yields 0, which is a
-    // legal explicit setting for both (greedy / top-k disabled) and therefore
-    // cannot double as a sentinel. has_generation() is not a substitute -- a
-    // caller that sets any other generation knob makes the submessage present
-    // while leaving these two absent.
+    // legal explicit setting for most of them (zero tokens, greedy, top-k or
+    // top-p disabled) and therefore cannot double as a sentinel. has_generation()
+    // is not a substitute -- a caller that sets any one generation knob makes
+    // the submessage present while leaving the others absent.
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
-    opts.max_tokens = gen.max_output_tokens() > 0 ? gen.max_output_tokens() : 512;
+    opts.max_tokens = gen.has_max_output_tokens() ? gen.max_output_tokens() : 512;
     opts.temperature = gen.has_temperature() ? gen.temperature() : opts.temperature;
-    opts.top_p = gen.top_p() > 0.0f ? gen.top_p() : 0.9f;
+    // top_p is a probability mass, so an out-of-range caller value is kept
+    // inside [0, 1], as the generate path does for temperature.
+    opts.top_p = gen.has_top_p() ? std::clamp(gen.top_p(), 0.0f, 1.0f) : 0.9f;
     opts.top_k = gen.has_top_k() ? gen.top_k() : opts.top_k;
+    opts.repetition_penalty =
+        gen.has_repeat_penalty() ? gen.repeat_penalty() : opts.repetition_penalty;
+    opts.frequency_penalty =
+        gen.has_frequency_penalty() ? gen.frequency_penalty() : opts.frequency_penalty;
+    opts.presence_penalty =
+        gen.has_presence_penalty() ? gen.presence_penalty() : opts.presence_penalty;
+    opts.min_p = gen.has_min_p() ? gen.min_p() : opts.min_p;
+    opts.seed = gen.has_seed() ? gen.seed() : opts.seed;
+    // The strings live in `query_proto`, which outlives the query call below, so
+    // their c_str() pointers stay valid without a second copy.
+    std::vector<const char*> stop_sequences;
+    stop_sequences.reserve(static_cast<size_t>(gen.stop_sequences_size()));
+    for (const auto& sequence : gen.stop_sequences()) {
+        // An empty stop matches at offset 0 on an engine that does a plain
+        // substring search and would end the answer on the first token. The
+        // other proto adapters drop empty elements for the same reason.
+        if (!sequence.empty()) {
+            stop_sequences.push_back(sequence.c_str());
+        }
+    }
+    opts.stop_sequences = stop_sequences.empty() ? nullptr : stop_sequences.data();
+    opts.num_stop_sequences = stop_sequences.size();
     opts.disable_thinking =
         (gen.has_reasoning() && gen.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF)
             ? RAC_TRUE

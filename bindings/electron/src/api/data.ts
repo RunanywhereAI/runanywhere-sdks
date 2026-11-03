@@ -17,11 +17,12 @@ import {
   RAGStreamEvent,
   RAGStreamEventKind,
 } from '@runanywhere/proto-ts/rag';
+import type { ReasoningOptions as ProtoReasoningOptions } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import type { RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
 import { DataAbi, toEmbeddingsRequest, toRerankRequest } from './data-abi';
-import { toPublicGenerationMetrics } from './llm-abi';
+import { toProtoReasoning, toPublicGenerationMetrics } from './llm-abi';
 import { RAC_CATEGORY, RAC_FRAMEWORK } from './native-backend';
 import { optionDefaults } from './options';
 import type { EmbedOptions, LlmOptions, RagConfig } from './options';
@@ -214,28 +215,44 @@ function toRagResult(raw: RAGResult, requestId: string, model: string): PublicRa
   };
 }
 
-// Only the sampling knobs commons' RAG pipeline reads; tools and structured output
-// are not part of a grounded-answer request. An unset knob stays absent so
-// commons applies its own `rac_default`, the same contract the LLM path uses.
-function toRagGeneration(options: LlmOptions = {}): {
+/** The `LLMGenerationOptions` subset a grounded-answer request carries. */
+interface RagGeneration {
   maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
   topK?: number;
+  minP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  repeatPenalty?: number;
+  seed?: number;
+  stopSequences?: string[];
   systemPrompt?: string;
-} {
-  const out: {
-    maxOutputTokens?: number;
-    temperature?: number;
-    topP?: number;
-    topK?: number;
-    systemPrompt?: string;
-  } = {};
+  reasoning?: ProtoReasoningOptions;
+}
+
+// The same sampling knobs the LLM path forwards in llm-abi.ts toProtoOptions, so a
+// RAG query carries everything commons' RAG pipeline can honour (#1073); tools and
+// structured output are not part of a grounded-answer request. An unset knob stays absent so commons applies its
+// own `rac_default`, the same contract the LLM path uses.
+function toRagGeneration(options: LlmOptions = {}): RagGeneration {
+  const out: RagGeneration = {};
   if (options.maxOutputTokens !== undefined) out.maxOutputTokens = options.maxOutputTokens;
   if (options.temperature !== undefined) out.temperature = options.temperature;
   if (options.topP !== undefined) out.topP = options.topP;
   if (options.topK !== undefined) out.topK = options.topK;
+  if (options.minP !== undefined) out.minP = options.minP;
+  if (options.frequencyPenalty !== undefined) out.frequencyPenalty = options.frequencyPenalty;
+  if (options.presencePenalty !== undefined) out.presencePenalty = options.presencePenalty;
+  if (options.repetitionPenalty !== undefined) out.repeatPenalty = options.repetitionPenalty;
+  if (options.seed !== undefined) out.seed = options.seed;
+  if (options.stopSequences !== undefined && options.stopSequences.length > 0) {
+    out.stopSequences = [...options.stopSequences];
+  }
   if (options.systemPrompt !== undefined) out.systemPrompt = options.systemPrompt;
+  // Commons turns thinking off for a RAG answer when `reasoning.mode` is OFF. It goes
+  // through the same translation as the LLM path, so the two cannot drift.
+  if (options.reasoning !== undefined) out.reasoning = toProtoReasoning(options.reasoning);
   return out;
 }
 

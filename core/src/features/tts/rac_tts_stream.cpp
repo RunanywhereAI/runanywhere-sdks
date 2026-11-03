@@ -191,10 +191,13 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
     }
 
     rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
-    if (parsed.has_options() &&
-        !rac::foundation::rac_tts_options_from_proto(parsed.options(), &options)) {
-        free_tts_options(&options);
-        return RAC_ERROR_DECODING_ERROR;
+    if (parsed.has_options()) {
+        const rac_result_t rc =
+            rac::foundation::rac_tts_options_from_proto(parsed.options(), &options);
+        if (rc != RAC_SUCCESS) {
+            free_tts_options(&options);
+            return rc;
+        }
     }
     if (parsed.has_options() && parsed.options().sample_rate() > 0) {
         options.sample_rate = parsed.options().sample_rate();

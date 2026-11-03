@@ -11,6 +11,7 @@ import ai.runanywhere.proto.v1.StructuredOutputParseRequest
 import ai.runanywhere.proto.v1.StructuredOutputPromptResult
 import ai.runanywhere.proto.v1.StructuredOutputResult
 import ai.runanywhere.proto.v1.StructuredOutputValidation
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAStructuredOutputResult
@@ -30,27 +31,33 @@ object CppBridgeStructuredOutput {
     fun preparePrompt(request: StructuredOutputParseRequest): StructuredOutputPromptResult =
         decodeOrThrow(
             StructuredOutputPromptResult.ADAPTER,
-            RunAnywhereBridge.racStructuredOutputPreparePromptProto(
-                StructuredOutputParseRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racStructuredOutputPreparePromptProto(
+                    StructuredOutputParseRequest.ADAPTER.encode(request),
+                )
+            },
             "racStructuredOutputPreparePromptProto",
         )
 
     fun validate(request: StructuredOutputParseRequest): StructuredOutputValidation =
         decodeOrThrow(
             StructuredOutputValidation.ADAPTER,
-            RunAnywhereBridge.racStructuredOutputValidateProto(
-                StructuredOutputParseRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racStructuredOutputValidateProto(
+                    StructuredOutputParseRequest.ADAPTER.encode(request),
+                )
+            },
             "racStructuredOutputValidateProto",
         )
 
     fun parse(request: StructuredOutputParseRequest): RAStructuredOutputResult =
         decodeOrThrow(
             StructuredOutputResult.ADAPTER,
-            RunAnywhereBridge.racStructuredOutputParseProto(
-                StructuredOutputParseRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racStructuredOutputParseProto(
+                    StructuredOutputParseRequest.ADAPTER.encode(request),
+                )
+            },
             "racStructuredOutputParseProto",
         )
 

@@ -5,10 +5,14 @@
  * @internal
  */
 
+import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+
 export interface BackendWorkerOwnedModel {
   modelId: string;
   loadedAtUnixMs: number;
   backendId: 'llamacpp' | 'onnx';
+  /** Framework that executed the load, which may differ from catalog metadata. */
+  framework?: InferenceFramework;
 }
 
 const workerOwnedModels = new Map<string, BackendWorkerOwnedModel>();
@@ -106,6 +110,7 @@ export function mustUseLlamaBackendWorker(): boolean {
 export function markModelOwnedByBackendWorker(
   modelId: string,
   backendId: 'llamacpp' | 'onnx' = 'llamacpp',
+  framework?: InferenceFramework,
 ): void {
   if (!modelId) return;
   // Only a successful reload of the same backend clears its sticky crash flag.
@@ -118,6 +123,7 @@ export function markModelOwnedByBackendWorker(
     modelId,
     loadedAtUnixMs: Date.now(),
     backendId,
+    framework,
   });
 }
 
@@ -150,6 +156,11 @@ export function getBackendWorkerOwner(
 ): 'llamacpp' | 'onnx' | null {
   if (!modelId) return null;
   return workerOwnedModels.get(modelId)?.backendId ?? null;
+}
+
+/** Actual framework of a model resident in a BackendWorker, if reported. */
+export function getBackendWorkerModelFramework(modelId: string): InferenceFramework | undefined {
+  return workerOwnedModels.get(modelId)?.framework;
 }
 
 export function hasBackendWorkerOwnedModels(
