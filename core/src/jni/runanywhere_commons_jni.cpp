@@ -727,7 +727,17 @@ static jboolean invokeProtoListener(JNIEnv* env, jobject listener, const uint8_t
                                 reinterpret_cast<const jbyte*>(bytes));
     }
     jclass cls = env->GetObjectClass(listener);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jBytes);
+        return JNI_FALSE;
+    }
     jmethodID method = env->GetMethodID(cls, "onProgress", "([B)Z");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
     env->DeleteLocalRef(cls);
     if (method == nullptr) {
         env->DeleteLocalRef(jBytes);
@@ -1380,9 +1390,37 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
         // entry — class lookup is cheap and the array length is typically
         // small (model-registry rescan_local on a single artifact dir).
         jclass entryClass = env->GetObjectClass(entryObj);
-        jfieldID nameField = env->GetFieldID(entryClass, "name", "Ljava/lang/String;");
-        jfieldID isDirField = env->GetFieldID(entryClass, "isDir", "Z");
-        jfieldID sizeField = env->GetFieldID(entryClass, "sizeBytes", "J");
+        if (entryClass == nullptr) {
+            if (env->ExceptionCheck() == JNI_TRUE) {
+                env->ExceptionClear();
+            }
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            out_entries[i].is_dir = RAC_FALSE;
+            out_entries[i].size_bytes = 0;
+            env->DeleteLocalRef(entryObj);
+            continue;
+        }
+
+        const auto resolve_field = [&](const char* name, const char* sig) -> jfieldID {
+            const jfieldID id = env->GetFieldID(entryClass, name, sig);
+            if (env->ExceptionCheck() == JNI_TRUE) {
+                env->ExceptionClear();
+            }
+            return id;
+        };
+
+        jfieldID nameField = resolve_field("name", "Ljava/lang/String;");
+        jfieldID isDirField = resolve_field("isDir", "Z");
+        jfieldID sizeField = resolve_field("sizeBytes", "J");
+
+        if (nameField == nullptr || isDirField == nullptr || sizeField == nullptr) {
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            out_entries[i].is_dir = RAC_FALSE;
+            out_entries[i].size_bytes = 0;
+            env->DeleteLocalRef(entryClass);
+            env->DeleteLocalRef(entryObj);
+            continue;
+        }
 
         jstring jName = static_cast<jstring>(env->GetObjectField(entryObj, nameField));
         jboolean jIsDir = env->GetBooleanField(entryObj, isDirField);
@@ -1699,6 +1737,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     }
 
     jclass adapterClass = env->GetObjectClass(adapter);
+    if (adapterClass == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        LOGe("racSetPlatformAdapter: failed to get adapter class");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
     const auto resolve_required = [&](const char* name, const char* sig) -> jmethodID {
         const jmethodID id = env->GetMethodID(adapterClass, name, sig);
@@ -1733,6 +1778,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     jobject adapterRef = env->NewGlobalRef(adapter);
     if (adapterRef == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
         LOGe("racSetPlatformAdapter: failed to create a global reference for the adapter");
         env->DeleteLocalRef(adapterClass);
         return RAC_ERROR_INITIALIZATION_FAILED;
@@ -1764,13 +1812,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         env->GetMethodID(adapterClass, "fileListDirectory",
                          "(Ljava/lang/String;)[Lcom/runanywhere/sdk/foundation/bridge/extensions/"
                          "RacDirectoryEntry;");
-    if (env->ExceptionCheck()) {
+    if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionClear();
         g_method_file_list_directory = nullptr;
     }
     g_method_is_non_empty_directory =
         env->GetMethodID(adapterClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
-    if (env->ExceptionCheck()) {
+    if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionClear();
         g_method_is_non_empty_directory = nullptr;
     }
@@ -3181,34 +3229,76 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerSetCall
         env->DeleteGlobalRef(g_device_jni_state.callback_obj);
         g_device_jni_state.callback_obj = nullptr;
     }
+    g_device_jni_state.get_device_info_method = nullptr;
+    g_device_jni_state.get_device_id_method = nullptr;
+    g_device_jni_state.is_registered_method = nullptr;
+    g_device_jni_state.set_registered_method = nullptr;
+    g_device_jni_state.http_post_method = nullptr;
 
     if (callbacks == nullptr) {
         LOGw("racDeviceManagerSetCallbacks: null callbacks");
+        rac_device_manager_clear_callbacks();
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-
-    // Create global reference
-    g_device_jni_state.callback_obj = env->NewGlobalRef(callbacks);
 
     // Cache method IDs
     jclass cls = env->GetObjectClass(callbacks);
-    g_device_jni_state.get_device_info_method =
-        env->GetMethodID(cls, "getDeviceInfo", "()Ljava/lang/String;");
-    g_device_jni_state.get_device_id_method =
-        env->GetMethodID(cls, "getDeviceId", "()Ljava/lang/String;");
-    g_device_jni_state.is_registered_method = env->GetMethodID(cls, "isRegistered", "()Z");
-    g_device_jni_state.set_registered_method = env->GetMethodID(cls, "setRegistered", "(Z)V");
-    g_device_jni_state.http_post_method =
-        env->GetMethodID(cls, "httpPost", "(Ljava/lang/String;Ljava/lang/String;Z)I");
-    env->DeleteLocalRef(cls);
-
-    // Verify methods found
-    if (!g_device_jni_state.get_device_id_method || !g_device_jni_state.is_registered_method) {
-        LOGe("racDeviceManagerSetCallbacks: required methods not found");
-        env->DeleteGlobalRef(g_device_jni_state.callback_obj);
-        g_device_jni_state.callback_obj = nullptr;
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        LOGe("racDeviceManagerSetCallbacks: failed to get class from callbacks object");
+        rac_device_manager_clear_callbacks();
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+
+    const auto resolve_method = [&](const char* name, const char* sig) -> jmethodID {
+        const jmethodID id = env->GetMethodID(cls, name, sig);
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        return id;
+    };
+
+    const jmethodID m_get_device_info =
+        resolve_method("getDeviceInfo", "()Ljava/lang/String;");
+    const jmethodID m_get_device_id =
+        resolve_method("getDeviceId", "()Ljava/lang/String;");
+    const jmethodID m_is_registered =
+        resolve_method("isRegistered", "()Z");
+    const jmethodID m_set_registered =
+        resolve_method("setRegistered", "(Z)V");
+    const jmethodID m_http_post =
+        resolve_method("httpPost", "(Ljava/lang/String;Ljava/lang/String;Z)I");
+
+    env->DeleteLocalRef(cls);
+
+    // Verify all five methods found
+    if (!m_get_device_info || !m_get_device_id || !m_is_registered ||
+        !m_set_registered || !m_http_post) {
+        LOGe("racDeviceManagerSetCallbacks: required methods not found "
+             "(getDeviceInfo/getDeviceId/isRegistered/setRegistered/httpPost)");
+        rac_device_manager_clear_callbacks();
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Create and verify global reference
+    jobject cbRef = env->NewGlobalRef(callbacks);
+    if (cbRef == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        LOGe("racDeviceManagerSetCallbacks: failed to create global reference for callbacks");
+        rac_device_manager_clear_callbacks();
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    g_device_jni_state.callback_obj = cbRef;
+    g_device_jni_state.get_device_info_method = m_get_device_info;
+    g_device_jni_state.get_device_id_method = m_get_device_id;
+    g_device_jni_state.is_registered_method = m_is_registered;
+    g_device_jni_state.set_registered_method = m_set_registered;
+    g_device_jni_state.http_post_method = m_http_post;
 
     // Set up C callbacks
     rac_device_callbacks_t c_callbacks = {};
@@ -3431,20 +3521,57 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerSetH
         env->DeleteGlobalRef(g_telemetry_jni_state.http_callback_obj);
         g_telemetry_jni_state.http_callback_obj = nullptr;
     }
+    g_telemetry_jni_state.http_callback_method = nullptr;
 
-    if (callback) {
-        g_telemetry_jni_state.http_callback_obj = env->NewGlobalRef(callback);
-
-        // Cache method ID
-        jclass cls = env->GetObjectClass(callback);
-        g_telemetry_jni_state.http_callback_method =
-            env->GetMethodID(cls, "onHttpRequest", "(Ljava/lang/String;Ljava/lang/String;IZ)V");
-        env->DeleteLocalRef(cls);
-
-        // Register C callback with telemetry manager
+    if (!callback) {
+        // Unregister C callback with telemetry manager
         rac_telemetry_manager_set_http_callback(reinterpret_cast<rac_telemetry_manager_t*>(handle),
-                                                jni_telemetry_http_callback, nullptr);
+                                                nullptr, nullptr);
+        return;
     }
+
+    jclass cls = env->GetObjectClass(callback);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        rac_telemetry_manager_set_http_callback(reinterpret_cast<rac_telemetry_manager_t*>(handle),
+                                                nullptr, nullptr);
+        LOGe("racTelemetryManagerSetHttpCallback: failed to get object class");
+        return;
+    }
+
+    jmethodID method =
+        env->GetMethodID(cls, "onHttpRequest", "(Ljava/lang/String;Ljava/lang/String;IZ)V");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
+    env->DeleteLocalRef(cls);
+
+    if (method == nullptr) {
+        rac_telemetry_manager_set_http_callback(reinterpret_cast<rac_telemetry_manager_t*>(handle),
+                                                nullptr, nullptr);
+        LOGe("racTelemetryManagerSetHttpCallback: onHttpRequest method not found");
+        return;
+    }
+
+    jobject cbRef = env->NewGlobalRef(callback);
+    if (cbRef == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        rac_telemetry_manager_set_http_callback(reinterpret_cast<rac_telemetry_manager_t*>(handle),
+                                                nullptr, nullptr);
+        LOGe("racTelemetryManagerSetHttpCallback: failed to create global reference");
+        return;
+    }
+
+    g_telemetry_jni_state.http_callback_obj = cbRef;
+    g_telemetry_jni_state.http_callback_method = method;
+
+    // Register C callback with telemetry manager
+    rac_telemetry_manager_set_http_callback(reinterpret_cast<rac_telemetry_manager_t*>(handle),
+                                            jni_telemetry_http_callback, nullptr);
 }
 
 JNIEXPORT jint JNICALL
@@ -4013,7 +4140,7 @@ static void free_directory_entry_copies(char** entries, size_t count) {
 // JNI file callback implementations
 static rac_result_t jni_fc_create_directory(const char* path, int recursive, void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_create_directory == nullptr)
         return RAC_ERROR_NOT_INITIALIZED;
     jstring jPath = env->NewStringUTF(path);
     jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_create_directory, jPath,
@@ -4024,7 +4151,7 @@ static rac_result_t jni_fc_create_directory(const char* path, int recursive, voi
 
 static rac_result_t jni_fc_delete_path(const char* path, int recursive, void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_delete_path == nullptr)
         return RAC_ERROR_NOT_INITIALIZED;
     jstring jPath = env->NewStringUTF(path);
     jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_delete_path, jPath,
@@ -4133,15 +4260,19 @@ static void jni_fc_free_entries(char** entries, size_t count, void* user_data) {
 static rac_bool_t jni_fc_path_exists(const char* path, rac_bool_t* out_is_directory,
                                      void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_path_exists == nullptr)
         return RAC_FALSE;
 
     jstring jPath = env->NewStringUTF(path);
     jboolean exists = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_path_exists, jPath);
 
     if (out_is_directory != nullptr && exists) {
-        jboolean isDir = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_is_directory, jPath);
-        *out_is_directory = isDir ? RAC_TRUE : RAC_FALSE;
+        if (g_fc_is_directory != nullptr) {
+            jboolean isDir = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_is_directory, jPath);
+            *out_is_directory = isDir ? RAC_TRUE : RAC_FALSE;
+        } else {
+            *out_is_directory = RAC_FALSE;
+        }
     }
 
     env->DeleteLocalRef(jPath);
@@ -4150,7 +4281,7 @@ static rac_bool_t jni_fc_path_exists(const char* path, rac_bool_t* out_is_direct
 
 static int64_t jni_fc_get_file_size(const char* path, void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_get_file_size == nullptr)
         return -1;
     jstring jPath = env->NewStringUTF(path);
     jlong size = env->CallLongMethod(g_file_callbacks_obj, g_fc_get_file_size, jPath);
@@ -4160,7 +4291,7 @@ static int64_t jni_fc_get_file_size(const char* path, void* user_data) {
 
 static int64_t jni_fc_get_available_space(void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_get_available_space == nullptr)
         return -1;
     return static_cast<int64_t>(
         env->CallLongMethod(g_file_callbacks_obj, g_fc_get_available_space));
@@ -4168,7 +4299,7 @@ static int64_t jni_fc_get_available_space(void* user_data) {
 
 static int64_t jni_fc_get_total_space(void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_get_total_space == nullptr)
         return -1;
     return static_cast<int64_t>(env->CallLongMethod(g_file_callbacks_obj, g_fc_get_total_space));
 }
@@ -4279,24 +4410,72 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerRegist
     if (callbacksObj == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
-    // Store global reference
+    // Cache method IDs and validate before touching existing globals
+    jclass cls = env->GetObjectClass(callbacksObj);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        LOGe("nativeFileManagerRegisterCallbacks: failed to get object class");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const auto resolve_method = [&](const char* name, const char* sig) -> jmethodID {
+        const jmethodID id = env->GetMethodID(cls, name, sig);
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        return id;
+    };
+
+    const jmethodID m_create_directory =
+        resolve_method("createDirectory", "(Ljava/lang/String;Z)I");
+    const jmethodID m_delete_path =
+        resolve_method("deletePath", "(Ljava/lang/String;Z)I");
+    const jmethodID m_list_directory =
+        resolve_method("listDirectory", "(Ljava/lang/String;)[Ljava/lang/String;");
+    const jmethodID m_path_exists =
+        resolve_method("pathExists", "(Ljava/lang/String;)Z");
+    const jmethodID m_is_directory =
+        resolve_method("isDirectory", "(Ljava/lang/String;)Z");
+    const jmethodID m_get_file_size =
+        resolve_method("getFileSize", "(Ljava/lang/String;)J");
+    const jmethodID m_get_available_space =
+        resolve_method("getAvailableSpace", "()J");
+    const jmethodID m_get_total_space =
+        resolve_method("getTotalSpace", "()J");
+    env->DeleteLocalRef(cls);
+
+    if (!m_create_directory || !m_delete_path || !m_list_directory ||
+        !m_path_exists || !m_is_directory || !m_get_file_size ||
+        !m_get_available_space || !m_get_total_space) {
+        LOGe("nativeFileManagerRegisterCallbacks: one or more required method IDs failed to resolve");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Create and verify global reference
+    jobject cbRef = env->NewGlobalRef(callbacksObj);
+    if (cbRef == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        LOGe("nativeFileManagerRegisterCallbacks: failed to create global reference");
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Only commit when all method IDs and global ref succeeded
     if (g_file_callbacks_obj != nullptr) {
         env->DeleteGlobalRef(g_file_callbacks_obj);
     }
-    g_file_callbacks_obj = env->NewGlobalRef(callbacksObj);
-
-    // Cache method IDs
-    jclass cls = env->GetObjectClass(callbacksObj);
-    g_fc_create_directory = env->GetMethodID(cls, "createDirectory", "(Ljava/lang/String;Z)I");
-    g_fc_delete_path = env->GetMethodID(cls, "deletePath", "(Ljava/lang/String;Z)I");
-    g_fc_list_directory =
-        env->GetMethodID(cls, "listDirectory", "(Ljava/lang/String;)[Ljava/lang/String;");
-    g_fc_path_exists = env->GetMethodID(cls, "pathExists", "(Ljava/lang/String;)Z");
-    g_fc_is_directory = env->GetMethodID(cls, "isDirectory", "(Ljava/lang/String;)Z");
-    g_fc_get_file_size = env->GetMethodID(cls, "getFileSize", "(Ljava/lang/String;)J");
-    g_fc_get_available_space = env->GetMethodID(cls, "getAvailableSpace", "()J");
-    g_fc_get_total_space = env->GetMethodID(cls, "getTotalSpace", "()J");
-    env->DeleteLocalRef(cls);
+    g_file_callbacks_obj = cbRef;
+    g_fc_create_directory = m_create_directory;
+    g_fc_delete_path = m_delete_path;
+    g_fc_list_directory = m_list_directory;
+    g_fc_path_exists = m_path_exists;
+    g_fc_is_directory = m_is_directory;
+    g_fc_get_file_size = m_get_file_size;
+    g_fc_get_available_space = m_get_available_space;
+    g_fc_get_total_space = m_get_total_space;
 
     LOGi("File manager callbacks registered");
     return RAC_SUCCESS;
@@ -4489,7 +4668,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadSetProgressP
     if (listener == nullptr) {
         return static_cast<jint>(rac_download_set_progress_proto_callback(nullptr, nullptr));
     }
-    g_download_proto_listener = env->NewGlobalRef(listener);
+    jobject listenerRef = env->NewGlobalRef(listener);
+    if (listenerRef == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        rac_download_set_progress_proto_callback(nullptr, nullptr);
+        LOGe("racDownloadSetProgressProtoCallback: failed to create global reference");
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    g_download_proto_listener = listenerRef;
     return static_cast<jint>(
         rac_download_set_progress_proto_callback(download_proto_jni_callback, nullptr));
 }
@@ -7058,10 +7246,19 @@ rac_result_t run_loop_execute_trampoline(const uint8_t* in_tool_call_bytes, size
     }
 
     jclass cls = env->GetObjectClass(ctx->executor);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(inBytes);
+        return RAC_ERROR_INTERNAL;
+    }
     jmethodID method = env->GetMethodID(cls, "executeToolCall", "([B)[B");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
     env->DeleteLocalRef(cls);
     if (method == nullptr) {
-        env->ExceptionClear();
         env->DeleteLocalRef(inBytes);
         return RAC_ERROR_INTERNAL;
     }
@@ -7097,10 +7294,18 @@ void run_loop_handle_published_trampoline(uint64_t run_loop_handle, void* user_d
     }
     JNIEnv* env = ctx->env;
     jclass cls = env->GetObjectClass(ctx->on_handle);
+    if (cls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        return;
+    }
     jmethodID method = env->GetMethodID(cls, "onHandlePublished", "(J)V");
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionClear();
+    }
     env->DeleteLocalRef(cls);
     if (method == nullptr) {
-        env->ExceptionClear();
         return;
     }
     env->CallVoidMethod(ctx->on_handle, method, static_cast<jlong>(run_loop_handle));
@@ -8654,6 +8859,14 @@ void rac_jni_release_all_listener_global_refs(JNIEnv* env) {
     if (g_file_callbacks_obj != nullptr) {
         env->DeleteGlobalRef(g_file_callbacks_obj);
         g_file_callbacks_obj = nullptr;
+        g_fc_create_directory = nullptr;
+        g_fc_delete_path = nullptr;
+        g_fc_list_directory = nullptr;
+        g_fc_path_exists = nullptr;
+        g_fc_is_directory = nullptr;
+        g_fc_get_file_size = nullptr;
+        g_fc_get_available_space = nullptr;
+        g_fc_get_total_space = nullptr;
     }
 }
 
