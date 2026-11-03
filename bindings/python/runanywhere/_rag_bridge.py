@@ -120,6 +120,20 @@ def build_query(
             query.generation.top_p = generation.top_p
             if generation.top_k is not None:
                 query.generation.top_k = generation.top_k
+            # The six knobs commons' RAG path honours when present; None means
+            # absent so commons applies its own rac_default.
+            if generation.min_p is not None:
+                query.generation.min_p = generation.min_p
+            if generation.frequency_penalty is not None:
+                query.generation.frequency_penalty = generation.frequency_penalty
+            if generation.presence_penalty is not None:
+                query.generation.presence_penalty = generation.presence_penalty
+            if generation.repetition_penalty is not None:
+                query.generation.repeat_penalty = generation.repetition_penalty
+            if generation.seed is not None:
+                query.generation.seed = generation.seed
+            if generation.stop_sequences:
+                query.generation.stop_sequences.extend(generation.stop_sequences)
             if generation.system_prompt is not None:
                 query.generation.system_prompt = generation.system_prompt
             if generation.reasoning is not None:

@@ -4,16 +4,16 @@
  *        dynamic loader.
  *
  * The PUBLIC ABI lives in `rac/plugin/rac_plugin_loader.h`. This header is
- * intentionally not installed; only the two internal TUs
- * (`rac_plugin_registry.cpp`, `plugin_loader.cpp`) include it. Keeps the
- * `dlopen` handle map private to commons while letting both files agree on
- * the bookkeeping signatures.
+ * intentionally not installed. The registry, loader and segmentation service
+ * use it to keep library bookkeeping and model leases private to commons.
  */
 
 #ifndef RAC_PLUGIN_REGISTRY_INTERNAL_H
 #define RAC_PLUGIN_REGISTRY_INTERNAL_H
 
 #include <stddef.h>
+
+#include "rac/plugin/rac_engine_manifest.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,22 +32,27 @@ extern "C" {
 #endif
 
 /**
- * Associate a `dlopen` handle with a registered plugin name. Called by the
- * loader immediately after `rac_plugin_register` succeeds. Replaces any
- * previously-stored handle for the same name (the previous one's `dlclose`
- * is the caller's responsibility).
- *
- * Pass `handle = NULL` to clear the association without unregistering.
+ * Register a dynamic plugin and transfer its OS handle under the registry lock.
+ * On success, the registry owns `handle` and returns the replaced handle (if any)
+ * through `out_previous_handle`; the loader closes it after the unload callback.
+ * On failure, the caller retains `handle` and no handle ownership is transferred.
  */
-void rac_plugin_registry_set_dl_handle(const char* name, void* handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+rac_result_t
+rac_plugin_registry_register_dynamic(const rac_engine_vtable_t* vtable, void* handle,
+                                     void** out_previous_handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-/**
- * Pop the dlopen handle associated with `name` (returns `NULL` if there is
- * none, e.g. for statically-registered plugins). Called by `rac_plugin_unregister`
- * so the loader can `dlclose` the right handle exactly once. After this call
- * the registry no longer tracks the handle.
+/** Atomically remove an idle plugin and return its OS handle to the loader.
+ * A model lease returns RAC_ERROR_PLUGIN_BUSY without removing any state.
  */
-void* rac_plugin_registry_take_dl_handle(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+rac_result_t rac_plugin_registry_unregister(const char* name,
+                                            void** out_dl_handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
+/** Pin an accepted vtable by pointer identity without dereferencing stale data.
+ * The returned manifest remains valid until the matching release. */
+rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
+                                         const rac_engine_manifest_t** out_manifest)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
+void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * Snapshot the names of every currently-registered plugin into `out_names`

@@ -27,6 +27,7 @@ import ai.runanywhere.proto.v1.VADServiceState
 import ai.runanywhere.proto.v1.VADStatistics
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
@@ -185,9 +186,11 @@ object CppBridgeVAD {
     suspend fun processLifecycle(request: VADProcessRequest): RAVADResult =
         decodeOrThrow(
             VADResult.ADAPTER,
-            RunAnywhereBridge.racVadProcessLifecycleProto(
-                VADProcessRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racVadProcessLifecycleProto(
+                    VADProcessRequest.ADAPTER.encode(request),
+                )
+            },
             "racVadProcessLifecycleProto",
         )
 
@@ -211,10 +214,12 @@ object CppBridgeVAD {
             )
         return decodeOrThrow(
             VADResult.ADAPTER,
-            RunAnywhereBridge.racVadComponentProcessProto(
-                handle,
-                VADProcessRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racVadComponentProcessProto(
+                    handle,
+                    VADProcessRequest.ADAPTER.encode(request),
+                )
+            },
             "racVadComponentProcessProto",
         )
     }
@@ -224,7 +229,7 @@ object CppBridgeVAD {
         val handle = actor.getHandle()
         return decodeOrThrow(
             VADStatistics.ADAPTER,
-            RunAnywhereBridge.racVadComponentGetStatisticsProto(handle),
+            withNativeProtoFailure { RunAnywhereBridge.racVadComponentGetStatisticsProto(handle) },
             "racVadComponentGetStatisticsProto",
         )
     }
@@ -364,9 +369,11 @@ object CppBridgeVAD {
             val state =
                 decodeOrThrow(
                     VADServiceState.ADAPTER,
-                    RunAnywhereBridge.racVadConfigureLifecycleProto(
-                        VADConfiguration.ADAPTER.encode(config),
-                    ),
+                    withNativeProtoFailure {
+                        RunAnywhereBridge.racVadConfigureLifecycleProto(
+                            VADConfiguration.ADAPTER.encode(config),
+                        )
+                    },
                     "racVadConfigureLifecycleProto",
                 )
             logger.info("VAD initialized (lifecycle)")
@@ -393,7 +400,7 @@ object CppBridgeVAD {
         try {
             decodeOrThrow(
                 VADServiceState.ADAPTER,
-                RunAnywhereBridge.racVadStartLifecycleProto(),
+                withNativeProtoFailure { RunAnywhereBridge.racVadStartLifecycleProto() },
                 "racVadStartLifecycleProto",
             )
         } catch (e: UnsatisfiedLinkError) {
@@ -415,7 +422,7 @@ object CppBridgeVAD {
         try {
             decodeOrThrow(
                 VADServiceState.ADAPTER,
-                RunAnywhereBridge.racVadStopLifecycleProto(),
+                withNativeProtoFailure { RunAnywhereBridge.racVadStopLifecycleProto() },
                 "racVadStopLifecycleProto",
             )
         } catch (e: UnsatisfiedLinkError) {
@@ -444,7 +451,7 @@ object CppBridgeVAD {
             val state =
                 decodeOrThrow(
                     VADServiceState.ADAPTER,
-                    RunAnywhereBridge.racVadResetLifecycleProto(),
+                    withNativeProtoFailure { RunAnywhereBridge.racVadResetLifecycleProto() },
                     "racVadResetLifecycleProto",
                 )
             logger.info("VAD state reset (lifecycle)")

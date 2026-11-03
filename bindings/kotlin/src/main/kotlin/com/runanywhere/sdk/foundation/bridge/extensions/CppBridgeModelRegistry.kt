@@ -13,6 +13,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
@@ -178,9 +179,15 @@ object CppBridgeModelRegistry {
         request: ProtoModelDiscoveryRequest = defaultDiscoveryRequest(),
     ): ProtoModelDiscoveryResult {
         val bytes =
-            RunAnywhereBridge.racModelRegistryDiscoverProto(
-                ProtoModelDiscoveryRequest.ADAPTER.encode(request),
-            ) ?: return ProtoModelDiscoveryResult(
+            try {
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racModelRegistryDiscoverProto(
+                        ProtoModelDiscoveryRequest.ADAPTER.encode(request),
+                    )
+                }
+            } catch (e: SDKException) {
+                return ProtoModelDiscoveryResult(error = e.error)
+            } ?: return ProtoModelDiscoveryResult(
                 error =
                     ai.runanywhere.proto.v1.SDKError(
                         code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
@@ -224,9 +231,11 @@ object CppBridgeModelRegistry {
      */
     fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
         val bytes =
-            RunAnywhereBridge.racRegisterModelFromUrlProto(
-                ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
-            ) ?: return null
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRegisterModelFromUrlProto(
+                    ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -240,9 +249,11 @@ object CppBridgeModelRegistry {
      */
     fun registerMultiFileModel(request: ProtoRegisterMultiFileModelRequest): ProtoModelInfo? {
         val bytes =
-            RunAnywhereBridge.racRegisterMultiFileModelProto(
-                ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
-            ) ?: return null
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRegisterMultiFileModelProto(
+                    ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -262,9 +273,11 @@ object CppBridgeModelRegistry {
      */
     fun importModel(request: ProtoModelImportRequest): ProtoModelImportResult {
         val bytes =
-            RunAnywhereBridge.racModelRegistryImportProto(
-                ProtoModelImportRequest.ADAPTER.encode(request),
-            ) ?: throw SDKException.make(
+            withNativeProtoFailure {
+                RunAnywhereBridge.racModelRegistryImportProto(
+                    ProtoModelImportRequest.ADAPTER.encode(request),
+                )
+            } ?: throw SDKException.make(
                 code = ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
                 message = "$TAG: Native registry returned no response for importProto",
                 category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
@@ -378,9 +391,11 @@ object CppBridgeModelRegistry {
 
     private fun refreshProto(request: ProtoModelRegistryRefreshRequest): ProtoModelRegistryRefreshResult? {
         val bytes =
-            RunAnywhereBridge.racModelRegistryRefreshProto(
-                ProtoModelRegistryRefreshRequest.ADAPTER.encode(request),
-            ) ?: return null
+            withNativeProtoFailure {
+                RunAnywhereBridge.racModelRegistryRefreshProto(
+                    ProtoModelRegistryRefreshRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return try {
             ProtoModelRegistryRefreshResult.ADAPTER.decode(bytes)

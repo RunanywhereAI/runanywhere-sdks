@@ -6,11 +6,11 @@ format: xcode
 skip_build: false
 clean_build: false
 
-# Targets to analyze (main SDK and backend modules)
-targets:
-  - RunAnywhere
-  - ONNXRuntime
-  - LlamaCPPRuntime
+# Periphery 3.x has no `targets:` key or `--targets` option; it scans all
+# SwiftPM targets. exclude_targets skips MLXRuntime and NeuRTRuntime.
+exclude_targets:
+  - MLXRuntime
+  - NeuRTRuntime
 
 # Retain patterns - don't flag these as unused
 retain_public: true

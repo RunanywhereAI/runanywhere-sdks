@@ -58,6 +58,7 @@ class DartBridgeProtoUtils {
     ) invoke,
     required T Function(List<int>) decode,
     required String symbol,
+    bool preserveNativeError = false,
   }) {
     final bytes = request.writeToBuffer();
     final requestPtr = copyBytes(bytes);
@@ -67,7 +68,7 @@ class DartBridgeProtoUtils {
     try {
       bindings.rac_proto_buffer_init(out);
       final code = invoke(requestPtr, bytes.length, out);
-      ensureSuccess(out, code, symbol);
+      ensureSuccess(out, code, symbol, preserveNativeError: preserveNativeError);
       return decodeBuffer(out, decode);
     } finally {
       bindings.rac_proto_buffer_free(out);
@@ -130,15 +131,24 @@ class DartBridgeProtoUtils {
   static void ensureSuccess(
     ffi.Pointer<RacProtoBuffer> out,
     int code,
-    String symbol,
-  ) {
+    String symbol, {
+    bool preserveNativeError = false,
+  }) {
     if (code == RacResultCodes.success &&
         out.ref.status == RacResultCodes.success) {
       return;
     }
+    final message = '$symbol failed: ${protoBufferError(out, code)}';
+    if (preserveNativeError) {
+      final result = code != RacResultCodes.success ? code : out.ref.status;
+      // The canonical mapper uses callOut's default failure handling.
+      final exception = SDKException.fromResult(result)!;
+      exception.error.message = message;
+      throw exception;
+    }
     throw SDKException.make(
       code: pb_enum.ErrorCode.ERROR_CODE_PROCESSING_FAILED,
-      message: '$symbol failed: ${protoBufferError(out, code)}',
+      message: message,
       category: pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,
     );
   }

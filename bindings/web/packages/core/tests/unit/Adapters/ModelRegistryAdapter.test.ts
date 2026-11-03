@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ModelInfo as ModelInfoCodec,
   ModelInfoList as ModelInfoListCodec,
@@ -7,6 +7,7 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { RAC_ERROR_NOT_FOUND } from '../../../src/Foundation/RACErrors';
+import { SDKLogger } from '../../../src/Foundation/SDKLogger.js';
 import {
   ModelRegistryAdapter,
   type ModelRegistryModule,
@@ -167,7 +168,48 @@ describe('ModelRegistryAdapter download status', () => {
 
 describe('ModelRegistryAdapter refresh', () => {
   beforeEach(() => ModelRegistryAdapter.clearDefaultModule());
-  afterEach(() => ModelRegistryAdapter.clearDefaultModule());
+  afterEach(() => {
+    ModelRegistryAdapter.clearDefaultModule();
+    vi.restoreAllMocks();
+  });
+
+  it.each([undefined, false, true])(
+    'disables native pruning in every Web registry when pruneOrphans is %s',
+    (pruneOrphans) => {
+      const commons = createRegistryModule(101);
+      const llama = createRegistryModule(202);
+      const onnx = createRegistryModule(303);
+      const warning = vi.spyOn(SDKLogger.prototype, 'warning').mockImplementation(() => undefined);
+      ModelRegistryAdapter.setDefaultModule(commons.module);
+      ModelRegistryAdapter.setDefaultModule(llama.module);
+      ModelRegistryAdapter.setDefaultModule(onnx.module);
+
+      const registry = ModelRegistryAdapter.tryDefault();
+      expect(registry!.refresh({
+        includeRemoteCatalog: true,
+        rescanLocal: false,
+        pruneOrphans,
+      })).toBe(true);
+
+      for (const target of [commons, llama, onnx]) {
+        expect(target.refreshRequests).toHaveLength(1);
+        expect(RefreshRequestCodec.decode(target.refreshRequests[0])).toMatchObject({
+          pruneOrphans: false,
+          rescanLocal: false,
+          includeRemoteCatalog: target === onnx,
+          includeDownloadedState: true,
+        });
+        expect(target.liveAllocations.size).toBe(0);
+      }
+      if (pruneOrphans) {
+        expect(warning).toHaveBeenCalledExactlyOnceWith(
+          expect.stringMatching(/ignoring pruneOrphans=true.*MEMFS.*OPFS/),
+        );
+      } else {
+        expect(warning).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it('rescans every live registry and fetches the remote catalog only once', () => {
     const commons = createRegistryModule(101);
@@ -186,6 +228,7 @@ describe('ModelRegistryAdapter refresh', () => {
       const request = RefreshRequestCodec.decode(target.refreshRequests[0]);
       expect(request.rescanLocal).toBe(true);
       expect(request.includeDownloadedState).toBe(true);
+      expect(request.pruneOrphans).toBe(false);
       expect(request.includeRemoteCatalog).toBe(target === onnx);
     }
   });

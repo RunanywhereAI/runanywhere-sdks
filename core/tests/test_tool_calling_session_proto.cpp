@@ -491,6 +491,38 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
     return request;
 }
 
+/** @brief An ambiguous call fails the session with INVALID_ARGUMENT and emits no tool call. */
+int test_session_repaired_key_collision_never_emits_call() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"items\":[{\"x\xFF\":1,\"x\xFE\":2}]}"
+        "}</tool_call>",
+    });
+    EventSink sink;
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "collision session request serializes");
+    uint64_t handle = 0;
+    sink.published_handle = &handle;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 0, "ambiguous session never emits a tool call");
+    CHECK(rc == RAC_SUCCESS, "ambiguous session create succeeds and reports via events");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 1, "ambiguous session emits exactly one error");
+    runanywhere::v1::SDKError error;
+    CHECK(parse_first_error(sink, &error), "ambiguous session error decodes");
+    CHECK(error.c_abi_code() == RAC_ERROR_INVALID_ARGUMENT,
+          "ambiguous session error is invalid argument");
+    if (handle) {
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+    cleanup_environment();
+    return 0;
+}
+
 int test_session_emits_tool_call() {
     if (!load_mock_llm()) {
         std::fprintf(stderr, "FAIL: mock LLM load\n");
@@ -531,11 +563,13 @@ int test_session_emits_tool_call() {
     return 0;
 }
 
-int test_step_with_result_emits_final() {
+int test_step_with_result_emits_final(const char* location = "Tokyo",
+                                      const char* expected_location = "Tokyo") {
     if (!load_mock_llm())
         return 1;
     set_responses({
-        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        std::string("<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"") +
+            location + "\"}}</tool_call>",
         "The weather in Tokyo is sunny, 25C.",
     });
 
@@ -555,8 +589,13 @@ int test_step_with_result_emits_final() {
     runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
     step.set_session_handle(handle);
     const auto* tool_ev = sink.find_first(EvCase::kToolCall);
-    if (tool_ev)
+    CHECK(tool_ev != nullptr, "validated default call reaches the session host");
+    if (tool_ev) {
+        CHECK(tool_ev->tool_call().arguments_json() ==
+                  std::string("{\"location\":\"") + expected_location + "\"}",
+              "session host receives the exact repaired argument");
         step.set_tool_call_id(tool_ev->tool_call().id());
+    }
     step.set_result_json(R"({"temp":25,"condition":"sunny"})");
     std::vector<uint8_t> step_bytes;
     serialize(step, &step_bytes);
@@ -1459,7 +1498,9 @@ int main() {
         return 0;
 #else
         test_session_emits_tool_call();
+        test_session_repaired_key_collision_never_emits_call();
         test_step_with_result_emits_final();
+        test_step_with_result_emits_final("\xC3\x28", "\xEF\xBF\xBD(");
         test_auto_execute_unset_defaults_to_true_and_pauses_for_tool_execution();
         test_auto_execute_false_in_session_completes_without_pausing();
         test_max_tool_calls_allows_final_synthesis();

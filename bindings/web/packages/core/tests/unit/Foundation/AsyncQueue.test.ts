@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { AsyncQueue } from '../../../src/Foundation/AsyncQueue.js';
+import { AsyncQueue } from '@runanywhere/proto-ts/streams/push';
 
 describe('AsyncQueue.fail', () => {
   it('rejects a consumer that is already parked on next()', async () => {
@@ -39,6 +39,15 @@ describe('AsyncQueue.fail', () => {
     const iterator = queue[Symbol.asyncIterator]();
     await expect(iterator.next()).resolves.toEqual({ value: 'a', done: false });
     await expect(iterator.next()).rejects.toThrow('inference exploded');
+  });
+
+  it('reports done on subsequent next() calls after throwing the failure', async () => {
+    const queue = new AsyncQueue<string>();
+    queue.fail(new Error('inference exploded'));
+
+    const iterator = queue[Symbol.asyncIterator]();
+    await expect(iterator.next()).rejects.toThrow('inference exploded');
+    await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
   });
 
   it('still ends normally on complete()', async () => {

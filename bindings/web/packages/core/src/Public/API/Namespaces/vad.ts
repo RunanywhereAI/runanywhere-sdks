@@ -5,7 +5,7 @@
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { SDKException } from '../../../Foundation/SDKException.js';
-import { AsyncQueue } from '../../../Foundation/AsyncQueue.js';
+import { AsyncQueue } from '@runanywhere/proto-ts/streams/push';
 import { detectVoice, streamVoiceActivity } from '../../Extensions/RunAnywhere+VAD.js';
 import { pcm16ToFloat32 } from '../../Extensions/RunAnywhere+AudioConvert.js';
 import { audioInputToFloat32, type AudioFormatSpec, type AudioFrame, type AudioInput } from '../Inputs.js';

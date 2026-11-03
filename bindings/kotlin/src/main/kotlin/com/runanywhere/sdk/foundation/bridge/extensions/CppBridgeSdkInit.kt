@@ -22,6 +22,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.SdkInitPhase1Request
 import ai.runanywhere.proto.v1.SdkInitPhase2Request
 import ai.runanywhere.proto.v1.SdkInitResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -57,7 +58,7 @@ object CppBridgeSdkInit {
             )
         val result =
             decode(
-                RunAnywhereBridge.racSdkInitPhase1Proto(SdkInitPhase1Request.ADAPTER.encode(request)),
+                withNativeProtoFailure { RunAnywhereBridge.racSdkInitPhase1Proto(SdkInitPhase1Request.ADAPTER.encode(request)) },
                 phase = "1",
             )
         assertSuccess(result)
@@ -81,9 +82,11 @@ object CppBridgeSdkInit {
         val request = SdkInitPhase2Request(build_token = buildToken.orEmpty())
         val result =
             decode(
-                RunAnywhereBridge.racSdkInitPhase2Proto(
-                    SdkInitPhase2Request.ADAPTER.encode(request),
-                ),
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racSdkInitPhase2Proto(
+                        SdkInitPhase2Request.ADAPTER.encode(request),
+                    )
+                },
                 phase = "2",
             )
         assertSuccess(result)
@@ -96,7 +99,7 @@ object CppBridgeSdkInit {
      * external config is available. Mirrors `rac_sdk_retry_http_proto`.
      */
     fun retryHTTP(): SdkInitResult {
-        val result = decode(RunAnywhereBridge.racSdkRetryHttpProto(), phase = "RETRY_HTTP")
+        val result = decode(withNativeProtoFailure { RunAnywhereBridge.racSdkRetryHttpProto() }, phase = "RETRY_HTTP")
         assertSuccess(result)
         return result
     }

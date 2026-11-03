@@ -22,6 +22,7 @@ import ai.runanywhere.proto.v1.LLMStreamEvent
 import ai.runanywhere.proto.v1.SDKEvent
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
@@ -143,7 +144,7 @@ object CppBridgeLLM {
      * cancellation [SDKEvent], or null when no generation was in flight.
      */
     suspend fun cancelProto(): SDKEvent? =
-        RunAnywhereBridge.racLlmCancelProto()?.let(SDKEvent.ADAPTER::decode)
+        withNativeProtoFailure { RunAnywhereBridge.racLlmCancelProto() }?.let(SDKEvent.ADAPTER::decode)
 
     /** One-shot generation. */
     suspend fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {
@@ -156,7 +157,7 @@ object CppBridgeLLM {
         inner.getHandle()
         return decodeOrThrow(
             LLMGenerationResult.ADAPTER,
-            RunAnywhereBridge.racLlmGenerateProto(LLMGenerateRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racLlmGenerateProto(LLMGenerateRequest.ADAPTER.encode(request)) },
             "racLlmGenerateProto",
         )
     }

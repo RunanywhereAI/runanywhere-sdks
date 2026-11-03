@@ -453,8 +453,13 @@ rac_result_t acquire_lifecycle_segmentation(LifecycleSegmentationRef* out_ref) {
         *out_ref = {};
     return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
 #else
-    return acquire_component(runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION, out_ref,
-                             &LoadedModel::segmentation_ops);
+    const rac_result_t rc = acquire_component(runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION,
+                                              out_ref, &LoadedModel::segmentation_ops);
+    if (rc == RAC_SUCCESS) {
+        const auto* token = static_cast<std::shared_ptr<LoadedModel>*>(out_ref->opaque);
+        out_ref->provider = (*token)->segmentation_provider;
+    }
+    return rc;
 #endif
 }
 

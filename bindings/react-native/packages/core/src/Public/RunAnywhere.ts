@@ -41,8 +41,7 @@ import { registerServicesReadyGuard } from '../Foundation/Initialization/Service
 import { registerInitializedProvider } from '../Foundation/Initialization/InitializedGuard';
 import type { SDKInitOptions } from '../types/models';
 import {
-  asSDKException,
-  sdkExceptionFromRcResult,
+  asNativeSDKException,
   SDKException,
 } from '../Foundation/Errors/SDKException';
 
@@ -127,21 +126,6 @@ function decodeSdkInitResultPayload(payload: ArrayBuffer): {
     httpConfigured: decoded.hasCompletedHttpSetup,
     httpApplicable: decoded.httpApplicable,
   };
-}
-
-const nativeRacResultPattern = /(?:^|\s)RAC_RESULT=(-?\d+)(?:\s|$)/;
-
-/** Convert a native bridge failure carrying RAC_RESULT into the canonical proto error. */
-async function asNativeSDKException(error: unknown): Promise<SDKException> {
-  if (error instanceof Error) {
-    const match = nativeRacResultPattern.exec(error.message);
-    if (match?.[1]) {
-      const rc = Number.parseInt(match[1], 10);
-      const mapped = await sdkExceptionFromRcResult(rc);
-      if (mapped) return mapped;
-    }
-  }
-  return asSDKException(error);
 }
 
 function environmentToConfigString(environment: SDKEnvironment): string {

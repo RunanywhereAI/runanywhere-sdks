@@ -38,6 +38,7 @@
 #include "features/llm/tool_calling_grammar.h"
 #include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
+#include "features/llm/utf8_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -851,7 +852,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                 }
                 tool_result.Clear();
                 tool_result.set_is_error(true);
-                tool_result.set_error(executor_error);
+                tool_result.set_error(rac::llm::sanitize_utf8(executor_error));
             }
             tool_result.set_tool_call_id(parsed_call.id());
             tool_result.set_name(parsed_call.name());

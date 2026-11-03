@@ -2,7 +2,7 @@
 
 **Optional Qualcomm Hexagon NPU backend for the RunAnywhere Kotlin SDK** — on-device LLM, VLM, STT, TTS, embeddings, and diffusion routed to Snapdragon Hexagon V75/V79/V81 NPUs. Android `arm64-v8a` only.
 
-The AAR is binary-only: it bundles the QHexRT engine, JNI bridge, redistributable Qualcomm QAIRT/QNN host libraries, and Hexagon DSP skels. Model conversion / CoreML / forge tooling is not included — download models at runtime through the SDK catalog.
+The AAR is binary-only: it bundles the QHexRT engine, JNI bridge, redistributable Qualcomm QAIRT/QNN host libraries, and Hexagon DSP skels. Model conversion / CoreML / forge tooling is not included. Register the dedicated model URL supplied by the model publisher through the core SDK.
 
 ---
 
@@ -26,17 +26,46 @@ Probe capability, register once at startup, then use standard RunAnywhere APIs �
 ```kotlin
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.ModelRegistration
+import com.runanywhere.sdk.public.api.models
+import ai.runanywhere.proto.v1.InferenceFramework
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
-val npu = QHexRT.probeNpu() // safe on any device
-if (npu.qhexrt_supported) {
-    QHexRT.register() // also installs DSP skels from AAR assets
+lifecycleScope.launch {
+    RunAnywhere.initialize(context = this@MainActivity)
+
+    val npu = QHexRT.probeNpu() // safe on any device
+    if (npu.supported) {
+        QHexRT.register() // also installs DSP skels from AAR assets
+        if (QHexRT.isRegistered) {
+            RunAnywhere.models.register(
+                ModelRegistration.url(
+                    id = "my-qhexrt-model",
+                    name = "My QHexRT Model",
+                    url = "https://huggingface.co/organization/dedicated-qhexrt-model/model.json",
+                    framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+                ),
+            )
+            // Download, load, and infer via core APIs.
+        }
+    }
 }
-
-RunAnywhere.initialize(context = this, /* ... */)
-// Register, download, load, and infer via core APIs
 ```
 
 See the [Kotlin SDK README](../../README.md) for full setup.
+
+The URL above is a logical bundle reference: Commons selects the device's architecture folder and registers the manifest with its companion files. A direct `/resolve/main/model.json` URL registers only that file. Explicitly pinned bundle references must match the device architecture.
+
+---
+
+## Explicit bundle registration
+
+When registering a bundle URL through the core model-registration API with the QHexRT backend registered, Commons selects the device's architecture folder for logical references such as `https://huggingface.co/organization/model-repository/model.json` and includes the manifest's companion files.
+
+A known architecture pin in the first repository folder, such as `/v79` or `/v79/model.json`, is checked before network resolution or registry changes. A mismatched pin returns `RAC_ERROR_INVALID_ARGUMENT` with a message naming the bundle and device architectures; a matching pin is kept unchanged. Probe failures and unsupported devices return the same errors as logical references.
+
+Direct `/resolve/` or `/blob/` URLs register a single file and do not receive this bundle-folder check.
 
 ---
 
@@ -51,7 +80,7 @@ See the [Kotlin SDK README](../../README.md) for full setup.
 | Embeddings | Nemotron Embed, EmbeddingGemma |
 | Diffusion | Cosmos3-Edge / LaMa inpaint |
 
-Exact catalog rows and Hexagon arch support are returned by the runtime model catalog after `QHexRT.register()`.
+QHexRT does not seed or select models. Register the exact model URL intended for the target device. Use `QHexRT.probeNpu()` as an optional preflight when your UI needs to report device support before registration.
 
 ---
 
