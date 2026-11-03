@@ -105,6 +105,47 @@ static inline rac_result_t qhexrt_resolve_bundle_variant(char* out_variant, size
     return RAC_SUCCESS;
 }
 
+/** Reject an architecture folder pin that differs from the current device. */
+static inline rac_result_t qhexrt_validate_bundle_ref(const char* folder, char* out_error_message,
+                                                      size_t out_error_message_size) {
+    if (out_error_message != NULL && out_error_message_size > 0) {
+        out_error_message[0] = '\0';
+    }
+    if (folder == NULL) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    /* Architecture pins occupy the first in-repository folder, as in logical resolution. */
+    const size_t length = strcspn(folder, "/");
+    const rac_qhexrt_hexagon_arch_t architectures[] = {
+        RAC_QHEXRT_HEXAGON_ARCH_V68, RAC_QHEXRT_HEXAGON_ARCH_V69, RAC_QHEXRT_HEXAGON_ARCH_V73,
+        RAC_QHEXRT_HEXAGON_ARCH_V75, RAC_QHEXRT_HEXAGON_ARCH_V79, RAC_QHEXRT_HEXAGON_ARCH_V81,
+    };
+    for (size_t index = 0; index < sizeof(architectures) / sizeof(architectures[0]); ++index) {
+        const char* pinned_variant = rac_qhexrt_arch_name(architectures[index]);
+        if (strlen(pinned_variant) != length || strncmp(folder, pinned_variant, length) != 0) {
+            continue;
+        }
+        char device_variant[64] = {0};
+        const rac_result_t rc = qhexrt_resolve_bundle_variant(
+            device_variant, sizeof(device_variant), out_error_message, out_error_message_size);
+        if (rc != RAC_SUCCESS) {
+            return rc;
+        }
+        if (strcmp(pinned_variant, device_variant) != 0) {
+            if (out_error_message != NULL && out_error_message_size > 0) {
+                (void)snprintf(
+                    out_error_message, out_error_message_size,
+                    "QHexRT bundle architecture %s does not match device architecture %s",
+                    pinned_variant, device_variant);
+            }
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        return RAC_SUCCESS;
+    }
+    return RAC_SUCCESS;
+}
+
 /** The process-lifetime QHexRT bundle policy (function-local static). */
 static inline const rac_bundle_policy_t* qhexrt_bundle_policy(void) {
     static const rac_bundle_policy_t policy = {
@@ -115,7 +156,7 @@ static inline const rac_bundle_policy_t* qhexrt_bundle_policy(void) {
         /* .manifest_leaf_names_bundle= */ RAC_TRUE,
         /* .is_bundle_manifest        = */ qhexrt_is_bundle_manifest,
         /* .resolve_variant           = */ {qhexrt_resolve_bundle_variant},
-        /* .reserved_1                = */ 0,
+        /* .validate_ref              = */ {qhexrt_validate_bundle_ref},
     };
     return &policy;
 }
