@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "features/llm/tool_calling_internal.h"
+#include "features/llm/tool_calling_key_repair_internal.h"
 #include "features/llm/utf8_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
@@ -923,12 +924,31 @@ static std::string validation_errors_to_json(const std::vector<std::string>& err
 // JSON NORMALIZATION
 // =============================================================================
 
+/**
+ * @brief Normalize a tool-call JSON payload, repairing malformed UTF-8.
+ *
+ * Rejects payloads whose distinct raw keys decode to the same key after repair
+ * (`RAC_ERROR_INVALID_ARGUMENT`), then repairs bytes and re-serializes valid
+ * JSON, falling back to the unquoted-key normalizer when the fast parse fails.
+ *
+ * @param json_str Raw JSON payload (must not be null).
+ * @param out_normalized Receives the owned normalized string on success.
+ * @return RAC_SUCCESS (repaired on the fast path, or via the unquoted-key
+ *         scanner when the fast parser rejects the payload),
+ *         RAC_ERROR_INVALID_ARGUMENT for ambiguous keys,
+ *         RAC_ERROR_OUT_OF_MEMORY on allocation failure, or RAC_ERROR_INTERNAL
+ *         for an unexpected exception.
+ */
 extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
                                                        char** out_normalized) try {
     if (!json_str || !out_normalized) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     *out_normalized = nullptr;
+
+    if (rac::llm::tool_calling::has_repaired_key_collision(json_str)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
     // Repair before the fast parse as well as unquoted-key normalization, so
     // malformed model bytes do not make otherwise valid JSON take the scanner path.
