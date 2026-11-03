@@ -90,7 +90,7 @@ primitives the engine does not serve are left `NULL`.
 // engines/llamacpp/rac_plugin_entry_llamacpp.cpp (per-engine example)
 static const rac_engine_vtable_t g_llamacpp_vtable = {
     .metadata = {
-        .abi_version = RAC_PLUGIN_API_VERSION,    // 9u
+        .abi_version = RAC_PLUGIN_API_VERSION,    // 14u
         .name        = "llamacpp",
         .display_name= "llama.cpp",
         // ...
@@ -996,7 +996,7 @@ rac_result_t my_function() {
 
    static const rac_engine_vtable_t g_<name>_vtable = {
        .metadata = {
-           .abi_version  = RAC_PLUGIN_API_VERSION,   // 9u
+           .abi_version  = RAC_PLUGIN_API_VERSION,   // 14u
            .name         = "<name>",
            .display_name = "<Display Name>",
            .priority     = 100,

@@ -19,9 +19,10 @@ count) — when reality and this doc disagree, the code wins; fix the doc.
 ## What an engine is
 
 An **engine is an op-table adapter for modalities.** It fills exactly **one**
-`rac_engine_vtable_t` (`core/include/rac/plugin/rac_engine_vtable.h`) — 10 live
+`rac_engine_vtable_t` (`core/include/rac/plugin/rac_engine_vtable.h`) — 13 live
 primitive slots (`llm_ops`/`stt_ops`/`tts_ops`/`vad_ops`/`embedding_ops`/
-`vlm_ops`/`diffusion_ops`/`diarization_ops`/`segmentation_ops`/`rerank_ops`);
+`vlm_ops`/`diffusion_ops`/`diarization_ops`/`segmentation_ops`/`rerank_ops`/
+`image_embedding_ops`/`ocr_ops`/`decision_ops`);
 **NULL means "I do not serve that primitive."** Serving more than one modality
 just means filling more than one slot — today `llamacpp` fills four
 (`llm`/`embedding`/`vlm`/`rerank`), `sherpa` fills three (`stt`/`tts`/`vad`). It
@@ -135,7 +136,7 @@ initializer is what keeps the ABI from drifting silently.
 5. **Registration** — `RAC_PLUGIN_ENTRY_DEF(<name>)` plus a static/dynamic
    register carrier (Build & registration below).
 
-`RAC_PLUGIN_API_VERSION` is currently `9u`; a mismatch rejects the plugin outright.
+`RAC_PLUGIN_API_VERSION` is currently `14u`; a mismatch rejects the plugin outright.
 
 ---
 

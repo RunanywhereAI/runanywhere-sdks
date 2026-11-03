@@ -2215,7 +2215,7 @@ Every backend publishes a single `rac_engine_vtable_t`:
 
 The optional `get_stream_token_counts` callback is on `rac_llm_service_ops_t`, not the vtable. NULL means commons estimates token totals and marks them as estimated.
 
-`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `9u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
+`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `14u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
 
 ### §13.5 Streaming fan-out — `HandleStreamAdapter`
 
@@ -2619,7 +2619,7 @@ All files in `Generated/` are produced by `idl/codegen/generate_all.sh` and must
 - **`NativeProtoABI`** — Internal Swift `enum` (`CppBridge+NativeProtoABI.swift`) holding `load`, `require`, `withSerializedBytes`, `decode`, `free`, `invoke` helpers for the proto-byte ABI. All other slices call through this enum.
 - **`RA*` typealias prefix** — Proto-generated Swift types keep their `RA` prefix. Public extensions then declare typealiases stripping it for the caller's convenience.
 - **`RAC_STATIC_PLUGINS`** — CMake flag forcing static plugin registration on iOS/WASM. Combined with `-force_load` linker flags via `RAC_STATIC_PLUGIN_REGISTER(name)` macro.
-- **`RAC_PLUGIN_API_VERSION`** — C macro currently `9u`. `rac_engine_vtable_t.metadata.abi_version` must equal this; mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`.
+- **`RAC_PLUGIN_API_VERSION`** — C macro currently `14u`. `rac_engine_vtable_t.metadata.abi_version` must equal this; mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`.
 - **Proto-byte buffer** — A `rac_proto_buffer_t` filled by C++ with serialized proto bytes. Swift wraps in `Data`, deserializes to the response type, then frees via `rac_proto_buffer_free` (via `NativeProtoABI.free`).
 - **Two-phase init** — Swift SDK contract: synchronous Phase 1 (`rac_sdk_init_phase1_proto`) registers platform services and validates inputs; async Phase 2 (`rac_sdk_init_phase2_proto`) performs HTTP/auth/device registration. Phase 2 failures are non-fatal.
 - **Platform adapter IoC** — `rac_platform_adapter_t` flat C struct of function pointers. Swift populates this struct; C++ calls into it for all platform services (file I/O, Keychain, logging, clock, memory, HTTP download).
