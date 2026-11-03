@@ -368,7 +368,7 @@ void run_generic_end_to_end() {
             }
         }
         CHECK(confidence_pattern_ok,
-              "confidence bytes are the exact quantized softmax (255 even / 253 odd columns)");
+              "confidence bytes follow the exact row/column quantized softmax (255 / 253)");
         CHECK(confidence_class_mask_ok,
               "confidence op keeps class 2 in the class mask at every pixel");
         rac_segmentation_result_free(&confidence_result);

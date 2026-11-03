@@ -444,11 +444,13 @@ void run_direct_cases(rac_handle_t handle, const std::vector<uint8_t>& rgb) {
                                                                          &result, &confidence);
         check(rc == RAC_SUCCESS, "direct valid payload succeeds");
         check_valid_result(result, confidence);
-        g_valid_class_mask.resize(kPixels * sizeof(uint16_t));
-        for (size_t i = 0; i < kPixels; ++i) {
-            const uint16_t value = result.class_mask[i];
-            g_valid_class_mask[i * 2] = static_cast<uint8_t>(value & 0xffU);
-            g_valid_class_mask[i * 2 + 1] = static_cast<uint8_t>((value >> 8U) & 0xffU);
+        if (result.class_mask && result.class_mask_count == kPixels) {
+            g_valid_class_mask.resize(kPixels * sizeof(uint16_t));
+            for (size_t i = 0; i < kPixels; ++i) {
+                const uint16_t value = result.class_mask[i];
+                g_valid_class_mask[i * 2] = static_cast<uint8_t>(value & 0xffU);
+                g_valid_class_mask[i * 2 + 1] = static_cast<uint8_t>((value >> 8U) & 0xffU);
+            }
         }
         if (result.diagnostic_rgba && result.diagnostic_rgba_size > 0) {
             g_valid_diagnostic.assign(result.diagnostic_rgba,
