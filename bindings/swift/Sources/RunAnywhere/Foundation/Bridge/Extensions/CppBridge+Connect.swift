@@ -46,6 +46,22 @@ private enum ConnectProtoABI {
         "rac_connect_host_validate_cancel_proto",
         as: NativeProtoABI.ProtoRequest.self
     )
+    static let clusterStart = NativeProtoABI.load(
+        "rac_connect_cluster_start_proto",
+        as: NativeProtoABI.ProtoRequest.self
+    )
+    static let clusterJoin = NativeProtoABI.load(
+        "rac_connect_cluster_join_proto",
+        as: NativeProtoABI.ProtoRequest.self
+    )
+    static let clusterStop = NativeProtoABI.load(
+        "rac_connect_cluster_stop_proto",
+        as: NativeProtoABI.ProtoRequest.self
+    )
+    static let clusterValidateActivation = NativeProtoABI.load(
+        "rac_connect_cluster_validate_activation_proto",
+        as: NativeProtoABI.ProtoRequest.self
+    )
 }
 
 extension CppBridge {
@@ -143,6 +159,46 @@ extension CppBridge {
                 request,
                 symbol: ConnectProtoABI.hostValidateCancel,
                 symbolName: "rac_connect_host_validate_cancel_proto",
+                responseType: RAConnectInvocationValidation.self
+            )
+        }
+
+        // MARK: - Cluster Orchestration
+
+        static func startCluster(_ request: RAClusterStartRequest) throws -> RAClusterState {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: ConnectProtoABI.clusterStart,
+                symbolName: "rac_connect_cluster_start_proto",
+                responseType: RAClusterState.self
+            )
+        }
+
+        static func joinCluster(_ request: RAClusterJoinRequest) throws -> RAClusterStartResponse {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: ConnectProtoABI.clusterJoin,
+                symbolName: "rac_connect_cluster_join_proto",
+                responseType: RAClusterStartResponse.self
+            )
+        }
+
+        static func stopCluster(_ request: RAClusterStopRequest) throws -> RAClusterState {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: ConnectProtoABI.clusterStop,
+                symbolName: "rac_connect_cluster_stop_proto",
+                responseType: RAClusterState.self
+            )
+        }
+
+        static func validateActivation(
+            _ request: RAClusterActivation
+        ) throws -> RAConnectInvocationValidation {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: ConnectProtoABI.clusterValidateActivation,
+                symbolName: "rac_connect_cluster_validate_activation_proto",
                 responseType: RAConnectInvocationValidation.self
             )
         }

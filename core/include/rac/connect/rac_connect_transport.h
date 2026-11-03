@@ -88,6 +88,28 @@ RAC_API rac_result_t rac_connect_transport_receive(rac_connect_channel_t channel
                                                    rac_proto_buffer_t* out_payload);
 RAC_API rac_result_t rac_connect_transport_close(rac_connect_channel_t channel);
 
+/* Forward declaration from rac_connect.h */
+struct rac_connect_decoded_activation;
+
+/**
+ * Receive and decode an activation tensor frame from a transport channel.
+ *
+ * Receives a ClusterActivation payload from the channel adapter, decodes
+ * tensor_data using ClusterActivation.dtype, byte-swapping on big-endian hosts.
+ * If expected_dtype is not 0, verifies that the payload matches expected_dtype,
+ * rejecting a mismatch with RAC_ERROR_INVALID_FORMAT.
+ *
+ * @param channel Open transport channel.
+ * @param expected_dtype Expected ClusterActivationDtype (or 0 to accept any valid declared dtype).
+ * @param out_host_tensor Output buffer for decoded host-endian tensor bytes (caller owns, free with rac_proto_buffer_free).
+ * @param out_metadata Optional pointer to receive tensor dimensions and dtype metadata.
+ */
+RAC_API rac_result_t
+rac_connect_transport_receive_activation(rac_connect_channel_t channel,
+                                         uint32_t expected_dtype,
+                                         rac_proto_buffer_t* out_host_tensor,
+                                         struct rac_connect_decoded_activation* out_metadata);
+
 #ifdef __cplusplus
 }
 #endif
