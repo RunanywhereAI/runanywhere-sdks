@@ -27,15 +27,20 @@
 #include <new>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "features/llm/tool_calling_internal.h"
+#include "features/llm/tool_calling_key_repair_internal.h"
+#include "features/llm/utf8_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
+
+#include "features/llm/tool_calling_result_internal.h"
 #endif
 
 using nlohmann::json;
@@ -184,12 +189,16 @@ extern "C" rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_ou
                     if (*a == ')') {
                         return RAC_TOOL_FORMAT_PYTHONIC;  // [name()]
                     }
-                    const bool arg_ident =
-                        (*a >= 'a' && *a <= 'z') || (*a >= 'A' && *a <= 'Z') || *a == '_';
+                    // Non-ASCII bytes, including malformed UTF-8, must reach
+                    // argument-key repair. Keep ASCII identifier boundaries
+                    // strict so punctuation and delimiters do not match.
+                    const bool arg_ident = (*a >= 'a' && *a <= 'z') || (*a >= 'A' && *a <= 'Z') ||
+                                           *a == '_' || static_cast<unsigned char>(*a) >= 0x80;
                     if (arg_ident) {
                         const char* k = a;
                         while ((*k >= 'a' && *k <= 'z') || (*k >= 'A' && *k <= 'Z') ||
-                               (*k >= '0' && *k <= '9') || *k == '_') {
+                               (*k >= '0' && *k <= '9') || *k == '_' ||
+                               static_cast<unsigned char>(*k) >= 0x80) {
                             ++k;
                         }
                         while (*k == ' ') {
@@ -615,6 +624,7 @@ static ToolParseStatus extract_json_value(const char* json_obj, const char* key,
     size_t len = strlen(json_obj);
     bool in_string = false;
     bool escaped = false;
+    int depth = 0;
 
     for (size_t i = 0; i < len; i++) {
         char ch = json_obj[i];
@@ -629,8 +639,18 @@ static ToolParseStatus extract_json_value(const char* json_obj, const char* key,
             continue;
         }
 
+        if (!in_string) {
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+            }
+        }
+
         if (ch == '"') {
-            if (!in_string) {
+            // Only keys of the outermost object match, as in get_json_keys():
+            // a nested {"arguments": {"name": ...}} is not the call's "name".
+            if (!in_string && depth == 1) {
                 // Start of a key string - extract it
                 size_t key_start = i + 1;
                 char* found_key = nullptr;
@@ -897,19 +917,43 @@ static std::string validation_errors_to_json(const std::vector<std::string>& err
     for (const auto& error : errors) {
         arr.push_back(error);
     }
-    return arr.dump();
+    return arr.dump(-1, ' ', false, json::error_handler_t::replace);
 }
 
 // =============================================================================
 // JSON NORMALIZATION
 // =============================================================================
 
+/**
+ * @brief Normalize a tool-call JSON payload, repairing malformed UTF-8.
+ *
+ * Rejects payloads whose distinct raw keys decode to the same key after repair
+ * (`RAC_ERROR_INVALID_ARGUMENT`), then repairs bytes and re-serializes valid
+ * JSON, falling back to the unquoted-key normalizer when the fast parse fails.
+ *
+ * @param json_str Raw JSON payload (must not be null).
+ * @param out_normalized Receives the owned normalized string on success.
+ * @return RAC_SUCCESS (repaired on the fast path, or via the unquoted-key
+ *         scanner when the fast parser rejects the payload),
+ *         RAC_ERROR_INVALID_ARGUMENT for ambiguous keys,
+ *         RAC_ERROR_OUT_OF_MEMORY on allocation failure, or RAC_ERROR_INTERNAL
+ *         for an unexpected exception.
+ */
 extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
                                                        char** out_normalized) try {
     if (!json_str || !out_normalized) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     *out_normalized = nullptr;
+
+    if (rac::llm::tool_calling::has_repaired_key_collision(json_str)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Repair before the fast parse as well as unquoted-key normalization, so
+    // malformed model bytes do not make otherwise valid JSON take the scanner path.
+    const std::string sanitized = rac::llm::sanitize_utf8(json_str);
+    json_str = sanitized.c_str();
 
     // Valid JSON needs no repair. Parsing and re-serializing it first avoids
     // the permissive unquoted-key scanner ever mistaking array elements after
@@ -1018,9 +1062,20 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
  * 2. Name/function variant: {"name": "name", "params": {...}}
  * 3. Placeholder key with value being tool name
  * 4. Tool name as key: {"calculate": "5 * 100"}
+ *
+ * An envelope such as {"function": {"name": ..., "arguments": ...}} is unwrapped
+ * once, and so is the single call in OpenAI's {"tool_calls": [...]} array.
+ * @p nesting tells the inner passes which of these they are.
  */
-static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** out_tool_name,
-                                                  char** out_args_json) {
+enum class ToolCallNesting {
+    kTopLevel,
+    kArrayElement,  // inside tool_calls: 1, 2 and the envelope, never 3 or 4
+    kEnvelope,      // inside an envelope: 1 and 2 only
+};
+
+static ToolParseStatus
+extract_tool_name_and_args(const char* json_obj, char** out_tool_name, char** out_args_json,
+                           ToolCallNesting nesting = ToolCallNesting::kTopLevel) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
 
@@ -1056,8 +1111,21 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                     if (args_status == ToolParseStatus::kSuccess) {
                         std::unique_ptr<char, decltype(&std::free)> owned_args_value(args_value,
                                                                                     &std::free);
+                        json decoded_args;
                         if (args_kind == JSON_VALUE_OBJECT) {
                             *out_args_json = owned_args_value.release();
+                        } else if (nesting != ToolCallNesting::kTopLevel &&
+                                   args_kind == JSON_VALUE_STRING &&
+                                   parse_json_value(owned_args_value.get(), &decoded_args) &&
+                                   decoded_args.is_object()) {
+                            // OpenAI's function envelope carries arguments as a JSON-encoded
+                            // string: {"function":{"name":...,"arguments":"{\"city\":...}"}}
+                            *out_args_json = dup_owned_string(decoded_args.dump());
+                            if (!*out_args_json) {
+                                free(*out_tool_name);
+                                *out_tool_name = nullptr;
+                                return ToolParseStatus::kOutOfMemory;
+                            }
                         } else {
                             // Wrap scalar/array/string in {"input": value} - escape the value for
                             // valid JSON
@@ -1159,6 +1227,62 @@ static ToolParseStatus extract_tool_name_and_args(const char* json_obj, char** o
                 return ToolParseStatus::kSuccess;
             }
             free(value);
+        }
+    }
+
+    if (nesting == ToolCallNesting::kEnvelope) {
+        return ToolParseStatus::kNoMatch;
+    }
+
+    // An object under a tool-name key may be an envelope. Only try it once no
+    // alias names the call directly, so in {"name": "a", "tool": {...}} the
+    // object stays an argument of "a".
+    for (int i = 0; TOOL_NAME_KEYS[i] != nullptr; i++) {
+        char* value = nullptr;
+        json_value_kind_t kind = JSON_VALUE_STRING;
+        const ToolParseStatus envelope_key_status =
+            extract_json_value(json_obj, TOOL_NAME_KEYS[i], &value, &kind);
+        if (envelope_key_status == ToolParseStatus::kOutOfMemory) {
+            return envelope_key_status;
+        }
+        const std::unique_ptr<char, decltype(&std::free)> owned_envelope(value, &std::free);
+        if (envelope_key_status != ToolParseStatus::kSuccess || kind != JSON_VALUE_OBJECT ||
+            !owned_envelope) {
+            continue;
+        }
+        const ToolParseStatus envelope_status = extract_tool_name_and_args(
+            owned_envelope.get(), out_tool_name, out_args_json, ToolCallNesting::kEnvelope);
+        if (envelope_status != ToolParseStatus::kNoMatch) {
+            return envelope_status;
+        }
+    }
+
+    if (nesting == ToolCallNesting::kArrayElement) {
+        return ToolParseStatus::kNoMatch;
+    }
+
+    // OpenAI's wire shape: {"tool_calls": [{"type": "function", "function": {...}}]}.
+    // Only a lone call is unwrapped; with several, taking the first would drop
+    // the rest without a trace.
+    {
+        char* value = nullptr;
+        json_value_kind_t kind = JSON_VALUE_STRING;
+        const ToolParseStatus calls_status =
+            extract_json_value(json_obj, "tool_calls", &value, &kind);
+        if (calls_status == ToolParseStatus::kOutOfMemory) {
+            return calls_status;
+        }
+        const std::unique_ptr<char, decltype(&std::free)> owned_calls(value, &std::free);
+        json calls;
+        if (calls_status == ToolParseStatus::kSuccess && kind == JSON_VALUE_ARRAY &&
+            parse_json_value(owned_calls.get(), &calls) && calls.size() == 1 &&
+            calls[0].is_object()) {
+            const std::string call = calls[0].dump();
+            const ToolParseStatus call_status = extract_tool_name_and_args(
+                call.c_str(), out_tool_name, out_args_json, ToolCallNesting::kArrayElement);
+            if (call_status != ToolParseStatus::kNoMatch) {
+                return call_status;
+            }
         }
     }
 
@@ -1344,7 +1468,9 @@ static std::string decode_lfm2_single_quoted_string(const std::string& value) {
 }
 
 static json parse_lfm2_argument_value(const std::string& raw_value) {
-    const std::string value = trim_ascii_whitespace(raw_value);
+    // Repair before parsing so quoted strings lose their delimiters and nested
+    // objects/arrays retain their types instead of falling back to raw strings.
+    const std::string value = rac::llm::sanitize_utf8(trim_ascii_whitespace(raw_value));
     if (value == "True") {
         return true;
     }
@@ -1357,11 +1483,41 @@ static json parse_lfm2_argument_value(const std::string& raw_value) {
     if (value.size() >= 2 && value.front() == '\'' && value.back() == '\'') {
         return decode_lfm2_single_quoted_string(value);
     }
-    json parsed = json::parse(value, nullptr, false);
-    if (!parsed.is_discarded()) {
-        return parsed;
+    // Observe decoded keys before insertion: repair and JSON escapes can make
+    // distinct spellings identical. Each object has its own key scope, even
+    // when nested inside an array.
+    std::vector<std::unordered_set<std::string>> object_keys;
+    bool duplicate_key = false;
+    const auto check_keys = [&](int, json::parse_event_t event, json& parsed_value) {
+        switch (event) {
+            case json::parse_event_t::object_start:
+                object_keys.emplace_back();
+                break;
+            case json::parse_event_t::key:
+                if (!object_keys.back().insert(parsed_value.get<std::string>()).second) {
+                    duplicate_key = true;
+                }
+                break;
+            case json::parse_event_t::object_end:
+                object_keys.pop_back();
+                break;
+            default:
+                break;
+        }
+        return true;
+    };
+    json parsed = json::parse(value, check_keys, false);
+    if (parsed.is_discarded()) {
+        // Preserve the existing raw-string fallback for invalid JSON syntax,
+        // even when duplicate keys were observed before the parse failed.
+        return value;
     }
-    return value;
+    if (duplicate_key) {
+        // A successfully parsed ambiguous object must reject the call;
+        // falling back to its raw text would hide the lost argument value.
+        return json(json::value_t::discarded);
+    }
+    return parsed;
 }
 
 static bool lfm2_arguments_to_json(const std::string& args, std::string* out_json) {
@@ -1378,14 +1534,24 @@ static bool lfm2_arguments_to_json(const std::string& args, std::string* out_jso
         if (assignment == std::string::npos) {
             return false;
         }
-        const std::string key = trim_ascii_whitespace(argument.substr(0, assignment));
+        const std::string key =
+            rac::llm::sanitize_utf8(trim_ascii_whitespace(argument.substr(0, assignment)));
         const std::string value = trim_ascii_whitespace(argument.substr(assignment + 1));
         if (key.empty() || value.empty()) {
             return false;
         }
-        result[key] = parse_lfm2_argument_value(value);
+        // Repair keys before insertion so serialization cannot create duplicate
+        // JSON members. Ambiguous calls must not silently lose an argument.
+        if (result.contains(key)) {
+            return false;
+        }
+        json parsed_value = parse_lfm2_argument_value(value);
+        if (parsed_value.is_discarded()) {
+            return false;
+        }
+        result[key] = std::move(parsed_value);
     }
-    *out_json = result.dump();
+    *out_json = result.dump(-1, ' ', false, json::error_handler_t::replace);
     return true;
 }
 
@@ -2531,20 +2697,10 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
             }
         }
 
-        const auto result_json = [](const runanywhere::v1::ToolResult& value) {
-            if (!value.result_json().empty()) {
-                return value.result_json();
-            }
-            if (value.has_error() && !value.error().empty()) {
-                json error = json::object();
-                error["error"] = value.error();
-                return error.dump();
-            }
-            return std::string("{}");
-        };
+        using rac::llm::tool_calling::tool_result_payload_json;
 
         if (request.tool_results_size() == 1) {
-            const std::string payload = result_json(tool_result);
+            const std::string payload = tool_result_payload_json(tool_result);
             rc = rac_tool_call_build_followup_prompt(
                 request.user_prompt().c_str(),
                 tools_prompt.empty() ? nullptr : tools_prompt.c_str(),
@@ -2568,7 +2724,7 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
                 followup += "\nTool '";
                 followup += name;
                 followup += "' result:\n";
-                followup += result_json(recorded);
+                followup += tool_result_payload_json(recorded);
                 followup += "\n";
             }
             followup += "\nUsing all results above, answer the original question. ";
@@ -2893,7 +3049,7 @@ static rac_result_t finalize_tool_validation(rac_tool_call_validation_t* out_val
     }
 
     if (!errors.empty()) {
-        out_validation->error_message = dup_owned_string(errors.front());
+        out_validation->error_message = dup_owned_string(rac::llm::sanitize_utf8(errors.front()));
         if (!out_validation->error_message) {
             rac_tool_call_validation_free(out_validation);
             return RAC_ERROR_OUT_OF_MEMORY;

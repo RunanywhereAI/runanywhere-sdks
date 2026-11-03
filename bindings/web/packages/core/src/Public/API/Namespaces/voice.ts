@@ -10,7 +10,7 @@ import {
 import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
-import { AsyncQueue } from '../../../Foundation/AsyncQueue.js';
+import { AsyncQueue } from '@runanywhere/proto-ts/streams/push';
 import {
   VoiceAgentMicDriver,
   type VoiceAgentMicPhase,

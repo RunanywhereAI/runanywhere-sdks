@@ -58,6 +58,7 @@
 #endif
 
 // Include runanywhere-commons C API headers
+#include "directory_probe_internal.h"
 #include "request_cancellation_relay.h"
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
@@ -497,6 +498,8 @@ static jbyteArray makeModelRegistryProtoByteArray(JNIEnv* env, uint8_t* bytes, s
     return env->ExceptionCheck() ? nullptr : result;
 }
 
+static bool jniClearPendingException(JNIEnv* env);
+
 static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_result_t status,
                                     const char* message) {
     if (env == nullptr || env->ExceptionCheck()) {
@@ -507,11 +510,38 @@ static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_resu
     char formatted[512];
     std::snprintf(formatted, sizeof(formatted), "%s failed with code %d: %s", operation, status,
                   detail);
-    jclass exClass = env->FindClass("java/lang/IllegalStateException");
+    jclass exClass = env->FindClass("com/runanywhere/sdk/native/bridge/NativeProtoException");
     if (exClass != nullptr) {
-        env->ThrowNew(exClass, formatted);
+        jmethodID constructor = env->GetMethodID(exClass, "<init>", "(ILjava/lang/String;)V");
+        jstring javaMessage = constructor != nullptr ? env->NewStringUTF(formatted) : nullptr;
+        if (!env->ExceptionCheck() && javaMessage != nullptr) {
+            jobject exception =
+                env->NewObject(exClass, constructor, static_cast<jint>(status), javaMessage);
+            if (!env->ExceptionCheck() && exception != nullptr) {
+                env->Throw(static_cast<jthrowable>(exception));
+                env->DeleteLocalRef(exception);
+                env->DeleteLocalRef(javaMessage);
+                env->DeleteLocalRef(exClass);
+                return;
+            }
+            if (exception != nullptr) {
+                env->DeleteLocalRef(exception);
+            }
+        }
+        if (javaMessage != nullptr) {
+            env->DeleteLocalRef(javaMessage);
+        }
         env->DeleteLocalRef(exClass);
     }
+
+    jniClearPendingException(env);
+    jclass fallbackClass = env->FindClass("java/lang/RuntimeException");
+    if (fallbackClass == nullptr) {
+        jniClearPendingException(env);
+        return;
+    }
+    env->ThrowNew(fallbackClass, formatted);
+    env->DeleteLocalRef(fallbackClass);
 }
 
 static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buffer,
@@ -522,10 +552,8 @@ static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buff
     if (RAC_FAILED(buffer->status)) {
         LOGe("%s: native proto API failed with code %d (%s)", operation, buffer->status,
              buffer->error_message ? buffer->error_message : "");
-        const rac_result_t status = buffer->status;
-        const char* message = buffer->error_message;
+        throwNativeProtoFailure(env, operation, buffer->status, buffer->error_message);
         rac_proto_buffer_free(buffer);
-        throwNativeProtoFailure(env, operation, status, message);
         return nullptr;
     }
     if (buffer->size > 0 && buffer->data == nullptr) {
@@ -1315,10 +1343,11 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
         env->ExceptionClear();
         return RAC_ERROR_INTERNAL;
     }
-    // Kotlin returns null to signal "directory does not exist" per the C ABI
-    // contract; any other error is mapped to a structured Throwable above.
+    // Java's boolean existence/type probes also return false on stat errors.
+    // Confirm absence before mapping null to NOT_FOUND; access/I/O failures
+    // must remain inconclusive so orphan pruning preserves the download.
     if (result == nullptr) {
-        return RAC_ERROR_FILE_NOT_FOUND;
+        return rac::jni::classify_null_directory_listing(dir_path ? dir_path : "");
     }
 
     const jsize total = env->GetArrayLength(result);
@@ -1664,36 +1693,65 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
 
-    // Clean up previous adapter
-    if (g_platform_adapter != nullptr) {
-        env->DeleteGlobalRef(g_platform_adapter);
-        g_platform_adapter = nullptr;
-    }
-
     if (adapter == nullptr) {
         LOGw("racSetPlatformAdapter: null adapter provided");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Create global reference to adapter
-    g_platform_adapter = env->NewGlobalRef(adapter);
-
-    // Cache method IDs
     jclass adapterClass = env->GetObjectClass(adapter);
 
-    g_method_log =
-        env->GetMethodID(adapterClass, "log", "(ILjava/lang/String;Ljava/lang/String;)V");
-    g_method_file_exists = env->GetMethodID(adapterClass, "fileExists", "(Ljava/lang/String;)Z");
-    g_method_file_read = env->GetMethodID(adapterClass, "fileRead", "(Ljava/lang/String;)[B");
-    g_method_file_write = env->GetMethodID(adapterClass, "fileWrite", "(Ljava/lang/String;[B)Z");
-    g_method_file_delete = env->GetMethodID(adapterClass, "fileDelete", "(Ljava/lang/String;)Z");
-    g_method_secure_get =
-        env->GetMethodID(adapterClass, "secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
-    g_method_secure_set =
-        env->GetMethodID(adapterClass, "secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
-    g_method_secure_delete =
-        env->GetMethodID(adapterClass, "secureDelete", "(Ljava/lang/String;)Z");
-    g_method_now_ms = env->GetMethodID(adapterClass, "nowMs", "()J");
+    const auto resolve_required = [&](const char* name, const char* sig) -> jmethodID {
+        const jmethodID id = env->GetMethodID(adapterClass, name, sig);
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            env->ExceptionClear();
+        }
+        if (id == nullptr) {
+            LOGe("racSetPlatformAdapter: platform adapter is missing required method %s%s", name,
+                 sig);
+        }
+        return id;
+    };
+
+    const jmethodID m_log = resolve_required("log", "(ILjava/lang/String;Ljava/lang/String;)V");
+    const jmethodID m_file_exists = resolve_required("fileExists", "(Ljava/lang/String;)Z");
+    const jmethodID m_file_read = resolve_required("fileRead", "(Ljava/lang/String;)[B");
+    const jmethodID m_file_write = resolve_required("fileWrite", "(Ljava/lang/String;[B)Z");
+    const jmethodID m_file_delete = resolve_required("fileDelete", "(Ljava/lang/String;)Z");
+    const jmethodID m_secure_get =
+        resolve_required("secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
+    const jmethodID m_secure_set =
+        resolve_required("secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
+    const jmethodID m_secure_delete = resolve_required("secureDelete", "(Ljava/lang/String;)Z");
+    const jmethodID m_now_ms = resolve_required("nowMs", "()J");
+
+    if (m_log == nullptr || m_file_exists == nullptr || m_file_read == nullptr ||
+        m_file_write == nullptr || m_file_delete == nullptr || m_secure_get == nullptr ||
+        m_secure_set == nullptr || m_secure_delete == nullptr || m_now_ms == nullptr) {
+        env->DeleteLocalRef(adapterClass);
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
+
+    jobject adapterRef = env->NewGlobalRef(adapter);
+    if (adapterRef == nullptr) {
+        LOGe("racSetPlatformAdapter: failed to create a global reference for the adapter");
+        env->DeleteLocalRef(adapterClass);
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
+
+    if (g_platform_adapter != nullptr) {
+        env->DeleteGlobalRef(g_platform_adapter);
+    }
+    g_platform_adapter = adapterRef;
+    g_method_log = m_log;
+    g_method_file_exists = m_file_exists;
+    g_method_file_read = m_file_read;
+    g_method_file_write = m_file_write;
+    g_method_file_delete = m_file_delete;
+    g_method_secure_get = m_secure_get;
+    g_method_secure_set = m_secure_set;
+    g_method_secure_delete = m_secure_delete;
+    g_method_now_ms = m_now_ms;
+
     // Optional Kotlin-side directory probes. Method lookup is
     // best-effort — older host apps that haven't been recompiled against the
     // new adapter surface will miss these IDs and commons will fall through

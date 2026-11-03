@@ -5,8 +5,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.ErrorCategory
-import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
@@ -15,6 +13,7 @@ import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGSearchResponse
 import ai.runanywhere.proto.v1.RAGStatistics
 import ai.runanywhere.proto.v1.RAGStreamEvent
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -59,10 +58,12 @@ object CppBridgeRAG {
     fun ingest(document: RARAGDocument): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagIngestProto(
-                requireSession(),
-                RAGDocument.ADAPTER.encode(document),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRagIngestProto(
+                    requireSession(),
+                    RAGDocument.ADAPTER.encode(document),
+                )
+            },
             "racRagIngestProto",
         )
 
@@ -84,14 +85,16 @@ object CppBridgeRAG {
     ): RAGResult =
         decodeOrThrow(
             RAGResult.ADAPTER,
-            RunAnywhereBridge.racRagQueryRequestProto(
-                requestId,
-                // The coordinator owns the lifecycle gate before this method
-                // is called. Capture only now so a queued query cannot retain
-                // a session that create/destroy replaces ahead of admission.
-                requireSession(),
-                request.queryProto,
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRagQueryRequestProto(
+                    requestId,
+                    // The coordinator owns the lifecycle gate before this method
+                    // is called. Capture only now so a queued query cannot retain
+                    // a session that create/destroy replaces ahead of admission.
+                    requireSession(),
+                    request.queryProto,
+                )
+            },
             "racRagQueryRequestProto",
         )
 
@@ -136,14 +139,14 @@ object CppBridgeRAG {
     fun clear(): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagClearProto(requireSession()),
+            withNativeProtoFailure { RunAnywhereBridge.racRagClearProto(requireSession()) },
             "racRagClearProto",
         )
 
     fun stats(): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagStatsProto(requireSession()),
+            withNativeProtoFailure { RunAnywhereBridge.racRagStatsProto(requireSession()) },
             "racRagStatsProto",
         )
 
@@ -169,21 +172,21 @@ object CppBridgeRAG {
     internal fun ingestOn(handle: Long, document: RARAGDocument): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagIngestProto(handle, RAGDocument.ADAPTER.encode(document)),
+            withNativeProtoFailure { RunAnywhereBridge.racRagIngestProto(handle, RAGDocument.ADAPTER.encode(document)) },
             "racRagIngestProto",
         )
 
     internal fun clearOn(handle: Long): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagClearProto(handle),
+            withNativeProtoFailure { RunAnywhereBridge.racRagClearProto(handle) },
             "racRagClearProto",
         )
 
     internal fun statsOn(handle: Long): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
-            RunAnywhereBridge.racRagStatsProto(handle),
+            withNativeProtoFailure { RunAnywhereBridge.racRagStatsProto(handle) },
             "racRagStatsProto",
         )
 
@@ -194,7 +197,7 @@ object CppBridgeRAG {
     ): RAGResult =
         decodeOrThrow(
             RAGResult.ADAPTER,
-            RunAnywhereBridge.racRagQueryRequestProto(requestId, handle, request.queryProto),
+            withNativeProtoFailure { RunAnywhereBridge.racRagQueryRequestProto(requestId, handle, request.queryProto) },
             "racRagQueryRequestProto",
         )
 
@@ -205,7 +208,7 @@ object CppBridgeRAG {
     ): RAGSearchResponse =
         decodeOrThrow(
             RAGSearchResponse.ADAPTER,
-            RunAnywhereBridge.racRagSearchRequestProto(requestId, handle, request.requestProto),
+            withNativeProtoFailure { RunAnywhereBridge.racRagSearchRequestProto(requestId, handle, request.requestProto) },
             "racRagSearchRequestProto",
         )
 
@@ -237,31 +240,14 @@ object CppBridgeRAG {
     private fun requireSession(): Long =
         sessionHandle.takeIf { it != 0L } ?: throw SDKException.notInitialized("RAG session not created")
 
+    /** Reuse canonical native error conversion, including its serialization-failure fallback. */
     private fun createSessionException(rc: Int): SDKException {
         if (rc == RunAnywhereBridge.RAC_SUCCESS) {
             return SDKException.operation("racRagSessionCreateProto returned 0")
         }
-        val magnitude = if (rc < 0) -rc else rc
-        val code = ErrorCode.fromValue(magnitude) ?: ErrorCode.ERROR_CODE_UNKNOWN
-        return SDKException.make(
-            code = code,
-            message = "RAG proto session create failed: $rc",
-            category = categoryForRacResult(magnitude),
-            cAbiCode = rc,
-        )
+        return SDKException.fromRACResult(rc)
+            ?: SDKException.operation("RAG proto session create failed: $rc")
     }
-
-    private fun categoryForRacResult(magnitude: Int): ErrorCategory =
-        when (magnitude) {
-            in 110..129 -> ErrorCategory.ERROR_CATEGORY_MODEL
-            in 150..179 -> ErrorCategory.ERROR_CATEGORY_NETWORK
-            in 180..219, in 330..369 -> ErrorCategory.ERROR_CATEGORY_IO
-            in 250..279 -> ErrorCategory.ERROR_CATEGORY_VALIDATION
-            in 320..329 -> ErrorCategory.ERROR_CATEGORY_AUTH
-            in 100..109 -> ErrorCategory.ERROR_CATEGORY_CONFIGURATION
-            in 400..499, in 600..999 -> ErrorCategory.ERROR_CATEGORY_INTERNAL
-            else -> ErrorCategory.ERROR_CATEGORY_COMPONENT
-        }
 
     private fun <M : Message<M, *>> decodeOrThrow(
         adapter: ProtoAdapter<M>,

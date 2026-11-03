@@ -49,7 +49,7 @@ object LlamaCPP {
     const val version = "2.0.0"
 
     /** LlamaCPP library version (underlying C++ library) */
-    const val llamaCppVersion = "runanywhere-b10453.6"
+    const val llamaCppVersion = "runanywhere-b10453.8"
 
     /** Human-readable module name (LlamaCPP). */
     const val moduleName: String = "LlamaCPP"

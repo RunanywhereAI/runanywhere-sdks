@@ -102,6 +102,15 @@ bool is_valid_model(const v1::ConnectModelDescriptor& model) {
            is_valid_display_name(model.display_name());
 }
 
+// Field-wise rather than a byte compare: serialized bytes can differ for equal
+// descriptors when a sender carries unknown fields in a different wire order.
+bool same_model_descriptor(const v1::ConnectModelDescriptor& a,
+                           const v1::ConnectModelDescriptor& b) {
+    return a.model_id() == b.model_id() && a.display_name() == b.display_name() &&
+           a.framework() == b.framework() && a.context_window() == b.context_window() &&
+           a.supports_streaming() == b.supports_streaming();
+}
+
 const PlatformRolePolicy* find_platform_policy(v1::ConnectPlatform platform) {
     for (const PlatformRolePolicy& policy : kPlatformRolePolicies) {
         if (policy.platform == platform) {
@@ -411,7 +420,9 @@ rac_result_t rac_connect_host_start_proto(const uint8_t* request_bytes, size_t r
         host.model = request.model();
         host.session_clients.clear();
         host.is_hosting = true;
-    } else if (host.model.model_id() != request.model().model_id()) {
+    } else if (!same_model_descriptor(host.model, request.model())) {
+        // Any descriptor change, not only model_id: returning success with the stored
+        // descriptor would tell a caller its corrected context window etc. was applied.
         rac_proto_buffer_set_error(out_host_state, RAC_ERROR_INVALID_CONFIGURATION,
                                    "Stop the active Connect host before changing its shared model");
         return RAC_ERROR_INVALID_CONFIGURATION;
@@ -1092,11 +1103,16 @@ rac_connect_cluster_decode_activation_proto(const uint8_t* activation_bytes,
         return RAC_ERROR_INVALID_FORMAT;
     }
 
-    const rac_result_t alloc_result =
-        rac_proto_buffer_allocate(out_host_tensor, static_cast<size_t>(expected_bytes));
-    if (alloc_result != RAC_SUCCESS) {
-        return alloc_result;
+    const size_t alloc_size = expected_bytes == 0 ? 1U : static_cast<size_t>(expected_bytes);
+    uint8_t* owned = static_cast<uint8_t*>(rac_alloc(alloc_size));
+    if (!owned) {
+        rac_proto_buffer_set_error(out_host_tensor, RAC_ERROR_OUT_OF_MEMORY,
+                                   "Failed to allocate host tensor buffer");
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
+    out_host_tensor->data = owned;
+    out_host_tensor->size = static_cast<size_t>(expected_bytes);
+    out_host_tensor->status = RAC_SUCCESS;
 
     const auto* src = reinterpret_cast<const uint8_t*>(activation.tensor_data().data());
     uint8_t* dst = out_host_tensor->data;

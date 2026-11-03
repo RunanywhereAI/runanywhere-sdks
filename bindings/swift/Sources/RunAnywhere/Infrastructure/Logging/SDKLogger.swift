@@ -22,6 +22,38 @@ extension RALogLevel: Comparable {
     }
 }
 
+// MARK: - RALogLevel and rac_log_level_t Mapping
+
+extension RALogLevel {
+    /// Maps the proto `RALogLevel` enum to the C++ commons `rac_log_level_t`.
+    public var racLogLevel: rac_log_level_t {
+        switch self {
+        case .trace:        return RAC_LOG_TRACE
+        case .debug:        return RAC_LOG_DEBUG
+        case .info:         return RAC_LOG_INFO
+        case .warning:      return RAC_LOG_WARNING
+        case .error:        return RAC_LOG_ERROR
+        case .fatal:        return RAC_LOG_FATAL
+        case .UNRECOGNIZED: return RAC_LOG_INFO
+        }
+    }
+}
+
+extension rac_log_level_t {
+    /// Maps the C++ commons `rac_log_level_t` enum to the proto `RALogLevel`.
+    public var raLogLevel: RALogLevel {
+        switch self {
+        case RAC_LOG_TRACE:   return .trace
+        case RAC_LOG_DEBUG:   return .debug
+        case RAC_LOG_INFO:    return .info
+        case RAC_LOG_WARNING: return .warning
+        case RAC_LOG_ERROR:   return .error
+        case RAC_LOG_FATAL:   return .fatal
+        default:              return .info
+        }
+    }
+}
+
 // MARK: - LogDestination Protocol
 
 /// Protocol for log output destinations (console, files, remote services, etc.)
@@ -106,6 +138,7 @@ public final class Logging: @unchecked Sendable {
     public func configure(_ config: RALoggingConfiguration) {
         lock.withLock { state in
             state.configuration = config
+            rac_logger_set_min_level(config.minLogLevel.racLogLevel)
         }
 
         syncOSLogDestination(for: config)
@@ -116,7 +149,10 @@ public final class Logging: @unchecked Sendable {
     }
 
     public func setMinLogLevel(_ level: RALogLevel) {
-        lock.withLock { $0.configuration.minLogLevel = level }
+        lock.withLock { state in
+            state.configuration.minLogLevel = level
+            rac_logger_set_min_level(level.racLogLevel)
+        }
     }
 
     public func setIncludeDeviceMetadata(_ include: Bool) {

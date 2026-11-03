@@ -28,6 +28,7 @@ import ai.runanywhere.proto.v1.STTStreamEventKind
 import ai.runanywhere.proto.v1.STTTranscriptionRequest
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
@@ -157,7 +158,7 @@ object CppBridgeSTT {
     suspend fun state(): STTServiceState =
         decodeOrThrow(
             STTServiceState.ADAPTER,
-            RunAnywhereBridge.racSttStateLifecycleProto(),
+            withNativeProtoFailure { RunAnywhereBridge.racSttStateLifecycleProto() },
             "racSttStateLifecycleProto",
         )
 
@@ -177,9 +178,11 @@ object CppBridgeSTT {
             )
         return decodeOrThrow(
             STTOutput.ADAPTER,
-            RunAnywhereBridge.racSttTranscribeLifecycleProto(
-                STTTranscriptionRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racSttTranscribeLifecycleProto(
+                    STTTranscriptionRequest.ADAPTER.encode(request),
+                )
+            },
             "racSttTranscribeLifecycleProto",
         )
     }

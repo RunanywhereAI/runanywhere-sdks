@@ -7,7 +7,7 @@ import { STTStreamEventKind } from '@runanywhere/proto-ts/stt_options';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
-import { AsyncQueue } from '../../../Foundation/AsyncQueue.js';
+import { AsyncQueue } from '@runanywhere/proto-ts/streams/push';
 import { spokenTranscript } from '../../../Foundation/TranscriptText.js';
 import { STTProtoAdapter } from '../../../Adapters/ModalityProtoAdapter.js';
 import { sttState } from '../../Extensions/RunAnywhere+STT.js';

@@ -10,6 +10,11 @@ end-to-end test can prove the provider reads them from the bundle:
   * input pixel_values[1,3,256,256]   (256 != the provider's kDefaultInputSize 512)
   * output logits[1,4,64,64]          (4 != SegFormer's 150; 64 != 128)
   * class_bias puts a +10 spike on channel 2 -> argmax is class 2 at every pixel
+  * channel 1 gets a +5 bias on pixels where the row and column phases differ,
+    so the winning-class softmax probability -- and therefore the confidence
+    byte -- varies by both row and column (255 / 253). This makes the confidence
+    test sensitive to a shifted, row-reversed, or transposed buffer, not just a
+    wrong scale.
   * id2label = {0:background, 1:road, 2:person, 3:sky} -> winning label 'person'
 
 Run by the CMake build (custom command) for test_segmentation_generic; also
@@ -27,6 +32,8 @@ INPUT_SIZE = 256      # != provider kDefaultInputSize (512)
 NUM_CLASSES = 4       # != SegFormer 150
 POOL = 4              # AveragePool kernel/stride -> logits plane = 256 / 4 = 64 (!= 128)
 WINNING_CLASS = 2     # argmax channel at every pixel
+RUNNER_UP_CLASS = 1   # gets a row/column-dependent bias, creating a known confidence pattern
+RUNNER_UP_BIAS = 5.0  # on pixels where the row and column phases differ; 0.0 otherwise
 
 
 def build_model():
@@ -44,8 +51,17 @@ def build_model():
     repeats = numpy_helper.from_array(
         np.array([1, NUM_CLASSES, 1, 1], dtype=np.int64), name="repeats")
     tile = helper.make_node("Tile", ["mean", "repeats"], ["tiled"])
-    bias = np.zeros((1, NUM_CLASSES, 1, 1), dtype=np.float32)
-    bias[0, WINNING_CLASS, 0, 0] = 10.0  # channel 2 dominates every pixel
+    bias = np.zeros((1, NUM_CLASSES, plane, plane), dtype=np.float32)
+    bias[0, WINNING_CLASS, :, :] = 10.0  # channel 2 dominates every pixel
+    # A +5 runner-up on an asymmetric row/column pattern. Class 2 still wins
+    # everywhere, but the winning-class probability becomes position-dependent:
+    #   no runner-up bias: round(255 / (1 + 3 * e^-10))       = 255
+    #   runner-up bias:    round(255 / (1 + e^-5 + 2 * e^-10)) = 253
+    # The row phase uses y % 4 and the column phase x % 2, so the pattern detects
+    # row reversal, transposition, and one-pixel shifts.
+    row_phase = (np.arange(plane)[:, None] % 4) == 0
+    column_phase = (np.arange(plane)[None, :] % 2) == 1
+    bias[0, RUNNER_UP_CLASS][row_phase != column_phase] = RUNNER_UP_BIAS
     class_bias = numpy_helper.from_array(bias, name="class_bias")
     add = helper.make_node("Add", ["tiled", "class_bias"], ["logits"])
 

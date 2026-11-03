@@ -21,15 +21,18 @@
 #include "features/segmentation/segmentation_internal.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/segmentation/rac_segmentation.h"
+#include "rac/features/segmentation/rac_segmentation_confidence.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 
 #ifndef RAC_SEGMENTATION_FIXTURE_DIR
 #error "RAC_SEGMENTATION_FIXTURE_DIR must name the real ONNX fixture bundle"
 #endif
 
 extern "C" const rac_segmentation_service_ops_t g_onnx_segmentation_ops;
+extern "C" const rac_segmentation_confidence_ops_v1_t g_onnx_segmentation_confidence_ops;
 
 namespace {
 
@@ -51,15 +54,22 @@ int g_failures = 0;
 
 const rac_segmentation_service_ops_t* fixture_segmentation_ops();
 
+constexpr const char* kFixtureName = "onnx-segmentation-fixture";
+constexpr const char* kFixtureDisplayName = "ONNX Segmentation Fixture";
+constexpr const char* kFixtureVersion = "1";
+constexpr int32_t kFixturePriority = 1000;
+const uint32_t kFixtureFormats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_ONNX)};
+const rac_primitive_t kFixturePrimitives[] = {RAC_PRIMITIVE_SEGMENT};
+
 rac_engine_vtable_t make_fixture_vtable() {
-    static const uint32_t kFormats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_ONNX)};
     rac_engine_vtable_t vtable{};
     vtable.metadata.abi_version = RAC_PLUGIN_API_VERSION;
-    vtable.metadata.name = "onnx-segmentation-fixture";
-    vtable.metadata.display_name = "ONNX Segmentation Fixture";
-    vtable.metadata.engine_version = "1";
-    vtable.metadata.priority = 1000;
-    vtable.metadata.formats = kFormats;
+    vtable.metadata.name = kFixtureName;
+    vtable.metadata.display_name = kFixtureDisplayName;
+    vtable.metadata.engine_version = kFixtureVersion;
+    vtable.metadata.priority = kFixturePriority;
+    vtable.metadata.capability_flags = RAC_ENGINE_CAP_SEGMENTATION_CONFIDENCE_V1;
+    vtable.metadata.formats = kFixtureFormats;
     vtable.metadata.formats_count = 1;
     vtable.segmentation_ops = fixture_segmentation_ops();
     return vtable;
@@ -242,11 +252,52 @@ const rac_segmentation_service_ops_t* fixture_segmentation_ops() {
     return &kOps;
 }
 
+rac_result_t fixture_segment_with_confidence(
+    void* impl, const rac_segmentation_image_t* image, const rac_segmentation_options_t* options,
+    rac_segmentation_result_t* out_result, rac_segmentation_confidence_mask_v1_t* out_confidence) {
+    return g_onnx_segmentation_confidence_ops.segment(impl, image, options, out_result,
+                                                      out_confidence);
+}
+
+const rac_segmentation_confidence_ops_v1_t kFixtureConfidenceOps = {
+    sizeof(rac_segmentation_confidence_ops_v1_t), RAC_SEGMENTATION_CONFIDENCE_VERSION_1,
+    fixture_segment_with_confidence};
+
+// The legacy manifest prefix must match make_fixture_vtable() field for field:
+// rac_engine_manifest_validate_vtable rejects any disagreement.
+const rac_segmentation_confidence_manifest_v1_t kFixtureConfidenceManifest = {
+    .manifest =
+        {
+            .name = kFixtureName,
+            .display_name = kFixtureDisplayName,
+            .version = kFixtureVersion,
+            .package_owner = "runanywhere-tests",
+            .package_name = "rac_segmentation_onnx_test",
+            .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
+            .priority = kFixturePriority,
+            .capability_flags = RAC_ENGINE_CAP_SEGMENTATION_CONFIDENCE_V1,
+            .primitives = kFixturePrimitives,
+            .primitives_count = sizeof(kFixturePrimitives) / sizeof(kFixturePrimitives[0]),
+            .runtimes = nullptr,
+            .runtimes_count = 0,
+            .formats = kFixtureFormats,
+            .formats_count = sizeof(kFixtureFormats) / sizeof(kFixtureFormats[0]),
+            .reserved_0 = 0,
+            .reserved_1 = 0,
+        },
+    .struct_size = sizeof(rac_segmentation_confidence_manifest_v1_t),
+    .version = RAC_SEGMENTATION_CONFIDENCE_VERSION_1,
+    .confidence_ops = &kFixtureConfidenceOps,
+};
+
 }  // namespace
 
 int main() {
     std::fprintf(stdout, "test_segmentation_onnx (real tiny ONNX graph)\n");
     const rac_engine_vtable_t vtable = make_fixture_vtable();
+    CHECK(rac_engine_manifest_attach_vtable(&kFixtureConfidenceManifest.manifest, &vtable) ==
+              RAC_SUCCESS,
+          "fixture confidence manifest matches the fixture vtable");
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "fixture segmentation plugin registers");
 
     rac_handle_t component = nullptr;
@@ -283,6 +334,100 @@ int main() {
             CHECK(mask == canonical_mask && diagnostic == canonical_diagnostic,
                   "RGB8, RGBA8, and BGRA8 produce identical stable outputs");
         }
+    }
+
+    // Confidence contract. The fixture's class bias is arange(150), so the
+    // winning class (149) always has softmax probability
+    // 1 / sum_{j=0..149} e^-j = 0.6321205588..., and the documented 8-bit
+    // quantization yields exactly 161 for every source pixel. The same image is
+    // driven through the direct and proto entry points and the buffers must be
+    // byte-identical.
+    const size_t kPixels = static_cast<size_t>(kWidth) * kHeight;
+    std::vector<uint8_t> direct_class_mask;
+    std::vector<uint8_t> direct_diagnostic;
+    std::vector<uint8_t> direct_confidence;
+    {
+        rac_handle_t direct = nullptr;
+        CHECK(rac_segmentation_create(RAC_SEGMENTATION_FIXTURE_DIR, &direct) == RAC_SUCCESS &&
+                  direct != nullptr,
+              "direct segmentation service creates against the fixture");
+        if (direct) {
+            CHECK(rac_segmentation_initialize(direct, RAC_SEGMENTATION_FIXTURE_DIR) == RAC_SUCCESS,
+                  "direct segmentation service initializes the fixture");
+            rac_segmentation_image_t image{};
+            image.data = rgb.data();
+            image.data_size = rgb.size();
+            image.width = kWidth;
+            image.height = kHeight;
+            image.stride_bytes = static_cast<size_t>(kWidth) * 3;
+            image.pixel_format = RAC_SEGMENTATION_PIXEL_FORMAT_RGB8;
+            rac_segmentation_options_t options = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+            options.include_diagnostic_rgba = RAC_TRUE;
+            rac_segmentation_result_t result{};
+            auto confidence = RAC_SEGMENTATION_CONFIDENCE_MASK_DEFAULT;
+            const rac_result_t rc = rac_segmentation_segment_with_confidence(
+                direct, &image, &options, &result, &confidence);
+            CHECK(rc == RAC_SUCCESS, "direct path returns a confidence mask");
+            CHECK(confidence.size == kPixels && confidence.data != nullptr,
+                  "direct confidence mask is exactly width * height bytes");
+            bool all_161 = confidence.data != nullptr;
+            for (size_t i = 0; i < confidence.size && all_161; ++i) {
+                all_161 = confidence.data[i] == 161U;
+            }
+            CHECK(all_161, "direct confidence is the quantized winning-class probability (161)");
+            if (result.class_mask && result.class_mask_count == kPixels) {
+                direct_class_mask.resize(kPixels * sizeof(uint16_t));
+                for (size_t i = 0; i < kPixels; ++i) {
+                    const uint16_t value = result.class_mask[i];
+                    direct_class_mask[i * 2] = static_cast<uint8_t>(value & 0xffU);
+                    direct_class_mask[i * 2 + 1] = static_cast<uint8_t>((value >> 8U) & 0xffU);
+                }
+            }
+            if (result.diagnostic_rgba && result.diagnostic_rgba_size > 0) {
+                direct_diagnostic.assign(result.diagnostic_rgba,
+                                         result.diagnostic_rgba + result.diagnostic_rgba_size);
+            }
+            if (confidence.data && confidence.size > 0) {
+                direct_confidence.assign(confidence.data, confidence.data + confidence.size);
+            }
+            rac_segmentation_result_free(&result);
+            rac_segmentation_confidence_mask_free(&confidence);
+            CHECK(rac_segmentation_cleanup(direct) == RAC_SUCCESS,
+                  "direct segmentation service cleans up the fixture session");
+            rac_segmentation_destroy(direct);
+        }
+    }
+
+    {
+        auto request = make_request(kWidth, kHeight, rgb,
+                                    runanywhere::v1::SEGMENTATION_PIXEL_FORMAT_RGB8, true);
+        request.mutable_options()->set_include_confidence(true);
+        runanywhere::v1::SegmentationResult result;
+        CHECK(segment_proto(component, request, &result), "proto path returns a confidence mask");
+        CHECK(result.confidence_mask_u8().size() == kPixels,
+              "proto confidence mask is exactly width * height bytes");
+        bool all_161 = result.confidence_mask_u8().size() == kPixels;
+        for (size_t i = 0; i < result.confidence_mask_u8().size() && all_161; ++i) {
+            all_161 = static_cast<uint8_t>(result.confidence_mask_u8()[i]) == 161U;
+        }
+        CHECK(all_161, "proto confidence matches the quantized softmax value (161)");
+        CHECK(std::vector<uint8_t>(result.confidence_mask_u8().begin(),
+                                   result.confidence_mask_u8().end()) == direct_confidence,
+              "direct and proto paths return byte-identical confidence masks");
+        CHECK(std::vector<uint8_t>(result.class_mask_u16_le().begin(),
+                                   result.class_mask_u16_le().end()) == direct_class_mask,
+              "direct and proto paths return byte-identical class masks");
+        CHECK(std::vector<uint8_t>(result.diagnostic_rgba().begin(),
+                                   result.diagnostic_rgba().end()) == direct_diagnostic,
+              "direct and proto paths return byte-identical diagnostics");
+    }
+
+    {
+        auto request = make_request(kWidth, kHeight, rgb,
+                                    runanywhere::v1::SEGMENTATION_PIXEL_FORMAT_RGB8, false);
+        runanywhere::v1::SegmentationResult result;
+        CHECK(segment_proto(component, request, &result) && result.confidence_mask_u8().empty(),
+              "proto path omits confidence when it was not requested");
     }
 
     auto oversized = make_request(4097, 1, make_rgb(4097, 1),

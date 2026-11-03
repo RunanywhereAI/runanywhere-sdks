@@ -56,6 +56,23 @@ rac_result_t cleanup(void* impl) {
     }
 }
 
+rac_result_t segment_with_confidence(void* impl, const rac_segmentation_image_t* image,
+                                     const rac_segmentation_options_t* options,
+                                     rac_segmentation_result_t* out_result,
+                                     rac_segmentation_confidence_mask_v1_t* out_confidence) {
+    if (!impl || !image || !options || !out_result || !out_confidence) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    try {
+        auto* handle = static_cast<onnx_segmentation_handle*>(impl);
+        return handle->provider->segment(*image, *options, out_result, out_confidence);
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+}
+
 void destroy(void* impl) {
     try {
         delete static_cast<onnx_segmentation_handle*>(impl);
@@ -85,4 +102,11 @@ extern "C" RAC_ONNX_API const rac_segmentation_service_ops_t g_onnx_segmentation
     .cleanup = cleanup,
     .destroy = destroy,
     .create = create,
+};
+
+extern "C" RAC_ONNX_API const rac_segmentation_confidence_ops_v1_t
+    g_onnx_segmentation_confidence_ops = {
+        .struct_size = sizeof(rac_segmentation_confidence_ops_v1_t),
+        .version = RAC_SEGMENTATION_CONFIDENCE_VERSION_1,
+        .segment = segment_with_confidence,
 };

@@ -190,6 +190,7 @@ rac_connect_transport_receive_activation(rac_connect_channel_t channel,
     rac_proto_buffer_init(&raw_payload);
     const rac_result_t recv_result = rac_connect_transport_receive(channel, &raw_payload);
     if (recv_result != RAC_SUCCESS) {
+        rac_proto_buffer_set_error(out_host_tensor, recv_result, "Connect transport receive failed");
         rac_proto_buffer_free(&raw_payload);
         return recv_result;
     }

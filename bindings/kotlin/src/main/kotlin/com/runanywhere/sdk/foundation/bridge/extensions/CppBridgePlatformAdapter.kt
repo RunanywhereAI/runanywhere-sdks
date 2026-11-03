@@ -13,6 +13,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
+import java.io.IOException
 
 /**
  * One directory entry returned by [CppBridgePlatformAdapter.fileListDirectory].
@@ -356,10 +357,11 @@ object CppBridgePlatformAdapter {
     /**
      * Enumerate the entries in [dirPath] for the commons platform adapter.
      *
-     * Returns null when the directory does not exist (mapped to
-     * RAC_ERROR_FILE_NOT_FOUND in the JNI layer). On other failures we log
-     * and return an empty array so commons treats the directory as empty
-     * rather than crashing the rescan / is_downloaded path.
+     * Returns null when Java's existence/type probe does not find a directory.
+     * JNI confirms missing/non-directory paths with an error-aware native probe
+     * before returning RAC_ERROR_FILE_NOT_FOUND; denied or inconclusive probes
+     * preserve the registered download path. Thrown failures propagate to JNI
+     * as RAC_ERROR_INTERNAL. A successful empty listing remains an empty array.
      *
      * Truncation contract (per `rac_directory_entry_t::name`): entries
      * whose UTF-8 byte length plus the trailing NUL exceed
@@ -369,54 +371,42 @@ object CppBridgePlatformAdapter {
      * logcat.
      */
     @JvmStatic
-    fun fileListDirectoryCallback(dirPath: String): Array<RacDirectoryEntry>? {
-        val dir =
-            try {
-                File(dirPath)
-            } catch (e: Exception) {
-                logCallback(LogLevel.ERROR, "FileOps", "fileListDirectory invalid path '$dirPath': ${e.message}")
-                return emptyArray()
-            }
+    fun fileListDirectoryCallback(dirPath: String): Array<RacDirectoryEntry>? = readDirectoryEntries(File(dirPath))
+
+    /**
+     * Read directory entries, preserving probe and enumeration errors for JNI.
+     *
+     * @throws IOException if an existing directory cannot be enumerated
+     * @throws SecurityException if the filesystem denies a probe or listing
+     */
+    internal fun readDirectoryEntries(dir: File): Array<RacDirectoryEntry>? {
         if (!dir.exists() || !dir.isDirectory) {
-            // Mirror the C ABI contract: null signals RAC_ERROR_FILE_NOT_FOUND.
+            // JNI rechecks null because Java can hide stat errors behind false.
             return null
         }
-        return try {
-            // listFiles() returns null on I/O errors (permission denied,
-            // disk error, etc.). Treat that as "empty directory" so commons
-            // can continue rather than abort the whole rescan.
-            val children = dir.listFiles() ?: return emptyArray()
-            val retained = ArrayList<RacDirectoryEntry>(children.size)
-            var skipped = 0
-            for (child in children) {
-                val nameBytes = child.name.toByteArray(Charsets.UTF_8)
-                if (nameBytes.size + 1 > NAME_MAX_BYTES) {
-                    skipped++
-                    continue
-                }
-                val isDir = child.isDirectory
-                val sizeBytes = if (isDir) 0L else runCatching { child.length() }.getOrDefault(0L)
-                retained.add(RacDirectoryEntry(child.name, isDir, sizeBytes))
+        // A null listing means I/O failure, not a successful empty directory.
+        val children = dir.listFiles() ?: throw IOException("Unable to enumerate directory '${dir.path}'")
+        val retained = ArrayList<RacDirectoryEntry>(children.size)
+        var skipped = 0
+        for (child in children) {
+            val nameBytes = child.name.toByteArray(Charsets.UTF_8)
+            if (nameBytes.size + 1 > NAME_MAX_BYTES) {
+                skipped++
+                continue
             }
-            if (skipped > 0) {
-                logCallback(
-                    LogLevel.WARN,
-                    "PlatformAdapter",
-                    "Skipped $skipped directory entries in '$dirPath': name longer than " +
-                        "$NAME_MAX_BYTES bytes (truncation contract).",
-                )
-            }
-            retained.toTypedArray()
-        } catch (e: SecurityException) {
-            // SecurityManager / Android scoped-storage denial. Surface as
-            // "empty" rather than RAC_ERROR_FILE_NOT_FOUND so commons does
-            // not treat a permission miss as a missing directory.
-            logCallback(LogLevel.WARN, "FileOps", "fileListDirectory denied for '$dirPath': ${e.message}")
-            emptyArray()
-        } catch (e: Exception) {
-            logCallback(LogLevel.ERROR, "FileOps", "fileListDirectory failed for '$dirPath': ${e.message}")
-            emptyArray()
+            val isDir = child.isDirectory
+            val sizeBytes = if (isDir) 0L else runCatching { child.length() }.getOrDefault(0L)
+            retained.add(RacDirectoryEntry(child.name, isDir, sizeBytes))
         }
+        if (skipped > 0) {
+            logCallback(
+                LogLevel.WARN,
+                "PlatformAdapter",
+                "Skipped $skipped directory entries in '${dir.path}': name longer than " +
+                    "$NAME_MAX_BYTES bytes (truncation contract).",
+            )
+        }
+        return retained.toTypedArray()
     }
 
     /**

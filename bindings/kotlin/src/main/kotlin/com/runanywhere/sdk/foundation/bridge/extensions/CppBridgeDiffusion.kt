@@ -7,6 +7,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.DiffusionGenerationRequest
 import ai.runanywhere.proto.v1.DiffusionResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RADiffusionGenerationOptions
@@ -27,9 +28,11 @@ object CppBridgeDiffusion {
             )
         val payload =
             withContext(Dispatchers.IO) {
-                RunAnywhereBridge.racDiffusionGenerateLifecycleProto(
-                    DiffusionGenerationRequest.ADAPTER.encode(request),
-                )
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racDiffusionGenerateLifecycleProto(
+                        DiffusionGenerationRequest.ADAPTER.encode(request),
+                    )
+                }
             } ?: throw SDKException.operation(
                 "racDiffusionGenerateLifecycleProto returned null",
             )
