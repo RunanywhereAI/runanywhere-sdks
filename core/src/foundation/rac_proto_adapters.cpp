@@ -15,7 +15,7 @@
  *     owns memory (char `*`, uint8_t `*` with size, T `*` with count), the
  *     adapter uses rac_alloc / rac_strdup so the caller can release with the
  *     matching `_free` helper (or rac_free + rac_free per element).
- *   - NULL inputs return false. We do NOT clear the destination on failure.
+ *   - NULL inputs return false. Destinations are cleared/zeroed on failure.
  */
 
 // Pull in <cstddef> (and friends) BEFORE the protobuf-bearing header so newer
@@ -219,7 +219,10 @@ bool rac_stt_word_to_proto(const rac_stt_word_t* in, ::runanywhere::v1::WordTime
 bool rac_stt_word_from_proto(const ::runanywhere::v1::WordTimestamp& in, rac_stt_word_t* out) {
     if (!out)
         return false;
+    std::memset(out, 0, sizeof(*out));
     out->text = copy_string_required(in.word());
+    if (!out->text)
+        return false;
     out->start_ms = in.start_ms();
     out->end_ms = in.end_ms();
     out->confidence = in.confidence();
@@ -244,7 +247,10 @@ bool rac_transcription_metadata_from_proto(const ::runanywhere::v1::Transcriptio
                                            rac_transcription_metadata_t* out) {
     if (!out)
         return false;
+    std::memset(out, 0, sizeof(*out));
     out->model_id = copy_string(in.model_id());
+    if (!in.model_id().empty() && !out->model_id)
+        return false;
     out->processing_time_ms = in.processing_time_ms();
     out->audio_length_ms = 0;  // field deleted from the proto; no source left
     return true;
@@ -266,7 +272,10 @@ bool rac_transcription_alternative_from_proto(const ::runanywhere::v1::Transcrip
                                               rac_transcription_alternative_t* out) {
     if (!out)
         return false;
+    std::memset(out, 0, sizeof(*out));
     out->text = copy_string_required(in.text());
+    if (!out->text)
+        return false;
     out->confidence = in.confidence();
     return true;
 }
@@ -1044,13 +1053,23 @@ bool rac_embedding_vector_from_proto(const ::runanywhere::v1::EmbeddingVector& i
     if (!out)
         return false;
     std::memset(out, 0, sizeof(*out));
-    out->dimension = static_cast<size_t>(in.values_size());
-    if (out->dimension > 0) {
-        out->data = static_cast<float*>(rac_alloc(sizeof(float) * out->dimension));
-        for (int i = 0; i < in.values_size(); ++i) {
-            out->data[i] = in.values(i);
+    if (in.values_size() < 0)
+        return false;
+    const size_t dimension = static_cast<size_t>(in.values_size());
+    if (dimension > 0) {
+        if (dimension > std::numeric_limits<size_t>::max() / sizeof(float)) {
+            return false;
         }
+        float* data = static_cast<float*>(rac_alloc(sizeof(float) * dimension));
+        if (!data) {
+            return false;
+        }
+        for (int i = 0; i < in.values_size(); ++i) {
+            data[i] = in.values(i);
+        }
+        out->data = data;
     }
+    out->dimension = dimension;
     return true;
 }
 
@@ -1135,6 +1154,8 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
         return false;
     std::memset(out, 0, sizeof(*out));
     out->model_id = copy_string(in.model_id());
+    if (!in.model_id().empty() && !out->model_id)
+        return false;
     out->size_on_disk = in.size_on_disk_bytes();
     return true;
 }
