@@ -376,7 +376,7 @@ class DartBridgeModelRegistry {
   /// Mirrors Swift's `RunAnywhere.registerModel(id:name:url:...)` URL form
   /// — commons owns the build-and-save flow; we only ship the proto request
   /// bytes and decode the resulting `ModelInfo` proto.
-  Future<model_pb.ModelInfo?> registerModelFromUrl(
+  Future<model_pb.ModelInfo> registerModelFromUrl(
     model_pb.RegisterModelFromUrlRequest request,
   ) async {
     try {
@@ -402,7 +402,7 @@ class DartBridgeModelRegistry {
   /// Mirrors Swift's `RunAnywhere.registerModel(multiFile:...)` — commons
   /// builds the MultiFileArtifact ModelInfo and persists it with
   /// merge-on-reseed semantics.
-  Future<model_pb.ModelInfo?> registerMultiFileModel(
+  Future<model_pb.ModelInfo> registerMultiFileModel(
     model_pb.RegisterMultiFileModelRequest request,
   ) async {
     try {

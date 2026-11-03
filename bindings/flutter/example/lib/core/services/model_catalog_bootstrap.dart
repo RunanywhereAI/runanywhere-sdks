@@ -46,12 +46,17 @@ abstract final class ModelCatalogBootstrap {
   /// True once the catalog has been registered. Without this guard,
   /// hot-reload (or any second call) re-runs the entire registration block.
   static bool _modulesRegistered = false;
+  static bool _qhexrtRegistered = false;
 
-  static Future<void> registerAll({bool mlxRegistered = false}) async {
+  static Future<void> registerAll({
+    bool mlxRegistered = false,
+    bool qhexrtRegistered = false,
+  }) async {
     if (_modulesRegistered) {
       debugPrint('Catalog already registered — skipping');
       return;
     }
+    _qhexrtRegistered = qhexrtRegistered;
     debugPrint('Registering modules with their models...');
 
     await _applyPersistedHfToken();
@@ -585,7 +590,9 @@ abstract final class ModelCatalogBootstrap {
   /// current device arch; unsupported devices or missing HF child dirs fail
   /// registration and never appear as runnable models.
   static Future<void> _registerNpuBundles() async {
-    final result = await QHexRTModelCatalog.registerForCurrentDevice();
+    final result = await QHexRTModelCatalog.registerForCurrentDevice(
+      backendRegistered: _qhexrtRegistered,
+    );
     debugPrint(
       'QHexRT catalog registered: ok=${result.registered} '
       'failed=${result.failed} skippedNative=${result.skippedNative}',

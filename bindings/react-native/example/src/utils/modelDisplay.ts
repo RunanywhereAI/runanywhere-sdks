@@ -1,5 +1,4 @@
 import { frameworkColors } from '../theme/system/colors';
-import { QHexRT } from '@runanywhere/qhexrt';
 import type { IconName } from '../theme/system/icons';
 import {
   InferenceFramework,
@@ -165,12 +164,7 @@ const privateHfTags = new Set([
 
 export const modelRequiresHfAuth = (model: ModelInfo): boolean => {
   const tags = model.metadata?.tags?.map((tag) => tag.toLowerCase()) ?? [];
-  return (
-    tags.some((tag) => privateHfTags.has(tag)) ||
-    (getPrimaryFramework(model) ===
-      InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
-      QHexRT.modelRequiresHfAuth(model.id))
-  );
+  return tags.some((tag) => privateHfTags.has(tag));
 };
 
 export const getModelDownloadSizeBytes = (model: ModelInfo): number =>
