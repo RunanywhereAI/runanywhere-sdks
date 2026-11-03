@@ -204,6 +204,17 @@ int test_default_repaired_key_collisions() {
          "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}",
          "{\"tool\":\"lookup\",\"arguments\":{\"metadata\":{\"arguments\":"
          "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}}}"},
+        // A tool-alias object nested in tool data is not an envelope the parser
+        // unwraps, so its `arguments` string stays data.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"tool\":{\"arguments\":"
+         "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"tool\":{\"arguments\":"
+         "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}}}"},
+        // Same for a `tool_calls` array nested in tool data.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"tool_calls\":[{\"type\":\"function\","
+         "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}]}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"tool_calls\":[{\"type\":\"function\","
+         "\"arguments\":\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}]}}"},
     };
     for (const AllowedCase& test : allowed) {
         char* normalized = nullptr;

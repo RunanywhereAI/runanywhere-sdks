@@ -701,10 +701,15 @@ int test_nested_tool_data_arguments_string_still_executes() {
     if (!load_mock_llm())
         return 1;
     // Object-valued arguments pass through untouched, so an "arguments" key
-    // buried in tool data is data: it must not be rejected as a collision.
+    // buried in tool data is data: it must not be rejected as a collision —
+    // including when it sits under a nested tool-alias object or a nested
+    // tool_calls array, neither of which the parser unwraps.
     set_responses({
         "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Paris\","
-        "\"metadata\":{\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}</tool_call>",
+        "\"metadata\":{\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"},"
+        "\"tool\":{\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"},"
+        "\"tool_calls\":[{\"type\":\"function\",\"arguments\":"
+        "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}]}}</tool_call>",
         "The weather lookup completed.",
     });
     auto request = make_request("Look up the weather.");

@@ -177,42 +177,72 @@ inline bool has_repaired_key_collision(const std::string& text, bool first_objec
  * A string value is scanned recursively only where the parser itself decodes
  * one: an argument alias (`arguments`/`args`/`params`/`parameters`/`input`,
  * matched case-insensitively) that is a direct member of an object the parser
- * treats as a wrapper (an envelope reached through a tool alias, or an element
- * of a `tool_calls` array). Object-valued arguments are passed through
- * unchanged by the parser, so JSON text nested inside ordinary tool data is
- * data, not keys, and must not be rejected.
+ * treats as a wrapper. Wrapper reachability mirrors the parser exactly: the
+ * root call's object-valued tool-alias members and its `tool_calls` array
+ * elements, plus the tool-alias members of those array elements. Object-valued
+ * arguments are passed through unchanged, so JSON text nested inside ordinary
+ * tool data — including a deeper `tool` object or `tool_calls` array — is data,
+ * not keys, and must not be rejected.
  */
 inline bool has_repaired_key_collision(const std::string& text, bool first_object_only = false) {
-    struct ObjectFrame {
+    // Parser traversal levels, mirroring extract_tool_name_and_args: kEnvelope
+    // and kArrayElement are the only objects whose string-encoded arguments the
+    // parser decodes.
+    enum class Nesting { kRoot, kEnvelope, kArrayElement, kData };
+    struct Container {
+        bool is_array = false;
+        // Arrays: true when this is the root call's `tool_calls` array, whose
+        // object elements the parser unwraps.
+        bool elements_are_wrappers = false;
+        // Objects: the parser level this object is reached at.
+        Nesting nesting = Nesting::kData;
+        // Objects only: decoded key -> was the raw token changed by repair.
         std::unordered_map<std::string, bool> keys;
-        // True when the parser decodes string-encoded arguments on this object.
-        bool parser_wrapper = false;
     };
-    std::vector<ObjectFrame> objects;
-    // One entry per open array: true for the `tool_calls` array, whose object
-    // elements the parser unwraps.
-    std::vector<bool> arrays;
+    std::vector<Container> containers;
     std::string last_key;  // last key parsed in the innermost object
     for (size_t i = 0; i < text.size(); ++i) {
         if (text[i] == '{') {
-            const bool wrapper =
-                key_repair_detail::is_tool_alias(last_key) || (!arrays.empty() && arrays.back());
-            objects.push_back(ObjectFrame{{}, wrapper});
+            Container frame;
+            if (containers.empty()) {
+                frame.nesting = Nesting::kRoot;
+            } else {
+                const Container& parent = containers.back();
+                if (parent.is_array) {
+                    frame.nesting = parent.elements_are_wrappers ? Nesting::kArrayElement
+                                                                 : Nesting::kData;
+                } else if ((parent.nesting == Nesting::kRoot ||
+                            parent.nesting == Nesting::kArrayElement) &&
+                           key_repair_detail::is_tool_alias(last_key)) {
+                    frame.nesting = Nesting::kEnvelope;
+                } else {
+                    frame.nesting = Nesting::kData;
+                }
+            }
+            containers.push_back(std::move(frame));
             last_key.clear();
         } else if (text[i] == '}') {
-            if (!objects.empty()) {
-                objects.pop_back();
+            if (!containers.empty() && !containers.back().is_array) {
+                containers.pop_back();
                 last_key.clear();
-                if (first_object_only && objects.empty()) {
+                if (first_object_only && containers.empty()) {
                     break;
                 }
             }
         } else if (text[i] == '[') {
-            arrays.push_back(key_repair_detail::ascii_lower(last_key) == "tool_calls");
+            Container frame;
+            frame.is_array = true;
+            // Only the root call's own `tool_calls` array is unwrapped; one
+            // nested inside object-valued arguments is data.
+            frame.elements_are_wrappers =
+                !containers.empty() && !containers.back().is_array &&
+                containers.back().nesting == Nesting::kRoot &&
+                key_repair_detail::ascii_lower(last_key) == "tool_calls";
+            containers.push_back(std::move(frame));
             last_key.clear();
         } else if (text[i] == ']') {
-            if (!arrays.empty()) {
-                arrays.pop_back();
+            if (!containers.empty() && containers.back().is_array) {
+                containers.pop_back();
             }
             last_key.clear();
         } else if (text[i] == '"') {
@@ -231,7 +261,7 @@ inline bool has_repaired_key_collision(const std::string& text, bool first_objec
             while (next < text.size() && std::isspace(static_cast<unsigned char>(text[next]))) {
                 ++next;
             }
-            if (objects.empty()) {
+            if (containers.empty() || containers.back().is_array) {
                 continue;
             }
             if (next < text.size() && text[next] == ':') {
@@ -244,7 +274,7 @@ inline bool has_repaired_key_collision(const std::string& text, bool first_objec
                 }
                 const bool changed = raw != repaired;
                 const auto [entry, inserted] =
-                    objects.back().keys.emplace(key.get<std::string>(), changed);
+                    containers.back().keys.emplace(key.get<std::string>(), changed);
                 if (!inserted && (entry->second || changed)) {
                     return true;
                 }
@@ -253,7 +283,9 @@ inline bool has_repaired_key_collision(const std::string& text, bool first_objec
             }
             // A string in value position. Only a parser-decoded argument alias
             // carries a JSON-encoded object that becomes keys of its own.
-            if (objects.back().parser_wrapper && key_repair_detail::is_argument_alias(last_key)) {
+            const Container& frame = containers.back();
+            if ((frame.nesting == Nesting::kEnvelope || frame.nesting == Nesting::kArrayElement) &&
+                key_repair_detail::is_argument_alias(last_key)) {
                 const std::string decoded =
                     key_repair_detail::decode_json_string_token(text.substr(start, i - start + 1));
                 if (has_repaired_key_collision(decoded, false)) {
