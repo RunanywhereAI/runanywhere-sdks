@@ -671,6 +671,30 @@ int test_mocked_vad_and_activity() {
     CHECK(saw_vad_event, "VAD process publishes canonical SDKEvent VoiceEvent bytes");
     rac_vad_component_destroy(vad);
 
+    rac_handle_t threshold_vad = nullptr;
+    CHECK(rac_vad_component_create(&threshold_vad) == RAC_SUCCESS,
+          "threshold VAD component creates");
+    runanywhere::v1::VADConfiguration threshold_config;
+    threshold_config.set_sample_rate(16000);
+    threshold_config.set_activation_threshold(0.0f);
+    std::vector<uint8_t> threshold_bytes;
+    CHECK(serialize(threshold_config, &threshold_bytes),
+          "zero-threshold VADConfiguration serializes");
+    CHECK(rac_vad_component_configure_proto(threshold_vad, threshold_bytes.data(),
+                                            threshold_bytes.size()) == RAC_SUCCESS,
+          "zero-threshold VAD configure proto succeeds");
+    CHECK(rac_vad_component_get_energy_threshold(threshold_vad) == 0.0f,
+          "explicit 0.0 activation_threshold reaches the detector");
+    threshold_config.clear_activation_threshold();
+    CHECK(serialize(threshold_config, &threshold_bytes),
+          "unset-threshold VADConfiguration serializes");
+    CHECK(rac_vad_component_configure_proto(threshold_vad, threshold_bytes.data(),
+                                            threshold_bytes.size()) == RAC_SUCCESS,
+          "unset-threshold VAD configure proto succeeds");
+    CHECK(rac_vad_component_get_energy_threshold(threshold_vad) == RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
+          "unset activation_threshold falls back to the default");
+    rac_vad_component_destroy(threshold_vad);
+
     rac_handle_t energy_vad = nullptr;
     CHECK(rac_vad_component_create(&energy_vad) == RAC_SUCCESS, "energy VAD component creates");
     runanywhere::v1::VADConfiguration config;

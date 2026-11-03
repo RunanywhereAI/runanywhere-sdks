@@ -53,7 +53,7 @@ message VADConfiguration {
     // it to an RMS bar. That conversion is backend-owned and is NOT fixed
     // here; the built-in energy path and the voice-agent path calibrate
     // separately today.
-    float  activation_threshold  = 4 [
+    optional float activation_threshold = 4 [
         (runanywhere.v1.rac_default) = "0.5",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
