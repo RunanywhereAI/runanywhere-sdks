@@ -32,6 +32,7 @@
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_loader.h"
+#include "rac/plugin/rac_plugin_registration.h"
 
 #if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
 #if defined(_WIN32)
@@ -263,13 +264,17 @@ rac_result_t rac_registry_load_plugin(const char* path) {
      * rac_plugin_registry.cpp). We do NOT (void)-cast the result here. */
     rac_result_t rc = rac_plugin_registry_register_dynamic(vt, guard.h, &prior);
     if (rc != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d",
-                      path, vt->metadata.name, static_cast<int>(rc));
+        if (!rac_plugin_registration_succeeded(rc)) {
+            RAC_LOG_ERROR(LOG_CAT,
+                          "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d", path,
+                          vt->metadata.name, static_cast<int>(rc));
+        }
+        // Detach refuses leased vtables, preserving the active manifest on a busy retry.
         (void)rac_engine_manifest_detach_vtable(vt);
         /* The registry recorded the reason under the vtable's own name; add
          * the path, which only the loader knows and which is what makes a
          * "wrong/stale library staged" diagnosis possible. */
-        if (rc != RAC_ERROR_PLUGIN_DUPLICATE && rc != RAC_ERROR_PLUGIN_BUSY)
+        if (!rac_plugin_registration_succeeded(rc))
             rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
         return rc;
     }
@@ -304,10 +309,10 @@ rac_result_t rac_registry_load_plugins(const char* const* paths, size_t count, s
         if (path == nullptr || path[0] == '\0')
             continue;
         rac_result_t rc = rac_registry_load_plugin(path);
-        /* DUPLICATE means the plugin is already in the registry — the host
+        /* DUPLICATE/BUSY mean a plugin is already serving — the host
          * pre-loaded it, or initialize() is replaying the same env list. The
          * caller asked for it to be available and it is. */
-        if (rc == RAC_SUCCESS || rc == RAC_ERROR_PLUGIN_DUPLICATE) {
+        if (rac_plugin_registration_succeeded(rc)) {
             ++loaded;
             continue;
         }
