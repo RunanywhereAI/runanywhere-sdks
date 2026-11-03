@@ -108,6 +108,7 @@
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "ON",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "14.5",
                 "GGML_METAL": "ON"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
