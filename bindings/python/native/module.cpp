@@ -144,6 +144,7 @@ rac_result_t rac_backend_cloud_register(void);  // Cloud STT provider
 // rac_registry_record_plugin_unavailable — the ledger a refused backend lands
 // in, so one engine declining does not have to fail initialize() to be noticed.
 #include "rac/plugin/rac_plugin_loader.h"
+#include "rac/plugin/rac_plugin_registration.h"
 
 namespace {
 
@@ -414,9 +415,7 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
          * availability ledger under `name`.
          */
         const auto try_register = [](const char* name, rac_result_t result) {
-            if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
-                result == RAC_ERROR_PLUGIN_BUSY ||
-                result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
+            if (rac_plugin_registration_succeeded(result))
                 return;
             rac_registry_record_plugin_unavailable(name, nullptr, result);
         };

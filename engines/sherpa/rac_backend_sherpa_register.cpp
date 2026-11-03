@@ -6,6 +6,7 @@
  * registry. Provides vtable implementations for STT, TTS, and VAD services.
  */
 
+#include "rac_sherpa_api.h"
 #include "rac_stt_sherpa.h"
 #include "rac_tts_sherpa.h"
 #include "rac_vad_sherpa.h"
@@ -28,7 +29,7 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
-#include "rac_sherpa_api.h"
+#include "rac/plugin/rac_plugin_registration.h"
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -560,7 +561,7 @@ rac_result_t rac_backend_sherpa_register(void) {
     const rac_engine_vtable_t* vt = rac_plugin_entry_sherpa();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);
-        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        if (!rac_plugin_registration_succeeded(plugin_rc)) {
             RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
         } else {
             RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'sherpa'");

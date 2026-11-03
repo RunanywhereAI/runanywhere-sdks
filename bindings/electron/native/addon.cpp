@@ -40,6 +40,7 @@
 // "C2064: term does not evaluate to a function taking 4 arguments".
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_plugin_loader.h"
+#include "rac/plugin/rac_plugin_registration.h"
 #ifdef RAC_HAVE_BACKEND_NEURT
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_neurt.h"
@@ -314,7 +315,7 @@ rac_result_t load_plugin_path(const char* path) {
     if (path == nullptr || path[0] == '\0')
         return RAC_ERROR_NULL_POINTER;
     rac_result_t rc = rac_registry_load_plugin(path);
-    if (rc == RAC_ERROR_PLUGIN_DUPLICATE)
+    if (rac_plugin_registration_succeeded(rc))
         return RAC_SUCCESS;
     return rc;
 }
@@ -529,9 +530,7 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
              * result is logged onto the availability ledger under `name`.
              */
             const auto try_register = [](const char* name, rac_result_t result) {
-                if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
-                    result == RAC_ERROR_PLUGIN_BUSY ||
-                    result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
+                if (rac_plugin_registration_succeeded(result))
                     return;
                 rac_registry_record_plugin_unavailable(name, nullptr, result);
             };

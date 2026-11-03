@@ -18,6 +18,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_cloud.h"
+#include "rac/plugin/rac_plugin_registration.h"
 
 namespace {
 
@@ -37,7 +38,7 @@ rac_result_t rac_backend_cloud_register(void) {
     const rac_engine_vtable_t* vt = rac_plugin_entry_cloud();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);
-        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        if (!rac_plugin_registration_succeeded(plugin_rc)) {
             RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
         } else {
             RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'cloud'");
