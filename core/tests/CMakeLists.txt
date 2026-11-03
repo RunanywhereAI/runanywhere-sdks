@@ -579,6 +579,25 @@ rac_link_archive_deps(test_engine_vtable)
 target_compile_features(test_engine_vtable PRIVATE cxx_std_17)
 add_test(NAME engine_vtable_tests COMMAND test_engine_vtable)
 
+# --- Segmentation confidence payload validation ----------------------------
+# Backend-neutral fake engine: the direct and proto entry points must reject a
+# requested confidence mask that is null or not exactly width * height, release
+# both outputs, and keep the diagnostic direction checks. No ONNX model or
+# backend linkage is required; the proto half compiles only when protobuf is
+# enabled.
+add_executable(test_segmentation_confidence test_segmentation_confidence.cpp)
+target_include_directories(test_segmentation_confidence PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_segmentation_confidence PRIVATE rac_commons)
+rac_link_archive_deps(test_segmentation_confidence)
+rac_test_define_have_protobuf(test_segmentation_confidence)
+target_compile_features(test_segmentation_confidence PRIVATE cxx_std_20)
+add_test(NAME segmentation_confidence_tests COMMAND test_segmentation_confidence)
+set_tests_properties(segmentation_confidence_tests PROPERTIES
+    LABELS "native;segmentation;confidence")
+
 add_executable(test_plugin_registry_isolation test_plugin_registry_isolation.cpp)
 target_include_directories(test_plugin_registry_isolation PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

@@ -50,11 +50,14 @@
 #include "onnx_segmentation_provider.cpp"  // NOLINT(bugprone-suspicious-include)
 
 #include "rac/core/rac_error.h"
+#include "rac/features/segmentation/rac_segmentation_confidence.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/segmentation/rac_segmentation_types.h"
 
 // The service-vtable adapter, compiled as a sibling TU.
 extern "C" const rac_segmentation_service_ops_t g_onnx_segmentation_ops;
+// The optional confidence extension, compiled into the same sibling TU.
+extern "C" const rac_segmentation_confidence_ops_v1_t g_onnx_segmentation_confidence_ops;
 
 #ifndef RAC_SEGMENTATION_GENERIC_FIXTURE_DIR
 #error "RAC_SEGMENTATION_GENERIC_FIXTURE_DIR must name the generated generic ONNX bundle"
@@ -318,6 +321,55 @@ void run_generic_end_to_end() {
                   std::string(result.class_summaries[0].label) == "person",
               "winning label is the id2label string \"person\", not the class_<id> fallback");
         rac_segmentation_result_free(&result);
+
+        // Confidence values. The fixture's class bias is known, so the winning
+        // class probability is exact: 255 on even columns and 253 on odd ones.
+        // A 64x64 source maps 1:1 onto the 64x64 logits grid, so there is no
+        // interpolation between columns. A shifted buffer swaps the parity and
+        // a wrong quantization base changes both values.
+        const uint32_t confidence_width = 64;
+        const uint32_t confidence_height = 64;
+        const auto confidence_rgb = make_solid_rgb_bytes(confidence_width, confidence_height);
+        rac_segmentation_image_t confidence_image{};
+        confidence_image.data = confidence_rgb.data();
+        confidence_image.data_size = confidence_rgb.size();
+        confidence_image.width = confidence_width;
+        confidence_image.height = confidence_height;
+        confidence_image.stride_bytes = static_cast<size_t>(confidence_width) * 3;
+        confidence_image.pixel_format = RAC_SEGMENTATION_PIXEL_FORMAT_RGB8;
+        rac_segmentation_options_t confidence_options{};
+        confidence_options.include_diagnostic_rgba = RAC_FALSE;
+        rac_segmentation_result_t confidence_result{};
+        auto confidence = RAC_SEGMENTATION_CONFIDENCE_MASK_DEFAULT;
+        const rac_result_t confidence_rc = g_onnx_segmentation_confidence_ops.segment(
+            impl, &confidence_image, &confidence_options, &confidence_result, &confidence);
+        CHECK(confidence_rc == RAC_SUCCESS, "confidence op runs the 4-class graph");
+        CHECK(confidence.size == static_cast<size_t>(confidence_width) * confidence_height &&
+                  confidence.data != nullptr,
+              "confidence mask is exactly one byte per source pixel");
+        bool confidence_pattern_ok = confidence.data != nullptr;
+        bool confidence_class_mask_ok =
+            confidence_result.class_mask != nullptr &&
+            confidence_result.class_mask_count ==
+                static_cast<size_t>(confidence_width) * confidence_height;
+        for (uint32_t y = 0; y < confidence_height; ++y) {
+            for (uint32_t x = 0; x < confidence_width; ++x) {
+                const size_t index = static_cast<size_t>(y) * confidence_width + x;
+                if (confidence_pattern_ok) {
+                    const uint8_t expected = (x % 2U == 0U) ? 255U : 253U;
+                    confidence_pattern_ok = confidence.data[index] == expected;
+                }
+                if (confidence_class_mask_ok) {
+                    confidence_class_mask_ok = confidence_result.class_mask[index] == 2;
+                }
+            }
+        }
+        CHECK(confidence_pattern_ok,
+              "confidence bytes are the exact quantized softmax (255 even / 253 odd columns)");
+        CHECK(confidence_class_mask_ok,
+              "confidence op keeps class 2 in the class mask at every pixel");
+        rac_segmentation_result_free(&confidence_result);
+        rac_segmentation_confidence_mask_free(&confidence);
     }
     (void)g_onnx_segmentation_ops.cleanup(impl);
     g_onnx_segmentation_ops.destroy(impl);

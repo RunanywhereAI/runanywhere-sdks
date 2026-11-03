@@ -10,6 +10,10 @@ end-to-end test can prove the provider reads them from the bundle:
   * input pixel_values[1,3,256,256]   (256 != the provider's kDefaultInputSize 512)
   * output logits[1,4,64,64]          (4 != SegFormer's 150; 64 != 128)
   * class_bias puts a +10 spike on channel 2 -> argmax is class 2 at every pixel
+  * channel 1 gets a +5 bias on odd columns, so the winning-class softmax
+    probability -- and therefore the confidence byte -- alternates by column
+    (255 on even columns, 253 on odd columns). This makes the confidence test
+    sensitive to a shifted or misaligned buffer, not just a wrong scale.
   * id2label = {0:background, 1:road, 2:person, 3:sky} -> winning label 'person'
 
 Run by the CMake build (custom command) for test_segmentation_generic; also
@@ -27,6 +31,8 @@ INPUT_SIZE = 256      # != provider kDefaultInputSize (512)
 NUM_CLASSES = 4       # != SegFormer 150
 POOL = 4              # AveragePool kernel/stride -> logits plane = 256 / 4 = 64 (!= 128)
 WINNING_CLASS = 2     # argmax channel at every pixel
+RUNNER_UP_CLASS = 1   # gets a column-dependent bias, creating a known confidence pattern
+RUNNER_UP_BIAS = 5.0  # on odd columns; 0.0 on even columns
 
 
 def build_model():
@@ -44,8 +50,13 @@ def build_model():
     repeats = numpy_helper.from_array(
         np.array([1, NUM_CLASSES, 1, 1], dtype=np.int64), name="repeats")
     tile = helper.make_node("Tile", ["mean", "repeats"], ["tiled"])
-    bias = np.zeros((1, NUM_CLASSES, 1, 1), dtype=np.float32)
-    bias[0, WINNING_CLASS, 0, 0] = 10.0  # channel 2 dominates every pixel
+    bias = np.zeros((1, NUM_CLASSES, plane, plane), dtype=np.float32)
+    bias[0, WINNING_CLASS, :, :] = 10.0  # channel 2 dominates every pixel
+    # Odd columns get a +5 runner-up. Class 2 still wins everywhere, but the
+    # winning-class probability becomes column-dependent:
+    #   even x: round(255 / (1 + 3 * e^-10))       = 255
+    #   odd  x: round(255 / (1 + e^-5 + 2 * e^-10)) = 253
+    bias[0, RUNNER_UP_CLASS, :, 1::2] = RUNNER_UP_BIAS
     class_bias = numpy_helper.from_array(bias, name="class_bias")
     add = helper.make_node("Add", ["tiled", "class_bias"], ["logits"])
 
