@@ -123,7 +123,10 @@ message RAGRetrievalOptions {
     ];
 
     // Keep only chunks whose document id starts with this prefix.
-    optional string scope_prefix = 9;
+    optional string scope_prefix = 5;
+
+    // Note: bm25_k1, bm25_b and rrf_k take effect once #1182 wires them
+    // through the C++ core (currently fixed constants).
 }
 
 message RAGQueryOptions {
