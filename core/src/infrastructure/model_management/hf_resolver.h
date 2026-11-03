@@ -69,6 +69,13 @@ bool is_hf_ref(const std::string& ref);
 bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
 
 /**
+ * Repository-relative directory of an explicit bundle folder/manifest ref,
+ * excluding the manifest leaf, query and fragment. Returns empty for logical
+ * refs, direct /resolve/ or /blob/ URLs, and ordinary single-file refs.
+ */
+std::string bundle_folder_for_ref(const std::string& ref, const char* manifest_leaf_ext);
+
+/**
  * True when @p ref is a logical repository/manifest bundle ref that can have
  * an engine-selected variant folder inserted. Already-pinned folders,
  * concrete /resolve/ URLs, and ordinary explicit file refs return false.

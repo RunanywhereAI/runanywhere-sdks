@@ -22,7 +22,10 @@ import {
   requireInitialized,
 } from '../../../Foundation/Initialization/InitializedGuard';
 import { ensureServicesReady, ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
-import { SDKException } from '../../../Foundation/Errors/SDKException';
+import {
+  asNativeSDKException,
+  SDKException,
+} from '../../../Foundation/Errors/SDKException';
 import {
   ArchiveArtifact,
   ArchiveStructure,
@@ -184,9 +187,11 @@ export async function registerModel(
   });
 
   const saved = arrayBufferToBytes(
-    await native.registerModelFromUrlProto(
-      encodeProtoMessage(request, RegisterModelFromUrlRequest),
-    ),
+    await native
+      .registerModelFromUrlProto(encodeProtoMessage(request, RegisterModelFromUrlRequest))
+      .catch(async (error: unknown) => {
+        throw await asNativeSDKException(error);
+      }),
   );
   if (saved.byteLength === 0) {
     throw SDKException.of(
@@ -361,9 +366,11 @@ export async function registerMultiFileModel(
     })),
   });
   const saved = arrayBufferToBytes(
-    await native.registerMultiFileModelProto(
-      encodeProtoMessage(message, RegisterMultiFileModelRequest),
-    ),
+    await native
+      .registerMultiFileModelProto(encodeProtoMessage(message, RegisterMultiFileModelRequest))
+      .catch(async (error: unknown) => {
+        throw await asNativeSDKException(error);
+      }),
   );
   if (saved.byteLength === 0) {
     throw SDKException.of(

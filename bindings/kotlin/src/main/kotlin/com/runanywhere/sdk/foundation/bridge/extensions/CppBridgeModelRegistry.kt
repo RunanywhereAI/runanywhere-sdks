@@ -13,6 +13,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
@@ -224,9 +225,11 @@ object CppBridgeModelRegistry {
      */
     fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
         val bytes =
-            RunAnywhereBridge.racRegisterModelFromUrlProto(
-                ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
-            ) ?: return null
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRegisterModelFromUrlProto(
+                    ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -240,9 +243,11 @@ object CppBridgeModelRegistry {
      */
     fun registerMultiFileModel(request: ProtoRegisterMultiFileModelRequest): ProtoModelInfo? {
         val bytes =
-            RunAnywhereBridge.racRegisterMultiFileModelProto(
-                ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
-            ) ?: return null
+            withNativeProtoFailure {
+                RunAnywhereBridge.racRegisterMultiFileModelProto(
+                    ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
 
         return decodeProtoModel(bytes)
     }
