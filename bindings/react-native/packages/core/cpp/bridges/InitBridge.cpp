@@ -575,6 +575,20 @@ namespace AndroidBridge {
     // rac_file_list_directory_fn. Truncation contract: skip oversized
     // names rather than write a half-name that aliases a different
     // artifact (Kotlin side already filters; we defend on this side too).
+    static rac_result_t classifyNullDirectoryListing(const char* dir_path) {
+        if (!dir_path) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        struct stat info {};
+        if (stat(dir_path, &info) != 0) {
+            return (errno == ENOENT || errno == ENOTDIR) ? RAC_ERROR_FILE_NOT_FOUND
+                                                         : RAC_ERROR_FILE_READ_FAILED;
+        }
+        // An existing directory is inconclusive too: it may have become
+        // readable since the Java probe, so keep its registered path.
+        return S_ISDIR(info.st_mode) ? RAC_ERROR_FILE_READ_FAILED : RAC_ERROR_FILE_NOT_FOUND;
+    }
+
     rac_result_t fileListDirectory(const char* dir_path,
                                    rac_directory_entry_t* out_entries,
                                    size_t* in_out_count) {
@@ -600,10 +614,12 @@ namespace AndroidBridge {
             LOGE("Exception in fileListDirectory");
             return RAC_ERROR_INTERNAL;
         }
-        // Kotlin returns null when the path does not exist or is not a
-        // directory — map to RAC_ERROR_FILE_NOT_FOUND per the C ABI contract.
+        // Kotlin returns null when File.exists()/isDirectory() are false, but
+        // those also return false on stat errors. Confirm absence before
+        // reporting NOT_FOUND; access/I/O failures stay inconclusive so orphan
+        // pruning preserves the download (same contract as the Kotlin SDK).
         if (!result) {
-            return RAC_ERROR_FILE_NOT_FOUND;
+            return classifyNullDirectoryListing(dir_path);
         }
 
         const jsize total = env->GetArrayLength(result);
