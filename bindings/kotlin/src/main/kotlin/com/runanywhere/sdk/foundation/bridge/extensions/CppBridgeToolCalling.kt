@@ -14,6 +14,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.ToolPromptFormatRequest
 import ai.runanywhere.proto.v1.ToolPromptFormatResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAToolDefinition
@@ -45,9 +46,11 @@ object CppBridgeToolCalling {
     private fun formatPrompt(request: ToolPromptFormatRequest): ToolPromptFormatResult =
         decodeOrThrow(
             ToolPromptFormatResult.ADAPTER,
-            RunAnywhereBridge.racToolCallFormatPromptProto(
-                ToolPromptFormatRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racToolCallFormatPromptProto(
+                    ToolPromptFormatRequest.ADAPTER.encode(request),
+                )
+            },
             "racToolCallFormatPromptProto",
         )
 

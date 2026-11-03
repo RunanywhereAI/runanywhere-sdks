@@ -286,6 +286,23 @@ bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
     return has_extension(leaf, manifest_leaf_ext);
 }
 
+std::string bundle_folder_for_ref(const std::string& ref, const char* manifest_leaf_ext) {
+    const std::string path_ref = ref.substr(0, ref.find_first_of("?#"));
+    if (!is_folder_ref(path_ref, manifest_leaf_ext)) {
+        return {};
+    }
+    ParsedRef parsed;
+    if (!parse_ref(path_ref, &parsed)) {
+        return {};
+    }
+    std::string folder = trim_trailing_slashes(parsed.file_path);
+    if (has_extension(basename_of(folder), manifest_leaf_ext)) {
+        const size_t slash = folder.find_last_of('/');
+        folder = slash == std::string::npos ? "" : folder.substr(0, slash);
+    }
+    return folder;
+}
+
 namespace {
 
 bool logical_variant_folder_parts(const std::string& ref, const char* manifest_leaf_ext,

@@ -30,6 +30,11 @@ export class StructuredOutputProtoAdapter {
   constructor(private readonly module: ModalityProtoModule) {}
 
   supportsProtoParse(): boolean {
+    // The worker path never uses the main-thread module, so skip the export
+    // check when the model is owned by the Llama BackendWorker.
+    if (mustUseLlamaBackendWorker()) {
+      return true;
+    }
     return missingExports(this.module, ['_rac_structured_output_parse_proto']).length === 0;
   }
 

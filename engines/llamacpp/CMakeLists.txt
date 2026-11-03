@@ -157,6 +157,10 @@ elseif(RAC_PLATFORM_LINUX)
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for Linux aarch64")
     endif()
+    # SVE stays OFF: ggml's SVE probe (cntb in ggml_cpu_init) faults with
+    # SIGILL on non-SVE cores (Apple Silicon VMs, Pi, older Graviton), and
+    # the kit must run on all of them. NEON above is the portable baseline.
+    set(GGML_SVE OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_WINDOWS)
     # Windows: Vulkan is the default GPU backend (AMD / Intel / NVIDIA) and
     # degrades to CPU when the SDK is absent. CUDA remains a separate opt-in
@@ -171,7 +175,28 @@ elseif(RAC_PLATFORM_WINDOWS)
     set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
     set(GGML_RPC OFF CACHE BOOL "" FORCE)
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
-    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    # No SVE on Windows ARM: Snapdragon has none, and an SVE probe in
+    # ggml_cpu_init would SIGILL there (seen on Linux ARM64). NEON is the
+    # portable baseline; GGML_NATIVE below only gates the NEON probe.
+    set(GGML_SVE OFF CACHE BOOL "" FORCE)
+    # MSVC targeting ARM has no -mcpu/-march: ggml (upstream #28362) selects
+    # NEON features by probing the host at configure time, and that probe only
+    # runs when GGML_NATIVE is ON — with it OFF ggml FATAL_ERRORs ("MSVC on ARM
+    # requires GGML_NATIVE=ON"). The probe executes ARM binaries, which is only
+    # valid for a native target; x64-on-ARM (Prism) and x64-on-x64 stay OFF.
+    # Detected from the compiler's target, not the host: CMAKE_SYSTEM_PROCESSOR
+    # is ARM64 even for the x64 kit built on a Snapdragon box.
+    if(MSVC
+       AND (CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64"
+            OR (NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID
+                AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64|aarch64"
+                AND NOT CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
+                AND NOT CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$")))
+        set(GGML_NATIVE ON CACHE BOOL "" FORCE)
+        message(STATUS "llama.cpp: native ARM64 MSVC — GGML_NATIVE=ON for the NEON probe")
+    else()
+        set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    endif()
     if(RAC_GPU_CUDA)
         set(GGML_CUDA ON CACHE BOOL "" FORCE)
         if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
@@ -183,23 +208,21 @@ elseif(RAC_PLATFORM_WINDOWS)
         message(STATUS "Configuring llama.cpp for Windows (no CUDA; Vulkan=${GGML_VULKAN})")
     endif()
 
-    # ggml's MSVC ARM backend is an explicit FATAL_ERROR ("use clang").
-    # Windows-on-ARM hosts still report CMAKE_SYSTEM_PROCESSOR=ARM64 even
-    # when vcvarsall amd64 has selected Hostx64/x64/cl.exe, which is how
-    # the cpp-desktop-windows-x64 kit is built on Snapdragon boxes under
-    # Prism. Force AMD64 so ggml takes the AVX path, not ARM.
-    if(MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64")
-        if(CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
-           OR CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$"
-           OR CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
-            set(CMAKE_SYSTEM_PROCESSOR AMD64)
-            message(STATUS "llama.cpp: x64 MSVC on ARM host — CMAKE_SYSTEM_PROCESSOR=AMD64")
-        else()
-            message(FATAL_ERROR
-                "llama.cpp cannot be built with MSVC targeting ARM. "
-                "Use vcvarsall amd64 (x64 kit under Prism) or clang, "
-                "or set RAC_BACKEND_LLAMACPP=OFF.")
-        endif()
+    # An ARM64 host can build two different targets:
+    #   * the x64 kit under Prism — vcvarsall amd64 selects Hostx64/x64/cl.exe
+    #     while CMAKE_SYSTEM_PROCESSOR still reports ARM64. Force AMD64 so ggml
+    #     takes the AVX path, not ARM.
+    #   * the native ARM64 kit — an ARM64 compiler on an ARM64 host. ggml used
+    #     to FATAL_ERROR on this ("MSVC is not supported for ARM, use clang");
+    #     the fork now carries upstream #28362 (0c6a6a7c), which probes the
+    #     host for NEON features instead of requiring -mcpu. Nothing to force;
+    #     GGML_NATIVE=ON (set above) drives the probe.
+    if(MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]|aarch64"
+       AND (CMAKE_CXX_COMPILER MATCHES "[/\\\\]Hostx64[/\\\\]x64[/\\\\]"
+            OR CMAKE_CXX_COMPILER MATCHES "[/\\\\]x64[/\\\\]cl\\.exe$"
+            OR CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64"))
+        set(CMAKE_SYSTEM_PROCESSOR AMD64)
+        message(STATUS "llama.cpp: x64 MSVC on ARM host — CMAKE_SYSTEM_PROCESSOR=AMD64")
     endif()
 endif()
 
@@ -216,7 +239,16 @@ FetchContent_MakeAvailable(llamacpp)
 # fetched source tree; a miss keeps the engine's decision_ops slot NULL, which
 # the registry already treats as "this engine does not serve the primitive".
 file(READ "${llamacpp_SOURCE_DIR}/include/llama.h" _rac_llama_public_header)
+file(READ "${llamacpp_SOURCE_DIR}/common/common.h" _rac_llama_common_header)
+set(RAC_LLAMACPP_HAS_CLEF_SPAN OFF)
+set(RAC_LLAMACPP_HAS_D1 OFF)
 if(_rac_llama_public_header MATCHES "llama_batch_set_decision_order")
+    set(RAC_LLAMACPP_HAS_CLEF_SPAN ON)
+endif()
+if(_rac_llama_common_header MATCHES "common_get_decision_type")
+    set(RAC_LLAMACPP_HAS_D1 ON)
+endif()
+if(RAC_LLAMACPP_HAS_CLEF_SPAN OR RAC_LLAMACPP_HAS_D1)
     set(RAC_LLAMACPP_HAS_DECISION ON)
 else()
     set(RAC_LLAMACPP_HAS_DECISION OFF)
@@ -280,6 +312,9 @@ set(LLAMACPP_BACKEND_SOURCES
 if(RAC_LLAMACPP_HAS_DECISION)
     list(APPEND LLAMACPP_BACKEND_SOURCES rac_decision_llamacpp.cpp)
 endif()
+if(RAC_LLAMACPP_HAS_D1)
+    list(APPEND LLAMACPP_BACKEND_SOURCES d1_decision.cpp)
+endif()
 
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
@@ -297,6 +332,8 @@ set(LLAMACPP_BACKEND_HEADERS
 #   ld.lld: error: undefined symbol: vtable for
 #     mtmd_image_preprocessor_{llava_uhd,step3vl,idefics3,internvl}
 list(APPEND LLAMACPP_BACKEND_SOURCES
+    ${llamacpp_SOURCE_DIR}/vendor/hash/hash.cpp
+    ${llamacpp_SOURCE_DIR}/vendor/hash/sha256/sha256.c
     ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
     ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
     ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
@@ -373,6 +410,8 @@ rac_add_engine_plugin(llamacpp
                         ${llamacpp_SOURCE_DIR}/vendor # nlohmann/json.hpp
     COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
                         $<$<BOOL:${RAC_LLAMACPP_HAS_DECISION}>:RAC_LLAMACPP_HAS_DECISION=1>
+                        $<$<BOOL:${RAC_LLAMACPP_HAS_CLEF_SPAN}>:RAC_LLAMACPP_HAS_CLEF_SPAN=1>
+                        $<$<BOOL:${RAC_LLAMACPP_HAS_D1}>:RAC_LLAMACPP_HAS_D1=1>
     AVAILABILITY        PUBLIC
     PACKAGE_OWNER       runanywhere
     PACKAGE_NAME        runanywhere_llamacpp
@@ -383,6 +422,7 @@ rac_add_engine_plugin(llamacpp
 target_include_directories(rac_backend_llamacpp PRIVATE
     ${llamacpp_SOURCE_DIR}/tools/mtmd
     ${llamacpp_SOURCE_DIR}/tools/mtmd/models
+    ${llamacpp_SOURCE_DIR}/vendor/hash
 )
 
 # Self-registration carrier: thin shim that wraps RAC_STATIC_PLUGIN_REGISTER.

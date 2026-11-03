@@ -27,6 +27,7 @@ import ai.runanywhere.proto.v1.RerankRequest
 import ai.runanywhere.proto.v1.RerankResult
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -88,10 +89,12 @@ object CppBridgeRerank {
         val payload =
             try {
                 withContext(Dispatchers.IO) {
-                    RunAnywhereBridge.racRerankComponentRerankProto(
-                        handle,
-                        RerankRequest.ADAPTER.encode(request),
-                    )
+                    withNativeProtoFailure {
+                        RunAnywhereBridge.racRerankComponentRerankProto(
+                            handle,
+                            RerankRequest.ADAPTER.encode(request),
+                        )
+                    }
                 }
             } catch (error: SDKException) {
                 throw error

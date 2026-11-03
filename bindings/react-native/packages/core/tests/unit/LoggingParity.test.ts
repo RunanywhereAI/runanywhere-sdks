@@ -1,5 +1,5 @@
+import { LoggingConfiguration } from '@runanywhere/proto-ts/logging';
 import { LogLevel } from '../../src/Foundation/Logging/Models/LogLevel';
-import { LoggingConfiguration } from '../../src/Foundation/Logging/Models/LoggingConfiguration';
 import {
   LoggingManager,
   setCommonsLogLevelSink,
@@ -11,7 +11,7 @@ import {
 } from '../../src/Public/Extensions/RunAnywhere+Logging';
 
 describe('LoggingParity (React Native)', () => {
-  let previousConfig: any;
+  let previousConfig: LoggingConfiguration;
   let mockSetMinLevel: jest.Mock;
 
   beforeEach(() => {

@@ -29,7 +29,7 @@ static inline const rac_bundle_policy_t* mlx_bundle_policy(void) {
         /* .manifest_leaf_names_bundle = */ RAC_FALSE,
         /* .is_bundle_manifest         = */ mlx_is_bundle_manifest,
         /* .resolve_variant            = */ {NULL},
-        /* .reserved_1                 = */ 0,
+        /* .validate_ref               = */ {NULL},
     };
     return &policy;
 }

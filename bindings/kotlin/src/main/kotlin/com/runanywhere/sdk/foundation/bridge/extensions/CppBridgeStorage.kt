@@ -13,6 +13,7 @@ import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import ai.runanywhere.proto.v1.StorageInfoResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
@@ -44,28 +45,28 @@ object CppBridgeStorage {
     fun info(request: StorageInfoRequest): StorageInfoResult? =
         decodeOrNull(
             StorageInfoResult.ADAPTER,
-            RunAnywhereBridge.racStorageInfoProto(StorageInfoRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racStorageInfoProto(StorageInfoRequest.ADAPTER.encode(request)) },
             "storageInfo",
         )
 
     fun availability(request: StorageAvailabilityRequest): StorageAvailabilityResult? =
         decodeOrNull(
             StorageAvailabilityResult.ADAPTER,
-            RunAnywhereBridge.racStorageAvailabilityProto(StorageAvailabilityRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racStorageAvailabilityProto(StorageAvailabilityRequest.ADAPTER.encode(request)) },
             "storageAvailability",
         )
 
     fun deletePlan(request: StorageDeletePlanRequest): StorageDeletePlan? =
         decodeOrNull(
             StorageDeletePlan.ADAPTER,
-            RunAnywhereBridge.racStorageDeletePlanProto(StorageDeletePlanRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racStorageDeletePlanProto(StorageDeletePlanRequest.ADAPTER.encode(request)) },
             "storageDeletePlan",
         )
 
     fun delete(request: StorageDeleteRequest): StorageDeleteResult? =
         decodeOrNull(
             StorageDeleteResult.ADAPTER,
-            RunAnywhereBridge.racStorageDeleteProto(StorageDeleteRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racStorageDeleteProto(StorageDeleteRequest.ADAPTER.encode(request)) },
             "storageDelete",
         )
 }

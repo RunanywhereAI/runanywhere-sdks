@@ -48,22 +48,23 @@
 #ifdef RAC_HAVE_BACKEND_NEURT
 #include "rac/plugin/rac_plugin_entry_neurt.h"
 #endif
-#include "rac/plugin/rac_plugin_entry_sherpa.h"
+#include "rac/core/rac_audio_utils.h"
+#include "rac/features/diarization/rac_diarization_service.h"
+#include "rac/features/diarization/rac_diarization_types.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/lora/rac_lora_service.h"
+#include "rac/features/segmentation/rac_segmentation_confidence.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
+#include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
-#include "rac/core/rac_audio_utils.h"
-#include "rac/features/llm/rac_llm_service.h"
-#include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_stream.h"
 #include "rac/features/vad/rac_vad_types.h"
-#include "rac/features/diarization/rac_diarization_service.h"
-#include "rac/features/diarization/rac_diarization_types.h"
-#include "rac/features/segmentation/rac_segmentation_service.h"
-#include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
+#include "rac/plugin/rac_plugin_entry_sherpa.h"
 #if defined(RAC_HAVE_BACKEND_NEURT)
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/diffusion/rac_diffusion_types.h"
@@ -403,8 +404,18 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
         // simply got there first. Commons' own batch loader counts DUPLICATE as
         // loaded (rac_registry_load_plugins), so recording either here would put
         // a working backend on the unavailability ledger.
+        // BUSY also means an existing plugin is serving a leased model.
+        /**
+         * try_register: handle one backend's registration result from the
+         * Python module bootstrap. SUCCESS, PLUGIN_DUPLICATE, PLUGIN_BUSY and
+         * MODULE_ALREADY_REGISTERED all leave the backend registered and
+         * serving (the active plugin owns any leased model), so none is
+         * recorded as unavailability; every other result is logged onto the
+         * availability ledger under `name`.
+         */
         const auto try_register = [](const char* name, rac_result_t result) {
             if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
+                result == RAC_ERROR_PLUGIN_BUSY ||
                 result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
                 return;
             rac_registry_record_plugin_unavailable(name, nullptr, result);
@@ -1925,11 +1936,13 @@ int32_t load_segmentation_model(const std::string& model_path, std::optional<std
 }
 
 // segment(handle, data, width, height, pixel_format=1, stride_bytes=0,
-//         include_diagnostic_rgba=False) ->
-//   {width, height, class_mask: uint16 ndarray, classes: [...], diagnostic_rgba?: bytes}.
+//         include_diagnostic_rgba=False, include_confidence=False) ->
+//   {width, height, class_mask: uint16 ndarray, classes: [...], diagnostic_rgba?: bytes,
+//    confidence_mask?: bytes}.
 py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t height,
                  std::optional<int32_t> pixel_format, std::optional<int64_t> stride_bytes,
-                 std::optional<bool> include_diagnostic_rgba) {
+                 std::optional<bool> include_diagnostic_rgba,
+                 std::optional<bool> include_confidence) {
     rac_handle_t h = begin_op(g_seg_handles, handle);
     if (!h) throw std::runtime_error("invalid segmentation handle");
     OpScope op(handle);
@@ -1956,10 +1969,19 @@ py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t 
 
     rac_segmentation_result_t result;
     std::memset(&result, 0, sizeof(result));
+    auto confidence = RAC_SEGMENTATION_CONFIDENCE_MASK_DEFAULT;
+    const auto free_result =
+        std::unique_ptr<rac_segmentation_result_t, decltype(&rac_segmentation_result_free)>(
+            &result, rac_segmentation_result_free);
+    const auto free_confidence = std::unique_ptr<rac_segmentation_confidence_mask_v1_t,
+                                                 decltype(&rac_segmentation_confidence_mask_free)>(
+        &confidence, rac_segmentation_confidence_mask_free);
     rac_result_t rc;
     {
         py::gil_scoped_release release;
-        rc = rac_segmentation_segment(h, &image, &opts, &result);
+        rc = include_confidence.value_or(false)
+                 ? rac_segmentation_segment_with_confidence(h, &image, &opts, &result, &confidence)
+                 : rac_segmentation_segment(h, &image, &opts, &result);
     }
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "segment");
 
@@ -1987,7 +2009,10 @@ py::dict segment(int32_t handle, const py::buffer& data, int32_t width, int32_t 
             py::bytes(reinterpret_cast<const char*>(result.diagnostic_rgba),
                       result.diagnostic_rgba_size);
     }
-    rac_segmentation_result_free(&result);
+    if (confidence.data && confidence.size) {
+        out["confidence_mask"] =
+            py::bytes(reinterpret_cast<const char*>(confidence.data), confidence.size);
+    }
     return out;
 }
 
@@ -2632,7 +2657,10 @@ PYBIND11_MODULE(_core, m) {
     m.def("segment", &segment, py::arg("handle"), py::arg("data"), py::arg("width"),
           py::arg("height"), py::arg("pixel_format") = py::none(),
           py::arg("stride_bytes") = py::none(), py::arg("include_diagnostic_rgba") = py::none(),
-          "Segment raw image pixels; returns {width, height, class_mask, classes}.");
+          py::arg("include_confidence") = py::none(),
+          "Segment raw image pixels; returns {width, height, class_mask, classes}, with optional "
+          "diagnostic_rgba and confidence_mask outputs when requested. confidence_mask contains "
+          "width * height bytes (0..255), one per source pixel, row-major like class_mask.");
     m.def("unload_segmentation_model", &unload_segmentation_model, py::arg("handle"),
           "Unload a segmentation handle.");
 
