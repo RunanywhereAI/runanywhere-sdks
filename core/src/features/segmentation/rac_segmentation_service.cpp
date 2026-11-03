@@ -234,7 +234,31 @@ rac_result_t rac_segmentation_segment(rac_handle_t handle, const rac_segmentatio
     }
     const rac_segmentation_options_t defaults = RAC_SEGMENTATION_OPTIONS_DEFAULT;
     const auto* effective_options = options ? options : &defaults;
-    return service->ops->segment(service->impl, image, effective_options, out_result);
+    rac_result_t rc;
+    try {
+        rc = service->ops->segment(service->impl, image, effective_options, out_result);
+    } catch (const std::bad_alloc&) {
+        rc = RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        rc = RAC_ERROR_INFERENCE_FAILED;
+    }
+    const size_t pixels = static_cast<size_t>(image->width) * image->height;
+    const bool diagnostic_requested = effective_options->include_diagnostic_rgba == RAC_TRUE;
+    if (rc == RAC_SUCCESS &&
+        (out_result->width != image->width || out_result->height != image->height ||
+         pixels > std::numeric_limits<size_t>::max() / sizeof(uint16_t) ||
+         !out_result->class_mask || out_result->class_mask_count != pixels ||
+         (diagnostic_requested &&
+          (pixels > std::numeric_limits<size_t>::max() / 4 || !out_result->diagnostic_rgba ||
+           out_result->diagnostic_rgba_size != pixels * 4)) ||
+         (!diagnostic_requested &&
+          (out_result->diagnostic_rgba || out_result->diagnostic_rgba_size != 0)))) {
+        rc = RAC_ERROR_ENCODING_ERROR;
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_segmentation_result_free(out_result);
+    }
+    return rc;
 }
 
 rac_result_t
