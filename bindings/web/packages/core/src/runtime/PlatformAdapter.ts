@@ -30,6 +30,7 @@ const logger = new SDKLogger('PlatformAdapter');
 // rac_error.h ranges
 const RAC_OK = 0;
 const RAC_ERROR_FILE_NOT_FOUND = -183;
+const RAC_ERROR_FILE_READ_FAILED = -184;
 const RAC_ERROR_FILE_WRITE_FAILED = -185;
 const RAC_ERROR_PLATFORM = -180;
 const RAC_ERROR_INVALID_ARGUMENT = -259;
