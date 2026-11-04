@@ -11,33 +11,8 @@
 #if defined(_WIN32)
 #include <string>
 
-#include "core/internal/platform_compat.h"  // <windows.h> with the repo's macro guards
-
-namespace {
-
-// The narrow std::filesystem::path constructor decodes with the ANSI code page
-// on Windows, so a non-ASCII UTF-8 path would name a different (usually
-// missing) file. Decode strictly: rac_to_wstring() replaces malformed bytes
-// with U+FFFD, which could also probe the wrong path. Returns false for
-// malformed UTF-8. May throw std::bad_alloc; the caller handles that.
-bool utf8_to_wide_strict(const char* utf8, std::wstring* out) {
-    out->clear();
-    if (!*utf8) {
-        return true;
-    }
-    const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, nullptr, 0);
-    if (size <= 0) {
-        return false;
-    }
-    out->resize(static_cast<size_t>(size));
-    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, &(*out)[0], size) != size) {
-        return false;
-    }
-    out->resize(static_cast<size_t>(size - 1));  // drop the terminating NUL
-    return true;
-}
-
-}  // namespace
+// rac_to_wstring_strict; also brings in <windows.h> with the repo's macro guards.
+#include "core/internal/platform_compat.h"
 #endif
 
 // File.exists()/isDirectory() hide stat errors behind false. After the platform
@@ -52,8 +27,10 @@ extern "C" rac_result_t rac_classify_null_directory_listing(const char* path) {
     std::filesystem::file_status status;
     try {
 #if defined(_WIN32)
+        // The narrow std::filesystem::path constructor uses the ANSI code page
+        // on Windows, so convert the UTF-8 path to UTF-16 first.
         std::wstring wide;
-        if (!utf8_to_wide_strict(path, &wide)) {
+        if (!rac_to_wstring_strict(path, &wide)) {
             // Can't name the path reliably, so don't claim it's missing.
             return RAC_ERROR_FILE_READ_FAILED;
         }
