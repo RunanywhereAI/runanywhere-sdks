@@ -570,6 +570,49 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     expect(getBackendWorkerOwner('moving')).toBe('onnx');
   });
 
+  it.each([
+    { failRelease: false },
+    { failRelease: true },
+  ])('waits for a pending previous-owner unload before loading back (failRelease=$failRelease)', async ({
+    failRelease,
+  }) => {
+    const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+    const onnx = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX });
+    registerBackends(llama.module, onnx.module);
+    const category = ModelCategory.MODEL_CATEGORY_EMBEDDING;
+    installRegistrySnapshots([
+      modelSnapshot('moving', category, InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP),
+    ]);
+    vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+    vi.mocked(getActiveBackendWorkerHost).mockReturnValue(null);
+    const loadOn = (framework: InferenceFramework) => WebModelLifecycle.loadModelAsync(
+      ModelLoadRequest.create({ modelId: 'moving', category, framework }),
+    );
+    await loadOn(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP);
+
+    // Suspend llama's unload like a JSPI export until the gate opens.
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => { openGate = resolve; });
+    const nativeUnload = llama.module._rac_model_lifecycle_unload_proto!;
+    llama.module._rac_model_lifecycle_unload_proto = (async (...args: Parameters<typeof nativeUnload>) => {
+      await gate;
+      if (failRelease) throw new Error('forced unload failure');
+      return nativeUnload(...args);
+    }) as unknown as typeof nativeUnload;
+
+    await loadOn(InferenceFramework.INFERENCE_FRAMEWORK_ONNX);
+    const reload = loadOn(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(llama.loadRequests).toHaveLength(1);
+
+    openGate();
+    const result = await reload;
+
+    expect(result?.error).toBeUndefined();
+    expect(llama.loadRequests).toHaveLength(2);
+    expect(llama.loadedModelIds()).toEqual(['moving']);
+  });
+
   it('routes framework-scoped current-model queries to the owning WASM', () => {
     const llama = fakeLifecycleRuntime([
       { id: 'llama-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },
