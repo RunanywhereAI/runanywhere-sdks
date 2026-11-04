@@ -570,11 +570,6 @@ namespace AndroidBridge {
         return callStaticString(g_getTimezoneIdentifierMethod, "getTimezoneIdentifier");
     }
 
-    // Directory enumeration via
-    // java.io.File.listFiles(). Two-call semantics matching
-    // rac_file_list_directory_fn. Truncation contract: skip oversized
-    // names rather than write a half-name that aliases a different
-    // artifact (Kotlin side already filters; we defend on this side too).
     static rac_result_t classifyNullDirectoryListing(const char* dir_path) {
         if (!dir_path) {
             return RAC_ERROR_INVALID_ARGUMENT;
@@ -589,6 +584,11 @@ namespace AndroidBridge {
         return S_ISDIR(info.st_mode) ? RAC_ERROR_FILE_READ_FAILED : RAC_ERROR_FILE_NOT_FOUND;
     }
 
+    // Directory enumeration via
+    // java.io.File.listFiles(). Two-call semantics matching
+    // rac_file_list_directory_fn. Truncation contract: skip oversized
+    // names rather than write a half-name that aliases a different
+    // artifact (Kotlin side already filters; we defend on this side too).
     rac_result_t fileListDirectory(const char* dir_path,
                                    rac_directory_entry_t* out_entries,
                                    size_t* in_out_count) {

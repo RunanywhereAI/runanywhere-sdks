@@ -98,8 +98,9 @@ neurt: `build-core-xcframework.sh` refuses to ship a stub unless
 
 ## The valid-engine contract (checklist)
 
-An engine is valid iff it provides all five. The all-NULL tripwire in the vtable
-initializer is what keeps the ABI from drifting silently.
+An engine is valid iff it provides all five. Explicit NULLs for every unserved
+slot keep each entry readable against the vtable; they do not catch every ABI
+change at compile time (see item 2), so re-check entries on each ABI bump.
 
 1. **A `rac_engine_manifest_t`**: `name` (snake_case identity matching
    `RAC_PLUGIN_ENTRY_DEF(<name>)` and the dlopen loader's filename heuristic,
@@ -112,8 +113,9 @@ initializer is what keeps the ABI from drifting silently.
 2. **A `rac_engine_vtable_t`**: served-primitive slots non-NULL, **every other
    slot explicit NULL** (13 primitive slots + **4 reserved slots**; the optional
    `get_stream_token_counts` callback lives on `rac_llm_service_ops_t`). Lives in
-   `.rodata`; a future reserved-slot promotion turns the aggregate initializer
-   into a compile error — the intended tripwire.
+   `.rodata`. A positional initializer only fails to compile when the struct
+   loses a field; a reserved-slot promotion or an added field still compiles
+   (the latter with `-Wmissing-field-initializers` warnings).
 3. **The uniform MODEL LIFECYCLE** on each served op-table:
 
    ```
