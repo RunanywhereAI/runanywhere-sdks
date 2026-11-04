@@ -217,7 +217,14 @@ export interface RagQueryOptions {
 export interface LoadOptions {
   /** Ranked backend choices; the first entry the platform can honor wins. */
   backendPreferences?: BackendPreference[];
-  /** Hardware class to run on. `'npu'` fails preflight — unsupported on Web. */
+  /**
+   * Hardware class to run on. `'npu'` fails preflight — unsupported on Web.
+   *
+   * Web contract: main-thread llama routes and speech honor this per load,
+   * but a llama.cpp BackendWorker fixes its acceleration for the backend
+   * session at `LlamaCPP.register({ acceleration })`; an explicit per-load
+   * mismatch is reported through `LoadedModel.fallbackReason`, not switched.
+   */
   accelerator?: AcceleratorPolicy;
   contextLength?: number;
   /**
