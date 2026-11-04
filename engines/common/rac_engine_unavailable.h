@@ -35,9 +35,11 @@
  *     (no runtime allocation), exactly like a hand-written entry.
  *   - The emitted vtable mirrors the real `rac_engine_vtable_t` slot count and
  *     order (13 active primitive slots + 4 reserved slots, all explicit NULL).
- *     If a future ABI bump promotes a reserved slot, the aggregate initializer
- *     here becomes a compile error — the same tripwire the hand-written entries
- *     rely on — forcing this header to be revisited in lockstep with the ABI.
+ *     The initializer is positional, so it only fails to compile if the
+ *     struct loses a field. Promoting a reserved slot keeps the count and
+ *     still compiles (the slot stays NULL, which is right for this shell);
+ *     adding a field leaves it short, value-initializing the rest (warned by
+ *     -Wmissing-field-initializers). Revisit this header with every ABI bump.
  *   - This header lives in engines/common/ and is header-only; adopting it adds
  *     no new .cpp / CMake wiring.
  *
@@ -197,9 +199,9 @@ static inline rac_result_t rac_engine_unavailable_capability(int platform_suppor
  *
  * The literal mirrors the real `rac_engine_vtable_t` slot count/order: 13 active
  * primitive slots (llm/stt/tts/vad/embedding/vlm/diffusion/diarization/
- * segmentation/rerank/image_embedding/ocr/decision) + 4 reserved slots. A future
- * reserved-slot promotion changes the struct and makes this aggregate initializer
- * a compile error — the intended tripwire.
+ * segmentation/rerank/image_embedding/ocr/decision) + 4 reserved slots. It is
+ * positional: removing a vtable field breaks the build, but a reserved-slot
+ * promotion or an added field still compiles, so update it with each ABI bump.
  *
  * Emitted as `static const` `.rodata`; @p cap_fn must have C linkage so the
  * function-pointer field stays ABI-correct across the FFI boundary.
