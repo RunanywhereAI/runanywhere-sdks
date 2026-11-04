@@ -481,7 +481,14 @@ private func platformMapDirectoryReadError(_ error: Error) -> rac_result_t {
 /// regular file (which would drop it from the caller's traversal).
 private func platformDirectoryChildInfo(_ path: String) -> (isDirectory: Bool, size: Int64)? {
     var info = stat()
-    guard stat(path, &info) == 0 else { return nil }
+    if stat(path, &info) != 0 {
+        // A dangling symlink has no target but is still a non-directory entry.
+        // If lstat also fails, the entry vanished mid-listing: inconclusive.
+        guard errno == ENOENT || errno == ENOTDIR else { return nil }
+        var linkInfo = lstat()
+        guard lstat(path, &linkInfo) == 0 else { return nil }
+        return (false, Int64(linkInfo.st_size))
+    }
     let isDirectory = (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR)
     return (isDirectory, isDirectory ? 0 : Int64(info.st_size))
 }
@@ -527,15 +534,20 @@ private func platformFileListDirectoryCallback(
     let capacity = inOutCount.pointee
     let nameMax = Int(RAC_DIRECTORY_ENTRY_NAME_MAX)
     var written = 0
-    var skipped = 0
 
     for entryName in entries {
-        if written >= capacity { break }
+        if written >= capacity {
+            // Entries remain beyond the caller's buffer: never report a
+            // partial listing as a complete directory.
+            return RAC_ERROR_FILE_READ_FAILED
+        }
 
-        // strlen excludes NUL — buffer must fit len + NUL.
+        // strlen excludes NUL — buffer must fit len + NUL. Skipping would make
+        // this a partial listing, so report the oversized name instead.
         if entryName.utf8.count + 1 > nameMax {
-            skipped += 1
-            continue
+            let logger = SDKLogger(category: "PlatformAdapter")
+            logger.warning("file_list_directory: oversized entry name in \(pathString)")
+            return RAC_ERROR_FILE_READ_FAILED
         }
 
         let fullPath = (pathString as NSString).appendingPathComponent(entryName)
@@ -543,8 +555,8 @@ private func platformFileListDirectoryCallback(
             return RAC_ERROR_FILE_READ_FAILED
         }
 
-        let didWrite = entryName.withCString { src -> Bool in
-            let entryPtr = outEntries.advanced(by: written)
+        let entryPtr = outEntries.advanced(by: written)
+        entryName.withCString { src in
             // Zero-fill the fixed-size name buffer, then copy bytes + NUL.
             withUnsafeMutablePointer(to: &entryPtr.pointee.name) { tuplePtr in
                 tuplePtr.withMemoryRebound(to: CChar.self, capacity: nameMax) { nameBuf in
@@ -552,21 +564,10 @@ private func platformFileListDirectoryCallback(
                     memcpy(nameBuf, src, strlen(src) + 1)
                 }
             }
-            entryPtr.pointee.is_dir = child.isDirectory ? RAC_TRUE : RAC_FALSE
-            entryPtr.pointee.size_bytes = child.size
-            return true
         }
-
-        if didWrite {
-            written += 1
-        } else {
-            skipped += 1
-        }
-    }
-
-    if skipped > 0 {
-        let logger = SDKLogger(category: "PlatformAdapter")
-        logger.warning("file_list_directory: skipped \(skipped) oversized entry name(s) in \(pathString)")
+        entryPtr.pointee.is_dir = child.isDirectory ? RAC_TRUE : RAC_FALSE
+        entryPtr.pointee.size_bytes = child.size
+        written += 1
     }
 
     inOutCount.pointee = written

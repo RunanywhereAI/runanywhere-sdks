@@ -106,6 +106,12 @@ rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, c
         // expose entries we did not actually receive.
         count = capacity;
     }
+    if (count == capacity) {
+        // A saturated fill can hide entries added after the capacity probe.
+        // Treat it as inconclusive so the whole-tree guard preserves state.
+        out_entries->clear();
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
     out_entries->resize(count);
     return RAC_SUCCESS;
 }
@@ -363,6 +369,14 @@ static bool model_path_is_orphan(const rac_platform_adapter_t* adapter, const Mo
                                     model.id().c_str());
                     return false;
                 }
+            } else if (!folder_tree_is_fully_enumerable(adapter, model.local_path())) {
+                // No finished artifact at the root, but the folder could still
+                // hold one under a hidden or unreadable child directory.
+                RAC_LOG_WARNING("ModelRegistry",
+                                "Skipping orphan prune for '%s': folder tree is not fully "
+                                "enumerable",
+                                model.id().c_str());
+                return false;
             }
         } else {
             // Some adapters report a non-directory file as FILE_NOT_FOUND;

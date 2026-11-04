@@ -90,13 +90,13 @@ typedef struct rac_directory_entry {
      *
      * Truncation contract: when the underlying filesystem produces an entry
      * name whose byte length (including NUL) would exceed
-     * `RAC_DIRECTORY_ENTRY_NAME_MAX`, the platform implementation MUST skip
-     * that entry rather than silently truncate it, and SHOULD emit a
-     * RAC_LOG_WARN log via the adapter's `log` slot (category
-     * "PlatformAdapter") so operators can detect oversized names. This keeps
-     * the canonical RunAnywhere model-registry path layout safe — model IDs
-     * never approach 511 bytes in practice — while ensuring the no-error
-     * path cannot return a half-name that aliases a different artifact. */
+     * `RAC_DIRECTORY_ENTRY_NAME_MAX`, the platform implementation MUST NOT
+     * truncate it. It MUST emit a RAC_LOG_WARN via the adapter's `log` slot
+     * (category "PlatformAdapter") and make the listing inconclusive by
+     * returning RAC_ERROR_FILE_READ_FAILED. This keeps the canonical
+     * RunAnywhere model-registry path layout safe — model IDs never approach
+     * 511 bytes in practice — while ensuring a partial listing is never
+     * mistaken for a complete one. */
     char name[RAC_DIRECTORY_ENTRY_NAME_MAX];
     /** RAC_TRUE if the entry is a directory, RAC_FALSE for regular files. */
     rac_bool_t is_dir;
@@ -117,8 +117,13 @@ typedef struct rac_directory_entry {
  *      *in_out_count entries and updates *in_out_count to the number actually
  *      written.
  *
- * Hidden entries ("." / ".." / dotfiles) MAY be filtered by the implementation;
- * the C++ rescan code does not require them.
+ * Every child entry, including dot-prefixed names, MUST be returned: the
+ * whole-tree orphan guard may need to traverse a hidden required directory.
+ * The "." and ".." pseudo-entries MAY be omitted.
+ *
+ * A callback that cannot represent an entry MUST return
+ * RAC_ERROR_FILE_READ_FAILED after logging; silently omitting it would turn a
+ * partial listing into a false "complete" result.
  *
  * Error classification (NORMATIVE): report RAC_ERROR_FILE_NOT_FOUND only when
  * the path's absence (or non-directory type) is affirmatively confirmed — e.g.
