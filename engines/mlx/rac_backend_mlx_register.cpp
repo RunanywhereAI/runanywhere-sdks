@@ -62,7 +62,8 @@ rac_result_t rac_backend_mlx_unregister(void) {
     if (!g_registered) {
         return RAC_SUCCESS;
     }
-    rac_plugin_unregister("mlx");
+    rac_result_t rc = rac_plugin_unregister("mlx");
+    RAC_PLUGIN_UNREGISTER_BUSY_CHECK("mlx", rc);
     rac_bundle_policy_unregister(RAC_FRAMEWORK_MLX);
     g_registered = false;
     return RAC_SUCCESS;

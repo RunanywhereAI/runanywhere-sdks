@@ -7,6 +7,7 @@
 #define RAC_PLUGIN_REGISTRATION_H
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +26,18 @@ static inline rac_bool_t rac_plugin_registration_succeeded(rac_result_t result) 
                ? RAC_TRUE
                : RAC_FALSE;
 }
+
+/* Requires LOG_CAT to be defined at the call site. */
+#define RAC_PLUGIN_UNREGISTER_BUSY_CHECK(name, result)                                          \
+    do {                                                                                        \
+        if ((result) == RAC_ERROR_PLUGIN_BUSY) {                                                \
+            return (result);                                                                    \
+        }                                                                                       \
+        if ((result) != RAC_SUCCESS && (result) != RAC_ERROR_NOT_FOUND &&                       \
+            (result) != RAC_ERROR_MODULE_NOT_FOUND) {                                           \
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_unregister('" name "') failed: %d", (result)); \
+        }                                                                                       \
+    } while (0)
 
 #ifdef __cplusplus
 }

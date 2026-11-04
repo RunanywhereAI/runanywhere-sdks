@@ -578,7 +578,8 @@ rac_result_t rac_backend_sherpa_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_plugin_unregister("sherpa");
+    rac_result_t rc = rac_plugin_unregister("sherpa");
+    RAC_PLUGIN_UNREGISTER_BUSY_CHECK("sherpa", rc);
 
     g_sherpa_registered = false;
     return RAC_SUCCESS;

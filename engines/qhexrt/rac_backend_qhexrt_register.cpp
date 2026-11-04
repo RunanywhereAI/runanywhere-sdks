@@ -83,7 +83,8 @@ rac_result_t rac_backend_qhexrt_register(void) {
 rac_result_t rac_backend_qhexrt_unregister(void) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_registered) {
-        rac_plugin_unregister("qhexrt");
+        rac_result_t rc = rac_plugin_unregister("qhexrt");
+        RAC_PLUGIN_UNREGISTER_BUSY_CHECK("qhexrt", rc);
         g_registered = false;
     }
     // The policy is installed before the device gate, so always remove it even
