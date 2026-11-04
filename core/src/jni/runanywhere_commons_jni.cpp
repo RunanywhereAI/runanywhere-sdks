@@ -4117,55 +4117,69 @@ static void free_directory_entry_copies(char** entries, size_t count) {
 
 // JNI file callback implementations
 static rac_result_t jni_fc_create_directory(const char* path, int recursive, void* user_data) {
+    if (path == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_create_directory == nullptr)
         return RAC_ERROR_NOT_INITIALIZED;
     jstring jPath = env->NewStringUTF(path);
+    if (jniClearPendingException(env) || jPath == nullptr) {
+        env->DeleteLocalRef(jPath);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_create_directory, jPath,
                                      static_cast<jboolean>(recursive != 0));
+    const bool failed = jniClearPendingException(env);
     env->DeleteLocalRef(jPath);
-    return static_cast<rac_result_t>(result);
+    return failed ? RAC_ERROR_INTERNAL : static_cast<rac_result_t>(result);
 }
 
 static rac_result_t jni_fc_delete_path(const char* path, int recursive, void* user_data) {
+    if (path == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_delete_path == nullptr)
         return RAC_ERROR_NOT_INITIALIZED;
     jstring jPath = env->NewStringUTF(path);
+    if (jniClearPendingException(env) || jPath == nullptr) {
+        env->DeleteLocalRef(jPath);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_delete_path, jPath,
                                      static_cast<jboolean>(recursive != 0));
+    const bool failed = jniClearPendingException(env);
     env->DeleteLocalRef(jPath);
-    return static_cast<rac_result_t>(result);
+    return failed ? RAC_ERROR_INTERNAL : static_cast<rac_result_t>(result);
 }
 
 static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries, size_t* out_count,
                                           void* user_data) {
+    if (out_entries != nullptr) {
+        *out_entries = nullptr;
+    }
+    if (out_count != nullptr) {
+        *out_count = 0;
+    }
     if (path == nullptr || out_entries == nullptr || out_count == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
-    *out_entries = nullptr;
-    *out_count = 0;
 
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_list_directory == nullptr)
         return RAC_ERROR_NOT_INITIALIZED;
 
     jstring jPath = env->NewStringUTF(path);
-    if (jPath == nullptr) {
-        if (env->ExceptionCheck() == JNI_TRUE) {
-            env->ExceptionClear();
-        }
+    if (jniClearPendingException(env) || jPath == nullptr) {
+        env->DeleteLocalRef(jPath);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     jobjectArray jEntries = static_cast<jobjectArray>(
         env->CallObjectMethod(g_file_callbacks_obj, g_fc_list_directory, jPath));
+    const bool failed = jniClearPendingException(env);
     env->DeleteLocalRef(jPath);
 
-    if (env->ExceptionCheck() == JNI_TRUE) {
-        env->ExceptionClear();
-        if (jEntries != nullptr) {
-            env->DeleteLocalRef(jEntries);
-        }
+    if (failed) {
+        env->DeleteLocalRef(jEntries);
         return RAC_ERROR_INTERNAL;
     }
     if (jEntries == nullptr) {
@@ -4173,6 +4187,10 @@ static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries,
     }
 
     const jsize count = env->GetArrayLength(jEntries);
+    if (jniClearPendingException(env)) {
+        env->DeleteLocalRef(jEntries);
+        return RAC_ERROR_INTERNAL;
+    }
     if (count == 0) {
         env->DeleteLocalRef(jEntries);
         return RAC_SUCCESS;
@@ -4190,25 +4208,20 @@ static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries,
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    // Copy the entries transactionally: any failed JNI/string allocation
-    // frees what has already been copied and reports RAC_ERROR_OUT_OF_MEMORY
-    // instead of returning a partially initialized array or strdup(nullptr).
+    // Publish only a complete listing; any failed copy rolls back the initialized prefix.
     for (jsize i = 0; i < count; i++) {
         auto jEntry = static_cast<jstring>(env->GetObjectArrayElement(jEntries, i));
-        if (jEntry == nullptr) {
-            const bool has_exception = env->ExceptionCheck() == JNI_TRUE;
-            if (has_exception) {
-                env->ExceptionClear();
-            }
+        const bool entry_failed = jniClearPendingException(env);
+        if (entry_failed || jEntry == nullptr) {
+            env->DeleteLocalRef(jEntry);
             free_directory_entry_copies(entries, static_cast<size_t>(i));
             env->DeleteLocalRef(jEntries);
-            return has_exception ? RAC_ERROR_INTERNAL : RAC_ERROR_INVALID_ARGUMENT;
+            return entry_failed ? RAC_ERROR_INTERNAL : RAC_ERROR_INVALID_ARGUMENT;
         }
-
         const char* entryChars = env->GetStringUTFChars(jEntry, nullptr);
-        if (entryChars == nullptr) {
-            if (env->ExceptionCheck() == JNI_TRUE) {
-                env->ExceptionClear();
+        if (jniClearPendingException(env) || entryChars == nullptr) {
+            if (entryChars != nullptr) {
+                env->ReleaseStringUTFChars(jEntry, entryChars);
             }
             env->DeleteLocalRef(jEntry);
             free_directory_entry_copies(entries, static_cast<size_t>(i));
@@ -4237,19 +4250,31 @@ static void jni_fc_free_entries(char** entries, size_t count, void* user_data) {
 
 static rac_bool_t jni_fc_path_exists(const char* path, rac_bool_t* out_is_directory,
                                      void* user_data) {
+    if (out_is_directory != nullptr) {
+        *out_is_directory = RAC_FALSE;
+    }
+    if (path == nullptr)
+        return RAC_FALSE;
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_path_exists == nullptr)
         return RAC_FALSE;
 
     jstring jPath = env->NewStringUTF(path);
+    if (jniClearPendingException(env) || jPath == nullptr) {
+        env->DeleteLocalRef(jPath);
+        return RAC_FALSE;
+    }
     jboolean exists = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_path_exists, jPath);
+    if (jniClearPendingException(env)) {
+        // Do not probe the type using a method result from an exceptional call.
+        env->DeleteLocalRef(jPath);
+        return RAC_FALSE;
+    }
 
-    if (out_is_directory != nullptr && exists) {
-        if (g_fc_is_directory != nullptr) {
-            jboolean isDir = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_is_directory, jPath);
+    if (out_is_directory != nullptr && exists && g_fc_is_directory != nullptr) {
+        jboolean isDir = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_is_directory, jPath);
+        if (!jniClearPendingException(env)) {
             *out_is_directory = isDir ? RAC_TRUE : RAC_FALSE;
-        } else {
-            *out_is_directory = RAC_FALSE;
         }
     }
 
@@ -4258,28 +4283,36 @@ static rac_bool_t jni_fc_path_exists(const char* path, rac_bool_t* out_is_direct
 }
 
 static int64_t jni_fc_get_file_size(const char* path, void* user_data) {
+    if (path == nullptr)
+        return -1;
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_get_file_size == nullptr)
         return -1;
     jstring jPath = env->NewStringUTF(path);
+    if (jniClearPendingException(env) || jPath == nullptr) {
+        env->DeleteLocalRef(jPath);
+        return -1;
+    }
     jlong size = env->CallLongMethod(g_file_callbacks_obj, g_fc_get_file_size, jPath);
+    const bool failed = jniClearPendingException(env);
     env->DeleteLocalRef(jPath);
-    return static_cast<int64_t>(size);
+    return failed ? -1 : static_cast<int64_t>(size);
 }
 
 static int64_t jni_fc_get_available_space(void* user_data) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_get_available_space == nullptr)
         return -1;
-    return static_cast<int64_t>(
-        env->CallLongMethod(g_file_callbacks_obj, g_fc_get_available_space));
+    const jlong size = env->CallLongMethod(g_file_callbacks_obj, g_fc_get_available_space);
+    return jniClearPendingException(env) ? -1 : static_cast<int64_t>(size);
 }
 
 static int64_t jni_fc_get_total_space(void* user_data) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_get_total_space == nullptr)
         return -1;
-    return static_cast<int64_t>(env->CallLongMethod(g_file_callbacks_obj, g_fc_get_total_space));
+    const jlong size = env->CallLongMethod(g_file_callbacks_obj, g_fc_get_total_space);
+    return jniClearPendingException(env) ? -1 : static_cast<int64_t>(size);
 }
 
 /**
