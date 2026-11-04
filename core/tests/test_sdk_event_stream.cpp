@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <cstdio>
 #include <mutex>
 #include <thread>
@@ -128,6 +129,18 @@ int main() {
     runanywhere::v1::SDKEvent polled_failure;
     CHECK(poll_event(&polled_failure), "poll returns queued SDKEvent bytes");
     CHECK(polled_failure.id() == callback_event.id(), "callback and poll observe same first event");
+
+    capture.events.clear();
+    rac_sdk_event_clear_queue();
+    rc = rac_sdk_event_publish_failure(INT32_MIN, "minimum code", "llm", "minCode", RAC_FALSE);
+    CHECK(rc == RAC_SUCCESS && capture.events.size() == 1, "INT32_MIN failure publishes");
+    runanywhere::v1::SDKEvent min_event;
+    CHECK(min_event.ParseFromArray(capture.events[0].data(),
+                                   static_cast<int>(capture.events[0].size())),
+          "INT32_MIN failure decodes");
+    CHECK(min_event.error().code() == runanywhere::v1::ERROR_CODE_UNKNOWN,
+          "unrepresentable INT32_MIN magnitude maps to UNKNOWN");
+    CHECK(min_event.error().c_abi_code() == INT32_MIN, "INT32_MIN ABI code preserved");
 
     rac_sdk_event_unsubscribe(sub);
     capture.events.clear();
