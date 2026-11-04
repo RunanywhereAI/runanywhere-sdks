@@ -435,6 +435,57 @@ private func platformFileDeleteCallback(
 
 // MARK: - Directory Enumeration Callbacks
 
+/// Reports whether `path` is an affirmatively confirmed directory. Missing and
+/// non-directory paths are the only failures that map to FILE_NOT_FOUND;
+/// permission denial and every other failed probe stay inconclusive so callers
+/// (notably orphan pruning) preserve existing state.
+private func platformDirectoryProbeResult(_ path: String) -> rac_result_t {
+    var info = stat()
+    guard stat(path, &info) == 0 else {
+        switch errno {
+        case ENOENT, ENOTDIR:
+            return RAC_ERROR_FILE_NOT_FOUND
+        default:
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+    }
+    return (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR)
+        ? RAC_SUCCESS : RAC_ERROR_FILE_NOT_FOUND
+}
+
+/// A failed directory read is never an empty or partial listing.
+private func platformMapDirectoryReadError(_ error: Error) -> rac_result_t {
+    let nsError = error as NSError
+    if let posix = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError)?.toPOSIXError()
+        ?? nsError.toPOSIXError() {
+        switch posix.code {
+        case .ENOENT, .ENOTDIR:
+            return RAC_ERROR_FILE_NOT_FOUND
+        default:
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+    }
+    if nsError.domain == NSCocoaErrorDomain {
+        switch CocoaError.Code(rawValue: nsError.code) {
+        case .fileNoSuchFile, .fileReadNoSuchFile:
+            return RAC_ERROR_FILE_NOT_FOUND
+        default:
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+    }
+    return RAC_ERROR_FILE_READ_FAILED
+}
+
+/// Returns an entry's type and size, or nil when the type cannot be confirmed.
+/// A failed child probe must stay inconclusive rather than being emitted as a
+/// regular file (which would drop it from the caller's traversal).
+private func platformDirectoryChildInfo(_ path: String) -> (isDirectory: Bool, size: Int64)? {
+    var info = stat()
+    guard stat(path, &info) == 0 else { return nil }
+    let isDirectory = (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR)
+    return (isDirectory, isDirectory ? 0 : Int64(info.st_size))
+}
+
 /// Enumerate a directory into a caller-provided array per the two-call contract
 /// on `rac_file_list_directory_fn`. Powers commons rescan_local + the multi-file
 /// `is_downloaded` probe (rac_path_is_non_empty_directory).
@@ -454,18 +505,17 @@ private func platformFileListDirectoryCallback(
     }
 
     let pathString = String(cString: dirPath)
-    let fileManager = FileManager.default
-    var isDirectory: ObjCBool = false
-    guard fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory),
-          isDirectory.boolValue else {
-        return RAC_ERROR_FILE_NOT_FOUND
+    let probeResult = platformDirectoryProbeResult(pathString)
+    guard probeResult == RAC_SUCCESS else {
+        return probeResult
     }
 
+    let fileManager = FileManager.default
     let entries: [String]
     do {
         entries = try fileManager.contentsOfDirectory(atPath: pathString)
     } catch {
-        return RAC_ERROR_INTERNAL
+        return platformMapDirectoryReadError(error)
     }
 
     // Capacity-query call: report total entries without filling the buffer.
@@ -482,33 +532,28 @@ private func platformFileListDirectoryCallback(
     for entryName in entries {
         if written >= capacity { break }
 
+        // strlen excludes NUL — buffer must fit len + NUL.
+        if entryName.utf8.count + 1 > nameMax {
+            skipped += 1
+            continue
+        }
+
+        let fullPath = (pathString as NSString).appendingPathComponent(entryName)
+        guard let child = platformDirectoryChildInfo(fullPath) else {
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+
         let didWrite = entryName.withCString { src -> Bool in
-            let length = strlen(src)
-            // strlen excludes NUL — buffer must fit len + NUL.
-            if length + 1 > nameMax {
-                return false
-            }
             let entryPtr = outEntries.advanced(by: written)
             // Zero-fill the fixed-size name buffer, then copy bytes + NUL.
             withUnsafeMutablePointer(to: &entryPtr.pointee.name) { tuplePtr in
                 tuplePtr.withMemoryRebound(to: CChar.self, capacity: nameMax) { nameBuf in
                     memset(nameBuf, 0, nameMax)
-                    memcpy(nameBuf, src, length + 1)
+                    memcpy(nameBuf, src, strlen(src) + 1)
                 }
             }
-
-            let fullPath = (pathString as NSString).appendingPathComponent(entryName)
-            var childIsDir: ObjCBool = false
-            let exists = FileManager.default.fileExists(atPath: fullPath, isDirectory: &childIsDir)
-            entryPtr.pointee.is_dir = (exists && childIsDir.boolValue) ? RAC_TRUE : RAC_FALSE
-
-            if exists && !childIsDir.boolValue {
-                let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath)
-                let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
-                entryPtr.pointee.size_bytes = size
-            } else {
-                entryPtr.pointee.size_bytes = 0
-            }
+            entryPtr.pointee.is_dir = child.isDirectory ? RAC_TRUE : RAC_FALSE
+            entryPtr.pointee.size_bytes = child.size
             return true
         }
 

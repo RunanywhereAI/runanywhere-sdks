@@ -28,6 +28,33 @@ namespace {
 // so the "callbacks may run on any thread" contract holds without locking.
 std::string g_secure_dir;
 
+// Distinguish a confirmed missing/non-directory path from a permission or I/O
+// failure. The boolean std::filesystem probes collapse both into false, which
+// lets orphan pruning mistake an unreadable download folder for a vanished one.
+bool is_confirmed_missing(const std::error_code& ec) {
+    return ec == std::errc::no_such_file_or_directory || ec == std::errc::not_a_directory;
+}
+
+rac_result_t classify_directory_probe(const fs::path& directory) {
+    std::error_code ec;
+    const fs::file_status status = fs::status(directory, ec);
+    if (is_confirmed_missing(ec)) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+    if (ec) {
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    switch (status.type()) {
+        case fs::file_type::not_found:
+            return RAC_ERROR_FILE_NOT_FOUND;
+        case fs::file_type::none:
+        case fs::file_type::unknown:
+            return RAC_ERROR_FILE_READ_FAILED;
+        default:
+            return fs::is_directory(status) ? RAC_SUCCESS : RAC_ERROR_FILE_NOT_FOUND;
+    }
+}
+
 const char* level_name(rac_log_level_t lvl) {
     switch (lvl) {
         case RAC_LOG_TRACE: return "TRACE";
@@ -259,7 +286,8 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
     if (!dir_path || !in_out_count) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::path dir = utf8_path(dir_path);
-    if (!fs::is_directory(dir, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;
+    const rac_result_t probe_rc = classify_directory_probe(dir);
+    if (probe_rc != RAC_SUCCESS) return probe_rc;
     const size_t cap = out_entries ? *in_out_count : 0;
     size_t written = 0, total = 0;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
@@ -267,15 +295,24 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
         if (!out_entries || written >= cap) continue;
         std::string name = wide_to_utf8(it->path().filename().wstring());  // UTF-8 contract
         if (name.size() + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) continue;  // skip oversized
+        // The type probe decides whether the walk recurses. A failed probe
+        // must stay inconclusive instead of reporting a regular file.
+        std::error_code type_ec;
+        const fs::file_status child_status = fs::status(it->path(), type_ec);
+        if (type_ec || child_status.type() == fs::file_type::none ||
+            child_status.type() == fs::file_type::unknown) {
+            return RAC_ERROR_FILE_READ_FAILED;
+        }
+        const bool is_dir = fs::is_directory(child_status);
         std::strncpy(out_entries[written].name, name.c_str(), RAC_DIRECTORY_ENTRY_NAME_MAX - 1);
         out_entries[written].name[RAC_DIRECTORY_ENTRY_NAME_MAX - 1] = '\0';
-        std::error_code ec2;
-        bool is_dir = fs::is_directory(it->path(), ec2);
         out_entries[written].is_dir = is_dir ? RAC_TRUE : RAC_FALSE;
-        out_entries[written].size_bytes =
-            is_dir ? 0 : static_cast<int64_t>(fs::file_size(it->path(), ec2));
-        if (ec2) {
+        if (is_dir) {
             out_entries[written].size_bytes = 0;
+        } else {
+            std::error_code size_ec;
+            const auto size = fs::file_size(it->path(), size_ec);
+            out_entries[written].size_bytes = size_ec ? 0 : static_cast<int64_t>(size);
         }
         ++written;
     }

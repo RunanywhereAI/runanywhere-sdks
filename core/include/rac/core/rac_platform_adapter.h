@@ -120,13 +120,23 @@ typedef struct rac_directory_entry {
  * Hidden entries ("." / ".." / dotfiles) MAY be filtered by the implementation;
  * the C++ rescan code does not require them.
  *
+ * Error classification (NORMATIVE): report RAC_ERROR_FILE_NOT_FOUND only when
+ * the path's absence (or non-directory type) is affirmatively confirmed — e.g.
+ * ENOENT/ENOTDIR, or a successful status probe that identifies a non-directory.
+ * Access-denied, unknown-status, and every other failed probe MUST return
+ * RAC_ERROR_FILE_READ_FAILED. Callers use this distinction to preserve registry
+ * state on an inconclusive read. A failed capacity or fill call is never a
+ * successful empty/partial listing, and a child whose type cannot be probed
+ * MUST NOT be emitted as a regular file (that would drop it from traversal).
+ *
  * @param dir_path     Absolute directory path to enumerate.
  * @param out_entries  Caller-allocated array (or NULL for capacity query).
  * @param in_out_count In: capacity of out_entries; Out: entries written
  *                     (or total available when out_entries is NULL).
  * @param user_data    Platform context.
- * @return RAC_SUCCESS, RAC_ERROR_FILE_NOT_FOUND when dir_path doesn't exist,
- *         or another error code on failure.
+ * @return RAC_SUCCESS; RAC_ERROR_FILE_NOT_FOUND only for confirmed
+ *         missing/non-directory paths; RAC_ERROR_FILE_READ_FAILED for denied or
+ *         otherwise inconclusive probes.
  */
 typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
                                                    rac_directory_entry_t* out_entries,

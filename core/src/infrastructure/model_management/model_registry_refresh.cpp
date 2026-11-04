@@ -110,12 +110,22 @@ rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, c
     return RAC_SUCCESS;
 }
 
-// Check the same finished-artifact shapes for both rescan and orphan pruning.
-// Propagate unreadable directories so pruning cannot mistake an I/O failure for
-// a missing artifact.
-static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* adapter,
-                                                 const std::string& model_path,
-                                                 bool* has_finished_artifact) {
+// Walk a model folder's bounded directory tree.
+//
+// kFinishedArtifact is the cheap rescan probe: stop at the first finished
+// artifact. kWholeTree is the pruning guard: it visits every child directory
+// (including hidden ones, which a required descriptor may live under) and
+// reports the first failed listing or exhausted bound instead of treating it as
+// absence. Both modes propagate unreadable directories so callers never mistake
+// an I/O failure for a missing artifact.
+enum class FolderWalkMode {
+    kFinishedArtifact,
+    kWholeTree,
+};
+
+static rac_result_t walk_model_folder(const rac_platform_adapter_t* adapter,
+                                      const std::string& model_path, FolderWalkMode mode,
+                                      bool* has_finished_artifact) {
     *has_finished_artifact = false;
     std::vector<std::string> pending{model_path};
     std::vector<rac_directory_entry_t> entries;
@@ -131,20 +141,28 @@ static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* a
             }
             // The parent exists; a child disappearing during enumeration is
             // an inconclusive read, not proof that the parent path vanished.
+            if (mode == FolderWalkMode::kWholeTree) {
+                return RAC_ERROR_FILE_READ_FAILED;
+            }
             nested_error = RAC_ERROR_FILE_READ_FAILED;
             continue;
         }
-        for (const rac_directory_entry_t& child : entries) {
-            if (is_finished_artifact_entry(child)) {
-                *has_finished_artifact = true;
-                return RAC_SUCCESS;
+        if (mode == FolderWalkMode::kFinishedArtifact) {
+            for (const rac_directory_entry_t& child : entries) {
+                if (is_finished_artifact_entry(child)) {
+                    *has_finished_artifact = true;
+                    return RAC_SUCCESS;
+                }
             }
         }
         // Descriptors can name arbitrarily nested subdirectories. Bound the
         // total walk (including directory-link cycles) using the listing cap;
         // exhaustion is inconclusive, so pruning preserves the registry row.
         for (const rac_directory_entry_t& child : entries) {
-            if (child.is_dir != RAC_TRUE || child.name[0] == '\0' || child.name[0] == '.') {
+            if (child.is_dir != RAC_TRUE || child.name[0] == '\0') {
+                continue;
+            }
+            if (mode == FolderWalkMode::kFinishedArtifact && child.name[0] == '.') {
                 continue;
             }
             if (directory_count >= kRescanMaxEntryCapacity) {
@@ -154,7 +172,25 @@ static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* a
             pending.push_back(current_path + "/" + child.name);
         }
     }
-    return nested_error;
+    return mode == FolderWalkMode::kWholeTree ? RAC_SUCCESS : nested_error;
+}
+
+// Check the same finished-artifact shapes for both rescan and orphan pruning.
+static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* adapter,
+                                                 const std::string& model_path,
+                                                 bool* has_finished_artifact) {
+    return walk_model_folder(adapter, model_path, FolderWalkMode::kFinishedArtifact,
+                             has_finished_artifact);
+}
+
+// A failed completeness check is only prunable evidence when the whole tree is
+// enumerable. A readable root companion file can otherwise hide an unreadable
+// nested directory that holds the required weights.
+static bool folder_tree_is_fully_enumerable(const rac_platform_adapter_t* adapter,
+                                            const std::string& model_path) {
+    bool unused = false;
+    return walk_model_folder(adapter, model_path, FolderWalkMode::kWholeTree, &unused) ==
+           RAC_SUCCESS;
 }
 
 // Walk {models_dir}/{framework}/{model_id}/ and link any registry entry whose
@@ -315,6 +351,16 @@ static bool model_path_is_orphan(const rac_platform_adapter_t* adapter, const Mo
                 if (!(has_expected_files || model.has_multi_file()) ||
                     !std::filesystem::exists(model.local_path(), ec) ||
                     model_folder_is_complete(model, model.local_path())) {
+                    return false;
+                }
+                // The folder is incomplete, but a failed completeness scan can
+                // also mean a nested directory was unreadable. Only prune when
+                // the whole bounded tree could be enumerated.
+                if (!folder_tree_is_fully_enumerable(adapter, model.local_path())) {
+                    RAC_LOG_WARNING("ModelRegistry",
+                                    "Skipping orphan prune for '%s': folder tree is not fully "
+                                    "enumerable",
+                                    model.id().c_str());
                     return false;
                 }
             }
