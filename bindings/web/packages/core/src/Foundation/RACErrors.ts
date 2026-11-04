@@ -50,6 +50,9 @@ export const RAC_ERROR_NULL_POINTER = -260 as const;
 /** `RAC_ERROR_CANCELLED` — operation aborted via a cancellation token. */
 export const RAC_ERROR_CANCELLED = -380 as const;
 
+/** `RAC_ERROR_MODULE_NOT_FOUND` — module teardown target was never registered. */
+export const RAC_ERROR_MODULE_NOT_FOUND = -400 as const;
+
 /**
  * `RAC_ERROR_MODULE_ALREADY_REGISTERED` — `rac_backend_*_register()` was
  * called twice for the same backend on the same module. Treated as success
@@ -65,3 +68,10 @@ export const RAC_ERROR_NOT_FOUND = -423 as const;
  * compiled into this WASM artifact (e.g. RAG with no native provider).
  */
 export const RAC_ERROR_FEATURE_NOT_AVAILABLE = -801 as const;
+
+/**
+ * `RAC_ERROR_PLUGIN_BUSY` — the native plugin stays registered because a
+ * loaded model still leases it. Retryable: unload the model, then retry the
+ * unregister. Never treat this as success or clear local registration state.
+ */
+export const RAC_ERROR_PLUGIN_BUSY = -821 as const;

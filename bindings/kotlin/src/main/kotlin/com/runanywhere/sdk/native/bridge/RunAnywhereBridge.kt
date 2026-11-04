@@ -2291,6 +2291,7 @@ object RunAnywhereBridge {
     val RAC_ERROR_SERVICE_NOT_FOUND = -ErrorCode.ERROR_CODE_SERVICE_NOT_FOUND.value
     val RAC_ERROR_NOT_FOUND = -ErrorCode.ERROR_CODE_NOT_FOUND.value
     val RAC_ERROR_FEATURE_NOT_AVAILABLE = -ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE.value
+    val RAC_ERROR_PLUGIN_BUSY = -ErrorCode.ERROR_CODE_PLUGIN_BUSY.value
 
     // Lifecycle states
     const val RAC_LIFECYCLE_IDLE = 0

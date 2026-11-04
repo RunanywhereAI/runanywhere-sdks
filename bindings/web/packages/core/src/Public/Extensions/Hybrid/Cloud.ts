@@ -25,7 +25,12 @@
  */
 
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
-import { RAC_OK, RAC_ERROR_MODULE_ALREADY_REGISTERED } from '../../../Foundation/RACErrors.js';
+import {
+  RAC_OK,
+  RAC_ERROR_MODULE_NOT_FOUND,
+  RAC_ERROR_PLUGIN_BUSY,
+  RAC_ERROR_MODULE_ALREADY_REGISTERED,
+} from '../../../Foundation/RACErrors.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
@@ -149,13 +154,25 @@ export const Cloud = {
    */
   unregister(): void {
     if (!backendRegistered) return;
-    backendRegistered = false;
     const module = (getModuleForCapability('stt') ??
       getModuleForCapability('commons')) as HybridWasmModule | null;
     const unregisterFn = module?._rac_backend_cloud_unregister;
-    if (typeof unregisterFn !== 'function') return;
-    unregisterFn();
-    logger.info('cloud backend unregistered');
+    if (typeof unregisterFn !== 'function') {
+      backendRegistered = false;
+      logger.info('cloud backend unregistered');
+      return;
+    }
+    const rc = unregisterFn();
+    if (rc === RAC_OK || rc === RAC_ERROR_MODULE_NOT_FOUND) {
+      backendRegistered = false;
+      logger.info('cloud backend unregistered');
+    } else if (rc === RAC_ERROR_PLUGIN_BUSY) {
+      logger.warning(
+        'cloud backend still leased by a loaded model; unload it and retry unregistration',
+      );
+    } else {
+      logger.warning(`rac_backend_cloud_unregister returned ${rc}`);
+    }
   },
 
   /** Register a cloud-STT model under `id` so the router can refer to it by id

@@ -164,13 +164,34 @@ public enum MLX {
         #endif
     }
 
+    /// Unregister the MLX backend from the C++ registry.
+    ///
+    /// Clears local state and callbacks only after the native side confirms the
+    /// plugin is gone. `RAC_ERROR_PLUGIN_BUSY` means a loaded model still
+    /// leases it, so the registration (and the callbacks it depends on) must
+    /// stay alive for a later retry.
+    ///
+    /// `@MainActor` so the `isRegistered` flag stays in the same isolation
+    /// domain as `register(priority:)` and the `autoRegister` Task hop.
     @MainActor
-    public static func unregister() {
-        guard isRegistered else { return }
-        _ = rac_backend_mlx_unregister()
-        _ = ra_mlx_set_chat_callback(nil, nil)
-        isRegistered = false
-        logger.info("MLX backend unregistered")
+    @discardableResult
+    public static func unregister() -> rac_result_t {
+        guard isRegistered else { return RAC_SUCCESS }
+
+        let result = rac_backend_mlx_unregister()
+        if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND {
+            _ = ra_mlx_set_chat_callback(nil, nil)
+            isRegistered = false
+            logger.info("MLX backend unregistered")
+        } else if result == RAC_ERROR_PLUGIN_BUSY {
+            logger.warning(
+                "MLX backend still leased by a loaded model; unload it and retry unregistration"
+            )
+        } else {
+            let message = String(cString: rac_error_message(result))
+            logger.error("MLX backend unregistration failed: \(message)")
+        }
+        return result
     }
 
     public static let autoRegister: Void = {
@@ -208,7 +229,6 @@ public func raMLXUnregisterRuntime() -> Int32 {
     mlxRuntimeMainActorResult {
         MLX.unregister()
     }
-    return RAC_SUCCESS
 }
 
 @_cdecl("ra_mlx_runtime_is_registered")

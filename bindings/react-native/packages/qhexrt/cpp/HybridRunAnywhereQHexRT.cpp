@@ -142,14 +142,23 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::unregisterBackend() {
     return true;
 #else
     rac_result_t result = rac_backend_qhexrt_unregister();
-    isRegistered_ = false;
-    if (result != RAC_SUCCESS) {
-      RAC_LOG_ERROR(LOG_CATEGORY, "QHexRT unregistration failed with code: %d",
-                    result);
-      throw std::runtime_error("QHexRT unregistration failed with error: " +
-                               std::to_string(result));
+    if (result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND) {
+      isRegistered_ = false;
+      RAC_LOG_INFO(LOG_CATEGORY, "QHexRT backend unregistered");
+      return true;
     }
-    return true;
+    if (result == RAC_ERROR_PLUGIN_BUSY) {
+      // The native plugin stays registered while a loaded model leases it.
+      // Keep local state so a later retry can finish the teardown.
+      RAC_LOG_WARNING(LOG_CATEGORY,
+                      "QHexRT backend still leased by a loaded model; "
+                      "unload it and retry unregistration");
+      return false;
+    }
+    RAC_LOG_ERROR(LOG_CATEGORY, "QHexRT unregistration failed with code: %d",
+                  result);
+    throw std::runtime_error("QHexRT unregistration failed with error: " +
+                             std::to_string(result));
 #endif
   });
 }

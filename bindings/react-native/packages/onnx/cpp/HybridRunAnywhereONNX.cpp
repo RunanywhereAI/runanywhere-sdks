@@ -109,31 +109,54 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::unregisterBackend() {
   return Promise<bool>::async([this]() {
     RAC_LOG_INFO(LOG_CATEGORY, "Unregistering ONNX backend...");
 
+    // Local registration state is cleared only when the native side confirms
+    // the backend is gone. RAC_ERROR_MODULE_NOT_FOUND means it was already
+    // unregistered, so it is just as good. RAC_ERROR_PLUGIN_BUSY means the
+    // plugin is still registered because a loaded model leases it: retryable,
+    // so report it through the return value instead of throwing.
+    bool fullyUnregistered = true;
+
 #if RAC_RN_HAS_SHERPA_REGISTRATION
     if (isSherpaRegistered_) {
       rac_result_t sherpaResult = rac_backend_sherpa_unregister();
       if (sherpaResult == RAC_SUCCESS || sherpaResult == RAC_ERROR_MODULE_NOT_FOUND) {
         isSherpaRegistered_ = false;
         RAC_LOG_INFO(LOG_CATEGORY, "Sherpa backend unregistered");
+      } else if (sherpaResult == RAC_ERROR_PLUGIN_BUSY) {
+        fullyUnregistered = false;
+        RAC_LOG_WARNING(LOG_CATEGORY,
+                        "Sherpa backend still leased by a loaded model; "
+                        "unload it and retry unregistration");
       } else {
+        fullyUnregistered = false;
         RAC_LOG_WARNING(LOG_CATEGORY, "Sherpa unregistration failed with code: %d", sherpaResult);
       }
     }
 #endif
 
     rac_result_t result = rac_backend_onnx_unregister();
-    isRegistered_ = false;
-    if (result != RAC_SUCCESS) {
+    if (result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND) {
+      isRegistered_ = false;
+      RAC_LOG_INFO(LOG_CATEGORY, "ONNX backend unregistered");
+    } else if (result == RAC_ERROR_PLUGIN_BUSY) {
+      fullyUnregistered = false;
+      RAC_LOG_WARNING(LOG_CATEGORY,
+                      "ONNX backend still leased by a loaded model; "
+                      "unload it and retry unregistration");
+    } else {
       RAC_LOG_ERROR(LOG_CATEGORY, "ONNX unregistration failed with code: %d", result);
       throw std::runtime_error("ONNX unregistration failed with error: " + describeError(result));
     }
-    return true;
+    return fullyUnregistered;
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::isBackendRegistered() {
   return Promise<bool>::async([this]() {
-    return isRegistered_;
+    // A teardown refused with RAC_ERROR_PLUGIN_BUSY can release one backend
+    // while the leased one stays registered, so report registered if either
+    // vtable this module owns is still installed.
+    return isRegistered_ || isSherpaRegistered_;
   });
 }
 
