@@ -21,6 +21,7 @@
 #include "win32_platform_adapter.h"
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 
 namespace fs = std::filesystem;
@@ -286,7 +287,7 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
         if (name.size() + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
             // A skipped name makes this a partial listing; callers must not
             // mistake it for a complete directory.
-            std::fprintf(stderr, "[WARN] [PlatformAdapter] oversized entry in %s\n", dir_path);
+            RAC_LOG_WARNING("PlatformAdapter", "oversized entry in %s", dir_path);
             return RAC_ERROR_FILE_READ_FAILED;
         }
         // The type probe decides whether the walk recurses. A failed probe

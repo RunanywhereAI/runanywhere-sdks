@@ -699,8 +699,8 @@ object PlatformAdapterBridge {
 
     /**
      * Maximum entry name length (incl. NUL) per `RAC_DIRECTORY_ENTRY_NAME_MAX`.
-     * Oversized entries are skipped per the truncation contract in
-     * `rac_platform_adapter.h::rac_directory_entry_t::name`.
+     * Oversized entries make the listing inconclusive per the truncation
+     * contract in `rac_platform_adapter.h::rac_directory_entry_t::name`.
      */
     private const val DIRECTORY_ENTRY_NAME_MAX = 512
 
@@ -708,11 +708,10 @@ object PlatformAdapterBridge {
      * Enumerate directory entries via java.io.File.listFiles().
      *
      * @return Array of RacDirectoryEntry or null if the path does not exist /
-     *         is not a directory. Oversized names (UTF-8 + NUL > 512) are
-     *         filtered out with a single WARN summary; the C++ layer enforces
-     *         the same contract defensively.
-     * @throws IOException if an existing directory cannot be enumerated; the
-     *         JNI caller reports any thrown failure as RAC_ERROR_INTERNAL.
+     *         is not a directory.
+     * @throws IOException if an existing directory cannot be enumerated or an
+     *         entry name exceeds [DIRECTORY_ENTRY_NAME_MAX]; the JNI caller
+     *         reports any thrown failure as RAC_ERROR_FILE_READ_FAILED.
      */
     @JvmStatic
     fun fileListDirectory(dirPath: String): Array<RacDirectoryEntry>? {
@@ -723,14 +722,13 @@ object PlatformAdapterBridge {
         // A null listing means I/O failure, not a successful empty directory.
         val children = dir.listFiles() ?: throw IOException("Unable to enumerate directory '$dirPath'")
 
-        var skipped = 0
         val entries = ArrayList<RacDirectoryEntry>(children.size)
         for (child in children) {
             val name = child.name
             val utf8Bytes = name.toByteArray(Charsets.UTF_8)
             if (utf8Bytes.size + 1 > DIRECTORY_ENTRY_NAME_MAX) {
-                skipped++
-                continue
+                Log.w(TAG, "fileListDirectory: oversized entry name in $dirPath")
+                throw IOException("Oversized directory entry name in '$dirPath'")
             }
             entries.add(
                 RacDirectoryEntry(
@@ -739,9 +737,6 @@ object PlatformAdapterBridge {
                     sizeBytes = if (child.isFile) child.length() else 0L,
                 ),
             )
-        }
-        if (skipped > 0) {
-            Log.w(TAG, "fileListDirectory: skipped $skipped oversized entry name(s) in $dirPath")
         }
         return entries.toTypedArray()
     }

@@ -23,6 +23,7 @@
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import { redactResourceURL } from '../Foundation/BackendContract.js';
+import { RAC_ERROR_FILE_READ_FAILED } from '../Foundation/RACErrors.js';
 import { OPFSBridge, type OPFSStreamingWriter } from '../Infrastructure/OPFSBridge.js';
 
 const logger = new SDKLogger('PlatformAdapter');
@@ -30,7 +31,6 @@ const logger = new SDKLogger('PlatformAdapter');
 // rac_error.h ranges
 const RAC_OK = 0;
 const RAC_ERROR_FILE_NOT_FOUND = -183;
-const RAC_ERROR_FILE_READ_FAILED = -184;
 const RAC_ERROR_FILE_WRITE_FAILED = -185;
 const RAC_ERROR_PLATFORM = -180;
 const RAC_ERROR_INVALID_ARGUMENT = -259;
@@ -983,7 +983,7 @@ interface DirectoryEntryLayout {
 }
 
 interface EmscriptenFS {
-  analyzePath(path: string): { exists: boolean };
+  analyzePath(path: string): { exists: boolean; error?: { errno?: number } };
   readFile(path: string): Uint8Array;
   writeFile(path: string, data: Uint8Array): void;
   unlink(path: string): void;
@@ -1006,7 +1006,25 @@ function listDirectoryEntries(m: PlatformAdapterModule, dirPath: string): Direct
   const fs = fsOf(m);
   if (!fs?.readdir) return null;
   const analyzed = fs.analyzePath(dirPath);
-  if (!analyzed.exists) return null;
+  if (!analyzed.exists) {
+    const errnoValue = analyzed.error?.errno;
+    const errnoCodes = (m as unknown as { ERRNO_CODES?: Record<string, number> }).ERRNO_CODES;
+    const missingCodes = [errnoCodes?.ENOENT ?? 44, errnoCodes?.ENOTDIR ?? 54];
+    if (errnoValue === undefined || missingCodes.includes(errnoValue)) {
+      return null;
+    }
+    throw new Error(`analyzePath failed for ${dirPath}`);
+  }
+  // analyzePath confirms existence but not the type. A regular file is a
+  // confirmed non-directory and must map to FILE_NOT_FOUND, not a read error.
+  const directoryStat = fs.stat?.(dirPath);
+  if (!directoryStat) {
+    throw new Error(`stat failed for ${dirPath}`);
+  }
+  if (typeof directoryStat.mode === 'number' && typeof fs.isDir === 'function' &&
+      !fs.isDir(directoryStat.mode)) {
+    return null;
+  }
   const names = fs.readdir(dirPath).filter((name) => name !== '.' && name !== '..');
   return names.map((name) => {
     const path = joinPath(dirPath, name);

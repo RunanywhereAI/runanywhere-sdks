@@ -499,8 +499,9 @@ private func platformDirectoryChildInfo(_ path: String) -> (isDirectory: Bool, s
 ///
 /// Truncation contract (per `rac_directory_entry_t::name`): entries whose UTF-8
 /// byte length plus the trailing NUL exceed `RAC_DIRECTORY_ENTRY_NAME_MAX` are
-/// skipped rather than truncated so the no-error path never aliases a different
-/// artifact. A single WARN log per call summarises any skipped entries.
+/// never truncated. The callback logs a warning and returns
+/// `RAC_ERROR_FILE_READ_FAILED` so a partial listing is not mistaken for a
+/// complete directory.
 private func platformFileListDirectoryCallback(
     dirPath: UnsafePointer<CChar>?,
     outEntries: UnsafeMutablePointer<rac_directory_entry_t>?,

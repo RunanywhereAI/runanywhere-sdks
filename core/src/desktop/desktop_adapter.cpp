@@ -47,6 +47,7 @@
 
 #include "desktop/desktop_internal.h"
 #include "desktop/desktop_path_utf8.h"  // utf8_to_path / utf8_fopen / utf8_remove / filename_utf8
+#include "rac/core/rac_logger.h"
 #include "rac/desktop/rac_desktop.h"
 
 namespace fs = std::filesystem;
@@ -326,7 +327,7 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
         if (name_len + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
             // A skipped name makes this a partial listing; callers must not
             // mistake it for a complete directory.
-            std::fprintf(stderr, "[WARN] [PlatformAdapter] oversized entry in %s\n", dir_path);
+            RAC_LOG_WARNING("PlatformAdapter", "oversized entry in %s", dir_path);
             return RAC_ERROR_FILE_READ_FAILED;
         }
 

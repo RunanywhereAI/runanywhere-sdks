@@ -12,6 +12,7 @@
 #include "ExternalConfigGuard.hpp"
 #include "HTTPBridge.hpp"
 #include "PlatformDownloadBridge.h"
+#include "rac/core/rac_logger.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/device/rac_device_identity.h" // rac_device_get_or_create_persistent_id
@@ -570,6 +571,10 @@ namespace AndroidBridge {
         return callStaticString(g_getTimezoneIdentifierMethod, "getTimezoneIdentifier");
     }
 
+    // Directory enumeration via
+    // java.io.File.listFiles(). Two-call semantics matching
+    // rac_file_list_directory_fn. An oversized name makes the listing
+    // inconclusive; Kotlin throws and this layer also defends against one.
     static rac_result_t classifyNullDirectoryListing(const char* dir_path) {
         if (!dir_path) {
             return RAC_ERROR_INVALID_ARGUMENT;
@@ -586,9 +591,8 @@ namespace AndroidBridge {
 
     // Directory enumeration via
     // java.io.File.listFiles(). Two-call semantics matching
-    // rac_file_list_directory_fn. Truncation contract: skip oversized
-    // names rather than write a half-name that aliases a different
-    // artifact (Kotlin side already filters; we defend on this side too).
+    // rac_file_list_directory_fn. An oversized name makes the listing
+    // inconclusive; Kotlin throws and this layer also defends against one.
     rac_result_t fileListDirectory(const char* dir_path,
                                    rac_directory_entry_t* out_entries,
                                    size_t* in_out_count) {
@@ -612,7 +616,7 @@ namespace AndroidBridge {
         if (env->ExceptionCheck()) {
             env->ExceptionClear();
             LOGE("Exception in fileListDirectory");
-            return RAC_ERROR_INTERNAL;
+            return RAC_ERROR_FILE_READ_FAILED;
         }
         // Kotlin returns null when File.exists()/isDirectory() are false, but
         // those also return false on stat errors. Confirm absence before
@@ -631,14 +635,19 @@ namespace AndroidBridge {
         }
 
         const size_t capacity = *in_out_count;
-        const size_t write_count =
-            (capacity < static_cast<size_t>(total)) ? capacity : static_cast<size_t>(total);
+        if (static_cast<size_t>(total) > capacity) {
+            // A partial fill is not a complete listing.
+            env->DeleteLocalRef(result);
+            return RAC_ERROR_FILE_READ_FAILED;
+        }
+        const size_t write_count = static_cast<size_t>(total);
         size_t written = 0;
 
         for (size_t i = 0; i < write_count; ++i) {
             jobject entryObj = env->GetObjectArrayElement(result, static_cast<jsize>(i));
             if (!entryObj) {
-                continue;
+                env->DeleteLocalRef(result);
+                return RAC_ERROR_FILE_READ_FAILED;
             }
             jclass entryClass = env->GetObjectClass(entryObj);
             jfieldID nameField = env->GetFieldID(entryClass, "name", "Ljava/lang/String;");
@@ -651,17 +660,31 @@ namespace AndroidBridge {
 
             const char* nameChars =
                 jName ? env->GetStringUTFChars(jName, nullptr) : nullptr;
-            if (nameChars) {
-                const size_t nameLen = std::strlen(nameChars);
-                if (nameLen + 1 <= RAC_DIRECTORY_ENTRY_NAME_MAX) {
-                    std::memset(out_entries[written].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
-                    std::memcpy(out_entries[written].name, nameChars, nameLen);
-                    out_entries[written].is_dir = jIsDir ? RAC_TRUE : RAC_FALSE;
-                    out_entries[written].size_bytes = static_cast<int64_t>(jSize);
-                    written++;
+            if (!nameChars) {
+                if (jName) {
+                    env->DeleteLocalRef(jName);
                 }
-                env->ReleaseStringUTFChars(jName, nameChars);
+                env->DeleteLocalRef(entryClass);
+                env->DeleteLocalRef(entryObj);
+                env->DeleteLocalRef(result);
+                return RAC_ERROR_FILE_READ_FAILED;
             }
+            const size_t nameLen = std::strlen(nameChars);
+            if (nameLen + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
+                RAC_LOG_WARNING("PlatformAdapter", "oversized entry in %s", dir_path);
+                env->ReleaseStringUTFChars(jName, nameChars);
+                env->DeleteLocalRef(jName);
+                env->DeleteLocalRef(entryClass);
+                env->DeleteLocalRef(entryObj);
+                env->DeleteLocalRef(result);
+                return RAC_ERROR_FILE_READ_FAILED;
+            }
+            std::memset(out_entries[written].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            std::memcpy(out_entries[written].name, nameChars, nameLen);
+            out_entries[written].is_dir = jIsDir ? RAC_TRUE : RAC_FALSE;
+            out_entries[written].size_bytes = static_cast<int64_t>(jSize);
+            written++;
+            env->ReleaseStringUTFChars(jName, nameChars);
 
             if (jName) {
                 env->DeleteLocalRef(jName);

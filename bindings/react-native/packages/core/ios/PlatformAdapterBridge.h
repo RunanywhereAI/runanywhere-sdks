@@ -216,7 +216,8 @@ typedef struct PlatformDirectoryEntry {
  * contract documented on rac_platform_adapter.h.
  *
  * Truncation: entries whose UTF-8 name (+NUL) would exceed 512 bytes are
- * skipped per the rac_directory_entry_t::name contract.
+ * logged and reported as RAC_ERROR_FILE_READ_FAILED; the listing is never
+ * reported as complete.
  *
  * @param dirPath     Absolute directory path.
  * @param outEntries  Caller-allocated array (or NULL for capacity query).

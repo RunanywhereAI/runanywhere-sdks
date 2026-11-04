@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -195,8 +196,13 @@ static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* a
 static bool folder_tree_is_fully_enumerable(const rac_platform_adapter_t* adapter,
                                             const std::string& model_path) {
     bool unused = false;
-    return walk_model_folder(adapter, model_path, FolderWalkMode::kWholeTree, &unused) ==
-           RAC_SUCCESS;
+    try {
+        return walk_model_folder(adapter, model_path, FolderWalkMode::kWholeTree, &unused) ==
+               RAC_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        // Allocation failure is inconclusive: preserve the registry row.
+        return false;
+    }
 }
 
 // Walk {models_dir}/{framework}/{model_id}/ and link any registry entry whose

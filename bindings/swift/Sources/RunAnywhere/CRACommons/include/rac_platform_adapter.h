@@ -90,13 +90,13 @@ typedef struct rac_directory_entry {
      *
      * Truncation contract: when the underlying filesystem produces an entry
      * name whose byte length (including NUL) would exceed
-     * `RAC_DIRECTORY_ENTRY_NAME_MAX`, the platform implementation MUST skip
-     * that entry rather than silently truncate it, and SHOULD emit a
-     * RAC_LOG_WARN log via the adapter's `log` slot (category
-     * "PlatformAdapter") so operators can detect oversized names. This keeps
-     * the canonical RunAnywhere model-registry path layout safe — model IDs
-     * never approach 511 bytes in practice — while ensuring the no-error
-     * path cannot return a half-name that aliases a different artifact. */
+     * `RAC_DIRECTORY_ENTRY_NAME_MAX`, the platform implementation MUST NOT
+     * truncate it. It MUST emit a RAC_LOG_WARNINGING via the adapter's `log` slot
+     * (category "PlatformAdapter") and make the listing inconclusive by
+     * returning RAC_ERROR_FILE_READ_FAILED. This keeps the canonical
+     * RunAnywhere model-registry path layout safe — model IDs never approach
+     * 511 bytes in practice — while ensuring a partial listing is never
+     * mistaken for a complete one. */
     char name[RAC_DIRECTORY_ENTRY_NAME_MAX];
     /** RAC_TRUE if the entry is a directory, RAC_FALSE for regular files. */
     rac_bool_t is_dir;
@@ -117,16 +117,31 @@ typedef struct rac_directory_entry {
  *      *in_out_count entries and updates *in_out_count to the number actually
  *      written.
  *
- * Hidden entries ("." / ".." / dotfiles) MAY be filtered by the implementation;
- * the C++ rescan code does not require them.
+ * Every child entry, including dot-prefixed names, MUST be returned: the
+ * whole-tree orphan guard may need to traverse a hidden required directory.
+ * The "." and ".." pseudo-entries MAY be omitted.
+ *
+ * A callback that cannot represent an entry MUST return
+ * RAC_ERROR_FILE_READ_FAILED after logging; silently omitting it would turn a
+ * partial listing into a false "complete" result.
+ *
+ * Error classification (NORMATIVE): report RAC_ERROR_FILE_NOT_FOUND only when
+ * the path's absence (or non-directory type) is affirmatively confirmed — e.g.
+ * ENOENT/ENOTDIR, or a successful status probe that identifies a non-directory.
+ * Access-denied, unknown-status, and every other failed probe MUST return
+ * RAC_ERROR_FILE_READ_FAILED. Callers use this distinction to preserve registry
+ * state on an inconclusive read. A failed capacity or fill call is never a
+ * successful empty/partial listing, and a child whose type cannot be probed
+ * MUST NOT be emitted as a regular file (that would drop it from traversal).
  *
  * @param dir_path     Absolute directory path to enumerate.
  * @param out_entries  Caller-allocated array (or NULL for capacity query).
  * @param in_out_count In: capacity of out_entries; Out: entries written
  *                     (or total available when out_entries is NULL).
  * @param user_data    Platform context.
- * @return RAC_SUCCESS, RAC_ERROR_FILE_NOT_FOUND when dir_path doesn't exist,
- *         or another error code on failure.
+ * @return RAC_SUCCESS; RAC_ERROR_FILE_NOT_FOUND only for confirmed
+ *         missing/non-directory paths; RAC_ERROR_FILE_READ_FAILED for denied or
+ *         otherwise inconclusive probes.
  */
 typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
                                                    rac_directory_entry_t* out_entries,
@@ -368,7 +383,7 @@ typedef struct rac_platform_adapter {
      *
      * Cross-SDK status (each SDK is responsible for populating this slot on
      * every platform whose runtime exposes a directory enumeration API). All
-     * five SDK populators now wire this slot; rac_init emits a RAC_LOG_WARNING
+     * five SDK populators now wire this slot; rac_init emits a RAC_LOG_WARNINGING
      * if it is ever left NULL:
      *   - Web:           POPULATED (registerFileListDirectory in
      *                    PlatformAdapter.ts via OPFS).
@@ -381,7 +396,7 @@ typedef struct rac_platform_adapter {
      * User-visible impact if this slot is NULL: model registry refresh with
      * `rescan_local = true` cannot link on-disk model folders to registered
      * entries — the warning in `ModelRegistryRefreshResult.warnings` (plus the
-     * rac_init RAC_LOG_WARNING) is the only signal to consuming code that the
+     * rac_init RAC_LOG_WARNINGING) is the only signal to consuming code that the
      * local rescan was skipped.
      */
     rac_file_list_directory_fn file_list_directory;
@@ -423,7 +438,7 @@ typedef struct rac_platform_adapter {
      * (see rac_model_info_make_proto), so a transient platform error degrades
      * gracefully to `is_downloaded == false` rather than surfacing a structured
      * error. Implementations that hit a genuine platform fault (vs. a clean
-     * missing/empty path) SHOULD emit a RAC_LOG_WARN via the adapter's `log`
+     * missing/empty path) SHOULD emit a RAC_LOG_WARNING via the adapter's `log`
      * slot (category "PlatformAdapter") so prod telemetry can detect
      * adapter-misconfiguration even though the C ABI return cannot distinguish
      * it. Promoting the signature to
