@@ -29,6 +29,7 @@ import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
 import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackException
 import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -160,18 +161,20 @@ internal class VoiceAgentMicDriver(
 
             val resultBytes =
                 try {
-                    RunAnywhereBridge.racVoiceAgentFeedAudioProto(
-                        handle,
-                        VoiceAgentAudioFrame.ADAPTER.encode(
-                            VoiceAgentAudioFrame(
-                                audio_data = chunk.toByteString(),
-                                sample_rate_hz = SAMPLE_RATE_HZ,
-                                channels = 1,
-                                encoding = AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
-                                is_final = false,
+                    withNativeProtoFailure {
+                        RunAnywhereBridge.racVoiceAgentFeedAudioProto(
+                            handle,
+                            VoiceAgentAudioFrame.ADAPTER.encode(
+                                VoiceAgentAudioFrame(
+                                    audio_data = chunk.toByteString(),
+                                    sample_rate_hz = SAMPLE_RATE_HZ,
+                                    channels = 1,
+                                    encoding = AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+                                    is_final = false,
+                                ),
                             ),
-                        ),
-                    )
+                        )
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {

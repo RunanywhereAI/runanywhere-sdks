@@ -89,7 +89,11 @@ RULES: list[tuple[str, re.Pattern[str], str]] = [
     ),
     (
         "absolute path into a personal home directory",
-        re.compile(r"(?:/Users/(?!<)[\w.-]+|/home/(?!<)[\w.-]+|C:\\\\Users\\\\[\w.-]+)/"),
+        re.compile(
+            r"(?:/Users/(?!<)[\w.-]+/"
+            r"|/home/(?!<)[\w.-]+/"
+            r"|[A-Za-z]:\\+(?i:Users)\\+(?!<)[\w.-]+\\+)"
+        ),
         "use ~ or a <placeholder>; an absolute home path names a person and a machine",
     ),
 ]

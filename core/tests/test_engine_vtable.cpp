@@ -18,9 +18,11 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 
 #include "../src/generated/proto/model_types.pb.h"
 #include "rac/core/rac_error.h"
+#include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -109,6 +111,44 @@ static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_PROPRIETARY) ==
 static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_UNKNOWN) == RAC_MODEL_FORMAT_ID_UNKNOWN);
 
 namespace {
+
+// Layout before confidence output. Keep every pre-existing result field at its
+// original offset and size: confidence uses a separate optional output.
+struct LegacySegmentationResult {
+    uint32_t width;
+    uint32_t height;
+    uint16_t* class_mask;
+    size_t class_mask_count;
+    uint8_t* diagnostic_rgba;
+    size_t diagnostic_rgba_size;
+    rac_segmentation_class_summary_t* class_summaries;
+    size_t class_summary_count;
+    int64_t processing_time_ms;
+    char* model_id;
+};
+
+static_assert(offsetof(rac_segmentation_result_t, width) ==
+              offsetof(LegacySegmentationResult, width));
+static_assert(offsetof(rac_segmentation_result_t, height) ==
+              offsetof(LegacySegmentationResult, height));
+static_assert(offsetof(rac_segmentation_result_t, class_mask) ==
+              offsetof(LegacySegmentationResult, class_mask));
+static_assert(offsetof(rac_segmentation_result_t, class_mask_count) ==
+              offsetof(LegacySegmentationResult, class_mask_count));
+static_assert(offsetof(rac_segmentation_result_t, diagnostic_rgba) ==
+              offsetof(LegacySegmentationResult, diagnostic_rgba));
+static_assert(offsetof(rac_segmentation_result_t, diagnostic_rgba_size) ==
+              offsetof(LegacySegmentationResult, diagnostic_rgba_size));
+static_assert(offsetof(rac_segmentation_result_t, class_summaries) ==
+              offsetof(LegacySegmentationResult, class_summaries));
+static_assert(offsetof(rac_segmentation_result_t, class_summary_count) ==
+              offsetof(LegacySegmentationResult, class_summary_count));
+static_assert(offsetof(rac_segmentation_result_t, processing_time_ms) ==
+              offsetof(LegacySegmentationResult, processing_time_ms));
+static_assert(offsetof(rac_segmentation_result_t, model_id) ==
+              offsetof(LegacySegmentationResult, model_id));
+static_assert(sizeof(rac_segmentation_result_t) == sizeof(LegacySegmentationResult));
+static_assert(sizeof(rac_segmentation_options_t) == sizeof(rac_bool_t));
 
 int g_capability_check_rc = RAC_SUCCESS;
 
@@ -244,12 +284,21 @@ int main() {
         CHECK(rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) == nullptr, "happy: post-unreg empty");
     }
 
-    // (2) ABI mismatch
-    {
-        auto vt = make_vt("abi-v6", 50, 6u);
+    // (2) Reject old segmentation providers before invoking any plugin callback.
+    // Confidence is additive to ABI 14; main's earlier ABI changes still apply.
+    for (uint32_t old_abi : {6u, 12u, 13u}) {
+        const int segmentation_sentinel = 10;
+        auto vt = make_vt("old-abi", 50, old_abi);
+        vt.llm_ops = nullptr;
+        vt.segmentation_ops =
+            reinterpret_cast<const struct rac_segmentation_service_ops*>(&segmentation_sentinel);
+        vt.capability_check = []() -> rac_result_t {
+            CHECK(false, "abi: incompatible provider callback must not run");
+            return RAC_SUCCESS;
+        };
         rac_result_t rc = rac_plugin_register(&vt);
-        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: v6 plugin rejected by v8 host");
-        CHECK(rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) == nullptr, "abi: not inserted");
+        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: old plugin rejected by current host");
+        CHECK(rac_plugin_find(RAC_PRIMITIVE_SEGMENT) == nullptr, "abi: not inserted");
     }
 
     // (3) capability_check rejection
@@ -277,10 +326,10 @@ int main() {
         const int diarization_sentinel = 9;
         const int segmentation_sentinel = 10;
         rac_engine_vtable_t vt{};
-        vt.diarization_ops = reinterpret_cast<const struct rac_diarization_service_ops*>(
-            &diarization_sentinel);
-        vt.segmentation_ops = reinterpret_cast<const struct rac_segmentation_service_ops*>(
-            &segmentation_sentinel);
+        vt.diarization_ops =
+            reinterpret_cast<const struct rac_diarization_service_ops*>(&diarization_sentinel);
+        vt.segmentation_ops =
+            reinterpret_cast<const struct rac_segmentation_service_ops*>(&segmentation_sentinel);
         CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_DIARIZE) == &diarization_sentinel,
               "v7: DIARIZE resolves diarization_ops");
         CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_SEGMENT) == &segmentation_sentinel,

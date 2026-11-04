@@ -749,6 +749,9 @@ _rac_file_manager_get_storage_info
 _rac_file_manager_model_folder_exists
 _rac_file_manager_models_storage_used
 
+# Directory probe — shared null-listing classifier (Kotlin JNI, RN Android bridge).
+_rac_classify_null_directory_listing
+
 # Storage analyzer non-proto entry points (used by CppBridge+Storage.swift).
 _rac_storage_analyzer_analyze
 _rac_storage_analyzer_calculate_size
@@ -1260,6 +1263,7 @@ _rac_diarization_stream_start_proto
 _rac_diarization_stream_stop_proto
 _rac_diarization_unset_stream_proto_callback
 _rac_segmentation_cleanup
+_rac_segmentation_confidence_mask_free
 _rac_segmentation_component_create
 _rac_segmentation_component_destroy
 _rac_segmentation_component_get_metrics
@@ -1275,6 +1279,7 @@ _rac_segmentation_initialize
 _rac_segmentation_result_free
 _rac_segmentation_segment
 _rac_segmentation_segment_lifecycle_proto
+_rac_segmentation_segment_with_confidence
 _rac_rerank_cleanup
 _rac_rerank_component_create
 _rac_rerank_component_destroy

@@ -121,13 +121,15 @@ Most loggers use `com.runanywhere.RunAnywhereAI`; a few use plain
 covers all of them. On a physical device use `idevicesyslog | grep "com.runanywhere"`
 instead.
 
-## 4. macOS/Swift — no separate repo, use the in-tree example or rcli
+## 4. macOS/Swift — no consumer repo, use the in-tree example
 
-There is no `runanywhere-macos` consumer repo. Two in-monorepo options, both inside
+There is no `runanywhere-macos` consumer repo. Use the in-tree example, inside
 `~/development/ODLM/MONOREPOOO/Qualcomm/runanywhere-sdks`:
 
 - `bindings/swift/example/` — a minimal SwiftPM example app/executable.
-- `rcli/` — the C++ core's CLI, `rac_*` C ABI consumer.
+
+The CLI is no longer in this repo; it lives in `RunanywhereAI/wally` (the `RunanywhereAI/RCLI`
+named in `CMakeLists.txt`, since renamed), so it is not an in-monorepo option.
 
 **The critical gotcha**: the repo's own `Package.swift` is fail-closed toward the
 *real published release* — it resolves the remote `binaryTargets` unless you
@@ -148,18 +150,6 @@ swift run runanywhere-minimal "Name three colours."
 If the example was previously built/run with the env var set, `swift build` may
 reuse a stale resolve — run `swift package reset` (or delete `.build/`) first if
 you're not sure which mode the last resolve used.
-
-For rcli instead (also validates the real published core):
-
-```bash
-cd ~/development/ODLM/MONOREPOOO/Qualcomm/runanywhere-sdks
-rcli models download qwen3          # ~639MB, small enough for a quick smoke test
-rcli llm generate --model qwen3 "Reply with exactly: RCLI WORKS" --reasoning off
-```
-
-`rcli models list --all` shows the rest of the built-in catalog
-(`whisper-tiny`, `smolvlm2`, `piper`, …) if LLM generate isn't the right modality
-for what you're verifying.
 
 ## 5. Android — `runanywhere-android`
 
