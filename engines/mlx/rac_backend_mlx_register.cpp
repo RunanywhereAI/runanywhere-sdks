@@ -62,7 +62,14 @@ rac_result_t rac_backend_mlx_unregister(void) {
     if (!g_registered) {
         return RAC_SUCCESS;
     }
-    rac_plugin_unregister("mlx");
+    // A refused unregister (e.g. BUSY while a model lease is held) leaves the
+    // registry entry intact, so the flag/policy must survive for a retry after
+    // the lease is released to complete teardown.
+    const rac_result_t rc = rac_plugin_unregister("mlx");
+    if (rc != RAC_SUCCESS && rc != RAC_ERROR_NOT_FOUND && rc != RAC_ERROR_MODULE_NOT_FOUND) {
+        RAC_LOG_WARNING(LOG_CAT, "rac_plugin_unregister(mlx) failed: %d", rc);
+        return rc;
+    }
     rac_bundle_policy_unregister(RAC_FRAMEWORK_MLX);
     g_registered = false;
     return RAC_SUCCESS;

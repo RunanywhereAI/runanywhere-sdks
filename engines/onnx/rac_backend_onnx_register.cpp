@@ -72,7 +72,11 @@ rac_result_t rac_backend_onnx_unregister(void) {
     rac_result_t plugin_rc = rac_plugin_unregister("onnx");
     if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_NOT_FOUND &&
         plugin_rc != RAC_ERROR_MODULE_NOT_FOUND) {
+        // A refused unregister (e.g. BUSY while a model lease is held) leaves the
+        // registry entry intact, so the flag and the embeddings registration must
+        // survive for a retry after the lease is released to complete teardown.
         RAC_LOG_WARNING(LOG_CAT, "rac_plugin_unregister('onnx') failed: %d", plugin_rc);
+        return plugin_rc;
     }
 
 #ifdef RAC_BACKEND_RAG

@@ -578,7 +578,14 @@ rac_result_t rac_backend_sherpa_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_plugin_unregister("sherpa");
+    // A refused unregister (e.g. BUSY while a model lease is held) leaves the
+    // registry entry intact, so the flag must survive for a retry after the
+    // lease is released to complete teardown.
+    const rac_result_t rc = rac_plugin_unregister("sherpa");
+    if (rc != RAC_SUCCESS && rc != RAC_ERROR_NOT_FOUND && rc != RAC_ERROR_MODULE_NOT_FOUND) {
+        RAC_LOG_WARNING(LOG_CAT, "rac_plugin_unregister('sherpa') failed: %d", rc);
+        return rc;
+    }
 
     g_sherpa_registered = false;
     return RAC_SUCCESS;

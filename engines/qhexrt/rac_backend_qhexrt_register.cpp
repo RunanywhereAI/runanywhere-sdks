@@ -83,7 +83,14 @@ rac_result_t rac_backend_qhexrt_register(void) {
 rac_result_t rac_backend_qhexrt_unregister(void) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_registered) {
-        rac_plugin_unregister("qhexrt");
+        // A refused unregister (e.g. BUSY while a model lease is held) leaves the
+        // registry entry intact, so the flag must survive for a retry after the
+        // lease is released to complete teardown.
+        const rac_result_t rc = rac_plugin_unregister("qhexrt");
+        if (rc != RAC_SUCCESS && rc != RAC_ERROR_NOT_FOUND && rc != RAC_ERROR_MODULE_NOT_FOUND) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_unregister(qhexrt) failed: %d", rc);
+            return rc;
+        }
         g_registered = false;
     }
     // The policy is installed before the device gate, so always remove it even
