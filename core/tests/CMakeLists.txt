@@ -104,6 +104,8 @@ add_executable(test_jni_directory_probe test_jni_directory_probe.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/infrastructure/file_management/directory_probe.cpp)
 target_include_directories(test_jni_directory_probe PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../include
+    # directory_probe.cpp includes core/internal/platform_compat.h on Windows.
+    ${CMAKE_CURRENT_LIST_DIR}/../src
 )
 target_compile_features(test_jni_directory_probe PRIVATE cxx_std_20)
 add_test(NAME jni_directory_probe_tests COMMAND test_jni_directory_probe)

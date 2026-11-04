@@ -35,6 +35,9 @@ extern "C" {
  *   so callers keep any registered path until a later refresh.
  * - `RAC_ERROR_INVALID_ARGUMENT`: @p path is NULL.
  *
+ * @p path is decoded as UTF-8 on every platform (on Windows it is converted to
+ * UTF-16 before probing). Malformed UTF-8 is inconclusive: READ_FAILED.
+ *
  * Never throws; safe to call across a JNI boundary.
  *
  * @param path Directory path the platform failed to list (UTF-8).
