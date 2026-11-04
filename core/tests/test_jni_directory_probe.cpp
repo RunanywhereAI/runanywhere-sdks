@@ -1,6 +1,6 @@
 /**
  * @file test_jni_directory_probe.cpp
- * @brief Real filesystem coverage for the JNI null-listing classification.
+ * @brief Real filesystem coverage for rac_classify_null_directory_listing.
  */
 
 #include <chrono>
@@ -9,12 +9,11 @@
 #include <fstream>
 #include <system_error>
 
-#include "jni/directory_probe_internal.h"
+#include "rac/infrastructure/file_management/rac_directory_probe.h"
 
 namespace {
 
 namespace fs = std::filesystem;
-using rac::jni::classify_null_directory_listing;
 
 #define EXPECT_EQ(actual, expected)                                                          \
     do {                                                                                     \
@@ -54,14 +53,14 @@ int main() {
     std::ofstream(file) << "weights";
     EXPECT_EQ(fs::is_regular_file(file), true);
 
-    EXPECT_EQ(classify_null_directory_listing(nullptr), RAC_ERROR_INVALID_ARGUMENT);
-    EXPECT_EQ(classify_null_directory_listing(missing.string().c_str()), RAC_ERROR_FILE_NOT_FOUND);
-    EXPECT_EQ(classify_null_directory_listing(file.string().c_str()), RAC_ERROR_FILE_NOT_FOUND);
+    EXPECT_EQ(rac_classify_null_directory_listing(nullptr), RAC_ERROR_INVALID_ARGUMENT);
+    EXPECT_EQ(rac_classify_null_directory_listing(missing.string().c_str()), RAC_ERROR_FILE_NOT_FOUND);
+    EXPECT_EQ(rac_classify_null_directory_listing(file.string().c_str()), RAC_ERROR_FILE_NOT_FOUND);
     const auto beneath_file = file / "model";
-    EXPECT_EQ(classify_null_directory_listing(beneath_file.string().c_str()),
+    EXPECT_EQ(rac_classify_null_directory_listing(beneath_file.string().c_str()),
               RAC_ERROR_FILE_NOT_FOUND);
     // A null Java result followed by an existing directory is inconclusive.
-    EXPECT_EQ(classify_null_directory_listing(fixture.model.string().c_str()),
+    EXPECT_EQ(rac_classify_null_directory_listing(fixture.model.string().c_str()),
               RAC_ERROR_FILE_READ_FAILED);
 
     std::error_code error;
@@ -77,7 +76,7 @@ int main() {
     }
     // No synthetic File overrides: the existing model cannot be stat'ed
     // through its denied ancestor, and must not become a missing-download result.
-    EXPECT_EQ(classify_null_directory_listing(fixture.model.string().c_str()),
+    EXPECT_EQ(rac_classify_null_directory_listing(fixture.model.string().c_str()),
               RAC_ERROR_FILE_READ_FAILED);
     std::puts("JNI directory probe tests passed, including real permission denial");
     return 0;

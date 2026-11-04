@@ -1,23 +1,18 @@
 /**
- * @file directory_probe_internal.h
- * @brief Error-aware classification of an ambiguous Java directory probe.
+ * @file directory_probe.cpp
+ * @brief Implementation of rac_classify_null_directory_listing.
  */
-
-#ifndef RAC_JNI_DIRECTORY_PROBE_INTERNAL_H
-#define RAC_JNI_DIRECTORY_PROBE_INTERNAL_H
 
 #include <filesystem>
 #include <system_error>
 
-#include "rac/core/rac_error.h"
+#include "rac/infrastructure/file_management/rac_directory_probe.h"
 
-namespace rac::jni {
-
-// File.exists()/isDirectory() hide stat errors behind false. After Kotlin
+// File.exists()/isDirectory() hide stat errors behind false. After the platform
 // returns a null listing, confirm absence using a probe that retains its error.
 // An existing directory is inconclusive too: it may have become accessible
-// since the Java probe, so preserve its registered path until a later refresh.
-inline rac_result_t classify_null_directory_listing(const char* path) noexcept {
+// since the platform probe, so preserve its registered path until a later refresh.
+extern "C" rac_result_t rac_classify_null_directory_listing(const char* path) {
     if (!path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -40,7 +35,3 @@ inline rac_result_t classify_null_directory_listing(const char* path) noexcept {
     }
     return RAC_ERROR_FILE_READ_FAILED;
 }
-
-}  // namespace rac::jni
-
-#endif  // RAC_JNI_DIRECTORY_PROBE_INTERNAL_H

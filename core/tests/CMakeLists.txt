@@ -100,7 +100,8 @@ include_directories(${CMAKE_CURRENT_LIST_DIR}/../src)
 
 # --- Kotlin JNI directory probe errors -------------------------------------
 # Java's null result must not turn a denied filesystem probe into NOT_FOUND.
-add_executable(test_jni_directory_probe test_jni_directory_probe.cpp)
+add_executable(test_jni_directory_probe test_jni_directory_probe.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/infrastructure/file_management/directory_probe.cpp)
 target_include_directories(test_jni_directory_probe PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../include
 )

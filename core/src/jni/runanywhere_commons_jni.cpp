@@ -58,7 +58,6 @@
 #endif
 
 // Include runanywhere-commons C API headers
-#include "directory_probe_internal.h"
 #include "request_cancellation_relay.h"
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
@@ -99,6 +98,7 @@
 #include "rac/infrastructure/device/rac_device_facts.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/file_management/rac_directory_probe.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
@@ -1347,7 +1347,7 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
     // Confirm absence before mapping null to NOT_FOUND; access/I/O failures
     // must remain inconclusive so orphan pruning preserves the download.
     if (result == nullptr) {
-        return rac::jni::classify_null_directory_listing(dir_path ? dir_path : "");
+        return rac_classify_null_directory_listing(dir_path ? dir_path : "");
     }
 
     const jsize total = env->GetArrayLength(result);

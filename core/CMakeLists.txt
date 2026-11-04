@@ -807,6 +807,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/storage/storage_analyzer.cpp
     src/infrastructure/storage/storage_event_publisher.cpp
     src/infrastructure/file_management/file_manager.cpp
+    src/infrastructure/file_management/directory_probe.cpp
     src/infrastructure/network/environment.cpp
     src/infrastructure/network/rac_dev_config_usability.cpp
     src/infrastructure/network/endpoints.cpp
