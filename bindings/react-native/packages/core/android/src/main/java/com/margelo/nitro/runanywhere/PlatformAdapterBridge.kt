@@ -728,6 +728,9 @@ object PlatformAdapterBridge {
             throw IOException("Unable to probe directory entry '$path'", error)
         }
         val isDir = OsConstants.S_ISDIR(info.st_mode)
+        if (!isDir && !OsConstants.S_ISREG(info.st_mode)) {
+            throw IOException("Unsupported directory entry type: '$path'")
+        }
         return isDir to if (isDir) 0L else info.st_size
     }
 

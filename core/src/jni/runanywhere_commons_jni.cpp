@@ -1314,11 +1314,9 @@ static int64_t jni_now_ms_callback(void* user_data) {
 //      *in_out_count to the number written.
 //
 // Truncation contract (per `rac_directory_entry_t::name`): when a UTF-8 entry
-// name (+NUL) would exceed RAC_DIRECTORY_ENTRY_NAME_MAX the Kotlin callback
-// MUST skip the entry rather than truncate; we mirror that on the JNI side
-// in case the Kotlin layer ever forwards an oversized name (defensive copy
-// uses strncpy with explicit NUL-termination so we never produce a half-name
-// that aliases a different artifact).
+// name (+NUL) would exceed RAC_DIRECTORY_ENTRY_NAME_MAX the listing is
+// inconclusive. Kotlin rejects oversized names; this layer returns
+// FILE_READ_FAILED instead of emitting a half-name or a partial listing.
 static rac_result_t jni_file_list_directory_callback(const char* dir_path,
                                                      rac_directory_entry_t* out_entries,
                                                      size_t* in_out_count, void* user_data) {
@@ -1341,7 +1339,7 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
     if (env->ExceptionCheck()) {
         env->ExceptionDescribe();
         env->ExceptionClear();
-        return RAC_ERROR_INTERNAL;
+        return RAC_ERROR_FILE_READ_FAILED;
     }
     // Java's boolean existence/type probes also return false on stat errors.
     // Confirm absence before mapping null to NOT_FOUND; access/I/O failures
@@ -1359,20 +1357,19 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
         return RAC_SUCCESS;
     }
 
-    // Fill branch: write up to *in_out_count entries.
+    // Fill branch: write every entry; a short buffer is a partial listing.
     const size_t capacity = *in_out_count;
-    const size_t write_count = std::min(capacity, static_cast<size_t>(total));
+    if (static_cast<size_t>(total) > capacity) {
+        env->DeleteLocalRef(result);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    const size_t write_count = static_cast<size_t>(total);
 
     for (size_t i = 0; i < write_count; ++i) {
         jobject entryObj = env->GetObjectArrayElement(result, static_cast<jsize>(i));
         if (entryObj == nullptr) {
-            // Skip null slots defensively — the Kotlin contract should never
-            // emit them, but treat as a benign skip rather than abort the
-            // whole listing.
-            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
-            out_entries[i].is_dir = RAC_FALSE;
-            out_entries[i].size_bytes = 0;
-            continue;
+            env->DeleteLocalRef(result);
+            return RAC_ERROR_FILE_READ_FAILED;
         }
 
         // Kotlin RacDirectoryEntry is a data class with `name: String`,
@@ -1390,24 +1387,34 @@ static rac_result_t jni_file_list_directory_callback(const char* dir_path,
 
         const char* nameChars =
             (jName != nullptr) ? env->GetStringUTFChars(jName, nullptr) : nullptr;
-        if (nameChars != nullptr) {
-            const size_t nameLen = std::strlen(nameChars);
-            if (nameLen + 1 <= RAC_DIRECTORY_ENTRY_NAME_MAX) {
-                std::memcpy(out_entries[i].name, nameChars, nameLen);
-                out_entries[i].name[nameLen] = '\0';
-            } else {
-                // Defensive: Kotlin should already have filtered oversized
-                // entries per the truncation contract. Zero-fill so we
-                // never expose a half-name to commons.
-                std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+        if (nameChars == nullptr) {
+            if (env->ExceptionCheck()) {
+                env->ExceptionClear();
             }
+            if (jName != nullptr) {
+                env->DeleteLocalRef(jName);
+            }
+            env->DeleteLocalRef(entryClass);
+            env->DeleteLocalRef(entryObj);
+            env->DeleteLocalRef(result);
+            return RAC_ERROR_FILE_READ_FAILED;
+        }
+        const size_t nameLen = std::strlen(nameChars);
+        if (nameLen + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
+            RAC_LOG_WARNING("PlatformAdapter", "oversized entry in %s", dir_path);
             env->ReleaseStringUTFChars(jName, nameChars);
-        } else {
-            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            env->DeleteLocalRef(jName);
+            env->DeleteLocalRef(entryClass);
+            env->DeleteLocalRef(entryObj);
+            env->DeleteLocalRef(result);
+            return RAC_ERROR_FILE_READ_FAILED;
         }
 
+        std::memcpy(out_entries[i].name, nameChars, nameLen);
+        out_entries[i].name[nameLen] = '\0';
         out_entries[i].is_dir = jIsDir ? RAC_TRUE : RAC_FALSE;
         out_entries[i].size_bytes = static_cast<int64_t>(jSize);
+        env->ReleaseStringUTFChars(jName, nameChars);
 
         if (jName != nullptr) {
             env->DeleteLocalRef(jName);

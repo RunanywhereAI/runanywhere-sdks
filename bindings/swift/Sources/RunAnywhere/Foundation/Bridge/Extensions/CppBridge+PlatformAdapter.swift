@@ -435,10 +435,8 @@ private func platformFileDeleteCallback(
 
 // MARK: - Directory Enumeration Callbacks
 
-/// Reports whether `path` is an affirmatively confirmed directory. Missing and
-/// non-directory paths are the only failures that map to FILE_NOT_FOUND;
-/// permission denial and every other failed probe stay inconclusive so callers
-/// (notably orphan pruning) preserve existing state.
+/// Only confirmed missing/non-directory paths map to FILE_NOT_FOUND.
+/// Other probe failures preserve registry state as inconclusive reads.
 private func platformDirectoryProbeResult(_ path: String) -> rac_result_t {
     var info = stat()
     guard stat(path, &info) == 0 else {
@@ -476,16 +474,13 @@ private func platformMapDirectoryReadError(_ error: Error) -> rac_result_t {
     return RAC_ERROR_FILE_READ_FAILED
 }
 
-/// Returns an entry's type and size, or nil when the type cannot be confirmed.
-/// A failed child probe must stay inconclusive rather than being emitted as a
-/// regular file (which would drop it from the caller's traversal).
+/// Returns nil on an inconclusive child probe so traversal cannot skip a directory.
 private func platformDirectoryChildInfo(_ path: String) -> (isDirectory: Bool, size: Int64)? {
     var info = stat()
     if stat(path, &info) != 0 {
-        // A dangling symlink has no target but is still a non-directory entry.
-        // If lstat also fails, the entry vanished mid-listing: inconclusive.
+        // A dangling symlink is non-directory; a failed lstat is inconclusive.
         guard errno == ENOENT || errno == ENOTDIR else { return nil }
-        var linkInfo = lstat()
+        var linkInfo = stat()
         guard lstat(path, &linkInfo) == 0 else { return nil }
         return (false, Int64(linkInfo.st_size))
     }
@@ -493,15 +488,9 @@ private func platformDirectoryChildInfo(_ path: String) -> (isDirectory: Bool, s
     return (isDirectory, isDirectory ? 0 : Int64(info.st_size))
 }
 
-/// Enumerate a directory into a caller-provided array per the two-call contract
-/// on `rac_file_list_directory_fn`. Powers commons rescan_local + the multi-file
-/// `is_downloaded` probe (rac_path_is_non_empty_directory).
-///
-/// Truncation contract (per `rac_directory_entry_t::name`): entries whose UTF-8
-/// byte length plus the trailing NUL exceed `RAC_DIRECTORY_ENTRY_NAME_MAX` are
-/// never truncated. The callback logs a warning and returns
-/// `RAC_ERROR_FILE_READ_FAILED` so a partial listing is not mistaken for a
-/// complete directory.
+/// Enumerates entries per `rac_file_list_directory_fn`'s two-call contract.
+/// An entry whose UTF-8 name plus NUL exceeds `RAC_DIRECTORY_ENTRY_NAME_MAX`
+/// causes a warning and FILE_READ_FAILED; partial listings never report success.
 private func platformFileListDirectoryCallback(
     dirPath: UnsafePointer<CChar>?,
     outEntries: UnsafeMutablePointer<rac_directory_entry_t>?,
@@ -538,13 +527,11 @@ private func platformFileListDirectoryCallback(
 
     for entryName in entries {
         if written >= capacity {
-            // Entries remain beyond the caller's buffer: never report a
-            // partial listing as a complete directory.
+            // Entries beyond the caller's buffer make the listing inconclusive.
             return RAC_ERROR_FILE_READ_FAILED
         }
 
-        // strlen excludes NUL — buffer must fit len + NUL. Skipping would make
-        // this a partial listing, so report the oversized name instead.
+        // The buffer must fit the name plus NUL; never skip or truncate an entry.
         if entryName.utf8.count + 1 > nameMax {
             let logger = SDKLogger(category: "PlatformAdapter")
             logger.warning("file_list_directory: oversized entry name in \(pathString)")

@@ -9,6 +9,8 @@ import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -50,7 +52,13 @@ class CppBridgePlatformAdapterDirectoryTest {
         File(directory, "weights.gguf").writeBytes(ByteArray(42))
         assertTrue(File(directory, "nested").mkdir())
 
-        val entries = assertNotNull(CppBridgePlatformAdapter.fileListDirectoryCallback(directory.path)).associateBy { it.name }
+        val entries =
+            assertNotNull(
+                CppBridgePlatformAdapter.readDirectoryEntries(directory) { child ->
+                    val attributes = Files.readAttributes(child.toPath(), BasicFileAttributes::class.java)
+                    attributes.isDirectory to if (attributes.isDirectory) 0L else attributes.size()
+                },
+            ).associateBy { it.name }
 
         assertEquals(setOf("weights.gguf", "nested"), entries.keys)
         assertEquals(RacDirectoryEntry("weights.gguf", false, 42), entries["weights.gguf"])
