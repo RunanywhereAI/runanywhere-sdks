@@ -79,7 +79,7 @@ object ONNX {
      */
     suspend fun unregister() {
         registrationMutex.withLock {
-            if (!isRegistered) return
+            if (!isRegistered && !isSherpaRegistered) return
 
             if (isSherpaRegistered) {
                 val sherpaResult = unregisterSherpaNative()
