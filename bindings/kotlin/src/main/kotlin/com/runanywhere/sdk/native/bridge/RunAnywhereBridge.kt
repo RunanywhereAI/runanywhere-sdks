@@ -65,6 +65,7 @@ object RunAnywhereBridge {
                 // C ABI so Kotlin SDKLogger and the C++ logger share one
                 // sensitive-substring list (mirrors Swift's SDKLogger).
                 Logging.shouldRedactPolicy = { key -> racLogMetadataShouldRedact(key) }
+                Logging.syncCommonsLogLevel()
                 logger.debug("Native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
@@ -113,6 +114,12 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racLog(level: Int, tag: String, message: String)
+
+    @JvmStatic
+    external fun racLoggerSetMinLevel(level: Int)
+
+    @JvmStatic
+    external fun racLoggerGetMinLevel(): Int
 
     /**
      * Determine whether a metadata key should be redacted in logs, delegating
