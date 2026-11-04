@@ -55,7 +55,8 @@ rac_result_t rac_backend_cloud_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_plugin_unregister("cloud");
+    rac_result_t rc = rac_plugin_unregister("cloud");
+    RAC_PLUGIN_UNREGISTER_BUSY_CHECK("cloud", rc);
 
     g_cloud_registered = false;
     return RAC_SUCCESS;

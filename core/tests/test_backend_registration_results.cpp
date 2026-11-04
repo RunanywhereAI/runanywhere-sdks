@@ -22,6 +22,7 @@ rac_result_t rac_backend_mlx_unregister(void);
 
 namespace {
 rac_result_t next_result = RAC_SUCCESS;
+rac_result_t next_unregister_result = RAC_SUCCESS;
 int registration_calls = 0;
 int mlx_policy_calls = 0;
 bool supported_device = true;
@@ -47,7 +48,7 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t*) noexcept {
     return next_result;
 }
 rac_result_t rac_plugin_unregister(const char*) noexcept {
-    return RAC_SUCCESS;
+    return next_unregister_result;
 }
 rac_result_t rac_bundle_policy_register(const rac_bundle_policy_t* policy) {
     if (policy->framework == RAC_FRAMEWORK_MLX) {
@@ -125,6 +126,29 @@ int main() {
         return 1;
     }
     rac_backend_qhexrt_unregister();
+    // Busy unregistration must keep state intact and propagate the error.
+    next_result = RAC_SUCCESS;
+    next_unregister_result = RAC_ERROR_PLUGIN_BUSY;
+    supported_device = true;
+    registration_calls = 0;
+    if (!check(rac_backend_qhexrt_register() == RAC_SUCCESS,
+               "QHexRT busy-test registration failed") ||
+        !check(rac_backend_qhexrt_unregister() == RAC_ERROR_PLUGIN_BUSY,
+               "QHexRT busy unregister not propagated") ||
+        !check(rac_backend_qhexrt_is_registered() == RAC_TRUE, "QHexRT busy dropped flag") ||
+        !check(rac_backend_mlx_register() == RAC_SUCCESS, "MLX busy-test registration failed") ||
+        !check(rac_backend_mlx_unregister() == RAC_ERROR_PLUGIN_BUSY,
+               "MLX busy unregister not propagated")) {
+        return 1;
+    }
+    // Retry after the lease is released unregisters cleanly.
+    next_unregister_result = RAC_SUCCESS;
+    if (!check(rac_backend_qhexrt_unregister() == RAC_SUCCESS, "QHexRT retry unregister failed") ||
+        !check(rac_backend_qhexrt_is_registered() == RAC_FALSE,
+               "QHexRT retry did not clear flag") ||
+        !check(rac_backend_mlx_unregister() == RAC_SUCCESS, "MLX retry unregister failed")) {
+        return 1;
+    }
     std::puts("ok: registration policy, flags, retries and genuine failures");
     return 0;
 }
