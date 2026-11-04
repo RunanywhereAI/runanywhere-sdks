@@ -33,6 +33,8 @@
 
 import {
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
+  RAC_ERROR_MODULE_NOT_FOUND,
+  RAC_ERROR_PLUGIN_BUSY,
   PlatformAdapter,
   SDKException,
   SDKLogger,
@@ -144,8 +146,14 @@ export class SherpaONNXBridge {
     return this._loaded;
   }
 
+  /**
+   * `true` while at least one of the native vtables this bridge installed is
+   * still registered. A teardown refused with `RAC_ERROR_PLUGIN_BUSY` can
+   * release one backend while the leased one stays registered, so this is an
+   * OR, not an AND: the bridge must not report itself fully gone.
+   */
   get isBackendRegistered(): boolean {
-    return this._onnxBackendRegistered && this._sherpaBackendRegistered;
+    return this._onnxBackendRegistered || this._sherpaBackendRegistered;
   }
 
   /** Acquire/load the commons module and register the ONNX backend vtable. */
@@ -171,41 +179,44 @@ export class SherpaONNXBridge {
    * STT/TTS/VAD/voice-agent), leaving siblings (commons, llamacpp) intact.
    * If this bridge held the module install, calls `_rac_shutdown` to
    * unwind C++ state too.
+   *
+   * @returns `true` when every backend this bridge owned is now unregistered.
+   *          `false` when the native registry kept one registered because a
+   *          loaded model still leases the plugin (`RAC_ERROR_PLUGIN_BUSY`).
+   *          That case is retryable: nothing is torn down, so calling
+   *          `unregister()` again after the model is unloaded completes it.
    */
-  unregister(): void {
-    this._teardown();
+  unregister(): boolean {
+    return this._teardown();
   }
 
-  /** Release backend registrations, native state, and JS callbacks in order. */
-  private _teardown(): void {
+  /**
+   * Release backend registrations, native state, and JS callbacks in order.
+   *
+   * Every local resource is cleared only after the native unregister reports
+   * success (or the backend was never registered natively). A
+   * `RAC_ERROR_PLUGIN_BUSY` leaves the module, platform adapter, capability
+   * slots and local flags intact so a later retry can finish the teardown.
+   */
+  private _teardown(): boolean {
     const module = this._module;
 
-    if (module && this._sherpaBackendRegistered) {
-      try {
-        const rc = module._rac_backend_sherpa_unregister?.() ?? 0;
-        if (rc !== 0) {
-          logger.warning(`rac_backend_sherpa_unregister returned ${rc}`);
-        }
-      } catch (err) {
-        logger.warning(
-          `rac_backend_sherpa_unregister threw: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+    const sherpaReleased =
+      !module || !this._sherpaBackendRegistered
+        ? true
+        : this._unregisterBackend(module, 'sherpa');
+    const onnxReleased =
+      !module || !this._onnxBackendRegistered
+        ? true
+        : this._unregisterBackend(module, 'onnx');
+
+    if (!sherpaReleased || !onnxReleased) {
+      logger.warning(
+        'ONNX/Sherpa backend is still registered; unload the leased model and retry unregister()',
+      );
+      return false;
     }
-    if (module && this._onnxBackendRegistered) {
-      try {
-        const rc = module._rac_backend_onnx_unregister?.() ?? 0;
-        if (rc !== 0) {
-          logger.warning(`rac_backend_onnx_unregister returned ${rc}`);
-        }
-      } catch (err) {
-        logger.warning(
-          `rac_backend_onnx_unregister threw: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
-    this._sherpaBackendRegistered = false;
-    this._onnxBackendRegistered = false;
+
     if (module && this._bridgeOwnedInit) {
       try {
         module._rac_shutdown?.();
@@ -237,6 +248,56 @@ export class SherpaONNXBridge {
     this._bridgeOwnedInit = false;
     this._loaded = false;
     this._loading = null;
+    return true;
+  }
+
+  /**
+   * Unregister one native backend and update its local flag only on a
+   * definitive result. `MODULE_NOT_FOUND` means the backend was already gone,
+   * so local state is clearable; `PLUGIN_BUSY` means it is still registered
+   * and owned by a leased model, so the flag must stay `true`.
+   */
+  private _unregisterBackend(
+    module: CommonsModule,
+    backend: 'onnx' | 'sherpa',
+  ): boolean {
+    const fn =
+      backend === 'onnx'
+        ? module._rac_backend_onnx_unregister
+        : module._rac_backend_sherpa_unregister;
+    if (typeof fn !== 'function') {
+      logger.warning(
+        `racommons-onnx-sherpa WASM module is missing _rac_backend_${backend}_unregister`,
+      );
+      return false;
+    }
+
+    let rc: number;
+    try {
+      rc = fn();
+    } catch (err) {
+      logger.warning(
+        `rac_backend_${backend}_unregister threw: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return false;
+    }
+
+    if (rc === 0 || rc === RAC_ERROR_MODULE_NOT_FOUND) {
+      if (backend === 'onnx') {
+        this._onnxBackendRegistered = false;
+      } else {
+        this._sherpaBackendRegistered = false;
+      }
+      return true;
+    }
+    if (rc === RAC_ERROR_PLUGIN_BUSY) {
+      logger.warning(
+        `rac_backend_${backend}_unregister reported PLUGIN_BUSY: a loaded model still leases the plugin; unload it and retry`,
+      );
+    } else {
+      logger.warning(`rac_backend_${backend}_unregister returned ${rc}`);
+    }
+    return false;
   }
 
   // -------------------------------------------------------------------------

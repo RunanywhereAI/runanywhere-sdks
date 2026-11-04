@@ -85,12 +85,26 @@ public enum Cloud {
     public static func unregister() {
         let wasRegistered = registrationState.withLock { state -> Bool in
             let old = state
-            state = false
+            if state { state = false }
             return old
         }
         guard wasRegistered else { return }
-        _ = rac_backend_cloud_unregister()
-        logger.info("cloud backend unregistered")
+        let result = rac_backend_cloud_unregister()
+        if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND {
+            logger.info("cloud backend unregistered")
+        } else {
+            // Keep the registration claim so a later retry can finish the
+            // teardown; only a confirmed unregister clears it.
+            registrationState.withLock { $0 = true }
+            if result == RAC_ERROR_PLUGIN_BUSY {
+                logger.warning(
+                    "cloud backend still leased by a loaded model; unload it and retry unregistration"
+                )
+            } else {
+                let message = String(cString: rac_error_message(result))
+                logger.error("cloud backend unregistration failed: \(message)")
+            }
+        }
     }
 
     // MARK: - Credential / model registry

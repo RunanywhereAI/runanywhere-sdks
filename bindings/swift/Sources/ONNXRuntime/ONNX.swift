@@ -139,6 +139,11 @@ public enum ONNX {
 
     /// Unregister the ONNX backend from C++ registry.
     ///
+    /// Local flags and native callbacks are cleared only once the native side
+    /// confirms the backend is gone (`RAC_SUCCESS` / `RAC_ERROR_MODULE_NOT_FOUND`).
+    /// `RAC_ERROR_PLUGIN_BUSY` means a loaded model still leases the plugin, so
+    /// the registration stays in place for a retry after the model is unloaded.
+    ///
     /// `@MainActor` so the `isRegistered` / `isSherpaRegistered` static flags
     /// stay in the same isolation domain as `register(priority:)` and the
     /// `autoRegister` Task hop. Without this annotation, a teardown call on
@@ -148,16 +153,34 @@ public enum ONNX {
     @MainActor
     public static func unregister() {
         if isSherpaRegistered {
-            _ = rac_plugin_unregister("sherpa")
-            isSherpaRegistered = false
-            logger.info("Sherpa engine plugin unregistered")
+            let sherpaResult = rac_plugin_unregister("sherpa")
+            if sherpaResult == RAC_SUCCESS || sherpaResult == RAC_ERROR_NOT_FOUND {
+                isSherpaRegistered = false
+                logger.info("Sherpa engine plugin unregistered")
+            } else if sherpaResult == RAC_ERROR_PLUGIN_BUSY {
+                logger.warning(
+                    "Sherpa engine plugin still leased by a loaded model; unload it and retry unregistration"
+                )
+            } else {
+                let message = String(cString: rac_error_message(sherpaResult))
+                logger.error("Sherpa engine plugin unregistration failed: \(message)")
+            }
         }
 
         guard isRegistered else { return }
 
-        _ = rac_backend_onnx_unregister()
-        isRegistered = false
-        logger.info("ONNX backend unregistered")
+        let result = rac_backend_onnx_unregister()
+        if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND {
+            isRegistered = false
+            logger.info("ONNX backend unregistered")
+        } else if result == RAC_ERROR_PLUGIN_BUSY {
+            logger.warning(
+                "ONNX backend still leased by a loaded model; unload it and retry unregistration"
+            )
+        } else {
+            let message = String(cString: rac_error_message(result))
+            logger.error("ONNX backend unregistration failed: \(message)")
+        }
     }
 
 }

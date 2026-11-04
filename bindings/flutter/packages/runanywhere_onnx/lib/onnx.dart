@@ -138,16 +138,34 @@ class Onnx {
   /// Unregister the ONNX backend from C++ registry.
   static void unregister() {
     if (_isSherpaRegistered) {
-      _bindings?.unregisterSherpa();
-      _isSherpaRegistered = false;
-      _logger.info('Sherpa engine plugin unregistered');
+      final sherpaResult = _bindings?.unregisterSherpa() ?? 0;
+      if (sherpaResult == RacResultCodes.success ||
+          sherpaResult == RacResultCodes.errorModuleNotFound) {
+        _isSherpaRegistered = false;
+        _logger.info('Sherpa engine plugin unregistered');
+      } else if (sherpaResult == RacResultCodes.errorPluginBusy) {
+        _logger.warning(
+          'Sherpa engine plugin still leased by a loaded model; unload it and retry unregistration',
+        );
+      } else {
+        _logger.warning('Sherpa unregistration returned: $sherpaResult');
+      }
     }
 
     if (!_isRegistered) return;
 
-    _bindings?.unregister();
-    _isRegistered = false;
-    _logger.info('ONNX backend unregistered');
+    final result = _bindings?.unregister() ?? 0;
+    if (result == RacResultCodes.success ||
+        result == RacResultCodes.errorModuleNotFound) {
+      _isRegistered = false;
+      _logger.info('ONNX backend unregistered');
+    } else if (result == RacResultCodes.errorPluginBusy) {
+      _logger.warning(
+        'ONNX backend still leased by a loaded model; unload it and retry unregistration',
+      );
+    } else {
+      _logger.warning('ONNX unregistration returned: $result');
+    }
   }
 
   /// Check if the native backend is available on this platform.
