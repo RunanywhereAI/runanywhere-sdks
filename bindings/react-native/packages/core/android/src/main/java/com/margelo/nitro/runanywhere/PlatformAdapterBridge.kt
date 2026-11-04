@@ -19,6 +19,9 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import com.margelo.nitro.NitroModules
 import com.runanywhere.sdk.generated.RADefaults
@@ -705,6 +708,30 @@ object PlatformAdapterBridge {
     private const val DIRECTORY_ENTRY_NAME_MAX = 512
 
     /**
+     * Probe an entry with stat(2)/lstat(2). A failed probe is inconclusive and
+     * must not be emitted as a regular file; a dangling symlink remains a
+     * non-directory entry.
+     */
+    private fun probeDirectoryEntry(child: File): Pair<Boolean, Long> {
+        val path = child.absolutePath
+        val info = try {
+            Os.stat(path)
+        } catch (error: ErrnoException) {
+            if (error.errno == OsConstants.ENOENT || error.errno == OsConstants.ENOTDIR) {
+                try {
+                    Os.lstat(path)
+                    return false to 0L
+                } catch (_: ErrnoException) {
+                    throw IOException("Directory entry vanished while listing: '$path'", error)
+                }
+            }
+            throw IOException("Unable to probe directory entry '$path'", error)
+        }
+        val isDir = OsConstants.S_ISDIR(info.st_mode)
+        return isDir to if (isDir) 0L else info.st_size
+    }
+
+    /**
      * Enumerate directory entries via java.io.File.listFiles().
      *
      * @return Array of RacDirectoryEntry or null if the path does not exist /
@@ -730,11 +757,12 @@ object PlatformAdapterBridge {
                 Log.w(TAG, "fileListDirectory: oversized entry name in $dirPath")
                 throw IOException("Oversized directory entry name in '$dirPath'")
             }
+            val (isDir, sizeBytes) = probeDirectoryEntry(child)
             entries.add(
                 RacDirectoryEntry(
                     name = name,
-                    isDir = child.isDirectory,
-                    sizeBytes = if (child.isFile) child.length() else 0L,
+                    isDir = isDir,
+                    sizeBytes = sizeBytes,
                 ),
             )
         }

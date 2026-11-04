@@ -196,13 +196,8 @@ static rac_result_t folder_has_finished_artifact(const rac_platform_adapter_t* a
 static bool folder_tree_is_fully_enumerable(const rac_platform_adapter_t* adapter,
                                             const std::string& model_path) {
     bool unused = false;
-    try {
-        return walk_model_folder(adapter, model_path, FolderWalkMode::kWholeTree, &unused) ==
-               RAC_SUCCESS;
-    } catch (const std::bad_alloc&) {
-        // Allocation failure is inconclusive: preserve the registry row.
-        return false;
-    }
+    return walk_model_folder(adapter, model_path, FolderWalkMode::kWholeTree, &unused) ==
+           RAC_SUCCESS;
 }
 
 // Walk {models_dir}/{framework}/{model_id}/ and link any registry entry whose
@@ -343,7 +338,8 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
 
 #ifdef RAC_HAVE_PROTOBUF
 // A false result includes inconclusive reads: only confirmed orphans may be cleared.
-static bool model_path_is_orphan(const rac_platform_adapter_t* adapter, const ModelInfo& model) {
+static bool model_path_is_orphan_impl(const rac_platform_adapter_t* adapter,
+                                      const ModelInfo& model) {
     if (model.local_path().empty() || model_is_built_in(model) ||
         model.local_path().rfind("builtin:", 0) == 0) {
         return false;
@@ -417,6 +413,15 @@ static bool model_path_is_orphan(const rac_platform_adapter_t* adapter, const Mo
         }
     }
     return true;
+}
+
+// Allocation failure anywhere in the probe sequence is inconclusive.
+static bool model_path_is_orphan(const rac_platform_adapter_t* adapter, const ModelInfo& model) {
+    try {
+        return model_path_is_orphan_impl(adapter, model);
+    } catch (const std::bad_alloc&) {
+        return false;
+    }
 }
 
 bool clear_download_status_if_path_matches(rac_model_registry_handle_t handle,

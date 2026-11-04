@@ -888,11 +888,12 @@ void PlatformAdapter_listDirectory(const char* dirPath,
             return;
         }
 
-        // lstat distinguishes a confirmed missing/non-directory path from a
-        // denied or otherwise inconclusive probe.
+        // stat follows symlinks so a link to a real directory enumerates.
+        // A confirmed missing target maps to FILE_NOT_FOUND; denied/other
+        // probes stay inconclusive.
         const char* pathFs = [pathStr fileSystemRepresentation];
         struct stat pathInfo;
-        if (!pathFs || lstat(pathFs, &pathInfo) != 0) {
+        if (!pathFs || stat(pathFs, &pathInfo) != 0) {
             *outResult = (errno == ENOENT || errno == ENOTDIR) ? -183 : -184;
             return;
         }
@@ -934,6 +935,9 @@ void PlatformAdapter_listDirectory(const char* dirPath,
             }
             size_t nameLen = strlen(utf8Name);
             if (nameLen + 1 > PLATFORM_DIRECTORY_ENTRY_NAME_MAX) {
+                // The RN ObjC bridge is below the commons adapter log slot;
+                // NSLog is this file's existing channel. The contract-visible
+                // result below is what callers rely on.
                 NSLog(@"[PlatformAdapterBridge] listDirectory: oversized entry name in %@", pathStr);
                 *outResult = -184;
                 return;

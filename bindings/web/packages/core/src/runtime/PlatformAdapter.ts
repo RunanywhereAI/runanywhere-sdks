@@ -983,7 +983,7 @@ interface DirectoryEntryLayout {
 }
 
 interface EmscriptenFS {
-  analyzePath(path: string): { exists: boolean; error?: { errno?: number } };
+  analyzePath(path: string): { exists: boolean; error?: number | { errno?: number } };
   readFile(path: string): Uint8Array;
   writeFile(path: string, data: Uint8Array): void;
   unlink(path: string): void;
@@ -1007,10 +1007,11 @@ function listDirectoryEntries(m: PlatformAdapterModule, dirPath: string): Direct
   if (!fs?.readdir) return null;
   const analyzed = fs.analyzePath(dirPath);
   if (!analyzed.exists) {
-    const errnoValue = analyzed.error?.errno;
+    const rawError = analyzed.error;
+    const errnoValue = typeof rawError === 'number' ? rawError : rawError?.errno;
     const errnoCodes = (m as unknown as { ERRNO_CODES?: Record<string, number> }).ERRNO_CODES;
     const missingCodes = [errnoCodes?.ENOENT ?? 44, errnoCodes?.ENOTDIR ?? 54];
-    if (errnoValue === undefined || missingCodes.includes(errnoValue)) {
+    if (errnoValue !== undefined && missingCodes.includes(errnoValue)) {
       return null;
     }
     throw new Error(`analyzePath failed for ${dirPath}`);

@@ -91,7 +91,7 @@ typedef struct rac_directory_entry {
      * Truncation contract: when the underlying filesystem produces an entry
      * name whose byte length (including NUL) would exceed
      * `RAC_DIRECTORY_ENTRY_NAME_MAX`, the platform implementation MUST NOT
-     * truncate it. It MUST emit a RAC_LOG_WARNINGING via the adapter's `log` slot
+     * truncate it. It MUST emit a RAC_LOG_WARNING via the adapter's `log` slot
      * (category "PlatformAdapter") and make the listing inconclusive by
      * returning RAC_ERROR_FILE_READ_FAILED. This keeps the canonical
      * RunAnywhere model-registry path layout safe — model IDs never approach
@@ -383,7 +383,7 @@ typedef struct rac_platform_adapter {
      *
      * Cross-SDK status (each SDK is responsible for populating this slot on
      * every platform whose runtime exposes a directory enumeration API). All
-     * five SDK populators now wire this slot; rac_init emits a RAC_LOG_WARNINGING
+     * five SDK populators now wire this slot; rac_init emits a RAC_LOG_WARNING
      * if it is ever left NULL:
      *   - Web:           POPULATED (registerFileListDirectory in
      *                    PlatformAdapter.ts via OPFS).
@@ -396,7 +396,7 @@ typedef struct rac_platform_adapter {
      * User-visible impact if this slot is NULL: model registry refresh with
      * `rescan_local = true` cannot link on-disk model folders to registered
      * entries — the warning in `ModelRegistryRefreshResult.warnings` (plus the
-     * rac_init RAC_LOG_WARNINGING) is the only signal to consuming code that the
+     * rac_init RAC_LOG_WARNING) is the only signal to consuming code that the
      * local rescan was skipped.
      */
     rac_file_list_directory_fn file_list_directory;

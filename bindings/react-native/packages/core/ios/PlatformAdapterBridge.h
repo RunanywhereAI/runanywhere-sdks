@@ -224,7 +224,7 @@ typedef struct PlatformDirectoryEntry {
  * @param inOutCount  In: capacity of outEntries; Out: entries written
  *                    (or total available when outEntries is NULL).
  * @param outResult   Output result code (0=success, -183=not found,
- *                    -805=internal error). MUST be non-NULL.
+ *                    -184=read failed/inconclusive). MUST be non-NULL.
  */
 void PlatformAdapter_listDirectory(const char* dirPath,
                                    PlatformDirectoryEntry* outEntries,

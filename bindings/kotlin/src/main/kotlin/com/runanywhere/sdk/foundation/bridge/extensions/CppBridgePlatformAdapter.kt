@@ -387,24 +387,16 @@ object CppBridgePlatformAdapter {
         // A null listing means I/O failure, not a successful empty directory.
         val children = dir.listFiles() ?: throw IOException("Unable to enumerate directory '${dir.path}'")
         val retained = ArrayList<RacDirectoryEntry>(children.size)
-        var skipped = 0
         for (child in children) {
             val nameBytes = child.name.toByteArray(Charsets.UTF_8)
             if (nameBytes.size + 1 > NAME_MAX_BYTES) {
-                skipped++
-                continue
+                val message = "Oversized directory entry in '${dir.path}'"
+                logCallback(LogLevel.WARN, "PlatformAdapter", message)
+                throw IOException(message)
             }
             val isDir = child.isDirectory
             val sizeBytes = if (isDir) 0L else runCatching { child.length() }.getOrDefault(0L)
             retained.add(RacDirectoryEntry(child.name, isDir, sizeBytes))
-        }
-        if (skipped > 0) {
-            logCallback(
-                LogLevel.WARN,
-                "PlatformAdapter",
-                "Skipped $skipped directory entries in '${dir.path}': name longer than " +
-                    "$NAME_MAX_BYTES bytes (truncation contract).",
-            )
         }
         return retained.toTypedArray()
     }

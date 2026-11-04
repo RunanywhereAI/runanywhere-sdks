@@ -661,6 +661,7 @@ namespace AndroidBridge {
             const char* nameChars =
                 jName ? env->GetStringUTFChars(jName, nullptr) : nullptr;
             if (!nameChars) {
+                env->ExceptionClear();
                 if (jName) {
                     env->DeleteLocalRef(jName);
                 }
