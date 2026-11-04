@@ -34,7 +34,7 @@
  *     `extern "C" const rac_engine_vtable_t` contract and lives in `.rodata`
  *     (no runtime allocation), exactly like a hand-written entry.
  *   - The emitted vtable mirrors the real `rac_engine_vtable_t` slot count and
- *     order (9 active primitive slots + 8 reserved slots, all explicit NULL).
+ *     order (13 active primitive slots + 4 reserved slots, all explicit NULL).
  *     If a future ABI bump promotes a reserved slot, the aggregate initializer
  *     here becomes a compile error — the same tripwire the hand-written entries
  *     rely on — forcing this header to be revisited in lockstep with the ABI.
@@ -195,10 +195,11 @@ static inline rac_result_t rac_engine_unavailable_capability(int platform_suppor
  * nothing". The only live fields are `metadata` (projected from the matching
  * unavailable manifest) and `capability_check` (the engine-provided @p cap_fn).
  *
- * The literal mirrors the real `rac_engine_vtable_t` slot count/order: 9 active
+ * The literal mirrors the real `rac_engine_vtable_t` slot count/order: 13 active
  * primitive slots (llm/stt/tts/vad/embedding/vlm/diffusion/diarization/
- * segmentation) + 8 reserved slots. A future reserved-slot promotion changes the struct and makes this
- * aggregate initializer a compile error — the intended tripwire.
+ * segmentation/rerank/image_embedding/ocr/decision) + 4 reserved slots. A future
+ * reserved-slot promotion changes the struct and makes this aggregate initializer
+ * a compile error — the intended tripwire.
  *
  * Emitted as `static const` `.rodata`; @p cap_fn must have C linkage so the
  * function-pointer field stays ABI-correct across the FFI boundary.
@@ -219,9 +220,12 @@ static inline rac_result_t rac_engine_unavailable_capability(int platform_suppor
         /* diffusion_ops    */ RAC_NULL,                                                     \
         /* diarization_ops  */ RAC_NULL,                                                     \
         /* segmentation_ops */ RAC_NULL,                                                     \
+        /* rerank_ops       */ RAC_NULL,                                                     \
+        /* image_embedding_ops */ RAC_NULL,                                                  \
+        /* ocr_ops          */ RAC_NULL,                                                     \
+        /* decision_ops     */ RAC_NULL,                                                     \
                                                                                             \
-        /* reserved_slot_2..9 */                                                            \
-        RAC_NULL, RAC_NULL, RAC_NULL, RAC_NULL,                                              \
+        /* reserved_slot_6..9 */                                                            \
         RAC_NULL, RAC_NULL, RAC_NULL, RAC_NULL,                                              \
     }
 
