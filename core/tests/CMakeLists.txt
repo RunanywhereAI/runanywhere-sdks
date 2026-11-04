@@ -121,6 +121,14 @@ target_compile_features(test_jni_request_cancellation_relay PRIVATE cxx_std_20)
 target_link_libraries(test_jni_request_cancellation_relay PRIVATE Threads::Threads)
 add_test(NAME jni_request_cancellation_relay_tests COMMAND test_jni_request_cancellation_relay)
 
+# --- Kotlin JNI listener slot -----------------------------------------------
+# The download progress listener swap must not hold its mutex across the
+# native setter, which locks against the emitter in the opposite order.
+add_executable(test_jni_listener_slot test_jni_listener_slot.cpp)
+target_compile_features(test_jni_listener_slot PRIVATE cxx_std_20)
+target_link_libraries(test_jni_listener_slot PRIVATE Threads::Threads)
+add_test(NAME jni_listener_slot_tests COMMAND test_jni_listener_slot)
+
 # --- DAG graph primitives unit tests --------------------------
 # CancelToken + RingBuffer + StreamEdge. Header-only
 # primitives; no backend dependency. Always built.
