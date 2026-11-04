@@ -119,11 +119,11 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
     /* diarization_ops  */ &g_onnx_diarization_ops,
     /* segmentation_ops */ &g_onnx_segmentation_ops,
 
-    /* reserved_slot_2..9 */
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+    /* rerank_ops       */ nullptr,
+    /* image_embedding_ops */ nullptr,
+    /* ocr_ops          */ nullptr,
+    /* decision_ops     */ nullptr,
+    /* reserved_slot_6..9 */
     nullptr,
     nullptr,
     nullptr,
