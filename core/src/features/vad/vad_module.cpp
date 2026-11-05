@@ -791,18 +791,21 @@ extern "C" rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle
 // CONTROL API
 // =============================================================================
 
-static void mark_running(rac_vad_component* component) {
+// Returns true when the component was not running, so the caller publishes VAD_STARTED.
+static bool mark_running(rac_vad_component* component) {
     const bool was_running = component->is_running;
     component->is_running = true;
     component->is_stopped = false;
-    if (!was_running) {
+    return !was_running;
+}
+
+static void publish_vad_started() {
 #if defined(RAC_HAVE_PROTOBUF)
-        runanywhere::v1::VoiceLifecycleEvent voice;
-        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
-        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
-                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+    runanywhere::v1::VoiceLifecycleEvent voice;
+    voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
+    rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD, runanywhere::v1::EVENT_CATEGORY_VAD,
+                         std::move(voice));
 #endif
-    }
 }
 
 extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
@@ -823,8 +826,8 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
         result = rac_energy_vad_start(component->vad_service);
     }
 
-    if (result == RAC_SUCCESS) {
-        mark_running(component);
+    if (result == RAC_SUCCESS && mark_running(component)) {
+        publish_vad_started();
     }
 
     return result;
@@ -843,7 +846,9 @@ extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
             component->model_service->ops->stop) {
             result = component->model_service->ops->stop(component->model_service->impl);
         }
-    } else if (component->vad_service) {
+    }
+    // Also stop a fallback rebuilt active while the model ran, so unload can't leave it running.
+    if (result == RAC_SUCCESS && component->vad_service) {
         result = rac_energy_vad_stop(component->vad_service);
     }
 
@@ -899,7 +904,7 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     (void)model_name;  // Reserved for future use
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
+    std::unique_lock<std::mutex> lock(component->mtx);
 
     // Clear any prior proto-stream callback
     // registration BEFORE re-creating the internal model service. The
@@ -962,7 +967,12 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     }
 
     // Loading starts the model, so unload knows to resume the energy fallback.
-    mark_running(component);
+    const bool started = mark_running(component);
+    lock.unlock();
+    // Publish outside the lock: synchronous subscribers may call back into this component.
+    if (started) {
+        publish_vad_started();
+    }
 
     RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
 
