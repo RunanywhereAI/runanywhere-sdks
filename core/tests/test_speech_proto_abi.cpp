@@ -1162,6 +1162,110 @@ int test_voice_agent_d7_component_create_destroy_proto() {
     return 0;
 }
 
+int test_voice_agent_reinitialize_applies_new_vad_config() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "voice agent creates");
+    rac_voice_agent_config_t config = RAC_VOICE_AGENT_CONFIG_DEFAULT;
+    config.vad_config.energy_threshold = 0.02f;
+    CHECK(rac_voice_agent_initialize(agent, &config) == RAC_SUCCESS, "voice agent initializes");
+    CHECK(rac_vad_component_get_energy_threshold(agent->vad_handle) == 0.02f,
+          "first initialize applies the VAD threshold");
+
+    CHECK(rac_voice_agent_cleanup(agent) == RAC_SUCCESS, "voice agent cleans up");
+    config.vad_config.energy_threshold = 0.04f;
+    CHECK(rac_voice_agent_initialize(agent, &config) == RAC_SUCCESS,
+          "voice agent re-initializes after cleanup");
+    CHECK(rac_vad_component_get_energy_threshold(agent->vad_handle) == 0.04f,
+          "re-initialize after cleanup applies the new VAD threshold");
+
+    config.vad_config.energy_threshold = 0.03f;
+    CHECK(rac_voice_agent_initialize(agent, &config) == RAC_SUCCESS,
+          "voice agent re-initializes without cleanup");
+    CHECK(rac_vad_component_get_energy_threshold(agent->vad_handle) == 0.03f,
+          "re-initialize without cleanup applies the new VAD threshold");
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
+int test_vad_reconfigure_keeps_stopped_detector_stopped() {
+    rac_handle_t vad = nullptr;
+    CHECK(rac_vad_component_create(&vad) == RAC_SUCCESS, "VAD component creates");
+    rac_vad_config_t config = RAC_VAD_CONFIG_DEFAULT;
+    config.energy_threshold = 0.01f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "VAD configures");
+    CHECK(rac_vad_component_initialize(vad) == RAC_SUCCESS, "VAD initializes");
+    CHECK(rac_vad_component_start(vad) == RAC_SUCCESS, "VAD starts");
+    CHECK(rac_vad_component_stop(vad) == RAC_SUCCESS, "VAD stops");
+    config.energy_threshold = 0.02f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "stopped VAD reconfigures");
+
+    std::vector<float> silence(1600, 0.0f);
+    std::vector<float> loud(1600, 0.5f);
+    rac_bool_t is_speech = RAC_FALSE;
+    for (int i = 0; i < 20; ++i) {
+        (void)rac_vad_component_process(vad, silence.data(), silence.size(), &is_speech);
+    }
+    (void)rac_vad_component_process(vad, loud.data(), loud.size(), &is_speech);
+    CHECK(is_speech == RAC_FALSE, "reconfigured detector stays stopped");
+    rac_vad_component_destroy(vad);
+    return 0;
+}
+
+int test_vad_unload_resumes_fallback_after_reload() {
+    rac_handle_t vad = nullptr;
+    CHECK(rac_vad_component_create(&vad) == RAC_SUCCESS, "VAD component creates");
+    rac_vad_config_t config = RAC_VAD_CONFIG_DEFAULT;
+    config.energy_threshold = 0.01f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "VAD configures");
+    CHECK(rac_vad_component_initialize(vad) == RAC_SUCCESS, "VAD initializes");
+    CHECK(rac_vad_component_load_model(vad, "mock-vad", "mock-vad", "Mock VAD") == RAC_SUCCESS,
+          "mock VAD model loads");
+    CHECK(rac_vad_component_stop(vad) == RAC_SUCCESS, "VAD stops");
+    config.energy_threshold = 0.02f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "stopped VAD reconfigures");
+    CHECK(rac_vad_component_load_model(vad, "mock-vad", "mock-vad", "Mock VAD") == RAC_SUCCESS,
+          "mock VAD model reloads");
+    CHECK(rac_vad_component_unload(vad) == RAC_SUCCESS, "VAD model unloads");
+
+    std::vector<float> silence(1600, 0.0f);
+    std::vector<float> loud(1600, 0.5f);
+    rac_bool_t is_speech = RAC_FALSE;
+    for (int i = 0; i < 20; ++i) {
+        (void)rac_vad_component_process(vad, silence.data(), silence.size(), &is_speech);
+    }
+    (void)rac_vad_component_process(vad, loud.data(), loud.size(), &is_speech);
+    CHECK(is_speech == RAC_TRUE, "unload resumes the fallback detector after a reload");
+    rac_vad_component_destroy(vad);
+    return 0;
+}
+
+int test_vad_stop_with_model_stops_rebuilt_fallback() {
+    rac_handle_t vad = nullptr;
+    CHECK(rac_vad_component_create(&vad) == RAC_SUCCESS, "VAD component creates");
+    rac_vad_config_t config = RAC_VAD_CONFIG_DEFAULT;
+    config.energy_threshold = 0.01f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "VAD configures");
+    CHECK(rac_vad_component_initialize(vad) == RAC_SUCCESS, "VAD initializes");
+    CHECK(rac_vad_component_stop(vad) == RAC_SUCCESS, "VAD stops");
+    CHECK(rac_vad_component_load_model(vad, "mock-vad", "mock-vad", "Mock VAD") == RAC_SUCCESS,
+          "mock VAD model loads");
+    config.energy_threshold = 0.02f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "running VAD reconfigures");
+    CHECK(rac_vad_component_stop(vad) == RAC_SUCCESS, "VAD stops with the model loaded");
+    CHECK(rac_vad_component_unload(vad) == RAC_SUCCESS, "VAD model unloads");
+
+    std::vector<float> silence(1600, 0.0f);
+    std::vector<float> loud(1600, 0.5f);
+    rac_bool_t is_speech = RAC_FALSE;
+    for (int i = 0; i < 20; ++i) {
+        (void)rac_vad_component_process(vad, silence.data(), silence.size(), &is_speech);
+    }
+    (void)rac_vad_component_process(vad, loud.data(), loud.size(), &is_speech);
+    CHECK(is_speech == RAC_FALSE, "stop also stops the rebuilt fallback detector");
+    rac_vad_component_destroy(vad);
+    return 0;
+}
+
 int test_stt_proto_adapters_mapping() {
     // 1. rac_stt_word_from_proto
     runanywhere::v1::WordTimestamp word_proto;
@@ -1261,6 +1365,10 @@ int main() {
         test_voice_agent_d7_transcribe_proto();
         test_voice_agent_d7_synthesize_speech_proto();
         test_voice_agent_d7_component_create_destroy_proto();
+        test_voice_agent_reinitialize_applies_new_vad_config();
+        test_vad_reconfigure_keeps_stopped_detector_stopped();
+        test_vad_unload_resumes_fallback_after_reload();
+        test_vad_stop_with_model_stops_rebuilt_fallback();
         test_stt_proto_adapters_mapping();
         rac_plugin_unregister("llamacpp");
         rac_plugin_unregister("onnx");

@@ -99,6 +99,10 @@ struct rac_vad_component {
      *  doesn't emit an unpaired vad.stopped telemetry event. */
     bool is_running = false;
 
+    /** Set by an explicit stop() and cleared by start()/cleanup(), so a rebuilt
+     *  energy detector keeps the stopped state of the one it replaces. */
+    bool is_stopped = false;
+
     /** Mutex for thread safety */
     std::mutex mtx;
 
@@ -509,6 +513,40 @@ static void vad_speech_activity_callback(rac_speech_activity_event_t event, void
     }
 }
 
+// Builds an energy VAD service from component->config. Caller holds component->mtx.
+static rac_result_t create_energy_vad_service(rac_vad_component* component,
+                                              rac_energy_vad_handle_t* out_service) {
+    rac_energy_vad_config_t vad_config = {};
+    vad_config.sample_rate = component->config.sample_rate;
+    vad_config.frame_length = component->config.frame_length;
+    vad_config.energy_threshold = component->config.energy_threshold;
+
+    rac_energy_vad_handle_t service = nullptr;
+    rac_result_t result = rac_energy_vad_create(&vad_config, &service);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VAD.Component", "Failed to create energy VAD service");
+        return result;
+    }
+
+    // Set speech callback
+    result = rac_energy_vad_set_speech_callback(service, vad_speech_activity_callback, component);
+    if (result != RAC_SUCCESS) {
+        rac_energy_vad_destroy(service);
+        return result;
+    }
+
+    // Initialize the VAD (starts calibration)
+    result = rac_energy_vad_initialize(service);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VAD.Component", "Failed to initialize energy VAD service");
+        rac_energy_vad_destroy(service);
+        return result;
+    }
+
+    *out_service = service;
+    return RAC_SUCCESS;
+}
+
 // =============================================================================
 // LIFECYCLE API
 // =============================================================================
@@ -581,7 +619,31 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
 
     // ==========================================================================
 
+    const rac_vad_config_t previous_config = component->config;
     component->config = *config;
+
+    // The energy detector copies its settings at creation, so rebuild a live one.
+    if (component->vad_service) {
+        rac_energy_vad_handle_t service = nullptr;
+        rac_result_t result = create_energy_vad_service(component, &service);
+        if (result == RAC_SUCCESS && component->is_running) {
+            result = rac_energy_vad_start(service);
+        } else if (result == RAC_SUCCESS && component->is_stopped) {
+            result = rac_energy_vad_stop(service);
+        }
+        if (result != RAC_SUCCESS && service) {
+            rac_energy_vad_destroy(service);
+        }
+        if (result != RAC_SUCCESS) {
+            component->config = previous_config;
+            return result;
+        }
+        // Stop under the lock, like process/stop/cleanup, so the old detector's
+        // SPEECH_ENDED reads the activity callback safely and precedes the new detector's events.
+        rac_energy_vad_stop(component->vad_service);
+        rac_energy_vad_destroy(component->vad_service);
+        component->vad_service = service;
+    }
 
     RAC_LOG_INFO("VAD.Component", "VAD component configured");
 
@@ -608,34 +670,8 @@ extern "C" rac_result_t rac_vad_component_initialize(rac_handle_t handle) {
         return RAC_SUCCESS;
     }
 
-    // Create energy VAD configuration
-    rac_energy_vad_config_t vad_config = {};
-    vad_config.sample_rate = component->config.sample_rate;
-    vad_config.frame_length = component->config.frame_length;
-    vad_config.energy_threshold = component->config.energy_threshold;
-
-    // Create energy VAD service
-    rac_result_t result = rac_energy_vad_create(&vad_config, &component->vad_service);
+    rac_result_t result = create_energy_vad_service(component, &component->vad_service);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("VAD.Component", "Failed to create energy VAD service");
-        return result;
-    }
-
-    // Set speech callback
-    result = rac_energy_vad_set_speech_callback(component->vad_service,
-                                                vad_speech_activity_callback, component);
-    if (result != RAC_SUCCESS) {
-        rac_energy_vad_destroy(component->vad_service);
-        component->vad_service = nullptr;
-        return result;
-    }
-
-    // Initialize the VAD (starts calibration)
-    result = rac_energy_vad_initialize(component->vad_service);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("VAD.Component", "Failed to initialize energy VAD service");
-        rac_energy_vad_destroy(component->vad_service);
-        component->vad_service = nullptr;
         return result;
     }
 
@@ -674,6 +710,7 @@ extern "C" rac_result_t rac_vad_component_cleanup(rac_handle_t handle) {
     }
 
     component->is_initialized = false;
+    component->is_stopped = false;
 
     RAC_LOG_INFO("VAD.Component", "VAD component cleaned up");
 
@@ -754,6 +791,23 @@ extern "C" rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle
 // CONTROL API
 // =============================================================================
 
+// Returns true when the component was not running, so the caller publishes VAD_STARTED.
+static bool mark_running(rac_vad_component* component) {
+    const bool was_running = component->is_running;
+    component->is_running = true;
+    component->is_stopped = false;
+    return !was_running;
+}
+
+static void publish_vad_started() {
+#if defined(RAC_HAVE_PROTOBUF)
+    runanywhere::v1::VoiceLifecycleEvent voice;
+    voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
+    rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD, runanywhere::v1::EVENT_CATEGORY_VAD,
+                         std::move(voice));
+#endif
+}
+
 extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
@@ -772,17 +826,8 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
         result = rac_energy_vad_start(component->vad_service);
     }
 
-    if (result == RAC_SUCCESS) {
-        const bool was_running = component->is_running;
-        component->is_running = true;
-        if (!was_running) {
-#if defined(RAC_HAVE_PROTOBUF)
-            runanywhere::v1::VoiceLifecycleEvent voice;
-            voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
-            rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
-                                 runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
-#endif
-        }
+    if (result == RAC_SUCCESS && mark_running(component)) {
+        publish_vad_started();
     }
 
     return result;
@@ -801,13 +846,16 @@ extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
             component->model_service->ops->stop) {
             result = component->model_service->ops->stop(component->model_service->impl);
         }
-    } else if (component->vad_service) {
+    }
+    // Also stop a fallback rebuilt active while the model ran, so unload can't leave it running.
+    if (result == RAC_SUCCESS && component->vad_service) {
         result = rac_energy_vad_stop(component->vad_service);
     }
 
     if (result == RAC_SUCCESS) {
         const bool was_running = component->is_running;
         component->is_running = false;
+        component->is_stopped = true;
         if (was_running) {
 #if defined(RAC_HAVE_PROTOBUF)
             runanywhere::v1::VoiceLifecycleEvent voice;
@@ -856,7 +904,7 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     (void)model_name;  // Reserved for future use
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
+    std::unique_lock<std::mutex> lock(component->mtx);
 
     // Clear any prior proto-stream callback
     // registration BEFORE re-creating the internal model service. The
@@ -918,6 +966,14 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
         }
     }
 
+    // Loading starts the model, so unload knows to resume the energy fallback.
+    const bool started = mark_running(component);
+    lock.unlock();
+    // Publish outside the lock: synchronous subscribers may call back into this component.
+    if (started) {
+        publish_vad_started();
+    }
+
     RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
 
     return RAC_SUCCESS;
@@ -942,6 +998,8 @@ extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
         return RAC_SUCCESS;  // Nothing to unload
     }
 
+    const bool was_running = component->is_running;
+
     if (component->model_service->ops && component->model_service->ops->stop) {
         component->model_service->ops->stop(component->model_service->impl);
     }
@@ -954,6 +1012,14 @@ extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
     component->is_model_loaded = false;
     free(component->loaded_model_id);
     component->loaded_model_id = nullptr;
+
+    // A reconfigure during an explicit stop leaves the fallback stopped; resume it if running.
+    if (was_running && component->vad_service) {
+        const rac_result_t result = rac_energy_vad_start(component->vad_service);
+        if (result != RAC_SUCCESS) {
+            return result;
+        }
+    }
 
     RAC_LOG_INFO("VAD.Component", "VAD model unloaded, reverted to energy VAD");
 
