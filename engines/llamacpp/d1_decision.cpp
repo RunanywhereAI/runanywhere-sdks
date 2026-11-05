@@ -389,7 +389,7 @@ std::vector<float> score_gliner(llama_model* model, llama_context* ctx, const ll
 rac_llamacpp_d1_kind rac_llamacpp_d1_kind_of(const llama_model* model) {
     const std::string key = meta_str(model, "general.architecture") + ".decision.type";
     const std::string type = meta_str(model, key);
-    if (type == "lfm2-d1") {
+    if (type == "lfm2-d1" || type == "lfm3-d1") {
         return rac_llamacpp_d1_kind::lfm2;
     }
     if (type == "lfm2-d1-omni") {

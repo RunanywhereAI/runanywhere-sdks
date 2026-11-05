@@ -800,6 +800,7 @@ private final class MLXSession: @unchecked Sendable {
         /// Routed by `joint_config.json`.
         var jointDeciderModel: Qwen35JointDecider?
         var d1Model: D1Model?
+        var lfm3D1Model: LFM3D1?
         var d1OmniModel: D1Omni?
         var d1OmniTokenizer: (any MLXLMCommon.Tokenizer)?
         var glinerModel: GLiNERClassifier?
@@ -844,10 +845,18 @@ private final class MLXSession: @unchecked Sendable {
         switch kind {
         case .llm:
             await registerRunAnywhereNemotronModelType()
-            let container = try await LLMModelFactory.shared.loadContainer(
-                from: directory,
-                using: tokenizerLoader
-            )
+            let container: ModelContainer
+            if MLXTextDecisionCheckpoint.modelType(at: directory) == "lfm3_omni" {
+                container = try await VLMModelFactory.shared.loadContainer(
+                    from: directory,
+                    using: tokenizerLoader
+                )
+            } else {
+                container = try await LLMModelFactory.shared.loadContainer(
+                    from: directory,
+                    using: tokenizerLoader
+                )
+            }
             modelLock.withLock {
                 $0.generationContainer = container
                 $0.llmChatCache = nil
@@ -904,6 +913,7 @@ private final class MLXSession: @unchecked Sendable {
             models.deciderModel = nil
             models.jointDeciderModel = nil
             models.d1Model = nil
+            models.lfm3D1Model = nil
             models.d1OmniModel = nil
             models.d1OmniTokenizer = nil
             models.glinerModel = nil
@@ -925,6 +935,9 @@ private final class MLXSession: @unchecked Sendable {
         case .d1:
             let model = try await D1Model.load(from: directory, using: tokenizerLoader)
             modelLock.withLockUnchecked { $0.d1Model = model }
+        case .lfm3D1:
+            let model = try await LFM3D1.load(from: directory, using: tokenizerLoader)
+            modelLock.withLockUnchecked { $0.lfm3D1Model = model }
         case .omni:
             let model = try await VLMModelFactory.shared.loadD1Omni(from: directory)
             let tokenizer = try await tokenizerLoader.load(from: directory)
@@ -1134,6 +1147,7 @@ private final class MLXSession: @unchecked Sendable {
             models.deciderModel = nil
             models.jointDeciderModel = nil
             models.d1Model = nil
+            models.lfm3D1Model = nil
             models.d1OmniModel = nil
             models.d1OmniTokenizer = nil
             models.glinerModel = nil
@@ -1563,6 +1577,10 @@ private final class MLXSession: @unchecked Sendable {
         }
         if let model = modelLock.withLockUnchecked({ $0.d1Model }) {
             let pass = try MLXTextDecisions.scoreD1(model, request: request)
+            return (pass, pass.inputTokens)
+        }
+        if let model = modelLock.withLockUnchecked({ $0.lfm3D1Model }) {
+            let pass = try MLXTextDecisions.scoreLFM3(model, request: request)
             return (pass, pass.inputTokens)
         }
         if let loaded = modelLock.withLockUnchecked({ state -> (D1Omni, any MLXLMCommon.Tokenizer)? in

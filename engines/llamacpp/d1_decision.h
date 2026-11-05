@@ -5,7 +5,7 @@
 
 #include "rac/features/decision/rac_decision_types.h"
 
-// lfm2-d1 reads vocab logits. lfm2-d1-omni reads an embedding column at a mask
+// lfm2-d1 and lfm3-d1 read vocab logits. lfm2-d1-omni reads an embedding column at a mask
 // token. GLiNER reads one score at each [L] marker. None of them use Clef spans.
 enum class rac_llamacpp_d1_kind { none, lfm2, omni, gliner };
 

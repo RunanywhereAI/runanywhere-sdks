@@ -120,6 +120,13 @@ runs:
       with:
         cmake-version: ${{ env.CMAKE_VERSION }}
 
+    # llama.cpp pins can include deep tools/ui paths; FetchContent clones under
+    # build/.../_deps and exceeds MAX_PATH on windows-2022 without this.
+    - name: Enable git long paths (Windows)
+      if: inputs.platform == 'windows'
+      shell: cmd
+      run: git config --global core.longpaths true
+
     - name: Install Linux build deps
       if: inputs.platform == 'linux'
       shell: bash
