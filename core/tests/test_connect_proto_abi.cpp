@@ -229,6 +229,14 @@ void test_host_handshake_and_reconnect_deduplication() {
     CHECK(call_proto(rac_connect_host_start_proto, changed_framework, &changed_framework_state) ==
               RAC_ERROR_INVALID_CONFIGURATION,
           "Repeat host start with a changed framework is rejected");
+    // model_id is the field a caller is most likely to retry with a correction, so it needs
+    // its own case too.
+    v1::ConnectHostStartRequest changed_id = mac_host;
+    changed_id.mutable_model()->set_model_id("other-model");
+    v1::ConnectHostState changed_id_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_id, &changed_id_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed model_id is rejected");
     v1::ConnectHostState unchanged_retry_state;
     CHECK(call_proto(rac_connect_host_start_proto, mac_host, &unchanged_retry_state) ==
                   RAC_SUCCESS &&
