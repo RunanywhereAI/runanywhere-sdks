@@ -16,7 +16,9 @@
 # Project version (read from VERSION file, but also defined here for scripts)
 # Note: the cpp-desktop-v0.20.40 kit was published from this branch ahead of an
 # SDK release, so main stays at 0.20.37. The next SDK release must go above
-# 0.20.40, or its version will collide with that kit tag.
+# 0.20.40, or its version will collide with that kit tag. The
+# cpp-desktop-v0.20.41 kit (pplx-decider v1.2 GGUF) is cut from main the same
+# way, so the next SDK release must go above 0.20.41.
 PROJECT_VERSION=0.20.37
 
 # =============================================================================

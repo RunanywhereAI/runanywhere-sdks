@@ -17,6 +17,7 @@
  */
 
 #include <llama.h>
+#include <llama-cpp.h>
 
 #include <algorithm>
 #include <chrono>
@@ -281,6 +282,33 @@ rac_result_t encode_tagged(LlamaCppDecisionHandle* handle,
         return RAC_ERROR_TEXT_TOO_LONG;
     }
 
+#if defined(RAC_LLAMACPP_CLEF_SPAN_EXT)
+    llama_batch_ext_ptr batch(llama_batch_ext_init(handle->context));
+    if (!batch) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    const auto n_tokens = static_cast<int32_t>(prompt.tokens.size());
+    for (int32_t index = 0; index < n_tokens; ++index) {
+        const int32_t at = llama_batch_ext_add_token(batch.get(), 0, prompt.tokens[static_cast<size_t>(index)]);
+        const llama_pos pos = index;
+        // The span tags are what the joint head reads to pool the right token
+        // runs into one score per option.
+        if (at != index || !llama_batch_ext_set_pos(batch.get(), at, &pos) ||
+            !llama_batch_ext_set_output_embd(batch.get(), at, true) ||
+            !llama_batch_ext_set_decision_order(
+                batch.get(), at,
+                static_cast<llama_decision_order>(prompt.order[static_cast<size_t>(index)]))) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+    }
+    llama_memory_clear(llama_get_memory(handle->context), true);
+    if (llama_process(handle->context, LLAMA_PROCESS_TYPE_ENCODE, batch.get()) != 0) {
+        RAC_LOG_ERROR(kLogCategory, "llama_process failed for %d tokens", n_tokens);
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+    *out_tokens = n_tokens;
+    return RAC_SUCCESS;
+#else
     LlamaBatchGuard batch_guard(llama_batch_init(static_cast<int32_t>(prompt.tokens.size()), 0, 1));
     llama_batch& batch = batch_guard.batch;
     if (batch.token == nullptr || batch.pos == nullptr || batch.n_seq_id == nullptr ||
@@ -312,6 +340,7 @@ rac_result_t encode_tagged(LlamaCppDecisionHandle* handle,
     }
     *out_tokens = batch.n_tokens;
     return RAC_SUCCESS;
+#endif
 }
 #endif
 
@@ -385,10 +414,16 @@ rac_result_t llamacpp_decision_initialize(void* implementation, const char* mode
         context_params.n_batch = 512;
         context_params.n_ubatch = 512;
     }
+    if (handle->d1_kind == rac_llamacpp_d1_kind::pplx_joint) {
+        context_params.n_outputs_max = kRacLlamacppPplxMaxMarkers;
+    }
     context_params.n_seq_max = 1;
     context_params.n_threads = handle->default_threads;
     context_params.n_threads_batch = handle->default_threads;
-    context_params.embeddings = handle->d1_kind != rac_llamacpp_d1_kind::lfm2;
+    // pplx-decider-joint attends both ways in its full-attention layers, so a
+    // sequence must fit one ubatch: n_ubatch stays at the context size.
+    context_params.embeddings = handle->d1_kind != rac_llamacpp_d1_kind::lfm2 &&
+                                handle->d1_kind != rac_llamacpp_d1_kind::pplx_joint;
     context_params.pooling_type = LLAMA_POOLING_TYPE_NONE;
     context_params.no_perf = true;
 
@@ -423,16 +458,23 @@ rac_result_t llamacpp_decision_decide(void* implementation, const char* state,
         return RAC_SUCCESS;
     }
 
-    // This engine scores every checkpoint one way and takes no images, so the
-    // grouping, length, pixel and image controls are refused, never ignored.
-    if (rac_decision_options_has_extended(options) == RAC_TRUE) {
+    // Only pplx-decider-joint takes grouping; the length, pixel and image
+    // controls, and grouping for any other checkpoint, are refused, never
+    // ignored.
+    rac_decision_options_t controls = options != nullptr ? *options : RAC_DECISION_OPTIONS_DEFAULT;
+    if (handle->d1_kind == rac_llamacpp_d1_kind::pplx_joint) {
+        controls.grouping = RAC_DECISION_GROUPING_UNSPECIFIED;
+    }
+    if (rac_decision_options_has_extended(&controls) == RAC_TRUE) {
         RAC_LOG_ERROR(kLogCategory,
                       "llama.cpp decisions take no grouping, max_length, pixel bounds or "
                       "images (grouping=%d max_length=%u max_pixels=%u min_pixels=%u images=%zu)",
                       static_cast<int>(options->grouping), options->max_length,
                       options->max_pixels, options->min_pixels, options->image_count);
         rac_error_set_details(
-            "this decision model takes no grouping, max_length, pixel bounds or images");
+            handle->d1_kind == rac_llamacpp_d1_kind::pplx_joint
+                ? "this decision model takes no max_length, pixel bounds or images"
+                : "this decision model takes no grouping, max_length, pixel bounds or images");
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
