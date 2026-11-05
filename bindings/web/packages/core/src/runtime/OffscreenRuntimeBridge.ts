@@ -351,7 +351,7 @@ export class OffscreenRuntimeBridge {
         const fail = (err: unknown): void => {
           if (finished) return;
           finished = true;
-          failure = { reason: err };
+          if (waiters.length === 0) failure = { reason: err };
           this.pending.delete(requestId);
           while (waiters.length > 0) waiters.shift()!.reject(err);
         };

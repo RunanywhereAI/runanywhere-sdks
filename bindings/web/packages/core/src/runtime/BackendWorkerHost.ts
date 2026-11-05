@@ -239,7 +239,7 @@ export class BackendWorkerHost {
     const fail = (error: unknown): void => {
       if (state.finished) return;
       state.finished = true;
-      state.failure = { reason: error };
+      if (state.waiters.length === 0) state.failure = { reason: error };
       this.pending.delete(requestId);
       this.activeStreamIds.delete(requestId);
       while (state.waiters.length) state.waiters.shift()!.reject(error);
@@ -405,7 +405,7 @@ export class BackendWorkerHost {
       return;
     }
     pending.finished = true;
-    pending.failure = { reason: error };
+    if (pending.waiters.length === 0) pending.failure = { reason: error };
     while (pending.waiters.length) pending.waiters.shift()!.reject(error);
   }
 
