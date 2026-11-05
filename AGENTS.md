@@ -134,7 +134,7 @@ reaches engines through `rac_engine_vtable_t`.
 | sherpa-onnx | STT, TTS, VAD |
 | onnx | Embed, Segment |
 | qhexrt | Hexagon NPU |
-| litertlm | LLM (`.litertlm`, CPU and GPU) |
+| litertlm | LLM (`.litertlm`, CPU, GPU and Google Tensor NPU) |
 | neurt, cloud | Apple Neural Engine, HTTP |
 
 Backend base priorities (highest wins per primitive via `rac_plugin_find()`, no

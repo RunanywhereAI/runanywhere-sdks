@@ -488,7 +488,7 @@ Every SDK is a thin binding over `runanywhere-commons`, a single C++ core behind
 | **QHexRT** | LLM, VLM, STT, TTS, embeddings, inpainting | Snapdragon Hexagon NPU (v75 / v79 / v81) | RunAnywhere's own NPU runtime, [details below](#hexagon-npu-acceleration-qhexrt) |
 | **MLX** | LLM, VLM, STT, TTS, embeddings | Apple silicon | Apple-native inference via mlx-swift, safetensors models |
 | **llama.cpp** | LLM, VLM | Everywhere: Metal on Apple, CUDA opt-in on Windows/Linux, WebGPU + WASM in the browser, CPU with NEON/AVX | GGUF models |
-| **LiteRT-LM** | LLM | Android arm64, on CPU or GPU (opt-in build) | `.litertlm` models |
+| **LiteRT-LM** | LLM | Android arm64, on CPU, GPU or Google Tensor NPU (opt-in build) | `.litertlm` models |
 | **sherpa + ONNX** | STT, TTS, VAD, embeddings | All platforms | sherpa-onnx for speech, ONNX Runtime for embeddings and RAG |
 | **Core ML** | Image generation (diffusion) | iOS, macOS | Core ML dispatches each layer across CPU, GPU, and the Apple Neural Engine |
 | **Platform** | Apple Foundation Models, system TTS | iOS, macOS, Android | Native OS capabilities behind the same API |

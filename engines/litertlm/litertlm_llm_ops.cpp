@@ -26,9 +26,12 @@
 
 #include "litertlm_stream_helpers.h"
 
+#include <dlfcn.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <filesystem>
 #include <fstream>
@@ -57,10 +60,11 @@ using litertlm_engine::StreamAssembler;
 
 const char* LOG_CAT = "LiteRTLM";
 
-// Keep in step with ACCELERATOR_POLICY_CPU / _GPU. config_json carries integers
+// Keep in step with ACCELERATOR_POLICY_CPU / _GPU / _NPU. config_json carries integers
 // and this engine does not link protobuf, as in engines/llamacpp.
 constexpr int kAcceleratorPolicyCpu = 2;
 constexpr int kAcceleratorPolicyGpu = 3;
+constexpr int kAcceleratorPolicyNpu = 4;
 
 // top_k 0 means "no limit" in rac_llm_options_t. LiteRT-LM needs k >= 1 and caps
 // it at the vocabulary size.
@@ -218,6 +222,16 @@ rac_result_t load_failure_code(LiteRtLmStatusCode status) {
     }
 }
 
+// The directory this library was loaded from, where the NPU vendor's dispatch library sits too.
+std::string own_directory() {
+    Dl_info info{};
+    if (dladdr(reinterpret_cast<const void*>(&own_directory), &info) == 0 ||
+        info.dli_fname == nullptr) {
+        return "";
+    }
+    return std::filesystem::path(info.dli_fname).parent_path().string();
+}
+
 rac_result_t open_engine(Service* service, const char* backend, LiteRtLmEngine** out_engine) {
     LiteRtLmEngineSettings* raw_settings = nullptr;
     LiteRtLmStatusCode status = litert_lm_engine_settings_create(
@@ -227,6 +241,18 @@ rac_result_t open_engine(Service* service, const char* backend, LiteRtLmEngine**
         return load_failure_code(status);
     }
     const EngineSettingsPtr settings(raw_settings);
+    if (std::strcmp(backend, "npu") == 0) {
+        // LiteRT finds the dispatch library by listing a directory, which an APK is not.
+        const std::string directory = own_directory();
+        if (directory.find("!/") != std::string::npos) {
+            report_failure("LiteRT-LM NPU",
+                           "the dispatch library cannot be read from inside the APK; set "
+                           "packaging.jniLibs.useLegacyPackaging = true in the app");
+            return RAC_ERROR_MODEL_LOAD_FAILED;
+        }
+        (void)litert_lm_engine_settings_set_litert_dispatch_lib_dir(settings.get(),
+                                                                    directory.c_str());
+    }
     if (service->context_length > 0) {
         (void)litert_lm_engine_settings_set_max_num_tokens(settings.get(), service->context_length);
     }
@@ -343,7 +369,8 @@ rac_result_t load_model(Service* service) {
         return RAC_ERROR_INVALID_MODEL_FORMAT;
     }
     std::ifstream file(service->model_path, std::ios::binary);
-    const std::uint64_t declared = litertlm_engine::bundle_declared_size(file);
+    const litertlm_engine::BundleHeader header = litertlm_engine::read_bundle_header(file);
+    const std::uint64_t declared = litertlm_engine::bundle_declared_size(header);
     if (declared > size) {
         const std::string details = service->model_path + " has " + std::to_string(size) + " of " +
                                     std::to_string(declared) + " bytes";
@@ -357,6 +384,12 @@ rac_result_t load_model(Service* service) {
         backends = {"cpu"};
     } else if (service->accelerator_policy == kAcceleratorPolicyGpu) {
         backends = {"gpu"};
+    } else if (header.compiled_for_npu) {
+        backends = {"npu"};
+    } else if (service->accelerator_policy == kAcceleratorPolicyNpu) {
+        // The library's "npu" would run this bundle on the CPU and say nothing.
+        report_failure("LiteRT-LM NPU", "this model is not compiled for an NPU");
+        return RAC_ERROR_MODEL_INCOMPATIBLE;
     } else {
         backends = {"gpu", "cpu"};
     }
@@ -375,6 +408,12 @@ rac_result_t load_model(Service* service) {
             return RAC_SUCCESS;
         }
         RAC_LOG_WARNING(LOG_CAT, "backend %s failed to load the model: %d", backend, rc);
+    }
+    if (header.compiled_for_npu && std::strcmp(backends.front(), "npu") != 0) {
+        // The library's words for this say nothing of the cause.
+        report_failure("LiteRT-LM NPU",
+                       "this model is compiled for an NPU and does not load on the CPU or GPU");
+        return RAC_ERROR_MODEL_INCOMPATIBLE;
     }
     return rc;
 }

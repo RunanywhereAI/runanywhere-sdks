@@ -168,9 +168,8 @@ std::string device_kind_for_vtable(const rac_engine_vtable_t* vt) {
     if (!vt) {
         return "unknown";
     }
-    // QHexRT is the sole NPU engine in this tree — every model it loads runs
-    // on the Hexagon NPU by construction, so this is a fact, not an
-    // inference from declarative metadata.
+    // Every model QHexRT loads runs on the Hexagon NPU by construction, so
+    // this is a fact, not an inference from declarative metadata.
     if (vt->metadata.name && std::string(vt->metadata.name) == RAC_ENGINE_ID_QHEXRT) {
         return "npu";
     }

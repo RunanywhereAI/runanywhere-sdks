@@ -1,6 +1,6 @@
 # runanywhere-litertlm-android
 
-**Optional LiteRT-LM backend for the RunAnywhere Kotlin SDK**: on-device LLM generation with `.litertlm` models on CPU or GPU. Android `arm64-v8a` only.
+**Optional LiteRT-LM backend for the RunAnywhere Kotlin SDK**: on-device LLM generation with `.litertlm` models on CPU, GPU or the Google Tensor NPU. Android `arm64-v8a` only.
 
 ## Build from source
 
@@ -47,9 +47,21 @@ A thinking model spends tokens on reasoning first, and the SDK does not stream r
 
 ## Accelerators
 
-`LoadOptions(accelerator = AcceleratorPolicy.CPU)` or `GPU` selects one. The default tries GPU and falls back to CPU. NPU is not available through this backend yet.
+`LoadOptions(accelerator = AcceleratorPolicy.CPU)` or `GPU` selects one. The default tries GPU and falls back to CPU.
 
-The module's manifest declares `libvndksupport.so` and `libOpenCL.so` as optional native libraries, which the GPU accelerators need on API 31 and above.
+A bundle compiled for an NPU, such as `gemma-4-E2B-it_Google_Tensor_G6.litertlm` on a Pixel with Tensor G6, runs on the NPU by default and with `AcceleratorPolicy.NPU`. It does not load on another chip, nor with `CPU` or `GPU`, and `NPU` refuses a bundle that is not compiled for one. This module carries the dispatch library for Google Tensor only. LiteRT finds that library by listing a directory, so the app has to extract its native libraries:
+
+```kotlin
+android {
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
+```
+
+The module's manifest declares `libvndksupport.so`, `libOpenCL.so`, `libedgetpu_util.so` and `libedgetpu_litert.so` as optional native libraries, which the GPU accelerators and the Tensor NPU need on API 31 and above. It also declares the optional `android.hardware.npu` feature, without which Android 17 denies the NPU to an app that targets API 37.
 
 ## Limits
 

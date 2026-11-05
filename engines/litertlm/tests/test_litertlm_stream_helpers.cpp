@@ -178,7 +178,7 @@ std::string bundle_with_section_end(std::uint64_t end) {
 
 std::uint64_t declared_size(const std::string& bytes) {
     std::istringstream stream(bytes);
-    return litertlm_engine::bundle_declared_size(stream);
+    return litertlm_engine::bundle_declared_size(litertlm_engine::read_bundle_header(stream));
 }
 
 void test_bundle_declared_size() {
@@ -270,6 +270,180 @@ void test_bundle_chat_template() {
     expect_true(declared_size(whole) == whole.size(), "a metadata section counts for the size");
 }
 
+// A bundle with one model section whose items hold { key: value }, with a key of at most 10 bytes.
+// The FlatBuffer starts as the one in bundle_with_section_end, with the items offset at 68, then
+// 72 item vector, 80 item vtable, 92 item table, 108 value vtable, 116 value table, 124 key, 140
+// value.
+std::string bundle_with_item(const std::string& key, std::uint8_t value_type,
+                             const std::string& value) {
+    std::string flat(145 + value.size(), '\0');
+    const auto put = [&flat](std::size_t position, auto number) {
+        std::memcpy(&flat[position], &number, sizeof(number));
+    };
+    put(0, std::uint32_t{12});
+    put(4, std::uint16_t{8});
+    put(6, std::uint16_t{8});
+    put(10, std::uint16_t{4});
+    put(12, std::int32_t{8});
+    put(16, std::uint32_t{12});
+    put(20, std::uint16_t{6});
+    put(22, std::uint16_t{8});
+    put(24, std::uint16_t{4});
+    put(28, std::int32_t{8});
+    put(32, std::uint32_t{4});
+    put(36, std::uint32_t{1});
+    put(40, std::uint32_t{16});
+    put(44, std::uint16_t{10});
+    put(46, std::uint16_t{16});
+    put(48, std::uint16_t{12});
+    put(52, std::uint16_t{4});
+    put(56, std::int32_t{12});
+    put(60, std::uint64_t{5000});
+    put(68, std::uint32_t{4});
+    put(72, std::uint32_t{1});
+    put(76, std::uint32_t{16});
+    put(80, std::uint16_t{10});
+    put(82, std::uint16_t{16});
+    put(84, std::uint16_t{4});
+    put(86, std::uint16_t{12});
+    put(88, std::uint16_t{8});
+    put(92, std::int32_t{12});
+    put(96, std::uint32_t{28});
+    put(100, std::uint32_t{16});
+    put(104, value_type);
+    put(108, std::uint16_t{6});
+    put(110, std::uint16_t{8});
+    put(112, std::uint16_t{4});
+    put(116, std::int32_t{8});
+    put(120, std::uint32_t{20});
+    put(124, static_cast<std::uint32_t>(key.size()));
+    flat.replace(128, key.size(), key);
+    put(140, static_cast<std::uint32_t>(value.size()));
+    flat.replace(144, value.size(), value);
+
+    std::string prefix(32, '\0');
+    std::memcpy(&prefix[0], "LITERTLM", 8);
+    const std::uint32_t major = 1;
+    std::memcpy(&prefix[8], &major, sizeof(major));
+    const std::uint64_t header_end = prefix.size() + flat.size();
+    std::memcpy(&prefix[24], &header_end, sizeof(header_end));
+    return prefix + flat;
+}
+
+void test_bundle_model_types() {
+    constexpr std::uint8_t kStringValue = 9;
+    const auto first_model_type = [](const std::string& bytes) -> std::string {
+        std::istringstream stream(bytes);
+        const auto header = litertlm_engine::read_bundle_header(stream);
+        return header.sections.empty() ? "?" : header.sections[0].model_type;
+    };
+    expect_eq(first_model_type(bundle_with_item("model_type", kStringValue, "tf_lite_aux")),
+              "tf_lite_aux", "a model type");
+    expect_eq(first_model_type(bundle_with_section_end(5000)), "", "no items");
+    expect_eq(first_model_type(bundle_with_item("note", kStringValue, "tf_lite_aux")), "",
+              "the name under another key");
+    expect_eq(first_model_type(bundle_with_item("model_type", 1, "tf_lite_aux")), "",
+              "a value that is not a string");
+
+    // An item vector that claims more items than the header holds ends the walk.
+    std::string long_vector = bundle_with_item("note", kStringValue, "tf_lite_aux");
+    const std::uint32_t huge = 0xFFFFFFFFu;
+    std::memcpy(&long_vector[32 + 72], &huge, sizeof(huge));
+    expect_eq(first_model_type(long_vector), "", "an item count past the header");
+
+    // A key or value longer than the header is not read.
+    std::string long_text = bundle_with_item("model_type", kStringValue, "tf_lite_aux");
+    std::memcpy(&long_text[32 + 140], &huge, sizeof(huge));
+    expect_eq(first_model_type(long_text), "", "a string past the header");
+}
+
+// A TFLite model with a builtin op and one custom op, laid out by hand: 0 root offset, 4 model
+// vtable, 12 model table, 24 operator code vector, 36 and 44 the vtables of the two codes,
+// 40 and 52 their tables, 60 the custom op's name.
+std::string tflite_with_custom_op(const std::string& custom) {
+    std::string flat(65 + custom.size(), '\0');
+    const auto put = [&flat](std::size_t position, auto number) {
+        std::memcpy(&flat[position], &number, sizeof(number));
+    };
+    put(0, std::uint32_t{12});
+    put(4, std::uint16_t{8});
+    put(6, std::uint16_t{12});
+    put(10, std::uint16_t{4});
+    put(12, std::int32_t{8});
+    put(16, std::uint32_t{8});
+    put(24, std::uint32_t{2});
+    put(28, std::uint32_t{12});
+    put(32, std::uint32_t{20});
+    put(36, std::uint16_t{4});
+    put(38, std::uint16_t{4});
+    put(40, std::int32_t{4});
+    put(44, std::uint16_t{8});
+    put(46, std::uint16_t{8});
+    put(50, std::uint16_t{4});
+    put(52, std::int32_t{8});
+    put(56, std::uint32_t{4});
+    put(60, static_cast<std::uint32_t>(custom.size()));
+    flat.replace(64, custom.size(), custom);
+    return flat;
+}
+
+void test_tflite_custom_op() {
+    // The model sits 100 bytes into the file; `cut` takes bytes off the end of its section.
+    const auto has = [](const std::string& model, const std::string& name, std::size_t cut) {
+        const std::string bytes = std::string(100, 'x') + model;
+        std::istringstream stream(bytes);
+        return litertlm_engine::tflite_has_custom_op(stream, 100, 100 + model.size() - cut, name);
+    };
+    const std::string dispatch = tflite_with_custom_op("DISPATCH_OP");
+    expect_true(has(dispatch, "DISPATCH_OP", 0), "the op");
+    expect_true(!has(dispatch, "DISPATCH", 0), "a shorter name");
+    expect_true(!has(tflite_with_custom_op("DISPATCH_OX"), "DISPATCH_OP", 0), "another op");
+    expect_true(!has(dispatch, "DISPATCH_OP", 8), "a section that ends inside the name");
+
+    // An operator code vector that claims more codes than the section holds ends the walk,
+    // and one longer than any model's is not walked.
+    std::string long_vector = tflite_with_custom_op("OTHER_OP");
+    const std::uint32_t past_section = 100;
+    std::memcpy(&long_vector[24], &past_section, sizeof(past_section));
+    expect_true(!has(long_vector, "DISPATCH_OP", 0), "a code count past the section");
+    const std::uint32_t huge = 0xFFFFFFFFu;
+    std::memcpy(&long_vector[24], &huge, sizeof(huge));
+    expect_true(!has(long_vector, "DISPATCH_OP", 0), "a code count past any model's");
+}
+
+void test_compiled_for_npu() {
+    using litertlm_engine::BundleSection;
+    const std::string dispatch = tflite_with_custom_op("DISPATCH_OP");
+    const std::string other = tflite_with_custom_op("OTHER_OP");
+    const std::string bytes = std::string(100, 'x') + dispatch + other;
+    const std::uint64_t first = 100;
+    const std::uint64_t second = first + dispatch.size();
+    const std::uint64_t end = second + other.size();
+    const auto section = [](std::uint64_t begin, std::uint64_t stop, const char* type) {
+        BundleSection result;
+        result.begin = begin;
+        result.end = stop;
+        result.data_type = 3;
+        result.model_type = type;
+        return result;
+    };
+    const auto compiled = [&bytes](const std::vector<BundleSection>& sections) {
+        std::istringstream stream(bytes);
+        return litertlm_engine::compiled_for_npu(stream, sections);
+    };
+    expect_true(compiled({section(second, end, "tf_lite_aux"),
+                          section(first, second, "tf_lite_prefill_decode")}),
+                "compiled for an NPU");
+    expect_true(!compiled({section(first, second, "tf_lite_prefill_decode")}),
+                "no auxiliary model");
+    expect_true(!compiled({section(first, second, "tf_lite_aux"),
+                           section(second, end, "tf_lite_prefill_decode")}),
+                "built for an NPU but not compiled");
+    expect_true(!compiled({section(second, second, "tf_lite_aux"),
+                           section(first, second, "tf_lite_prefill_decode")}),
+                "an empty auxiliary model");
+}
+
 }  // namespace
 
 int main() {
@@ -280,6 +454,9 @@ int main() {
     test_printable_ascii();
     test_bundle_declared_size();
     test_bundle_chat_template();
+    test_bundle_model_types();
+    test_tflite_custom_op();
+    test_compiled_for_npu();
     if (g_failures != 0) {
         std::fprintf(stderr, "%d failure(s)\n", g_failures);
         return 1;

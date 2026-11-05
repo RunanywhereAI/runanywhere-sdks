@@ -621,7 +621,8 @@ for ABI in "${ABIS[@]}"; do
         LIB_LITERTLM_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_litertlm_jni.so" -print -quit || true)"
         copy_if_exists "${LIB_LITERTLM}" "${KOTLIN_LITERTLM_DEST}"
         copy_if_exists "${LIB_LITERTLM_JNI}" "${KOTLIN_LITERTLM_DEST}"
-        # The C API library, the libraries it links, and the GPU accelerators it opens.
+        # The C API library, the libraries it links, the GPU accelerators it opens, and the
+        # Google Tensor dispatch library.
         cp -v "${LITERTLM_PREBUILT}/lib/${ABI}"/*.so "${KOTLIN_LITERTLM_DEST}/"
         cp -v "${NDK_SYSROOT_LIB}/${TRIPLE}/libc++_shared.so" "${KOTLIN_LITERTLM_DEST}/"
     fi

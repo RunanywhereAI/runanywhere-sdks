@@ -213,13 +213,106 @@ struct BundleSection {
     std::uint64_t begin = 0;
     std::uint64_t end = 0;
     std::uint8_t data_type = 0;
+    std::string model_type;  // the section's "model_type" item; empty when it has none
 };
 
 struct BundleHeader {
     std::uint64_t end = 0;
-    bool cut_short = false;  // the file ends inside its own header
+    bool cut_short = false;         // the file ends inside its own header
+    bool compiled_for_npu = false;  // see compiled_for_npu() below
     std::vector<BundleSection> sections;
 };
+
+// Whether the TFLite model stored in [begin, end) of `file` uses the custom op `name`.
+// Layout (TFLite schema): Model { version, operator_codes: [OperatorCode { deprecated_builtin_code,
+// custom_code }] }. Read in place, a few bytes at a time, since a model section can take
+// gigabytes.
+inline bool tflite_has_custom_op(std::istream& file, std::uint64_t begin, std::uint64_t end,
+                                 const std::string& name) {
+    const auto read = [&file, begin, end](std::uint64_t position, auto* out) {
+        if (position < begin || position > end || end - position < sizeof(*out)) {
+            return false;
+        }
+        file.clear();
+        file.seekg(static_cast<std::streamoff>(position));
+        return static_cast<bool>(file.read(reinterpret_cast<char*>(out), sizeof(*out)));
+    };
+    // Where field `index` of the table at `table` is stored; 0 when it is absent.
+    const auto field = [&read](std::uint64_t table, std::uint64_t index) -> std::uint64_t {
+        std::int32_t to_vtable = 0;
+        std::uint16_t vtable_size = 0;
+        std::uint16_t offset = 0;
+        if (!read(table, &to_vtable)) {
+            return 0;
+        }
+        const std::int64_t start = static_cast<std::int64_t>(table) - to_vtable;
+        const std::uint64_t slot = 4 + 2 * index;
+        if (start < 0 || !read(static_cast<std::uint64_t>(start), &vtable_size) ||
+            slot >= vtable_size || !read(static_cast<std::uint64_t>(start) + slot, &offset)) {
+            return 0;
+        }
+        return offset != 0 ? table + offset : 0;
+    };
+    // The object an offset stored at `position` refers to; 0 when there is none.
+    const auto follow = [&read](std::uint64_t position) -> std::uint64_t {
+        std::uint32_t offset = 0;
+        return position != 0 && read(position, &offset) && offset != 0 ? position + offset : 0;
+    };
+
+    // TFLite has a few hundred operators; a longer list is not a model's, and walking it in a
+    // section of gigabytes would take long.
+    constexpr std::uint32_t kMaxOperatorCodes = 4096;
+    const std::uint64_t model = follow(begin);
+    const std::uint64_t codes_field = model != 0 ? field(model, 1) : 0;
+    const std::uint64_t codes = follow(codes_field);
+    std::uint32_t count = 0;
+    if (codes == 0 || !read(codes, &count) || count > kMaxOperatorCodes) {
+        return false;
+    }
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const std::uint64_t code = follow(codes + 4 + std::uint64_t{4} * i);
+        if (code == 0) {
+            return false;
+        }
+        const std::uint64_t text = follow(field(code, 1));
+        std::uint32_t length = 0;
+        if (text == 0 || !read(text, &length) || length != name.size()) {
+            continue;
+        }
+        std::string custom(length, '\0');
+        file.clear();
+        file.seekg(static_cast<std::streamoff>(text + sizeof(length)));
+        if (end - text - sizeof(length) >= length && file.read(&custom[0], length) &&
+            custom == name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether a bundle was compiled ahead of time for an NPU: it carries the auxiliary model that
+// the library's NPU executor needs, and its prefill-decode model hands its work to the NPU
+// through LiteRT's "DISPATCH_OP". The library's "npu" loads any other bundle too and runs it
+// without the NPU, since this build has no compiler plugin to compile it on the device. That
+// includes one built for an NPU but not compiled, such as
+// gemma-4-E2B-it_NPU_Uncompiled.litertlm, which carries the auxiliary model only.
+inline bool compiled_for_npu(std::istream& file, const std::vector<BundleSection>& sections) {
+    constexpr std::uint8_t kTfLiteModel = 3;  // AnySectionDataType in the schema
+    bool auxiliary = false;
+    const BundleSection* prefill_decode = nullptr;
+    for (const BundleSection& section : sections) {
+        if (section.end <= section.begin || section.data_type != kTfLiteModel) {
+            continue;
+        }
+        if (section.model_type == "tf_lite_aux") {
+            auxiliary = true;
+        } else if (section.model_type == "tf_lite_prefill_decode") {
+            prefill_decode = &section;
+        }
+    }
+    return auxiliary && prefill_decode != nullptr &&
+           tflite_has_custom_op(file, prefill_decode->begin, prefill_decode->end, "DISPATCH_OP");
+}
 
 // Reads the section table of a .litertlm file. No sections when the header cannot be read:
 // those files are left to the library, which reports them.
@@ -227,13 +320,16 @@ struct BundleHeader {
 // Layout (schema/core/litertlm_header.h, litertlm_header_schema.fbs at v0.19.0): "LITERTLM",
 // u32 major/minor/patch, 4 bytes of padding, u64 header end, then a little-endian FlatBuffer
 //   LiteRTLMMetaData { system_metadata, section_metadata: { objects: [{ items, begin_offset,
-//   end_offset, data_type }] } }.
+//   end_offset, data_type }] } }, where a model section's items hold
+//   { key: "model_type", value: StringValue { value } }.
 // Read by hand so that this engine has no FlatBuffers dependency for a few fields.
 inline BundleHeader read_bundle_header(std::istream& file) {
     constexpr std::size_t kPrefix = 32;
     constexpr std::uint64_t kMaxHeader = 16 * 1024;  // the library's kLitertLmHeaderMaxSize
     BundleHeader result;
     char prefix[kPrefix];
+    file.clear();
+    file.seekg(0);
     if (!file.read(prefix, kPrefix) || std::memcmp(prefix, "LITERTLM", 8) != 0) {
         return result;
     }
@@ -250,7 +346,6 @@ inline BundleHeader read_bundle_header(std::istream& file) {
         result.cut_short = true;
         return result;
     }
-
     const auto read = [&header](std::size_t position, auto* out) {
         if (position > header.size() || header.size() - position < sizeof(*out)) {
             return false;
@@ -280,6 +375,49 @@ inline BundleHeader read_bundle_header(std::istream& file) {
         return read(position, &offset) && offset != 0 ? position + offset : 0;
     };
 
+    // The string an offset stored at `position` refers to; false when there is none.
+    const auto text = [&header, &read, &follow](std::size_t position, std::string* out) {
+        const std::size_t start = position != 0 ? follow(position) : 0;
+        std::uint32_t length = 0;
+        if (start == 0 || !read(start, &length) ||
+            header.size() - start - sizeof(length) < length) {
+            return false;
+        }
+        *out = header.substr(start + sizeof(length), length);
+        return true;
+    };
+    // The value of the "model_type" item of the section at `object`; empty when it has none.
+    const auto model_type = [&read, &field, &follow, &text](std::size_t object) -> std::string {
+        constexpr std::uint8_t kStringValue = 9;  // VData in the schema
+        const std::size_t items_field = field(object, 0);
+        const std::size_t items = items_field != 0 ? follow(items_field) : 0;
+        std::uint32_t count = 0;
+        if (items == 0 || !read(items, &count)) {
+            return "";
+        }
+        for (std::uint32_t i = 0; i < count; ++i) {
+            const std::size_t item = follow(items + 4 + std::size_t{4} * i);
+            if (item == 0) {
+                return "";
+            }
+            std::string key;
+            if (!text(field(item, 0), &key) || key != "model_type") {
+                continue;
+            }
+            const std::size_t value_type_field = field(item, 1);
+            const std::size_t value_field = field(item, 2);
+            const std::size_t value = value_field != 0 ? follow(value_field) : 0;
+            std::uint8_t value_type = 0;
+            std::string type;
+            if (value_type_field != 0 && read(value_type_field, &value_type) &&
+                value_type == kStringValue && value != 0 && text(field(value, 0), &type)) {
+                return type;
+            }
+            return "";
+        }
+        return "";
+    };
+
     const std::size_t root = follow(0);
     const std::size_t section_metadata_field = root != 0 ? field(root, 1) : 0;
     const std::size_t section_metadata =
@@ -304,17 +442,18 @@ inline BundleHeader read_bundle_header(std::istream& file) {
             (type_field != 0 && !read(type_field, &section.data_type))) {
             return result;
         }
-        sections.push_back(section);
+        section.model_type = model_type(object);
+        sections.push_back(std::move(section));
     }
     result.sections = std::move(sections);
+    result.compiled_for_npu = compiled_for_npu(file, result.sections);
     return result;
 }
 
 // The size a .litertlm file declares: the end of its last section. Library v0.19.0 maps
 // sections without checking the file reaches them, so a bundle cut short can end the
 // process with SIGBUS instead of a load error. 0 when the header cannot be read.
-inline std::uint64_t bundle_declared_size(std::istream& file) {
-    const BundleHeader header = read_bundle_header(file);
+inline std::uint64_t bundle_declared_size(const BundleHeader& header) {
     if (header.cut_short) {
         return header.end;
     }
