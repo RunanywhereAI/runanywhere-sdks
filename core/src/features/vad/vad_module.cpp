@@ -576,7 +576,7 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
+    std::unique_lock<std::mutex> lock(component->mtx);
 
     // ==========================================================================
     // VALIDATION - Ported from Swift VADConfiguration.swift:62-110
@@ -638,9 +638,12 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
             component->config = previous_config;
             return result;
         }
-        rac_energy_vad_stop(component->vad_service);
-        rac_energy_vad_destroy(component->vad_service);
+        rac_energy_vad_handle_t old_service = component->vad_service;
         component->vad_service = service;
+        // Stopping may fire the speech callback, which can re-enter a locking component API.
+        lock.unlock();
+        rac_energy_vad_stop(old_service);
+        rac_energy_vad_destroy(old_service);
     }
 
     RAC_LOG_INFO("VAD.Component", "VAD component configured");
