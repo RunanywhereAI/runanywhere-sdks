@@ -957,7 +957,18 @@ export const WebModelLifecycle = {
   },
 
   async unloadModelAsync(request: ModelUnloadRequest): Promise<ModelUnloadResult | null> {
-    await Promise.all(pendingOwnerReleases.values());
+    // Wait only on the owner this unload reaches, so a stalled release on one
+    // backend cannot block an unrelated unload; fan-out unloads wait on all.
+    const workerOwner = request.modelId ? getBackendWorkerOwner(request.modelId) : undefined;
+    await Promise.all(
+      request.modelId && !request.unloadAll
+        ? (workerOwner
+          ? [pendingOwnerReleases.get(workerOwner)]
+          : adaptersForUnload(request).map((adapter) => (
+            pendingOwnerReleases.get(lifecycleModuleAsEmscripten(adapter))
+          )))
+        : pendingOwnerReleases.values(),
+    );
     const backendId = request.modelId && isModelOwnedByBackendWorker(request.modelId, 'onnx')
       ? 'onnx'
       : 'llamacpp';
