@@ -58,6 +58,7 @@
 #endif
 
 // Include runanywhere-commons C API headers
+#include "listener_slot.h"
 #include "request_cancellation_relay.h"
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
@@ -4658,6 +4659,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventPublishFailu
 
 static jobject g_download_proto_listener = nullptr;
 static std::mutex g_download_proto_listener_mutex;
+// Serializes racDownloadSetProgressProtoCallback; never taken by the callback.
+static std::mutex g_download_proto_registration_mutex;
 
 static void download_proto_jni_callback(const uint8_t* proto_bytes, size_t proto_size,
                                         void* user_data) {
@@ -4678,31 +4681,28 @@ static void download_proto_jni_callback(const uint8_t* proto_bytes, size_t proto
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadSetProgressProtoCallback(
     JNIEnv* env, jclass clazz, jobject listener) {
-    std::lock_guard<std::mutex> lock(g_download_proto_listener_mutex);
-    if (g_download_proto_listener != nullptr) {
-        env->DeleteGlobalRef(g_download_proto_listener);
-        g_download_proto_listener = nullptr;
-    }
-    if (listener == nullptr) {
-        return static_cast<jint>(rac_download_set_progress_proto_callback(nullptr, nullptr));
-    }
-    jobject listenerRef = env->NewGlobalRef(listener);
-    if (listenerRef == nullptr) {
-        if (env->ExceptionCheck() == JNI_TRUE) {
+    jobject listenerRef = nullptr;
+    if (listener != nullptr) {
+        listenerRef = env->NewGlobalRef(listener);
+        if (listenerRef == nullptr && env->ExceptionCheck() == JNI_TRUE) {
             env->ExceptionClear();
         }
-        rac_download_set_progress_proto_callback(nullptr, nullptr);
+    }
+    // emit_progress invokes download_proto_jni_callback under the progress sink
+    // lock, so the native setter must run without g_download_proto_listener_mutex.
+    const rac_result_t rc = rac::jni::replace_listener_then_register(
+        g_download_proto_registration_mutex, g_download_proto_listener_mutex,
+        g_download_proto_listener, listenerRef,
+        [](bool hasListener) {
+            return rac_download_set_progress_proto_callback(
+                hasListener ? download_proto_jni_callback : nullptr, nullptr);
+        },
+        [env](jobject ref) { env->DeleteGlobalRef(ref); });
+    if (listener != nullptr && listenerRef == nullptr) {
         LOGe("racDownloadSetProgressProtoCallback: failed to create global reference");
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    const rac_result_t rc =
-        rac_download_set_progress_proto_callback(download_proto_jni_callback, nullptr);
-    if (rc != RAC_SUCCESS) {
-        env->DeleteGlobalRef(listenerRef);
-        return static_cast<jint>(rc);
-    }
-    g_download_proto_listener = listenerRef;
-    return static_cast<jint>(RAC_SUCCESS);
+    return static_cast<jint>(rc);
 }
 
 JNIEXPORT jbyteArray JNICALL
