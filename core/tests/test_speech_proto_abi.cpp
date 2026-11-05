@@ -1162,6 +1162,31 @@ int test_voice_agent_d7_component_create_destroy_proto() {
     return 0;
 }
 
+int test_voice_agent_reinitialize_applies_new_vad_config() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "voice agent creates");
+    rac_voice_agent_config_t config = RAC_VOICE_AGENT_CONFIG_DEFAULT;
+    config.vad_config.energy_threshold = 0.02f;
+    CHECK(rac_voice_agent_initialize(agent, &config) == RAC_SUCCESS, "voice agent initializes");
+    CHECK(rac_vad_component_get_energy_threshold(agent->vad_handle) == 0.02f,
+          "first initialize applies the VAD threshold");
+
+    CHECK(rac_voice_agent_cleanup(agent) == RAC_SUCCESS, "voice agent cleans up");
+    config.vad_config.energy_threshold = 0.04f;
+    CHECK(rac_voice_agent_initialize(agent, &config) == RAC_SUCCESS,
+          "voice agent re-initializes after cleanup");
+    CHECK(rac_vad_component_get_energy_threshold(agent->vad_handle) == 0.04f,
+          "re-initialize after cleanup applies the new VAD threshold");
+
+    config.vad_config.energy_threshold = 0.03f;
+    CHECK(rac_voice_agent_initialize(agent, &config) == RAC_SUCCESS,
+          "voice agent re-initializes without cleanup");
+    CHECK(rac_vad_component_get_energy_threshold(agent->vad_handle) == 0.03f,
+          "re-initialize without cleanup applies the new VAD threshold");
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
 int test_stt_proto_adapters_mapping() {
     // 1. rac_stt_word_from_proto
     runanywhere::v1::WordTimestamp word_proto;
@@ -1261,6 +1286,7 @@ int main() {
         test_voice_agent_d7_transcribe_proto();
         test_voice_agent_d7_synthesize_speech_proto();
         test_voice_agent_d7_component_create_destroy_proto();
+        test_voice_agent_reinitialize_applies_new_vad_config();
         test_stt_proto_adapters_mapping();
         rac_plugin_unregister("llamacpp");
         rac_plugin_unregister("onnx");

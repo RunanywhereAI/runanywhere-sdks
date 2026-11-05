@@ -509,6 +509,40 @@ static void vad_speech_activity_callback(rac_speech_activity_event_t event, void
     }
 }
 
+// Builds an energy VAD service from component->config. Caller holds component->mtx.
+static rac_result_t create_energy_vad_service(rac_vad_component* component,
+                                              rac_energy_vad_handle_t* out_service) {
+    rac_energy_vad_config_t vad_config = {};
+    vad_config.sample_rate = component->config.sample_rate;
+    vad_config.frame_length = component->config.frame_length;
+    vad_config.energy_threshold = component->config.energy_threshold;
+
+    rac_energy_vad_handle_t service = nullptr;
+    rac_result_t result = rac_energy_vad_create(&vad_config, &service);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VAD.Component", "Failed to create energy VAD service");
+        return result;
+    }
+
+    // Set speech callback
+    result = rac_energy_vad_set_speech_callback(service, vad_speech_activity_callback, component);
+    if (result != RAC_SUCCESS) {
+        rac_energy_vad_destroy(service);
+        return result;
+    }
+
+    // Initialize the VAD (starts calibration)
+    result = rac_energy_vad_initialize(service);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VAD.Component", "Failed to initialize energy VAD service");
+        rac_energy_vad_destroy(service);
+        return result;
+    }
+
+    *out_service = service;
+    return RAC_SUCCESS;
+}
+
 // =============================================================================
 // LIFECYCLE API
 // =============================================================================
@@ -581,7 +615,27 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
 
     // ==========================================================================
 
+    const rac_vad_config_t previous_config = component->config;
     component->config = *config;
+
+    // The energy detector copies its settings at creation, so rebuild a live one.
+    if (component->vad_service) {
+        rac_energy_vad_handle_t service = nullptr;
+        rac_result_t result = create_energy_vad_service(component, &service);
+        if (result == RAC_SUCCESS && component->is_running) {
+            result = rac_energy_vad_start(service);
+            if (result != RAC_SUCCESS) {
+                rac_energy_vad_destroy(service);
+            }
+        }
+        if (result != RAC_SUCCESS) {
+            component->config = previous_config;
+            return result;
+        }
+        rac_energy_vad_stop(component->vad_service);
+        rac_energy_vad_destroy(component->vad_service);
+        component->vad_service = service;
+    }
 
     RAC_LOG_INFO("VAD.Component", "VAD component configured");
 
@@ -608,34 +662,8 @@ extern "C" rac_result_t rac_vad_component_initialize(rac_handle_t handle) {
         return RAC_SUCCESS;
     }
 
-    // Create energy VAD configuration
-    rac_energy_vad_config_t vad_config = {};
-    vad_config.sample_rate = component->config.sample_rate;
-    vad_config.frame_length = component->config.frame_length;
-    vad_config.energy_threshold = component->config.energy_threshold;
-
-    // Create energy VAD service
-    rac_result_t result = rac_energy_vad_create(&vad_config, &component->vad_service);
+    rac_result_t result = create_energy_vad_service(component, &component->vad_service);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("VAD.Component", "Failed to create energy VAD service");
-        return result;
-    }
-
-    // Set speech callback
-    result = rac_energy_vad_set_speech_callback(component->vad_service,
-                                                vad_speech_activity_callback, component);
-    if (result != RAC_SUCCESS) {
-        rac_energy_vad_destroy(component->vad_service);
-        component->vad_service = nullptr;
-        return result;
-    }
-
-    // Initialize the VAD (starts calibration)
-    result = rac_energy_vad_initialize(component->vad_service);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("VAD.Component", "Failed to initialize energy VAD service");
-        rac_energy_vad_destroy(component->vad_service);
-        component->vad_service = nullptr;
         return result;
     }
 
