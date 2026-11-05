@@ -6,6 +6,7 @@ format: xcode
 skip_build: false
 clean_build: false
 
+# Requires Periphery >= 3.0 (2.x rejects exclude_targets as an invalid key).
 # Periphery 3.x has no `targets:` key or `--targets` option; it scans all
 # SwiftPM targets. exclude_targets skips MLXRuntime and NeuRTRuntime.
 exclude_targets:
