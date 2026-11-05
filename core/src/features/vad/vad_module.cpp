@@ -99,6 +99,10 @@ struct rac_vad_component {
      *  doesn't emit an unpaired vad.stopped telemetry event. */
     bool is_running = false;
 
+    /** Set by an explicit stop() and cleared by start()/cleanup(), so a rebuilt
+     *  energy detector keeps the stopped state of the one it replaces. */
+    bool is_stopped = false;
+
     /** Mutex for thread safety */
     std::mutex mtx;
 
@@ -624,9 +628,11 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
         rac_result_t result = create_energy_vad_service(component, &service);
         if (result == RAC_SUCCESS && component->is_running) {
             result = rac_energy_vad_start(service);
-            if (result != RAC_SUCCESS) {
-                rac_energy_vad_destroy(service);
-            }
+        } else if (result == RAC_SUCCESS && component->is_stopped) {
+            result = rac_energy_vad_stop(service);
+        }
+        if (result != RAC_SUCCESS && service) {
+            rac_energy_vad_destroy(service);
         }
         if (result != RAC_SUCCESS) {
             component->config = previous_config;
@@ -702,6 +708,7 @@ extern "C" rac_result_t rac_vad_component_cleanup(rac_handle_t handle) {
     }
 
     component->is_initialized = false;
+    component->is_stopped = false;
 
     RAC_LOG_INFO("VAD.Component", "VAD component cleaned up");
 
@@ -803,6 +810,7 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     if (result == RAC_SUCCESS) {
         const bool was_running = component->is_running;
         component->is_running = true;
+        component->is_stopped = false;
         if (!was_running) {
 #if defined(RAC_HAVE_PROTOBUF)
             runanywhere::v1::VoiceLifecycleEvent voice;
@@ -836,6 +844,7 @@ extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
     if (result == RAC_SUCCESS) {
         const bool was_running = component->is_running;
         component->is_running = false;
+        component->is_stopped = true;
         if (was_running) {
 #if defined(RAC_HAVE_PROTOBUF)
             runanywhere::v1::VoiceLifecycleEvent voice;
