@@ -341,22 +341,13 @@ async function initializeCore(options: InitializeOptions): Promise<void> {
         }
 
         LoggingManager.shared.applyEnvironmentConfiguration(environment);
-        setCommonsLogLevelSink((lvl: LogLevel) => {
-          if (isNativeModuleAvailable()) {
-            try {
-              const nativeModule = requireNativeModule();
-              void nativeModule.loggerSetMinLevel(lvl);
-            } catch {
-              // Native logger setup failure is non-fatal
-            }
-          }
-        });
-
-        try {
-          await native.loggerSetMinLevel(LoggingManager.shared.configuration.minLogLevel);
-        } catch {
-          // Native logger setup failure is non-fatal
-        }
+        // Failures are swallowed by the sink queue (non-fatal); awaiting
+        // applies the initial level before init completes.
+        await setCommonsLogLevelSink((lvl: LogLevel) =>
+          isNativeModuleAvailable()
+            ? requireNativeModule().loggerSetMinLevel(lvl)
+            : undefined
+        );
 
         requireCurrentLifecycle(generation, 'initialization');
         initState = markCoreInitialized(initState, initParams);
