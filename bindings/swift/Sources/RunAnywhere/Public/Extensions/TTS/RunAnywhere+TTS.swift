@@ -58,7 +58,7 @@ public extension RunAnywhere {
     }
 
     /// Current TTS service state from the commons lifecycle.
-    @available(*, deprecated, renamed: "tts.voices()")
+    @available(*, deprecated, message: "Use tts.voices() and models.state()")
     static func ttsState() async throws -> RATTSServiceState {
         try await ttsStateProto()
     }
