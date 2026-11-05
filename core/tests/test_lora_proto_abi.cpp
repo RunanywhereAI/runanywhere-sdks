@@ -16,6 +16,7 @@
 #include <vector>
 
 #if defined(RAC_HAVE_PROTOBUF)
+#define RAC_TEST_INTERPOSE_RAC_MEMORY 1
 #include "lora_options.pb.h"
 #include "model_types.pb.h"
 
@@ -27,10 +28,40 @@
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/lora/rac_lora_service.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#endif
+
+#if defined(RAC_TEST_INTERPOSE_RAC_MEMORY)
+// rac_commons is linked as a static archive here, so these definitions take the
+// place of core/src/core/rac_memory.cpp. rac_strdup fails for one sentinel
+// string so a test can force an allocation failure inside a proto adapter.
+constexpr char kOomSentinel[] = "rac-test-oom";
+
+extern "C" {
+
+void* rac_alloc(size_t size) {
+    return size == 0 ? nullptr : std::malloc(size);
+}
+
+void rac_free(void* ptr) {
+    std::free(ptr);
+}
+
+char* rac_strdup(const char* str) {
+    if (!str || std::strcmp(str, kOomSentinel) == 0)
+        return nullptr;
+    const size_t len = std::strlen(str) + 1;
+    auto* copy = static_cast<char*>(std::malloc(len));
+    if (copy)
+        std::memcpy(copy, str, len);
+    return copy;
+}
+
+}  // extern "C"
 #endif
 
 namespace {
@@ -633,6 +664,115 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+int test_lora_entry_from_proto_null_destination() {
+    runanywhere::v1::LoraAdapterCatalogEntry proto;
+    proto.set_id("adapter-1");
+    proto.set_name("Adapter One");
+    CHECK(!rac::foundation::rac_lora_entry_from_proto(proto, nullptr),
+          "null destination returns false");
+    return 0;
+}
+
+int test_lora_entry_from_proto_empty_mapping() {
+    runanywhere::v1::LoraAdapterCatalogEntry empty_proto;
+    rac_lora_entry_t entry{};
+    entry.compatible_model_count = 99;
+    entry.default_scale = -99.0f;
+    CHECK(rac::foundation::rac_lora_entry_from_proto(empty_proto, &entry),
+          "empty proto maps successfully");
+    CHECK(entry.id == nullptr, "empty proto id is nullptr");
+    CHECK(entry.name == nullptr, "empty proto name is nullptr");
+    CHECK(entry.compatible_model_ids == nullptr, "empty proto compatible_model_ids is nullptr");
+    CHECK(entry.compatible_model_count == 0, "empty proto compatible_model_count is 0");
+    CHECK(entry.default_scale == 1.0f, "empty proto default_scale defaults to 1.0");
+    return 0;
+}
+
+int test_lora_entry_from_proto_populated_mapping() {
+    runanywhere::v1::LoraAdapterCatalogEntry full_proto;
+    full_proto.set_id("adapter-42");
+    full_proto.set_name("Test Adapter");
+    full_proto.set_default_scale(0.0f);
+    full_proto.add_compatible_models("llama-3-8b");
+    full_proto.add_compatible_models("qwen-2.5-7b");
+    full_proto.add_compatible_models("mistral-7b");
+
+    rac_lora_entry_t entry{};
+    CHECK(rac::foundation::rac_lora_entry_from_proto(full_proto, &entry),
+          "fully populated proto maps successfully");
+    CHECK(entry.id != nullptr && std::strcmp(entry.id, "adapter-42") == 0,
+          "adapter id matches");
+    CHECK(entry.name != nullptr && std::strcmp(entry.name, "Test Adapter") == 0,
+          "adapter name matches");
+    CHECK(entry.default_scale == 0.0f,
+          "explicit 0.0 default_scale preserved");
+    CHECK(entry.compatible_model_count == 3,
+          "compatible_model_count is 3");
+    CHECK(entry.compatible_model_ids != nullptr,
+          "compatible_model_ids array allocated");
+    if (entry.compatible_model_ids) {
+        CHECK(entry.compatible_model_ids[0] != nullptr &&
+              std::strcmp(entry.compatible_model_ids[0], "llama-3-8b") == 0,
+              "first compatible model matches");
+        CHECK(entry.compatible_model_ids[1] != nullptr &&
+              std::strcmp(entry.compatible_model_ids[1], "qwen-2.5-7b") == 0,
+              "second compatible model matches");
+        CHECK(entry.compatible_model_ids[2] != nullptr &&
+              std::strcmp(entry.compatible_model_ids[2], "mistral-7b") == 0,
+              "third compatible model matches");
+    }
+
+    rac_free(entry.id);
+    rac_free(entry.name);
+    if (entry.compatible_model_ids) {
+        for (size_t i = 0; i < entry.compatible_model_count; ++i) {
+            rac_free(entry.compatible_model_ids[i]);
+        }
+        std::free(entry.compatible_model_ids);
+    }
+    return 0;
+}
+
+#if defined(RAC_TEST_INTERPOSE_RAC_MEMORY)
+int test_lora_entry_from_proto_allocation_failure() {
+    // 1. Name allocation failure after id is allocated
+    {
+        runanywhere::v1::LoraAdapterCatalogEntry proto;
+        proto.set_id("valid-id");
+        proto.set_name(kOomSentinel);
+
+        rac_lora_entry_t entry{};
+        entry.default_scale = 5.0f;
+        CHECK(!rac::foundation::rac_lora_entry_from_proto(proto, &entry),
+              "name allocation failure returns false");
+        CHECK(entry.id == nullptr, "id is cleaned up and null on name failure");
+        CHECK(entry.name == nullptr, "name is null on name failure");
+        CHECK(entry.default_scale == 0.0f, "struct is zeroed on name failure");
+    }
+
+    // 2. Compatible model string allocation failure after previous allocations
+    {
+        runanywhere::v1::LoraAdapterCatalogEntry proto;
+        proto.set_id("valid-id");
+        proto.set_name("valid-name");
+        proto.add_compatible_models("model-1");
+        proto.add_compatible_models(kOomSentinel);
+
+        rac_lora_entry_t entry{};
+        CHECK(!rac::foundation::rac_lora_entry_from_proto(proto, &entry),
+              "compatible model allocation failure returns false");
+        CHECK(entry.id == nullptr, "id is cleaned up and null on model string failure");
+        CHECK(entry.name == nullptr, "name is cleaned up and null on model string failure");
+        CHECK(entry.compatible_model_ids == nullptr,
+              "compatible_model_ids array is cleaned up on model string failure");
+        CHECK(entry.compatible_model_count == 0,
+              "compatible_model_count is 0 on model string failure");
+    }
+
+    return 0;
+}
+#endif
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -656,6 +796,12 @@ int main() {
         test_malformed_proto_bytes_return_decoding_error();
         test_apis_before_load_report_component_not_ready();
         test_double_clear_is_idempotent(registry);
+        test_lora_entry_from_proto_null_destination();
+        test_lora_entry_from_proto_empty_mapping();
+        test_lora_entry_from_proto_populated_mapping();
+#if defined(RAC_TEST_INTERPOSE_RAC_MEMORY)
+        test_lora_entry_from_proto_allocation_failure();
+#endif
     } catch (const std::exception& e) {
         std::fprintf(stderr, "  FATAL: %s\n", e.what());
         reset_environment();
