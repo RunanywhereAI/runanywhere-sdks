@@ -172,17 +172,17 @@ def test_one_stale_readme_pin_is_rejected(tmp_path):
 def test_readme_pin_with_a_prerelease_suffix_is_rejected(tmp_path):
     # The version must end the pin: a suffix names a different artifact.
     version = _readme_pin_version()
-    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}-rc.1")
+    result = _mutate_readme(tmp_path, f"@runanywhere/core@{version}", f"@runanywhere/core@{version}-rc.1")
     assert result.returncode == 1
-    assert f"found 'runanywhere=={version}-rc.1'" in result.stderr
+    assert f"found '@runanywhere/core@{version}-rc.1'" in result.stderr
 
 
 def test_readme_pin_with_an_attached_prerelease_suffix_is_rejected(tmp_path):
-    # PEP 440 attaches the suffix with no separator; a prefix match would pass it.
+    # A suffix attached with no separator (PEP 440 style); a prefix match would pass it.
     version = _readme_pin_version()
-    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}rc1")
+    result = _mutate_readme(tmp_path, f"@runanywhere/core@{version}", f"@runanywhere/core@{version}rc1")
     assert result.returncode == 1
-    assert f"found 'runanywhere=={version}rc1'" in result.stderr
+    assert f"found '@runanywhere/core@{version}rc1'" in result.stderr
 
 
 def test_readme_pin_with_an_unrecognized_suffix_is_rejected(tmp_path):
@@ -192,11 +192,11 @@ def test_readme_pin_with_an_unrecognized_suffix_is_rejected(tmp_path):
     for suffix in ("+build.1", "_rc1"):
         result = _mutate_readme(
             tmp_path / suffix.strip("+_"),
-            f"runanywhere=={version}",
-            f"runanywhere=={version}{suffix}",
+            f"@runanywhere/core@{version}",
+            f"@runanywhere/core@{version}{suffix}",
         )
         assert result.returncode == 1
-        assert f"found 'runanywhere=={version}{suffix}'" in result.stderr
+        assert f"found '@runanywhere/core@{version}{suffix}'" in result.stderr
 
 
 def test_unpinned_package_beside_a_pinned_one_is_rejected(tmp_path):
@@ -214,7 +214,7 @@ def test_readme_pin_followed_by_a_full_stop_passes(tmp_path):
     # Sentence punctuation after a pin is not part of the version; reading it as
     # a suffix fails the gate and makes the sync delete the full stop.
     version = _readme_pin_version()
-    result = _mutate_readme(tmp_path, f"runanywhere=={version}", f"runanywhere=={version}.")
+    result = _mutate_readme(tmp_path, f"@runanywhere/core@{version}", f"@runanywhere/core@{version}.")
     assert result.returncode == 0, result.stderr
 
 
@@ -222,9 +222,23 @@ def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
     # A shape with no match means the README was reworded under the gate, which
     # would otherwise stop checking that install command without saying so.
     version = _readme_pin_version()
-    result = _mutate_readme(tmp_path, f"runanywhere=={version}", "runanywhere")
+    sandbox = _mirror(tmp_path, writable={"README.md"})
+    text = (sandbox / "README.md").read_text(encoding="utf-8")
+    reworded = re.sub(r"@runanywhere/[a-z-]+@\S+", "@runanywhere/core", text)
+    assert reworded != text
+    (sandbox / "README.md").write_text(reworded, encoding="utf-8")
+    result = _run(sandbox)
     assert result.returncode == 1
-    assert "no version pin matches 'runanywhere=='" in result.stderr
+    assert "no version pin matches '@runanywhere/[a-z-]+@'" in result.stderr
+
+
+def test_unpublished_installs_are_not_pinned_in_the_root_readme():
+    # runanywhere is not on PyPI and pub.dev's runanywhere_qhexrt lags the train,
+    # so neither install line may be written as a registry pin the gate would
+    # then have to hold to a version nobody can install.
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "runanywhere==" not in readme
+    assert not re.search(r"runanywhere_qhexrt: \^", readme)
 
 
 def test_readme_temp_marker_for_another_release_is_rejected(tmp_path):
@@ -269,7 +283,7 @@ def test_deleting_only_the_temp_marker_rejects_stale_pins(tmp_path):
         return  # no marker, so there are no held pins to go stale
     result = _run(_readme_without_temp_marker(tmp_path, repin=False))
     assert result.returncode == 1
-    assert f"expected {_core_version()}, found 'runanywhere=={pin_version}'" in result.stderr
+    assert f"expected {_core_version()}, found '@runanywhere/core@{pin_version}'" in result.stderr
 
 
 if __name__ == "__main__":

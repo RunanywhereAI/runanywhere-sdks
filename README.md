@@ -95,8 +95,11 @@ Your code rarely picks hardware. Engines register what they can run, and the hig
 The fastest way to feel it. Install, load, generate, all local:
 
 ```bash
-pip install runanywhere
+git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+pip install ./runanywhere-sdks/bindings/python
 ```
+
+`runanywhere` is not on PyPI yet, so this builds the native runtime from source (CMake and a C++ toolchain required). See the [Python SDK README](bindings/python/).
 
 ```python
 import runanywhere as ra
@@ -234,7 +237,9 @@ dependencies:
   runanywhere_llamacpp: ^0.20.27  # LLM/VLM text generation
   # runanywhere_onnx: ^0.20.27    # STT, TTS, VAD, voice agent
   # runanywhere_mlx: ^0.20.27     # Apple-native LLM/VLM/STT/TTS/embeddings
-  # runanywhere_qhexrt: ^0.20.27  # Snapdragon Hexagon NPU
+  # Snapdragon Hexagon NPU: runanywhere_qhexrt is not on pub.dev at this version line.
+  # Use a path dependency on bindings/flutter/packages/runanywhere_qhexrt; its README
+  # covers the native payload, which is not in this repo.
 ```
 
 [Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](bindings/flutter/)
@@ -365,12 +370,12 @@ result = ra.llm.generate("Capital of France? One word.")
 print(result.text, result.tokens_per_second)   # "Paris" 41.2
 ```
 
-Namespaces per modality (`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rag`, `models`), an `a`-prefixed async twin for every blocking verb, structured output and tool calling, with prebuilt wheels that bundle the native runtime. CUDA is available as an opt-in source build.
+Namespaces per modality (`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rag`, `models`), an `a`-prefixed async twin for every blocking verb, structured output and tool calling. There are no prebuilt wheels yet, so install from source as below; CUDA is an opt-in source build.
 
-Install via pip:
+Install from a clone of this repo (`runanywhere` is not on PyPI yet, so there is no wheel to download):
 
 ```bash
-pip install runanywhere==0.20.27
+pip install ./bindings/python
 ```
 
 [Source](bindings/python/)
@@ -420,7 +425,7 @@ irm https://raw.githubusercontent.com/RunanywhereAI/wally/main/install.ps1 | iex
 | **React Native** | iOS, Android | Beta | npm (`@runanywhere/core`) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
 | **Web** | Chromium, Safari, Firefox | Beta | npm (`@runanywhere/web`) | [SDK README](bindings/web/) |
 | **Electron** | Windows x64 desktop | Preview | [Build from source](bindings/electron/) | [SDK README](bindings/electron/) |
-| **Python** | Windows, macOS, Linux | Alpha | pip (`runanywhere`) | [SDK README](bindings/python/) |
+| **Python** | Windows, macOS, Linux | Alpha | [Build from source](bindings/python/) (`pip install ./bindings/python`) | [SDK README](bindings/python/) |
 | **wally** | macOS, Linux, Windows | Stable | install script | [wally](https://github.com/RunanywhereAI/wally) |
 
 All SDKs ship on one version line, currently **0.20.37**, from a single C++ core. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
@@ -529,7 +534,7 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
 The Python SDK and wally both expose the local runtime as a drop-in OpenAI API, so anything that speaks the OpenAI client works against models running on your machine:
 
 ```bash
-pip install "runanywhere[server]"
+pip install "./bindings/python[server]"   # from a clone of this repo
 runanywhere serve        # http://127.0.0.1:8000
 ```
 
