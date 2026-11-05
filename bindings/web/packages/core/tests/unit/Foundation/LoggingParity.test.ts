@@ -10,6 +10,7 @@ import {
   registerWasmModule,
   unregisterWasmModule,
   getCommonsMinLogLevel,
+  getWasmModuleRecordForCapability,
   setCommonsMinLogLevel,
   type EmscriptenRunanywhereModule,
 } from '../../../src/runtime/EmscriptenModule.js';
@@ -106,5 +107,24 @@ describe('LoggingParity (Web)', () => {
     expect(SDKLogger.level).toBe(LogLevel.LOG_LEVEL_INFO);
     expect(mockModule._rac_logger_set_min_level).toHaveBeenCalledWith(2);
     expect(getCommonsMinLogLevel()).toBe(2);
+  });
+
+  it('log-level changes reach a module demoted by a later registration', () => {
+    const newOwner = {
+      _rac_logger_set_min_level: vi.fn(),
+    } as unknown as EmscriptenRunanywhereModule;
+    // Last-writer-wins: newOwner takes the only capability slot mockModule held.
+    registerWasmModule(['tool-calling'], newOwner);
+    try {
+      expect(getWasmModuleRecordForCapability('tool-calling')?.module).toBe(newOwner);
+
+      SDKLogger.setMinLogLevel(LogLevel.LOG_LEVEL_ERROR);
+
+      expect(newOwner._rac_logger_set_min_level).toHaveBeenLastCalledWith(4);
+      expect(mockModule._rac_logger_set_min_level).toHaveBeenLastCalledWith(4);
+      expect(currentModuleLevel).toBe(4);
+    } finally {
+      unregisterWasmModule(newOwner);
+    }
   });
 });
