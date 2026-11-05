@@ -1596,10 +1596,10 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
         options.max_tokens = opts.max_output_tokens();
     }
 
-    // temperature: when the canonical LLMGenerationOptions is set, pass its value through
-    // unconditionally so the documented greedy-decoding sentinel (0.0) reaches the engine
-    // (idl/llm_options.proto:49).
-    if (has_options) {
+    // temperature is `optional` (idl/llm_options.proto): an absent field keeps the
+    // RAC_LLM_OPTIONS_DEFAULT value (0.7), while an explicit 0.0 still reaches the engine
+    // as the documented greedy-decoding request.
+    if (has_options && opts.has_temperature()) {
         options.temperature = std::clamp(opts.temperature(), 0.0f, 2.0f);
     }
 
@@ -1634,7 +1634,9 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     if (has_options && opts.has_min_p()) {
         options.min_p = opts.min_p();
     }
-    options.seed = has_options ? opts.seed() : 0;
+    if (has_options && opts.has_seed()) {
+        options.seed = opts.seed();
+    }
     // n_threads was deleted from LLMGenerationOptions (idl/llm_options.proto):
     // thread count is now a load-time-only decision the engine makes when it
     // builds its thread pool at model load, not a per-request override.
