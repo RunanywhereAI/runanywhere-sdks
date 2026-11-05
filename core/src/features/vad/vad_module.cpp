@@ -982,6 +982,8 @@ extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
         return RAC_SUCCESS;  // Nothing to unload
     }
 
+    const bool was_running = component->is_running;
+
     if (component->model_service->ops && component->model_service->ops->stop) {
         component->model_service->ops->stop(component->model_service->impl);
     }
@@ -994,6 +996,14 @@ extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
     component->is_model_loaded = false;
     free(component->loaded_model_id);
     component->loaded_model_id = nullptr;
+
+    // A reconfigure during an explicit stop leaves the fallback stopped; resume it if running.
+    if (was_running && component->vad_service) {
+        const rac_result_t result = rac_energy_vad_start(component->vad_service);
+        if (result != RAC_SUCCESS) {
+            return result;
+        }
+    }
 
     RAC_LOG_INFO("VAD.Component", "VAD model unloaded, reverted to energy VAD");
 
