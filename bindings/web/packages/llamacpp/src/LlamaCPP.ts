@@ -214,7 +214,11 @@ export const LlamaCPP = {
    * 6. Registers the module for its actual LLM/embedding/VLM/structured/tool/
    *    LoRA capabilities while leaving ONNX embeddings and cross-WASM RAG intact.
    * 7. Wires `RunAnywhere.runtime.setAcceleration(mode)` to the bridge's
-   *    acceleration switcher.
+   *    acceleration switcher. While a BackendWorker is configured, that
+   *    switcher (plus the model-load preparation and failure-recovery
+   *    hooks) refuses to mutate either module — the worker's mode is fixed
+   *    for the backend session at `LlamaCPP.register({ acceleration })`,
+   *    and the main-thread bridge stays a CPU companion.
    *
    * Idempotent — concurrent callers share the same in-flight promise.
    */
@@ -238,11 +242,37 @@ export const LlamaCPP = {
         // Wire `RunAnywhere.runtime.setAcceleration(mode)` into the bridge.
         // Cleared on `unregister()`. Mirrors the previous public surface so
         // the core's `RuntimeConfig.setAcceleration` actually works.
+        //
+        // Fixed worker policy: while a llama.cpp BackendWorker stays
+        // configured — including before its first model load and across
+        // crash recovery, which retains the host — runtime acceleration
+        // changes are refused. Per-load switching must not tear down or
+        // rebuild either module (a main-thread WebGPU module opened beside
+        // a live worker has been correlated with worker generate Abort()).
+        // The worker's mode is selected once, at
+        // `LlamaCPP.register({ acceleration })`, and lasts for the backend
+        // session. When NO worker is configured, the existing direct
+        // bridge switch runs and the actually-resolved mode is published.
         setAccelerationSwitcher(async (mode) => {
+          if (_backendWorkerHost !== null) {
+            logger.warning(
+              `runtime.setAcceleration('${mode}') recorded as a preference only: runtime acceleration `
+              + 'changes are unsupported while the llama.cpp BackendWorker is configured. Select the '
+              + 'worker mode via LlamaCPP.register({ acceleration }) in a fresh backend session.',
+            );
+            return;
+          }
           await bridge.switchToAcceleration(mode);
           setActiveAccelerationMode(bridge.accelerationMode);
+          // Publish only the resolved result so `LlamaCPP.accelerationMode`
+          // no longer retains its registration-time value after a direct
+          // switch (capability detection may resolve WebGPU → CPU).
+          _inferenceAcceleration = bridge.accelerationMode;
         });
         setModelLoadPreparation(async ({ request, model }) => {
+          // A worker-owned load must not mutate the idle CPU companion
+          // bridge for a worker-side attempt.
+          if (_backendWorkerHost !== null) return;
           if (!shouldPrepareCpuForModelLoad(bridge, request, model)) return;
           logger.warning(
             `WebGPU VLM load is not stable for ${request.modelId}; loading with the CPU WASM artifact.`,
@@ -251,6 +281,9 @@ export const LlamaCPP = {
           setActiveAccelerationMode(bridge.accelerationMode);
         });
         setModelLoadFailureRecovery(async ({ request, error }) => {
+          // Never retry a worker-owned load by pretending the companion
+          // bridge changed its device.
+          if (_backendWorkerHost !== null) return false;
           if (!shouldFallbackWebGPUModelLoad(bridge, request, error)) return false;
           logger.warning(
             `WebGPU model load failed for ${request.modelId}; retrying with the CPU WASM artifact.`,
@@ -263,7 +296,11 @@ export const LlamaCPP = {
         // When the BackendWorker owns LLM inference, keep the main-thread
         // bridge on CPU so we do not open a second WebGPU device (dual
         // WebGPU modules have been correlated with worker generate Abort()).
-        // The worker still resolves auto → WebGPU when the adapter supports it.
+        // The worker still resolves auto → WebGPU when the adapter supports
+        // it. This mode is fixed for the whole backend session: the hooks
+        // installed above refuse runtime acceleration changes for as long
+        // as the host is retained, so changing it means unregistering and
+        // registering a fresh backend session with a new `acceleration`.
         const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
         const preferWorker = options.preferBackendWorker !== false && workerAvailable;
         const requested = options.acceleration ?? 'auto';
