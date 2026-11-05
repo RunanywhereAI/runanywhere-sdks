@@ -810,7 +810,7 @@ function fakeLifecycleRuntime(
     heapU32[(outResult + 12) >>> 2] = 0;
   };
 
-  const module: EmscriptenRunanywhereModule = {
+  const module: Partial<EmscriptenRunanywhereModule> = {
     HEAPU8: heapU8,
     HEAP32: heap32,
     HEAPU32: heapU32,
@@ -930,7 +930,7 @@ function fakeLifecycleRuntime(
   };
 
   return {
-    module,
+    module: module as EmscriptenRunanywhereModule,
     loadRequests,
     unloadRequests,
     loadedModelIds: () => Array.from(loaded.keys()).sort((left, right) => left.localeCompare(right)),

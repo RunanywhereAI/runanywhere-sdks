@@ -116,9 +116,9 @@ function createFakeModule(): FakeModuleHandle {
       lifecycle.push(`free:${ptr}`);
       freedPointers.push(ptr);
     },
-    addFunction(fn: Trampoline): number {
+    addFunction(fn: (...args: never[]) => number | bigint | void): number {
       const ptr = nextTrampoline++;
-      trampolines.set(ptr, fn);
+      trampolines.set(ptr, fn as Trampoline);
       return ptr;
     },
     removeFunction(ptr: number): void {
