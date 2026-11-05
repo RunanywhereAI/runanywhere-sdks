@@ -694,6 +694,42 @@ int test_mocked_vad_and_activity() {
           "unset-threshold VAD configure proto succeeds");
     CHECK(rac_vad_component_get_energy_threshold(threshold_vad) == RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
           "unset activation_threshold falls back to the default");
+    threshold_config.set_activation_threshold(0.0f);
+    CHECK(serialize(threshold_config, &threshold_bytes),
+          "zero-threshold VADConfiguration serializes");
+    CHECK(rac_vad_component_configure_proto(threshold_vad, threshold_bytes.data(),
+                                            threshold_bytes.size()) == RAC_SUCCESS,
+          "zero-threshold VAD reconfigure proto succeeds");
+    CHECK(rac_vad_component_initialize(threshold_vad) == RAC_SUCCESS,
+          "zero-threshold VAD initializes");
+    const float quiet[] = {0.001f, -0.001f, 0.001f, -0.001f};
+    runanywhere::v1::VADProcessRequest quiet_request;
+    quiet_request.mutable_audio()->set_audio_data(quiet, sizeof(quiet));
+    quiet_request.mutable_audio()->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
+    std::vector<uint8_t> quiet_bytes;
+    CHECK(serialize(quiet_request, &quiet_bytes), "quiet VADProcessRequest serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_vad_component_process_proto(threshold_vad, quiet_bytes.data(), quiet_bytes.size(),
+                                         &out);
+    runanywhere::v1::VADResult quiet_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &quiet_result), "zero-threshold VADResult parses");
+    CHECK(quiet_result.probability() == (quiet_result.is_speech() ? 1.0f : 0.0f),
+          "confidence is computed against the configured 0.0 threshold");
+    rac_proto_buffer_free(&out);
+    for (const float bad : {std::nanf(""), -0.1f, 1.5f}) {
+        threshold_config.set_activation_threshold(bad);
+        CHECK(serialize(threshold_config, &threshold_bytes),
+              "invalid-threshold VADConfiguration serializes");
+        CHECK(rac_vad_component_configure_proto(threshold_vad, threshold_bytes.data(),
+                                                threshold_bytes.size()) ==
+                  RAC_ERROR_INVALID_PARAMETER,
+              "NaN/out-of-range activation_threshold is rejected by component configure");
+        rac_proto_buffer_init(&out);
+        CHECK(rac_vad_configure_lifecycle_proto(threshold_bytes.data(), threshold_bytes.size(),
+                                                &out) == RAC_ERROR_INVALID_PARAMETER,
+              "NaN/out-of-range activation_threshold is rejected by lifecycle configure");
+        rac_proto_buffer_free(&out);
+    }
     rac_vad_component_destroy(threshold_vad);
 
     rac_handle_t energy_vad = nullptr;

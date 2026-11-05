@@ -545,7 +545,8 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     // ==========================================================================
 
     // 1. Energy threshold range (Swift lines 64-69)
-    if (config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
+    if (!std::isfinite(config->energy_threshold) || config->energy_threshold < 0.0f ||
+        config->energy_threshold > 1.0f) {
         RAC_LOG_ERROR("VAD.Component",
                       "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05");
         return RAC_ERROR_INVALID_PARAMETER;
@@ -1273,11 +1274,8 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
         std::lock_guard<std::mutex> lock(component->mtx);
         sample_rate = component->config.sample_rate > 0 ? component->config.sample_rate
                                                         : RAC_VAD_DEFAULT_SAMPLE_RATE;
-        threshold = component->is_model_loaded
-                        ? component->model_threshold
-                        : (component->config.energy_threshold > 0.0f
-                               ? component->config.energy_threshold
-                               : RAC_VAD_DEFAULT_ENERGY_THRESHOLD);
+        threshold = component->is_model_loaded ? component->model_threshold
+                                               : component->config.energy_threshold;
     }
 
     const bool has_override = options.has_activation_threshold();
@@ -1758,6 +1756,10 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
                                     : static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f);
     const float threshold =
         proto.has_activation_threshold() ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+    if (!std::isfinite(threshold) || threshold < 0.0f || threshold > 1.0f) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_PARAMETER,
+                                          "activation_threshold must be between 0 and 1.0");
+    }
 
     rac::lifecycle::LifecycleVadRef ref;
     const bool have_model = rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS;
