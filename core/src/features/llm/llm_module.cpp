@@ -36,6 +36,7 @@
 
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/common/special_token_filter.h"
+#include "features/common/utf8_stream_boundary.h"
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 // BUG-STREAMING-001: the canonical 13-field LLM stream emitter shared with the
@@ -717,6 +718,7 @@ struct llm_stream_context {
     // `<|im_end|>` across two callbacks, and neither half is recognisable on
     // its own.
     rac::tokens::StreamFilter filter;
+    rac::tokens::Utf8Assembler utf8;
 
     // Analytics event data
     std::string generation_id;
@@ -781,6 +783,7 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
     if (is_final) {
         cleaned += ctx->filter.flush();
     }
+    cleaned = rac::llm::sanitize_utf8(ctx->utf8.feed(cleaned));
     const bool cleaned_empty = cleaned.empty();
 
     // Track first token time and emit first token event only for the first
@@ -1836,6 +1839,7 @@ struct ProtoStreamContext {
     // Flutter FFI, React Native) — so without it `<|im_end|>` reached chat
     // bubbles and TTS on four platforms while iOS was clean.
     rac::tokens::StreamFilter filter;
+    rac::tokens::Utf8Assembler utf8;
     uint64_t seq = 0;
     bool terminal_sent = false;
     bool first_token_sent = false;
@@ -2230,6 +2234,7 @@ rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const c
     if (is_final) {
         cleaned += ctx->filter.flush();
     }
+    cleaned = sanitize_utf8(ctx->utf8.feed(cleaned));
     if (cleaned.empty()) {
         return RAC_TRUE;
     }
