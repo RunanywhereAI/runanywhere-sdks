@@ -222,6 +222,7 @@ typedef enum rac_model_format {
     RAC_MODEL_FORMAT_ZIP = RAC_MODEL_FORMAT_ID_ZIP,                 /**< Archive wrapping a model */
     RAC_MODEL_FORMAT_FOLDER = RAC_MODEL_FORMAT_ID_FOLDER,           /**< Folder-backed model */
     RAC_MODEL_FORMAT_PROPRIETARY = RAC_MODEL_FORMAT_ID_PROPRIETARY, /**< Built-in system model */
+    RAC_MODEL_FORMAT_LITERTLM = RAC_MODEL_FORMAT_ID_LITERTLM,       /**< LiteRT-LM bundle */
     RAC_MODEL_FORMAT_UNKNOWN = RAC_MODEL_FORMAT_ID_UNKNOWN          /**< Unknown format */
 } rac_model_format_t;
 
@@ -247,9 +248,10 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
     // Value 9 (WHISPERKIT_COREML) is retired.
     // Value 11 (GENIE) is retired.
-    RAC_FRAMEWORK_SHERPA = 12, /**< Sherpa-ONNX speech engine (STT/TTS/VAD) */
-    RAC_FRAMEWORK_QHEXRT = 13, /**< QHexRT (Qualcomm Hexagon NPU runtime) */
-    RAC_FRAMEWORK_UNKNOWN = 99 /**< Unknown framework */
+    RAC_FRAMEWORK_SHERPA = 12,   /**< Sherpa-ONNX speech engine (STT/TTS/VAD) */
+    RAC_FRAMEWORK_QHEXRT = 13,   /**< QHexRT (Qualcomm Hexagon NPU runtime) */
+    RAC_FRAMEWORK_LITERTLM = 14, /**< Google LiteRT-LM (.litertlm bundles) */
+    RAC_FRAMEWORK_UNKNOWN = 99   /**< Unknown framework */
 } rac_inference_framework_t;
 
 // =============================================================================

@@ -188,6 +188,8 @@ ModelFormat infer_format_from_path(const std::string& path) {
         return runanywhere::v1::MODEL_FORMAT_BIN;
     if (ends_with(lower, ".tflite"))
         return runanywhere::v1::MODEL_FORMAT_TFLITE;
+    if (ends_with(lower, ".litertlm"))
+        return runanywhere::v1::MODEL_FORMAT_LITERTLM;
     if (ends_with(lower, ".safetensors"))
         return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
     if (ends_with(lower, ".mlmodel"))

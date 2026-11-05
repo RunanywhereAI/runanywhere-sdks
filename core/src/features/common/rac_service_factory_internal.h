@@ -235,6 +235,8 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
             return RAC_ENGINE_ID_NEURT;
         case RAC_FRAMEWORK_QHEXRT:
             return RAC_ENGINE_ID_QHEXRT;
+        case RAC_FRAMEWORK_LITERTLM:
+            return RAC_ENGINE_ID_LITERTLM;
         case RAC_FRAMEWORK_FLUID_AUDIO:
         case RAC_FRAMEWORK_BUILTIN:
         case RAC_FRAMEWORK_NONE:
@@ -251,7 +253,7 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
  * @return True if fallback to alternative engines is disallowed.
  */
 inline bool framework_requires_hinted_plugin(rac_inference_framework_t framework) {
-    return framework == RAC_FRAMEWORK_COREML;
+    return framework == RAC_FRAMEWORK_COREML || framework == RAC_FRAMEWORK_LITERTLM;
 }
 
 /**

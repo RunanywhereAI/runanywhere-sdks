@@ -372,6 +372,7 @@ object CppBridgeSTT {
             InferenceFramework.INFERENCE_FRAMEWORK_COREML -> CppBridgeModelRegistry.Framework.COREML
             InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> CppBridgeModelRegistry.Framework.SHERPA
             InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> CppBridgeModelRegistry.Framework.QHEXRT
+            InferenceFramework.INFERENCE_FRAMEWORK_LITERT_LM -> CppBridgeModelRegistry.Framework.LITERTLM
             else -> CppBridgeModelRegistry.Framework.UNKNOWN
         }
 }

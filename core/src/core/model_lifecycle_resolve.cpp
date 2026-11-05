@@ -78,6 +78,8 @@ bool path_matches_proto_format(const std::string& path, runanywhere::v1::ModelFo
             return path_has_extension(path, "safetensors");
         case runanywhere::v1::MODEL_FORMAT_ZIP:
             return path_has_extension(path, "zip");
+        case runanywhere::v1::MODEL_FORMAT_LITERTLM:
+            return path_has_extension(path, "litertlm");
         case runanywhere::v1::MODEL_FORMAT_COREML:
             return path_has_extension(path, "mlmodelc") || path_has_extension(path, "mlmodel") ||
                    path_has_extension(path, "mlpackage");
@@ -89,7 +91,7 @@ bool path_matches_proto_format(const std::string& path, runanywhere::v1::ModelFo
                    path_has_extension(path, "bin") || path_has_extension(path, "mlmodel") ||
                    path_has_extension(path, "mlpackage") || path_has_extension(path, "mlmodelc") ||
                    path_has_extension(path, "tflite") || path_has_extension(path, "safetensors") ||
-                   path_has_extension(path, "zip");
+                   path_has_extension(path, "zip") || path_has_extension(path, "litertlm");
     }
 }
 

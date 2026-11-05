@@ -33,6 +33,7 @@ typedef enum rac_model_format_id {
     RAC_MODEL_FORMAT_ID_FOLDER = 13u,
     RAC_MODEL_FORMAT_ID_PROPRIETARY = 14u,
     RAC_MODEL_FORMAT_ID_UNKNOWN = 15u,
+    RAC_MODEL_FORMAT_ID_LITERTLM = 16u,
 } rac_model_format_id_t;
 
 static inline uint32_t rac_model_format_id_value(rac_model_format_id_t id) {

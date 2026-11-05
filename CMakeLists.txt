@@ -321,6 +321,33 @@ if(RAC_BUILD_TESTS)
         add_test(NAME qhexrt_request_cancellation_tests
                  COMMAND test_qhexrt_request_cancellation)
     endif()
+    # LiteRT-LM message JSON and stream assembly: header-only, so this runs with or
+    # without the prebuilt library.
+    if(NOT TARGET test_litertlm_stream_helpers)
+        add_executable(test_litertlm_stream_helpers
+            engines/litertlm/tests/test_litertlm_stream_helpers.cpp)
+        target_include_directories(test_litertlm_stream_helpers PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/litertlm)
+        target_link_libraries(test_litertlm_stream_helpers PRIVATE nlohmann_json::nlohmann_json)
+        target_compile_features(test_litertlm_stream_helpers PRIVATE cxx_std_17)
+        add_test(NAME litertlm_stream_helpers_tests COMMAND test_litertlm_stream_helpers)
+    endif()
+    # LiteRT-LM ops against the real library. Broken-file cases need no model; the
+    # rest read RAC_LITERTLM_TEST_MODEL and the test exits 77 without it.
+    if(TARGET litertlm_capi AND NOT TARGET test_litertlm_engine)
+        find_package(Threads REQUIRED)
+        add_executable(test_litertlm_engine engines/litertlm/tests/test_litertlm_engine.cpp)
+        target_include_directories(test_litertlm_engine PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/litertlm)
+        target_link_libraries(test_litertlm_engine PRIVATE
+            rac_backend_litertlm rac_commons Threads::Threads)
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_litertlm_engine)
+        endif()
+        target_compile_features(test_litertlm_engine PRIVATE cxx_std_17)
+        add_test(NAME litertlm_engine_tests COMMAND test_litertlm_engine)
+        set_tests_properties(litertlm_engine_tests PROPERTIES SKIP_RETURN_CODE 77)
+    endif()
     # The llama.cpp engine is configured after commons/tests, so its plugin
     # contract test must be wired here once the backend target exists.
     if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp AND

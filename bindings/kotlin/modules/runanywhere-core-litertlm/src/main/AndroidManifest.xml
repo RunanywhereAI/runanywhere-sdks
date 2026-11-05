@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Vendor GPU libraries the LiteRT-LM accelerators open. Apps targeting
+             API 31+ cannot reach them without these. Absent on some devices: the
+             engine then runs on CPU. -->
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+    </application>
+</manifest>

@@ -468,6 +468,9 @@ tests/streaming/README.md
 tests/streaming/cancel_parity/README.md
 tests/streaming/perf_bench/README.md
 
+# LiteRT-LM — C API tree built by scripts/build/build-litertlm-android.sh (never commit)
+engines/litertlm/prebuilt/
+
 # QHexRT — PRIVATE prebuilt engine archive (never commit; staged via QHEXRT_ROOT)
 engines/qhexrt/prebuilt/
 /.idea/noctule.xml

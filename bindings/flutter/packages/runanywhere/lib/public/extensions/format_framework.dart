@@ -37,6 +37,7 @@ const Map<InferenceFramework, String> _kFrameworkDisplayNames = {
       'Swift Transformers',
   InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN: 'Built-in',
   InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT: 'QHexRT',
+  InferenceFramework.INFERENCE_FRAMEWORK_LITERT_LM: 'LiteRT-LM',
   InferenceFramework.INFERENCE_FRAMEWORK_NONE: 'None',
 };
 

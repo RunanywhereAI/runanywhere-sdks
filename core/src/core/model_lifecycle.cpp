@@ -81,6 +81,8 @@ const char* engine_name_for_framework(runanywhere::v1::InferenceFramework framew
             return RAC_ENGINE_ID_LLAMACPP;
         case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
             return RAC_ENGINE_ID_QHEXRT;
+        case runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM:
+            return RAC_ENGINE_ID_LITERTLM;
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
             return RAC_ENGINE_ID_ONNX;
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:

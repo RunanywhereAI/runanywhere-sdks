@@ -88,6 +88,8 @@ static_assert(RAC_MODEL_FORMAT_ID_PROPRIETARY ==
               static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_PROPRIETARY));
 static_assert(RAC_MODEL_FORMAT_ID_UNKNOWN ==
               static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_UNKNOWN));
+static_assert(RAC_MODEL_FORMAT_ID_LITERTLM ==
+              static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_LITERTLM));
 
 static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_UNSPECIFIED) ==
               RAC_MODEL_FORMAT_ID_UNSPECIFIED);
@@ -109,6 +111,7 @@ static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_FOLDER) == RAC_MODEL_FORMAT
 static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_PROPRIETARY) ==
               RAC_MODEL_FORMAT_ID_PROPRIETARY);
 static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_UNKNOWN) == RAC_MODEL_FORMAT_ID_UNKNOWN);
+static_assert(static_cast<uint32_t>(RAC_MODEL_FORMAT_LITERTLM) == RAC_MODEL_FORMAT_ID_LITERTLM);
 
 namespace {
 

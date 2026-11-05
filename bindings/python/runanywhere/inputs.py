@@ -277,6 +277,7 @@ class InferenceFramework(IntEnum):
     COREML = 8
     SHERPA = 12
     QHEXRT = 13
+    LITERTLM = 14
     UNKNOWN = 99
 
 

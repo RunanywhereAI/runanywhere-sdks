@@ -370,3 +370,11 @@ QAIRT_RUNTIME_VERSION=2.47.0.260601
 QAIRT_RUNTIME_RELEASE_TAG=qairt-runtime-v2.47.0.260601
 QAIRT_RUNTIME_ARM64_V8A_SHA256=b851e3d3f8b7888ce747f1ef05e0b41d5dab60f9b2490fe384649461cecd0800
 QAIRT_RUNTIME_WIN_ARM64_SHA256=76499d3bb11196e42f5801e1d3c240f0fd120938b75820992f93101a33db8aa8
+
+# =============================================================================
+# LiteRT-LM C API (engines/litertlm)
+# =============================================================================
+# Android has no released C API binary, so scripts/build/build-litertlm-android.sh
+# builds this tag and refuses any other commit. C API 1.0.0.
+LITERT_LM_VERSION=0.19.0
+LITERT_LM_COMMIT=83ce6067f2e2a3fb697556928f93936693ded971
