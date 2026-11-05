@@ -1,3 +1,4 @@
+import com.runanywhere.gradle.NativeArchiveDownloader
 import org.gradle.api.artifacts.dsl.LockMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.security.MessageDigest
@@ -12,6 +13,9 @@ plugins {
     id("maven-publish")
     signing
 }
+
+// Ant's <get> has no connect/read timeout; see NativeArchiveDownloader in buildSrc.
+extra["downloadWithTimeouts"] = NativeArchiveDownloader::downloadWithTimeouts
 
 allprojects {
     dependencyLocking {
@@ -291,6 +295,10 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -550,6 +558,9 @@ tasks.register("downloadJniLibs") {
         outputDir.mkdirs()
         tempDir.mkdirs()
 
+        @Suppress("UNCHECKED_CAST")
+        val downloadWithTimeouts = rootProject.extra["downloadWithTimeouts"] as (String, File) -> Unit
+
         var totalDownloaded = 0
         val downloadFailures = mutableListOf<String>()
 
@@ -562,9 +573,7 @@ tasks.register("downloadJniLibs") {
             val tempZip = file("$tempDir/$packageName")
 
             try {
-                ant.withGroovyBuilder {
-                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-                }
+                downloadWithTimeouts(zipUrl, tempZip)
 
                 // VERIFY BEFORE EXTRACT. This path had no integrity check at all: it
                 // fetched a .zip over the network and unzipped it straight into jniLibs.
@@ -575,9 +584,7 @@ tasks.register("downloadJniLibs") {
                 // filename assertion, so a sidecar for a DIFFERENT asset cannot satisfy
                 // this one.
                 val sidecar = file("$tempDir/$packageName.sha256")
-                ant.withGroovyBuilder {
-                    "get"("src" to "$zipUrl.sha256", "dest" to sidecar, "verbose" to false)
-                }
+                downloadWithTimeouts("$zipUrl.sha256", sidecar)
                 val sidecarMatch =
                     Regex("""^([0-9a-fA-F]{64})\s+\*?(.+)$""")
                         .find(sidecar.readText().trim())
