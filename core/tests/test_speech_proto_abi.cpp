@@ -1211,6 +1211,34 @@ int test_vad_reconfigure_keeps_stopped_detector_stopped() {
     return 0;
 }
 
+int test_vad_unload_resumes_fallback_after_reload() {
+    rac_handle_t vad = nullptr;
+    CHECK(rac_vad_component_create(&vad) == RAC_SUCCESS, "VAD component creates");
+    rac_vad_config_t config = RAC_VAD_CONFIG_DEFAULT;
+    config.energy_threshold = 0.01f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "VAD configures");
+    CHECK(rac_vad_component_initialize(vad) == RAC_SUCCESS, "VAD initializes");
+    CHECK(rac_vad_component_load_model(vad, "mock-vad", "mock-vad", "Mock VAD") == RAC_SUCCESS,
+          "mock VAD model loads");
+    CHECK(rac_vad_component_stop(vad) == RAC_SUCCESS, "VAD stops");
+    config.energy_threshold = 0.02f;
+    CHECK(rac_vad_component_configure(vad, &config) == RAC_SUCCESS, "stopped VAD reconfigures");
+    CHECK(rac_vad_component_load_model(vad, "mock-vad", "mock-vad", "Mock VAD") == RAC_SUCCESS,
+          "mock VAD model reloads");
+    CHECK(rac_vad_component_unload(vad) == RAC_SUCCESS, "VAD model unloads");
+
+    std::vector<float> silence(1600, 0.0f);
+    std::vector<float> loud(1600, 0.5f);
+    rac_bool_t is_speech = RAC_FALSE;
+    for (int i = 0; i < 20; ++i) {
+        (void)rac_vad_component_process(vad, silence.data(), silence.size(), &is_speech);
+    }
+    (void)rac_vad_component_process(vad, loud.data(), loud.size(), &is_speech);
+    CHECK(is_speech == RAC_TRUE, "unload resumes the fallback detector after a reload");
+    rac_vad_component_destroy(vad);
+    return 0;
+}
+
 int test_stt_proto_adapters_mapping() {
     // 1. rac_stt_word_from_proto
     runanywhere::v1::WordTimestamp word_proto;
@@ -1312,6 +1340,7 @@ int main() {
         test_voice_agent_d7_component_create_destroy_proto();
         test_voice_agent_reinitialize_applies_new_vad_config();
         test_vad_reconfigure_keeps_stopped_detector_stopped();
+        test_vad_unload_resumes_fallback_after_reload();
         test_stt_proto_adapters_mapping();
         rac_plugin_unregister("llamacpp");
         rac_plugin_unregister("onnx");

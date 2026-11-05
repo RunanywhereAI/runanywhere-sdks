@@ -791,6 +791,20 @@ extern "C" rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle
 // CONTROL API
 // =============================================================================
 
+static void mark_running(rac_vad_component* component) {
+    const bool was_running = component->is_running;
+    component->is_running = true;
+    component->is_stopped = false;
+    if (!was_running) {
+#if defined(RAC_HAVE_PROTOBUF)
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+#endif
+    }
+}
+
 extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
@@ -810,17 +824,7 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     }
 
     if (result == RAC_SUCCESS) {
-        const bool was_running = component->is_running;
-        component->is_running = true;
-        component->is_stopped = false;
-        if (!was_running) {
-#if defined(RAC_HAVE_PROTOBUF)
-            runanywhere::v1::VoiceLifecycleEvent voice;
-            voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
-            rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
-                                 runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
-#endif
-        }
+        mark_running(component);
     }
 
     return result;
@@ -956,6 +960,9 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
             return result;
         }
     }
+
+    // Loading starts the model, so unload knows to resume the energy fallback.
+    mark_running(component);
 
     RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
 
