@@ -407,12 +407,43 @@ function currentModelFromBackendWorker(
 }
 
 /**
+ * Unloads still in flight (previous-owner releases and explicit unloads),
+ * keyed by the WASM module or BackendWorker they run on. Later loads and
+ * unloads on that owner await the entry so a model moved back (M1 -> M2 -> M1)
+ * cannot be loaded while the stale unload is still running and then removed by
+ * it, and two unloads never overlap on one owner. Entries never reject.
+ */
+const pendingOwnerReleases = new Map<
+  EmscriptenRunanywhereModule | 'llamacpp' | 'onnx',
+  Promise<void>
+>();
+
+/** Run `task` after every unload already queued on `owner`, queueing it too. */
+function runAfterOwnerUnloads<T>(
+  owner: EmscriptenRunanywhereModule | 'llamacpp' | 'onnx',
+  task: () => Promise<T>,
+): Promise<T> {
+  const previous = pendingOwnerReleases.get(owner);
+  const run = (async () => {
+    await previous;
+    return task();
+  })();
+  const settled = run.then(() => undefined, () => undefined);
+  pendingOwnerReleases.set(owner, settled);
+  void settled.then(() => {
+    if (pendingOwnerReleases.get(owner) === settled) pendingOwnerReleases.delete(owner);
+  });
+  return run;
+}
+
+/**
  * Release the copy of `modelId` held by its previous owner after it loaded
  * successfully elsewhere. `nextBackendId` names the BackendWorker that now
  * owns it (undefined = main thread), and `nextModule` the main-thread WASM
  * that now owns it (undefined = a worker). Ownership bookkeeping is updated
  * synchronously, so callers start this without awaiting and record the new
- * owner immediately afterwards; the unload itself completes in the background.
+ * owner immediately afterwards; the unload itself completes in the background
+ * and is tracked in `pendingOwnerReleases` until it settles.
  */
 async function releasePreviousModelOwner(
   modelId: string,
@@ -426,18 +457,22 @@ async function releasePreviousModelOwner(
   if (workerOwner === nextBackendId || (!workerOwner && previousModule === nextModule)) return;
   if (workerOwner) clearModelOwnedByBackendWorker(modelId, workerOwner);
   if (previousModule) recordModelLifecycle(modelId, previousModule, false);
-  // Best effort: the new load already succeeded, so a failed release must not fail it.
-  try {
-    if (workerOwner) {
-      const host = getActiveBackendWorkerHost(workerOwner);
-      const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
-      await host?.unloadModel(workerOwner === 'onnx' ? 'stt' : 'llm', { requestBytes });
-    } else if (previousModule) {
-      await ModelLifecycleAdapter.fromModule(
-        previousModule as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
-      ).unloadAsync(request);
-    }
-  } catch { /* ignore */ }
+  const owner = workerOwner ?? previousModule;
+  if (!owner) return;
+  await runAfterOwnerUnloads(owner, async () => {
+    // Best effort: the new load already succeeded, so a failed release must not fail it.
+    try {
+      if (workerOwner) {
+        const host = getActiveBackendWorkerHost(workerOwner);
+        const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
+        await host?.unloadModel(workerOwner === 'onnx' ? 'stt' : 'llm', { requestBytes });
+      } else if (previousModule) {
+        await ModelLifecycleAdapter.fromModule(
+          previousModule as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
+        ).unloadAsync(request);
+      }
+    } catch { /* ignore */ }
+  });
 }
 
 async function loadModelViaBackendWorker(
@@ -465,6 +500,7 @@ async function loadModelViaBackendWorker(
     );
   }
 
+  await pendingOwnerReleases.get(backendId);
   const requestBytes = ModelLoadRequestCodec.encode(request).finish();
   const modelInfoBytes = ModelInfoCodec.encode(resolved).finish();
   const response = await host.loadModel(
@@ -584,7 +620,10 @@ async function unloadAcrossAdaptersAsync(
   // state, and deterministic teardown is more important than parallelism here.
   for (const adapter of adaptersForUnload(request)) {
     try {
-      const result = await adapter.unloadAsync(request);
+      const result = await runAfterOwnerUnloads(
+        lifecycleModuleAsEmscripten(adapter),
+        () => adapter.unloadAsync(request),
+      );
       results.push(result);
       if (result && !result.error) {
         for (const modelId of result.unloadedModelIds) {
@@ -627,7 +666,9 @@ async function unloadCategoryAcrossWorkers(request: ModelUnloadRequest): Promise
   for (const [backendId, modelIds] of idsByBackend) {
     const host = getActiveBackendWorkerHost(backendId);
     if (!host) continue;
-    await host.unloadModel(backendId === 'onnx' ? 'stt' : 'llm', { requestBytes });
+    await runAfterOwnerUnloads(backendId, () => (
+      host.unloadModel(backendId === 'onnx' ? 'stt' : 'llm', { requestBytes })
+    ));
     for (const modelId of modelIds) clearModelOwnedByBackendWorker(modelId, backendId);
   }
 }
@@ -874,6 +915,7 @@ export const WebModelLifecycle = {
       );
       if (workerResult) return workerResult;
 
+      await pendingOwnerReleases.get(lifecycleModuleAsEmscripten(adapter));
       const result = await adapter.loadAsync(request);
       if (result && !result.error) {
         void releasePreviousModelOwner(
@@ -908,6 +950,7 @@ export const WebModelLifecycle = {
         retryWorkerRoute,
       );
       if (workerResult) return workerResult;
+      await pendingOwnerReleases.get(lifecycleModuleAsEmscripten(retryAdapter));
       const result = await retryAdapter.loadAsync(request);
       if (result && !result.error) {
         void releasePreviousModelOwner(
@@ -934,6 +977,20 @@ export const WebModelLifecycle = {
   },
 
   async unloadModelAsync(request: ModelUnloadRequest): Promise<ModelUnloadResult | null> {
+    // Wait only on the owners this unload reaches (worker plus the recorded
+    // module the adapter unload also runs on), so a stalled release on one
+    // backend cannot block an unrelated unload; fan-out unloads wait on all.
+    const workerOwner = request.modelId ? getBackendWorkerOwner(request.modelId) : undefined;
+    await Promise.all(
+      request.modelId && !request.unloadAll
+        ? [
+          ...(workerOwner ? [pendingOwnerReleases.get(workerOwner)] : []),
+          ...adaptersForUnload(request).map((adapter) => (
+            pendingOwnerReleases.get(lifecycleModuleAsEmscripten(adapter))
+          )),
+        ]
+        : pendingOwnerReleases.values(),
+    );
     const backendId = request.modelId && isModelOwnedByBackendWorker(request.modelId, 'onnx')
       ? 'onnx'
       : 'llamacpp';
@@ -946,7 +1003,9 @@ export const WebModelLifecycle = {
       )
     ) {
       const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
-      await host.unloadModel(backendId === 'onnx' ? 'stt' : 'llm', { requestBytes });
+      await runAfterOwnerUnloads(backendId, () => (
+        host.unloadModel(backendId === 'onnx' ? 'stt' : 'llm', { requestBytes })
+      ));
       if (request.unloadAll) {
         clearModelOwnedByBackendWorker(undefined, backendId);
       } else {
