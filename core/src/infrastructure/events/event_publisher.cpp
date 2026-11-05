@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstring>
 #include <deque>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -164,12 +165,14 @@ void populate_error(runanywhere::v1::SDKError* error, rac_result_t code, const c
                     runanywhere::v1::ErrorSeverity severity = runanywhere::v1::ERROR_SEVERITY_ERROR,
                     bool retryable = false) {
     const int32_t c_code = static_cast<int32_t>(code);
-    const int32_t abs_code = c_code < 0 ? -c_code : c_code;
+    const int64_t abs_code = c_code < 0 ? -static_cast<int64_t>(c_code) : c_code;
     // proto enum range is validated by the protobuf reflection layer; abs_code is
     // normalized from rac_result_t and may legitimately exceed declared enum values
-    // for forward compat.
+    // for forward compat. INT32_MIN has no positive int32 equivalent; c_abi_code keeps it.
     // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
-    error->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
+    error->set_code(abs_code > std::numeric_limits<int32_t>::max()
+                        ? runanywhere::v1::ERROR_CODE_UNKNOWN
+                        : static_cast<runanywhere::v1::ErrorCode>(abs_code));
     error->set_category(rac::foundation::rac_result_to_proto_category(code));
     error->set_message(message != nullptr && message[0] != '\0' ? message
                                                                 : rac_error_message(code));
