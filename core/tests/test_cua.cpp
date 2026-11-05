@@ -385,6 +385,104 @@ TestResult run_proto_unknown_profile_error() {
 }
 #endif
 
+
+// --- runtime profile registry -------------------------------------------------
+//
+// The registry exists so a new computer-use model family needs no edit to this
+// library, no rebuild, and no republish of the language bindings. These cover
+// the parts that would silently misbehave rather than fail loudly.
+
+TestResult run_runtime_profile_registers_and_resolves() {
+    const char* prompt = "Registered at runtime. Emit <tool_call>{...}</tool_call>.";
+    ASSERT_TRUE(rac_cua_register_profile("test-vlm", prompt, 1280, 720) == RAC_SUCCESS,
+                "registering a profile must succeed");
+
+    char buf[512];
+    int n = rac_cua_system_prompt("test-vlm", 0, 0, buf, sizeof(buf));
+    ASSERT_TRUE(n == static_cast<int>(std::strlen(prompt)), "prompt length must round-trip");
+    ASSERT_TRUE(std::string(buf) == prompt, "prompt text must round-trip verbatim");
+    return TEST_PASS();
+}
+
+TestResult run_runtime_profile_uses_its_own_coordinate_space() {
+    // The whole point of a per-profile space: this must rescale from the
+    // REGISTERED 1280x720, not from Fara's built-in 1000x1000. Centre of that
+    // space on a 1440x900 viewport is (720, 450); rescaling from 1000x1000
+    // would give (921, 324) and every click would be quietly wrong.
+    ASSERT_TRUE(rac_cua_register_profile("space-vlm", "p", 1280, 720) == RAC_SUCCESS,
+                "registration must succeed");
+
+    rac_cua_action_t action{};
+    const char* out =
+        "<tool_call>{\"name\":\"computer_use\",\"arguments\":"
+        "{\"action\":\"left_click\",\"coordinate\":[640,360]}}</tool_call>";
+    ASSERT_TRUE(rac_cua_parse_action("space-vlm", out, 1440, 900, &action) == 0, "parse must succeed");
+    ASSERT_TRUE(action.x == 720, "x must rescale from the registered width");
+    ASSERT_TRUE(action.y == 450, "y must rescale from the registered height");
+    return TEST_PASS();
+}
+
+TestResult run_runtime_profile_replaces_rather_than_duplicates() {
+    ASSERT_TRUE(rac_cua_register_profile("dupe-vlm", "first", 1000, 1000) == RAC_SUCCESS, "first registration");
+    const size_t after_first = rac_cua_profile_count();
+    ASSERT_TRUE(rac_cua_register_profile("dupe-vlm", "second", 1000, 1000) == RAC_SUCCESS, "re-registration");
+    ASSERT_TRUE(rac_cua_profile_count() == after_first, "re-registering must not grow the registry");
+
+    char buf[64];
+    rac_cua_system_prompt("dupe-vlm", 0, 0, buf, sizeof(buf));
+    ASSERT_TRUE(std::string(buf) == "second", "the later registration must win");
+    return TEST_PASS();
+}
+
+TestResult run_runtime_profile_can_override_builtin() {
+    // Deliberately allowed: it lets an application correct a shipped prompt
+    // without waiting for an SDK release. It must not double-count the id.
+    const size_t before = rac_cua_profile_count();
+    ASSERT_TRUE(rac_cua_register_profile(RAC_CUA_PROFILE_FARA, "overridden", 1000, 1000) == RAC_SUCCESS,
+                "overriding a built-in must be allowed");
+    ASSERT_TRUE(rac_cua_profile_count() == before, "override must not double-count the built-in");
+
+    char buf[64];
+    rac_cua_system_prompt(RAC_CUA_PROFILE_FARA, 0, 0, buf, sizeof(buf));
+    ASSERT_TRUE(std::string(buf) == "overridden", "the override must win over the built-in");
+
+    // Restore the built-in. Without this the override leaks into every later
+    // test in the process, and whether they pass would depend on run order.
+    ASSERT_TRUE(rac_cua_unregister_profile(RAC_CUA_PROFILE_FARA) == RAC_SUCCESS, "unregister must succeed");
+    char restored[8192];
+    int n = rac_cua_system_prompt(RAC_CUA_PROFILE_FARA, 0, 0, restored, sizeof(restored));
+    ASSERT_TRUE(n > 0 && std::string(restored).find("You are Fara") != std::string::npos,
+                "unregistering an override must restore the built-in");
+
+    // A built-in itself is not removable.
+    ASSERT_TRUE(rac_cua_unregister_profile(RAC_CUA_PROFILE_FARA) == RAC_ERROR_INVALID_ARGUMENT,
+                "a built-in must not be removable");
+    return TEST_PASS();
+}
+
+TestResult run_runtime_profile_rejects_bad_input() {
+    ASSERT_TRUE(rac_cua_register_profile(nullptr, "p", 10, 10) == RAC_ERROR_INVALID_ARGUMENT, "null id");
+    ASSERT_TRUE(rac_cua_register_profile("", "p", 10, 10) == RAC_ERROR_INVALID_ARGUMENT, "empty id");
+    ASSERT_TRUE(rac_cua_register_profile("bad", nullptr, 10, 10) == RAC_ERROR_INVALID_ARGUMENT, "null prompt");
+    // A zero-sized space would make every rescale meaningless rather than wrong.
+    ASSERT_TRUE(rac_cua_register_profile("bad", "p", 0, 10) == RAC_ERROR_INVALID_ARGUMENT, "zero width");
+    ASSERT_TRUE(rac_cua_register_profile("bad", "p", 10, 0) == RAC_ERROR_INVALID_ARGUMENT, "zero height");
+    return TEST_PASS();
+}
+
+TestResult run_profile_enumeration_covers_every_profile_once() {
+    ASSERT_TRUE(rac_cua_register_profile("enum-vlm", "p", 800, 600) == RAC_SUCCESS, "registration");
+    const size_t total = rac_cua_profile_count();
+    ASSERT_TRUE(total >= 2, "at least the built-in plus the registered one");
+
+    char buf[128];
+    for (size_t i = 0; i < total; ++i) {
+        ASSERT_TRUE(rac_cua_profile_id_at(i, buf, sizeof(buf)) > 0, "every index must yield an id");
+    }
+    ASSERT_TRUE(rac_cua_profile_id_at(total, buf, sizeof(buf)) < 0, "past the end must return -1");
+    return TEST_PASS();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -413,6 +511,12 @@ int main(int argc, char** argv) {
     suite.add("golden_real_mlx_new_tab", run_golden_real_mlx_new_tab);
     suite.add("golden_real_loop_click", run_golden_real_loop_click);
     suite.add("golden_real_loop_terminate", run_golden_real_loop_terminate);
+    suite.add("runtime_profile_registers_and_resolves", run_runtime_profile_registers_and_resolves);
+    suite.add("runtime_profile_uses_its_own_coordinate_space", run_runtime_profile_uses_its_own_coordinate_space);
+    suite.add("runtime_profile_replaces_rather_than_duplicates", run_runtime_profile_replaces_rather_than_duplicates);
+    suite.add("runtime_profile_can_override_builtin", run_runtime_profile_can_override_builtin);
+    suite.add("runtime_profile_rejects_bad_input", run_runtime_profile_rejects_bad_input);
+    suite.add("profile_enumeration_covers_every_profile_once", run_profile_enumeration_covers_every_profile_once);
 #if defined(RAC_HAVE_PROTOBUF)
     suite.add("proto_roundtrip_golden", run_proto_roundtrip_golden);
     suite.add("proto_unknown_profile_error", run_proto_unknown_profile_error);

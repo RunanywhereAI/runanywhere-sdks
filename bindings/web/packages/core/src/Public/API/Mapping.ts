@@ -13,7 +13,11 @@ import {
 import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { ToolChoiceMode } from '@runanywhere/proto-ts/tool_calling';
-import type { StructuredOutputOptions, StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
+import {
+  StructuredOutputMode as ProtoStructuredOutputMode,
+  type StructuredOutputOptions,
+  type StructuredOutputResult,
+} from '@runanywhere/proto-ts/structured_output';
 import type { STTOptions, STTOutput } from '@runanywhere/proto-ts/stt_options';
 import type { TTSOptions, TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
 import type { VADOptions, VADResult as ProtoVadResult } from '@runanywhere/proto-ts/vad_options';
@@ -304,23 +308,33 @@ export function vlmToGenerationResult(result: VLMResult, requestId = ''): Genera
   };
 }
 
+/** Map the cross-SDK `StructuredOutputMode` to the proto enum value it selects. */
+const STRUCTURED_OUTPUT_MODES: Record<StructuredOutputMode, ProtoStructuredOutputMode> = {
+  constrained: ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_CONSTRAINED,
+  validationOnly: ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_VALIDATION_ONLY,
+  repair: ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_REPAIR,
+};
+
 /**
  * Build the proto structured-output request options for one
- * `llm.generateStructured` call. `CONSTRAINED` is not wired on Web (no
- * grammar-constrained decoding hook) — callers must preflight-reject it
- * before reaching this helper. `StructuredOutputOptions` no longer carries a
- * `mode`/`strictMode`/`repairJson` knob: it is just
- * `includeSchemaInPrompt`/`schema`/`grammar`/`regex` now, so `mode` is kept
- * only as the caller-facing enforcement level threaded through to
- * `toStructuredResult` — commons always validates+extracts on the result.
+ * `llm.generateStructured` call. Always sets `schema` (a constraint arm) and
+ * the explicit `mode` the caller asked for — leaving `mode` unset defaults to
+ * CONSTRAINED whenever a constraint arm is present, which would silently
+ * constrain a `'validationOnly'` request, so it must always be threaded
+ * through explicitly. `'constrained'`/`'repair'` ask commons to compile
+ * `schema` to a GBNF grammar (`rac::llm::json_schema_to_gbnf()`) and
+ * constrain decoding token-by-token; llama.cpp's grammar sources are compiled
+ * into the Web WASM, so this is wired end-to-end today. `'validationOnly'`
+ * leaves decoding unconstrained and validates the free-text result instead.
  */
 export function toProtoStructuredOutputOptions(
   json: string,
-  _mode: Exclude<StructuredOutputMode, 'constrained'>,
+  mode: StructuredOutputMode,
 ): StructuredOutputOptions {
   return {
     includeSchemaInPrompt: true,
     schema: json,
+    mode: STRUCTURED_OUTPUT_MODES[mode],
   };
 }
 
