@@ -1231,10 +1231,16 @@ export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
 
 let _currentCommonsMinLogLevel = 2; // Default to INFO (2)
 
-/** Set the minimum log level across all registered WASM modules. */
+/**
+ * Set the minimum log level across all registered WASM modules.
+ *
+ * Iterates `_recordByModule`, not the capability map: a module that lost
+ * every capability slot to a later registration is still registered and
+ * still logs, so it must receive the new level too.
+ */
 export function setCommonsMinLogLevel(racLevel: number): void {
   _currentCommonsMinLogLevel = racLevel;
-  for (const mod of getAllRegisteredModules()) {
+  for (const mod of _recordByModule.keys()) {
     try {
       mod._rac_logger_set_min_level?.(racLevel);
     } catch {
