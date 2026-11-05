@@ -15,15 +15,34 @@ import {
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
-export type CommonsLogLevelSink = (level: LogLevel) => void;
+export type CommonsLogLevelSink = (level: LogLevel) => void | Promise<void>;
 let _commonsLogLevelSink: CommonsLogLevelSink | null = null;
+let _commonsLogLevelSync: Promise<void> = Promise.resolve();
 
-/** Register a sink that receives C-ABI minimum log level changes. */
-export function setCommonsLogLevelSink(sink: CommonsLogLevelSink | null): void {
-  _commonsLogLevelSink = sink;
+/**
+ * Queue a level change behind any in-flight one so the native side applies
+ * them in call order (the async bridge gives no ordering), and swallow
+ * failures: a native logger error is non-fatal.
+ */
+function syncCommonsLogLevel(level: LogLevel): Promise<void> {
+  const sink = _commonsLogLevelSink;
   if (sink) {
-    sink(LoggingManager.shared.configuration.minLogLevel);
+    _commonsLogLevelSync = _commonsLogLevelSync
+      .then(() => sink(level))
+      .catch(() => {});
   }
+  return _commonsLogLevelSync;
+}
+
+/**
+ * Register a sink that receives C-ABI minimum log level changes. Resolves
+ * once the current level has been delivered to it.
+ */
+export function setCommonsLogLevelSink(
+  sink: CommonsLogLevelSink | null
+): Promise<void> {
+  _commonsLogLevelSink = sink;
+  return syncCommonsLogLevel(LoggingManager.shared.configuration.minLogLevel);
 }
 
 export interface LogEntry {
@@ -108,7 +127,7 @@ export class LoggingManager {
     } else if (!this.destinations.has(this.consoleDestination.identifier)) {
       this.addDestination(this.consoleDestination);
     }
-    this.syncCommonsLogLevel(this.config.minLogLevel);
+    void syncCommonsLogLevel(this.config.minLogLevel);
   }
 
   public applyEnvironmentConfiguration(environment: SDKEnvironment): void {
@@ -126,17 +145,7 @@ export class LoggingManager {
 
   public setMinLogLevel(level: LogLevel): void {
     this.config.minLogLevel = level;
-    this.syncCommonsLogLevel(level);
-  }
-
-  private syncCommonsLogLevel(level: LogLevel): void {
-    if (_commonsLogLevelSink) {
-      try {
-        _commonsLogLevelSink(level);
-      } catch {
-        // Sink call failed
-      }
-    }
+    void syncCommonsLogLevel(level);
   }
 
   public addDestination(destination: LogDestination): void {
