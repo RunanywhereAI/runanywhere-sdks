@@ -139,6 +139,7 @@ export interface ReasoningOptions {
 /** Schema-constrained output for a generation. */
 export interface StructuredOutput {
   schema: JsonSchema;
+  mode?: StructuredOutputMode;
   strict?: boolean;
 }
 
