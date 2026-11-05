@@ -177,9 +177,12 @@ trampolines are `@convention(c)` free functions (no captures) using
 `Unmanaged.passRetained`/`.release()` for context. Naming: platform impls get an
 explicit prefix (`AndroidTTSService`); `CppBridge+{Domain}.swift` per extension.
 
-Periphery scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRuntime` (not the MLX/NeuRT
- targets, excluded via `exclude_targets:` in `.periphery.yml`) with `retain_public: true`,
- `retain_codable_properties: true`.
+Periphery must be >= 3.0 (not pinned; install the current release, e.g. `brew install
+periphery`). 3.x has no `targets:` key or `--targets` option: it indexes every SwiftPM target
+the build produces, and `.periphery.yml` narrows that with `exclude_targets:` (`MLXRuntime`,
+`NeuRTRuntime`), `index_exclude:` and `report_exclude:`, plus `retain_public: true` and
+`retain_codable_properties: true`. Periphery 2.x rejects `exclude_targets` with an
+`invalid key` warning, which the pre-commit hooks report as a failure.
 
 ## Key file locations
 
