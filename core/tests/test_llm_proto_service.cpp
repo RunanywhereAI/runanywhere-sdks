@@ -96,6 +96,7 @@ std::string g_last_prompt;
 bool g_last_disable_thinking = false;
 int32_t g_last_top_k = -1;
 float g_last_min_p = -1.0f;
+float g_last_temperature = -1.0f;
 
 void record_prompt(const char* prompt, const rac_llm_options_t* options) {
     std::lock_guard<std::mutex> lock(g_prompt_mutex);
@@ -103,6 +104,7 @@ void record_prompt(const char* prompt, const rac_llm_options_t* options) {
     g_last_disable_thinking = options != nullptr && options->disable_thinking == RAC_TRUE;
     g_last_top_k = options != nullptr ? options->top_k : -1;
     g_last_min_p = options != nullptr ? options->min_p : -1.0f;
+    g_last_temperature = options != nullptr ? options->temperature : -1.0f;
 }
 
 rac_result_t mock_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
@@ -410,7 +412,7 @@ int test_mocked_generation(rac_model_registry_handle_t registry) {
 // top_k and min_p are `optional` in llm_options.proto: an absent field must keep
 // the IDL default (as RAG and VLM do), while an explicit 0 still disables it.
 bool generate_and_capture_sampler(const runanywhere::v1::LLMGenerateRequest& request,
-                                  int32_t* top_k, float* min_p) {
+                                  int32_t* top_k, float* min_p, float* temperature = nullptr) {
     std::vector<uint8_t> bytes;
     if (!serialize(request, &bytes)) {
         return false;
@@ -422,6 +424,9 @@ bool generate_and_capture_sampler(const runanywhere::v1::LLMGenerateRequest& req
     std::lock_guard<std::mutex> lock(g_prompt_mutex);
     *top_k = g_last_top_k;
     *min_p = g_last_min_p;
+    if (temperature != nullptr) {
+        *temperature = g_last_temperature;
+    }
     return rc == RAC_SUCCESS;
 }
 
@@ -451,6 +456,33 @@ int test_generate_sampler_defaults(rac_model_registry_handle_t registry) {
           "generate with explicit zero sampler succeeds");
     CHECK(top_k == 0, "generate honours an explicit top_k of 0");
     CHECK(min_p == 0.0f, "generate honours an explicit min_p of 0");
+    cleanup_environment();
+    return 0;
+}
+
+// temperature is `optional` as well: an options envelope that sets only another knob
+// must keep the 0.7 default rather than decode greedily, while an explicit 0.0 is
+// still honoured as a greedy request.
+int test_generate_temperature_presence(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for temperature presence");
+    runanywhere::v1::LLMGenerateRequest request;
+    auto* message = request.add_messages();
+    message->set_role(runanywhere::v1::MESSAGE_ROLE_USER);
+    message->set_content("temperature presence");
+    int32_t top_k = -1;
+    float min_p = -1.0f;
+    float temperature = -1.0f;
+
+    request.mutable_options()->set_top_p(0.9f);
+    CHECK(generate_and_capture_sampler(request, &top_k, &min_p, &temperature),
+          "generate with an options envelope that omits temperature succeeds");
+    CHECK(temperature == RAC_LLM_OPTIONS_DEFAULT.temperature,
+          "generate keeps the default temperature when it is unset");
+
+    request.mutable_options()->set_temperature(0.0f);
+    CHECK(generate_and_capture_sampler(request, &top_k, &min_p, &temperature),
+          "generate with an explicit zero temperature succeeds");
+    CHECK(temperature == 0.0f, "generate honours an explicit temperature of 0");
     cleanup_environment();
     return 0;
 }
@@ -706,6 +738,7 @@ int main() {
         test_missing_lifecycle_model();
         test_mocked_generation(registry);
         test_generate_sampler_defaults(registry);
+        test_generate_temperature_presence(registry);
         test_empty_generation_skips_structured_validation(registry);
         test_stream_terminal_once(registry);
         test_stream_producer_finish_reason_stop(registry);
