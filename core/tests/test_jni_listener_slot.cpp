@@ -27,6 +27,7 @@ int g_b = 0;
 // Mirrors the download progress sink: emit holds sink_mutex while the callback
 // takes listener_mutex, so registration must not hold listener_mutex.
 bool registration_does_not_hold_listener_mutex() {
+    std::mutex registration_mutex;
     std::mutex listener_mutex;
     std::mutex sink_mutex;
     int* slot = nullptr;
@@ -44,7 +45,7 @@ bool registration_does_not_hold_listener_mutex() {
     emitter_holds_sink.get_future().wait();
 
     auto rc = replace_listener_then_register(
-        listener_mutex, slot, &g_a,
+        registration_mutex, listener_mutex, slot, &g_a,
         [&](bool has_listener) {
             setter_entered.set_value();
             std::lock_guard<std::mutex> sink(sink_mutex);
@@ -60,11 +61,13 @@ bool registration_does_not_hold_listener_mutex() {
 }
 
 bool success_releases_previous_listener() {
+    std::mutex registration_mutex;
     std::mutex mutex;
     int* slot = &g_a;
     std::vector<int*> released;
     auto rc = replace_listener_then_register(
-        mutex, slot, &g_b, [](bool has_listener) { return has_listener ? 0 : 1; },
+        registration_mutex, mutex, slot, &g_b,
+        [](bool has_listener) { return has_listener ? 0 : 1; },
         [&](int* ref) { released.push_back(ref); });
     EXPECT_TRUE(rc == 0);
     EXPECT_TRUE(slot == &g_b);
@@ -72,7 +75,7 @@ bool success_releases_previous_listener() {
 
     released.clear();
     rc = replace_listener_then_register(
-        mutex, slot, static_cast<int*>(nullptr), [](bool) { return 0; },
+        registration_mutex, mutex, slot, static_cast<int*>(nullptr), [](bool) { return 0; },
         [&](int* ref) { released.push_back(ref); });
     EXPECT_TRUE(rc == 0);
     EXPECT_TRUE(slot == nullptr);
@@ -81,11 +84,13 @@ bool success_releases_previous_listener() {
 }
 
 bool failure_restores_previous_and_releases_new() {
+    std::mutex registration_mutex;
     std::mutex mutex;
     int* slot = &g_a;
     std::vector<int*> released;
     auto rc = replace_listener_then_register(
-        mutex, slot, &g_b, [](bool) { return -1; }, [&](int* ref) { released.push_back(ref); });
+        registration_mutex, mutex, slot, &g_b, [](bool) { return -1; },
+        [&](int* ref) { released.push_back(ref); });
     EXPECT_TRUE(rc == -1);
     EXPECT_TRUE(slot == &g_a);
     EXPECT_TRUE(released.size() == 1 && released[0] == &g_b);
@@ -93,11 +98,12 @@ bool failure_restores_previous_and_releases_new() {
 }
 
 bool failure_after_concurrent_replace_releases_only_previous() {
+    std::mutex registration_mutex;
     std::mutex mutex;
     int* slot = &g_a;
     std::vector<int*> released;
     auto rc = replace_listener_then_register(
-        mutex, slot, &g_b,
+        registration_mutex, mutex, slot, &g_b,
         [&](bool) {
             // Another setter swaps &g_b out (and so owns it) before this one fails.
             std::lock_guard<std::mutex> lock(mutex);
@@ -108,6 +114,31 @@ bool failure_after_concurrent_replace_releases_only_previous() {
     EXPECT_TRUE(rc == -1);
     EXPECT_TRUE(slot == nullptr);
     EXPECT_TRUE(released.size() == 1 && released[0] == &g_a);
+    return true;
+}
+
+// A set and a clear racing must not finish their native registrations out of
+// order, so the registration lock is held across the native call.
+bool registration_is_serialized() {
+    std::mutex registration_mutex;
+    std::mutex mutex;
+    int* slot = nullptr;
+    bool held = false;
+    auto rc = replace_listener_then_register(
+        registration_mutex, mutex, slot, &g_a,
+        [&](bool) {
+            std::thread probe([&] {
+                held = !registration_mutex.try_lock();
+                if (!held) {
+                    registration_mutex.unlock();
+                }
+            });
+            probe.join();
+            return 0;
+        },
+        [](int*) {});
+    EXPECT_TRUE(rc == 0);
+    EXPECT_TRUE(held);
     return true;
 }
 
@@ -124,7 +155,8 @@ int main() {
     }
     const bool ok = first.get() && success_releases_previous_listener() &&
                     failure_restores_previous_and_releases_new() &&
-                    failure_after_concurrent_replace_releases_only_previous();
+                    failure_after_concurrent_replace_releases_only_previous() &&
+                    registration_is_serialized();
     if (!ok) {
         return 1;
     }

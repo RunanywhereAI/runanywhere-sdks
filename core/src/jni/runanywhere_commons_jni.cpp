@@ -4626,6 +4626,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventPublishFailu
 
 static jobject g_download_proto_listener = nullptr;
 static std::mutex g_download_proto_listener_mutex;
+// Serializes racDownloadSetProgressProtoCallback; never taken by the callback.
+static std::mutex g_download_proto_registration_mutex;
 
 static void download_proto_jni_callback(const uint8_t* proto_bytes, size_t proto_size,
                                         void* user_data) {
@@ -4656,7 +4658,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadSetProgressP
     // emit_progress invokes download_proto_jni_callback under the progress sink
     // lock, so the native setter must run without g_download_proto_listener_mutex.
     const rac_result_t rc = rac::jni::replace_listener_then_register(
-        g_download_proto_listener_mutex, g_download_proto_listener, listenerRef,
+        g_download_proto_registration_mutex, g_download_proto_listener_mutex,
+        g_download_proto_listener, listenerRef,
         [](bool hasListener) {
             return rac_download_set_progress_proto_callback(
                 hasListener ? download_proto_jni_callback : nullptr, nullptr);

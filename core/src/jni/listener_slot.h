@@ -14,14 +14,19 @@ namespace rac::jni {
  * invokes the callback, and the callback takes `mutex` to read `slot`. Holding
  * `mutex` across the setter would lock the two in opposite orders.
  *
+ * `registration_mutex` is held for the whole call so concurrent calls finish
+ * their native registrations in the same order they publish to `slot`. The
+ * callback must never take it.
+ *
  * `register_native(bool has_listener)` returns 0 on success. On failure the
  * previous listener is restored if `slot` still holds `next`. Every ref this
  * call swaps out of `slot` is released through `release(ref)` exactly once;
  * a ref swapped out by a concurrent call belongs to that call.
  */
 template <typename Ref, typename RegisterFn, typename ReleaseFn>
-auto replace_listener_then_register(std::mutex& mutex, Ref& slot, Ref next,
-                                    RegisterFn&& register_native, ReleaseFn&& release) {
+auto replace_listener_then_register(std::mutex& registration_mutex, std::mutex& mutex, Ref& slot,
+                                    Ref next, RegisterFn&& register_native, ReleaseFn&& release) {
+    std::lock_guard<std::mutex> registration(registration_mutex);
     Ref previous;
     {
         std::lock_guard<std::mutex> lock(mutex);
