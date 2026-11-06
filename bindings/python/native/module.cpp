@@ -961,17 +961,25 @@ int32_t load_embedding_model(const std::string& path) {
     return register_handle(g_embed_handles, h);
 }
 
-py::array_t<float> embed(int32_t handle, const std::string& text) {
+// normalize=false asks the backend for the raw pooled vector (RAC_EMBEDDINGS_NORMALIZE_NONE).
+rac_embeddings_options_t embed_options(bool normalize) {
+    rac_embeddings_options_t options = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    options.normalize = normalize ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
+    return options;
+}
+
+py::array_t<float> embed(int32_t handle, const std::string& text, bool normalize) {
     rac_handle_t h = begin_op(g_embed_handles, handle);
     if (!h) throw std::runtime_error("invalid embedding handle");
     OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
 
+    const rac_embeddings_options_t options = embed_options(normalize);
     rac_embeddings_result_t result;
     std::memset(&result, 0, sizeof(result));
     rac_result_t rc;
     {
         py::gil_scoped_release release;
-        rc = rac_embeddings_embed(h, text.c_str(), nullptr, &result);
+        rc = rac_embeddings_embed(h, text.c_str(), &options, &result);
     }
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "embed");
     if (result.num_embeddings == 0 || result.embeddings == nullptr ||
@@ -987,7 +995,7 @@ py::array_t<float> embed(int32_t handle, const std::string& text) {
 }
 
 
-py::list embed_batch(int32_t handle, const std::vector<std::string>& texts) {
+py::list embed_batch(int32_t handle, const std::vector<std::string>& texts, bool normalize) {
     rac_handle_t h = begin_op(g_embed_handles, handle);
     if (!h) throw std::runtime_error("invalid embedding handle");
     OpScope op(handle);
@@ -996,12 +1004,13 @@ py::list embed_batch(int32_t handle, const std::vector<std::string>& texts) {
     ptrs.reserve(texts.size());
     for (const auto& t : texts) ptrs.push_back(t.c_str());
 
+    const rac_embeddings_options_t options = embed_options(normalize);
     rac_embeddings_result_t result;
     std::memset(&result, 0, sizeof(result));
     rac_result_t rc;
     {
         py::gil_scoped_release release;
-        rc = rac_embeddings_embed_batch(h, ptrs.data(), ptrs.size(), nullptr, &result);
+        rc = rac_embeddings_embed_batch(h, ptrs.data(), ptrs.size(), &options, &result);
     }
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "embed_batch");
 
@@ -2539,9 +2548,10 @@ PYBIND11_MODULE(_core, m) {
     // Embeddings
     m.def("load_embedding_model", &load_embedding_model, py::arg("path"),
           "Load an embedding model (ONNX); returns an integer handle.");
-    m.def("embed", &embed, py::arg("handle"), py::arg("text"),
-          "Embed text; returns a float32 numpy array.");
+    m.def("embed", &embed, py::arg("handle"), py::arg("text"), py::arg("normalize") = true,
+          "Embed text; returns a float32 numpy array (L2-normalized unless normalize=False).");
     m.def("embed_batch", &embed_batch, py::arg("handle"), py::arg("texts"),
+          py::arg("normalize") = true,
           "Embed a batch of texts; returns a list of float32 numpy arrays.");
     m.def("unload_embedding_model", &unload_embedding_model, py::arg("handle"),
           "Unload an embedding handle.");

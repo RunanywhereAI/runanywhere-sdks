@@ -235,12 +235,14 @@ class FakeCore:
         self._record("load_embedding_model", path)
         return self._handle()
 
-    def embed(self, handle: int, text: str) -> np.ndarray:
-        self._record("embed", handle, text)
+    def embed(self, handle: int, text: str, normalize: bool = True) -> np.ndarray:
+        self._record("embed", handle, text, normalize)
         return np.arange(self.dimension, dtype=np.float32)
 
-    def embed_batch(self, handle: int, texts: Sequence[str]) -> List[np.ndarray]:
-        self._record("embed_batch", handle, tuple(texts))
+    def embed_batch(
+        self, handle: int, texts: Sequence[str], normalize: bool = True
+    ) -> List[np.ndarray]:
+        self._record("embed_batch", handle, tuple(texts), normalize)
         return [np.arange(self.dimension, dtype=np.float32) for _ in texts]
 
     def unload_embedding_model(self, handle: int) -> None:

@@ -211,6 +211,17 @@ def test_embed_returns_vectors(live_sdk) -> None:
     assert vectors[0].vector.dtype == np.float32
 
 
+@requires_model(EMBEDDER_ID)
+def test_embed_normalize_false_returns_the_raw_pooled_vector(live_sdk) -> None:
+    unit = ra.embeddings.embed(["hello world"], EmbedOptions(model=EMBEDDER_ID))[0].vector
+    raw = ra.embeddings.embed(
+        ["hello world"], EmbedOptions(normalize=False, model=EMBEDDER_ID)
+    )[0].vector
+    assert np.linalg.norm(unit) == pytest.approx(1.0, abs=1e-4)
+    assert np.linalg.norm(raw) != pytest.approx(1.0, abs=1e-2)
+    np.testing.assert_allclose(raw / np.linalg.norm(raw), unit, atol=1e-5)
+
+
 @requires_model(STT_ID)
 def test_transcribe_silence(live_sdk) -> None:
     transcription = ra.stt.transcribe(_silence(), SttOptions(model=STT_ID))
