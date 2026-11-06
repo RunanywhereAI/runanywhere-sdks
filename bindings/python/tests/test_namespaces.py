@@ -237,13 +237,15 @@ def test_aembed(sdk, sherpa_dir) -> None:
     assert len(vectors) == 1
 
 
-@pytest.mark.parametrize(
-    "options",
-    [EmbedOptions(normalize=False), EmbedOptions(pooling=PoolingMode.CLS)],
-)
-def test_unsupported_embed_options_raise(sdk, options) -> None:
+@pytest.mark.parametrize("normalize", [True, False])
+def test_embed_forwards_normalize(sdk, sherpa_dir, normalize) -> None:
+    ra.embeddings.embed(["a"], EmbedOptions(normalize=normalize, model=sherpa_dir))
+    assert sdk.args_of("embed_batch")[-1] is normalize
+
+
+def test_unsupported_embed_options_raise(sdk) -> None:
     with pytest.raises(SDKException) as error:
-        ra.embeddings.embed(["a"], options)
+        ra.embeddings.embed(["a"], EmbedOptions(pooling=PoolingMode.CLS))
     assert error.value.code == ErrorCode.NOT_IMPLEMENTED
     assert "rac_embeddings_options_t" in str(error.value)
 

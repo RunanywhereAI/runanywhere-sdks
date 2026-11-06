@@ -34,7 +34,7 @@ class Embeddings:
         if not items:
             raise SDKException.invalid_input("texts must not be empty")
         model = runtime.embedder(options.model if options else None)
-        vectors = model.embed_batch(items)
+        vectors = model.embed_batch(items, normalize=options.normalize if options else True)
         return [Embedding(index=i, vector=v) for i, v in enumerate(vectors)]
 
     async def aembed(
