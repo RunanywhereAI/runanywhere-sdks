@@ -518,6 +518,10 @@ int test_stream_chunks_are_valid_utf8(rac_model_registry_handle_t registry) {
         if (!event.token().empty()) {
             tokens.push_back(event.token());
         }
+        if (is_terminal_event_kind(event.event_kind())) {
+            CHECK(event.result().usage().output_tokens() == 3,
+                  "split UTF-8 terminal counts the held chunk");
+        }
     }
     CHECK((tokens == std::vector<std::string>{"\xE4\xBD\xA0 a\xEF\xBF\xBD", "b"}),
           "split character is rejoined, invalid byte replaced, dangling tail dropped");
