@@ -201,8 +201,14 @@ void test_host_handshake_and_reconnect_deduplication() {
     CHECK(refreshed_state.active_client_count() == 1,
           "Reconnect does not inflate connected-device count");
 
-    // A repeat start that changes any descriptor field -- not only model_id -- is rejected
-    // instead of answering success with the stored descriptor.
+    // A repeat start that changes any descriptor field is rejected instead of answering
+    // success with the stored descriptor.
+    v1::ConnectHostStartRequest changed_id = mac_host;
+    changed_id.mutable_model()->set_model_id("other-model");
+    v1::ConnectHostState changed_id_state;
+    CHECK(call_proto(rac_connect_host_start_proto, changed_id, &changed_id_state) ==
+              RAC_ERROR_INVALID_CONFIGURATION,
+          "Repeat host start with a changed model_id is rejected");
     v1::ConnectHostStartRequest changed_context = mac_host;
     changed_context.mutable_model()->set_context_window(8192);
     v1::ConnectHostState changed_context_state;
