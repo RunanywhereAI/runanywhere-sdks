@@ -1321,6 +1321,15 @@ function countCodePoints(str: string): number {
  * points without breaking surrogate pairs. Ordinary words cost one budget unit; space-free
  * script runs cost one unit per code point, so a chunk never exceeds `size` code points
  * however those runs are distributed across lines. Iteratively appends chunks to avoid stack limits.
+ *
+ * This fallback deliberately does not reproduce the C++ core chunker (`rag_chunker.cpp`), so the
+ * same document and `size` give different chunks depending on which path
+ * `resolveRagExecutionPlan` picks. The core is a recursive separator splitter bounded at
+ * `size * chars_per_token` (4) UTF-8 bytes; this one counts ordinary words and space-free code
+ * points, and only splits a spaced-script word past 40 code points, which has no core
+ * counterpart. For space-free CJK with `size` 64 the core cuts at 256 bytes (85 characters) and
+ * this cuts at 64 characters, still inside the core's byte budget. Exact agreement needs the
+ * commons chunker exported over the RAG ABI; until then the tests pin this divergence.
  */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];

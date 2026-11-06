@@ -822,6 +822,35 @@ ${'中'.repeat(20)}`;
   });
 });
 
+describe('splitRAGText vs. the C++ core chunker budget (#1117)', () => {
+  // The core bounds chunks at chunk_size * chars_per_token (4) UTF-8 bytes.
+  const coreByteBudget = (chunkSize: number) => chunkSize * 4;
+  const utf8Bytes = (text: string) => new TextEncoder().encode(text).length;
+
+  it('cuts space-free CJK at chunkSize code points, inside the core byte budget', () => {
+    // The core splits this document into 255-byte (85-character) chunks: [85, 85, 30].
+    const chunks = __testing__.splitRAGText('漢'.repeat(200), 64, 0);
+    expect(chunks.map((c) => [...c.text].length)).toEqual([64, 64, 64, 8]);
+    for (const chunk of chunks) {
+      expect(utf8Bytes(chunk.text)).toBeLessThanOrEqual(coreByteBudget(64));
+    }
+  });
+
+  it('keeps a 30-byte spaced-script word whole where the core splits it', () => {
+    // The core splits this into [20, 10] bytes because 30 > 5 * 4.
+    const word = 'a'.repeat(30);
+    expect(utf8Bytes(word)).toBeGreaterThan(coreByteBudget(5));
+    expect(__testing__.splitRAGText(word, 5, 0).map((c) => c.text)).toEqual([word]);
+  });
+
+  it('budgets English by word count, not by the core byte budget', () => {
+    // The core packs 40 x "word " at chunkSize 8 into eight 29-byte chunks of 6 words.
+    const chunks = __testing__.splitRAGText('word '.repeat(40), 8, 0);
+    expect(chunks.map((c) => c.tokenCount)).toEqual([8, 8, 8, 8, 8]);
+    expect(utf8Bytes(chunks[0]!.text)).toBeGreaterThan(coreByteBudget(8));
+  });
+});
+
 function installBackendSpies() {
   // Cross-WASM RAG ranks chunks via commons `rac_embeddings_similarity`.
   // Register a math-only WASM stub so retrieval never fabricates cosine in TS.
