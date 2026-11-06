@@ -26,8 +26,10 @@
 
 package com.runanywhere.sdk.httptransport
 
+import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -41,6 +43,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
 class OkHttpHttpTransportTest {
@@ -340,5 +343,82 @@ class OkHttpHttpTransportTest {
 
         val captured = stub.received.single()
         assertNull("non-resume requests must not carry a Range header", captured.headers["Range"])
+    }
+
+    /**
+     * Starts a server that accepts one connection, signals [requestSeen], and
+     * then never answers, so the streaming call parks in `Call.execute()`.
+     */
+    private fun startSilentServer(requestSeen: CountDownLatch): ServerSocket {
+        val socket = ServerSocket(0)
+        thread(name = "silent-http-server", isDaemon = true) {
+            try {
+                socket.accept().use { conn ->
+                    BufferedReader(InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)).readLine()
+                    requestSeen.countDown()
+                    Thread.sleep(30_000)
+                }
+            } catch (_: Throwable) {
+                // closed by the test
+            }
+        }
+        return socket
+    }
+
+    @Test
+    fun executeStreamingRequest_hostDispatcherCancel_reportsCancelled() {
+        val hostClient = OkHttpClient()
+        OkHttpHttpTransport.setHttpClient(hostClient)
+        val requestSeen = CountDownLatch(1)
+        val silent = startSilentServer(requestSeen)
+        try {
+            val result = AtomicReference<OkHttpHttpTransport.StreamResponse>()
+            val caller =
+                thread {
+                    result.set(
+                        OkHttpHttpTransport.executeStreamingRequest(
+                            method = "GET",
+                            url = "http://127.0.0.1:${silent.localPort}/stream",
+                            headersFlat = emptyArray(),
+                            bodyBytes = null,
+                            timeoutMs = 0L,
+                            nativeCallback = 0L,
+                            nativeUserData = 0L,
+                        ),
+                    )
+                }
+            assertTrue(requestSeen.await(5, TimeUnit.SECONDS))
+            // Cancel through the host's own dispatcher, bypassing cancelAllStreams().
+            hostClient.dispatcher.cancelAll()
+            caller.join(5_000)
+
+            assertTrue("host dispatcher cancel must surface as cancelled", result.get().cancelled)
+        } finally {
+            silent.close()
+        }
+    }
+
+    @Test
+    fun executeStreamingRequest_callTimeout_isNotReportedAsCancelled() {
+        val requestSeen = CountDownLatch(1)
+        val silent = startSilentServer(requestSeen)
+        try {
+            val response =
+                OkHttpHttpTransport.executeStreamingRequest(
+                    method = "GET",
+                    url = "http://127.0.0.1:${silent.localPort}/stream",
+                    headersFlat = emptyArray(),
+                    bodyBytes = null,
+                    timeoutMs = 300L,
+                    nativeCallback = 0L,
+                    nativeUserData = 0L,
+                )
+
+            assertFalse("a call timeout must stay a timeout, not a cancel", response.cancelled)
+            assertNotNull(response.errorMessage)
+            assertTrue(response.errorMessage!!.startsWith("InterruptedIOException"))
+        } finally {
+            silent.close()
+        }
     }
 }

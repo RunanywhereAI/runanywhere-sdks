@@ -42,6 +42,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -547,12 +548,21 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = activeCall != null && synchronized(slot) { slot.cancelRequested },
+                cancelled = activeCall?.let { isCancellation(it, slot, e) } ?: false,
             )
         } finally {
             inFlightStreams.remove(streamId)
         }
     }
+
+    /**
+     * True when [e] is the abort of a cancelled stream: an SDK cancel path set
+     * `cancelRequested`, or the host cancelled [call] through its own client
+     * (e.g. `dispatcher.cancelAll()`). OkHttp's call timeout also cancels the
+     * call but throws [InterruptedIOException], which stays a timeout.
+     */
+    private fun isCancellation(call: Call, slot: StreamSlot, e: Throwable): Boolean =
+        synchronized(slot) { slot.cancelRequested } || (call.isCanceled() && e !is InterruptedIOException)
 
     /**
      * Drains the response body chunk-by-chunk, forwarding each chunk to the
@@ -581,7 +591,7 @@ object OkHttpHttpTransport {
                         // If the caller cancelled, OkHttp surfaces the abort
                         // as an IOException — treat that as a clean
                         // cancellation rather than a transport failure.
-                        if (synchronized(slot) { slot.cancelRequested }) {
+                        if (isCancellation(call, slot, io)) {
                             cancelled = true
                             break
                         }
@@ -742,9 +752,9 @@ object OkHttpHttpTransport {
      * through [deliverChunkNative]; this struct only carries status + headers
      * metadata back to C++ for the `rac_http_response_t`.
      *
-     * [cancelled] is true only for explicit SDK cancellation: either the native
-     * chunk callback returned false or [cancelAllStreams] requested teardown.
-     * OkHttp-triggered timeouts remain transport errors for JNI to map to
+     * [cancelled] is true only for explicit cancellation: the native chunk
+     * callback returned false, [cancelAllStreams] requested teardown, or the
+     * host cancelled the call through its own installed client. OkHttp-triggered timeouts remain transport errors for JNI to map to
      * `RAC_ERROR_TIMEOUT`.
      */
     class StreamResponse(

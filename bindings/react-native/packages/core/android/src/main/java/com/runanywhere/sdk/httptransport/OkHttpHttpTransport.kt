@@ -28,6 +28,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -426,12 +427,21 @@ object OkHttpHttpTransport {
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = activeCall != null && synchronized(slot) { slot.cancelRequested },
+                cancelled = activeCall?.let { isCancellation(it, slot, e) } ?: false,
             )
         } finally {
             inFlightStreams.remove(streamId)
         }
     }
+
+    /**
+     * True when [e] is the abort of a cancelled stream: an SDK cancel path set
+     * `cancelRequested`, or the host cancelled [call] through its own client
+     * (e.g. `dispatcher.cancelAll()`). OkHttp's call timeout also cancels the
+     * call but throws [InterruptedIOException], which stays a timeout.
+     */
+    private fun isCancellation(call: Call, slot: StreamSlot, e: Throwable): Boolean =
+        synchronized(slot) { slot.cancelRequested } || (call.isCanceled() && e !is InterruptedIOException)
 
     private fun drainBody(
         body: okhttp3.ResponseBody,
@@ -451,7 +461,7 @@ object OkHttpHttpTransport {
                 val n = try {
                     input.read(buffer)
                 } catch (io: IOException) {
-                    if (synchronized(slot) { slot.cancelRequested }) {
+                    if (isCancellation(call, slot, io)) {
                         cancelled = true
                         break
                     }
