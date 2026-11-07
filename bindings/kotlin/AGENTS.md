@@ -41,7 +41,7 @@ cd bindings/kotlin/
 
 **Build outputs:**
 - Android AAR: `build/outputs/aar/runanywhere-kotlin-{debug,release}.aar`
-- Sub-module AARs: `modules/runanywhere-core-{llamacpp,onnx,qhexrt}/build/outputs/aar/*.aar`
+- Sub-module AARs: `modules/runanywhere-core-{llamacpp,onnx,qhexrt,litertlm}/build/outputs/aar/*.aar`
 
 **Native lib sourcing** is controlled by `gradle.properties`:
 - `runanywhere.useLocalNatives=true` (default) → runs `scripts/build/build-core-android.sh` to compile C++ from source
@@ -75,6 +75,7 @@ bindings/kotlin/
         runanywhere-core-llamacpp/  (Android library sub-module; registers llama.cpp backend, bundles librac_backend_llamacpp_jni.so)
         runanywhere-core-onnx/      (Android library sub-module; registers ONNX/Sherpa backend, bundles librac_backend_onnx_jni.so)
         runanywhere-core-qhexrt/    (Android library sub-module, arm64-v8a only; registers the Qualcomm Hexagon NPU backend)
+        runanywhere-core-litertlm/  (Android library sub-module, arm64-v8a only; registers the LiteRT-LM backend)
 ```
 
 Standard single-target Android library — there is no `commonMain`/`jvmAndroidMain`/`androidMain`/`jvmMain` hierarchy. Subdirectories named `JNI` or `bridge` under `src/main/kotlin/com/runanywhere/sdk/` mirror the iOS bridge layout but compile as a single Android target. Platform-specific suffixes like `AndroidTTSService.kt` are kept by convention so future re-introduction of a JVM or KMP variant remains low-friction.
@@ -157,13 +158,14 @@ RunAnywhere.events.eventsOfPayload { it.generation }.collect { ... }
 
 ### Modules
 
-Three optional backend modules in `modules/`:
+Four optional backend modules in `modules/`:
 
 - **`runanywhere-core-llamacpp`** — LLM backend. Single file (`LlamaCPP.kt`) calling `rac_backend_llamacpp_register()`. Bundles `librac_backend_llamacpp_jni.so`.
 - **`runanywhere-core-onnx`** — co-distributed generic ONNX + Sherpa speech backends. `ONNX.kt` explicitly registers both engines and the module bundles their native `.so` files.
 - **`runanywhere-core-qhexrt`** — Qualcomm Hexagon NPU backend, `arm64-v8a` only. `QHexRT.kt` exposes `probeNpu()` / `register()` / `unregister()`; `QHexRTSkelInstaller.kt` extracts the per-arch (V75/V79/V81) DSP skel at install time. The AAR is binary-only (proprietary QAIRT/QNN host libs + skels are gitignored upstream, only staged by authorized builds), so **every entry point guards on `QHexRTBridge.ensureNativeLibraryLoaded()` and no-ops instead of throwing** when the native lib is absent — a contributor checkout without the private binary must still build and run. Packaged separately via `scripts/package-qhexrt.sh` (not `package-sdk.sh`); that script is not yet wired into `release.yml`. Building it locally needs `ANDROID_NDK_HOME` (or the default SDK Manager path) even when `useLocalNatives=false`, to stage `libc++_shared.so` alongside the prebuilt `.so`s.
+- **`runanywhere-core-litertlm`** — LiteRT-LM LLM backend for `.litertlm` models, `arm64-v8a` only. `LiteRTLM.kt` exposes `register()` / `unregister()`. The module bundles `liblitert-lm.so`, the libraries it links, its GPU accelerators and the Google Tensor dispatch library, staged by `build-core-android.sh` when `scripts/build/build-litertlm-android.sh` has produced `engines/litertlm/prebuilt/current`.
 
-All three follow the same pattern: thin Android-library sub-modules that register a C++ backend with the core's plugin system. They depend on the root SDK via `api()`.
+All four follow the same pattern: thin Android-library sub-modules that register a C++ backend with the core's plugin system. They depend on the root SDK via `api()`.
 
 ### Streaming Adapters
 

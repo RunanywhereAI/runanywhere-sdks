@@ -17,10 +17,12 @@
  *     Elite, a real v81 target that runs the published bundles unmodified).
  *     The condition mirrors RAC_QHEXRT_PLATFORM_SUPPORTED in
  *     engines/qhexrt/qhexrt_backend.h and must stay in step with it.
+ *   - LITERT_LM is supported on arm64 Android and macOS, the hosts
+ *     engines/litertlm/CMakeLists.txt finds a C API library for.
  *   - Everything else (LLAMA_CPP, ONNX, SHERPA, SYSTEM_TTS, BUILT_IN, cloud,
  *     ...) is available everywhere and is never restricted.
- *   - WASM/Emscripten, desktop Linux, and x64 Windows exclude both restricted
- *     sets; desktop macOS behaves as Apple.
+ *   - WASM/Emscripten, desktop Linux, and x64 Windows exclude every restricted
+ *     set; desktop macOS behaves as Apple.
  */
 
 #ifndef RAC_PLATFORM_CAPABILITIES_H

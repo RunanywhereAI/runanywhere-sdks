@@ -13,5 +13,6 @@
 #define RAC_ENGINE_ID_PLATFORM "platform"
 #define RAC_ENGINE_ID_NEURT "neurt"
 #define RAC_ENGINE_ID_QHEXRT "qhexrt"
+#define RAC_ENGINE_ID_LITERTLM "litertlm"
 
 #endif /* RAC_PLUGIN_RAC_ENGINE_IDS_H */

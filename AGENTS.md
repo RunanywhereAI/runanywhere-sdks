@@ -92,7 +92,7 @@ read it before working in that SDK.
 | Native dir | Contents |
 |-----------|----------|
 | `core/` | C/C++ core library: all AI logic, plugin registry, event system |
-| `engines/` | 7 backend plugins: llamacpp, sherpa, onnx, cloud, mlx, qhexrt, neurt |
+| `engines/` | 8 backend plugins: llamacpp, sherpa, onnx, cloud, mlx, qhexrt, neurt, litertlm |
 | `runtimes/` | 3 runtime adapters: cpu (always), onnxrt, coreml |
 | `idl/` | 39 Protobuf schemas + per-language codegen scripts |
 
@@ -134,11 +134,12 @@ reaches engines through `rac_engine_vtable_t`.
 | sherpa-onnx | STT, TTS, VAD |
 | onnx | Embed, Segment |
 | qhexrt | Hexagon NPU |
+| litertlm | LLM (`.litertlm`, CPU, GPU and Google Tensor NPU) |
 | neurt, cloud | Apple Neural Engine, HTTP |
 
 Backend base priorities (highest wins per primitive via `rac_plugin_find()`, no
 runtime/format scoring): qhexrt=150 (QNN-context models only), mlx=110 (Apple),
-llamacpp=100, sherpa=90, onnx/cloud=50. An explicit engine name is honored through
+llamacpp=100, sherpa=90, litertlm=80 (`.litertlm` models, pinned by framework), onnx/cloud=50. An explicit engine name is honored through
 `rac_plugin_find_for_engine()` regardless of priority.
 
 ### Non-obvious invariants that span every SDK

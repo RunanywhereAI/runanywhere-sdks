@@ -103,6 +103,9 @@ runanywhere::v1::InferenceFramework framework_for_engine_name(const std::string&
     if (engine_name == RAC_ENGINE_ID_QHEXRT) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
     }
+    if (engine_name == RAC_ENGINE_ID_LITERTLM) {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM;
+    }
     if (engine_name == RAC_ENGINE_ID_ONNX) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_ONNX;
     }
@@ -165,9 +168,8 @@ std::string device_kind_for_vtable(const rac_engine_vtable_t* vt) {
     if (!vt) {
         return "unknown";
     }
-    // QHexRT is the sole NPU engine in this tree — every model it loads runs
-    // on the Hexagon NPU by construction, so this is a fact, not an
-    // inference from declarative metadata.
+    // Every model QHexRT loads runs on the Hexagon NPU by construction, so
+    // this is a fact, not an inference from declarative metadata.
     if (vt->metadata.name && std::string(vt->metadata.name) == RAC_ENGINE_ID_QHEXRT) {
         return "npu";
     }
@@ -277,6 +279,8 @@ rac_inference_framework_t c_framework_from_proto(runanywhere::v1::InferenceFrame
             return RAC_FRAMEWORK_SHERPA;
         case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
             return RAC_FRAMEWORK_QHEXRT;
+        case runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM:
+            return RAC_FRAMEWORK_LITERTLM;
         case runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED:
         default:
             return RAC_FRAMEWORK_UNKNOWN;

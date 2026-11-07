@@ -69,6 +69,7 @@ enum ModelFormat {
     MODEL_FORMAT_FOLDER      = 13;
     MODEL_FORMAT_PROPRIETARY = 14;  // Built-in system models
     MODEL_FORMAT_UNKNOWN     = 15;
+    MODEL_FORMAT_LITERTLM    = 16;  // LiteRT-LM bundle (.litertlm)
 }
 
 // Engine that executes a model. Reached from ModelInfo.framework, so the
@@ -94,6 +95,7 @@ enum InferenceFramework {
     INFERENCE_FRAMEWORK_UNKNOWN            = 22;
     INFERENCE_FRAMEWORK_SHERPA             = 23;  // Sherpa-ONNX speech engine (STT/TTS/VAD)
     INFERENCE_FRAMEWORK_QHEXRT             = 24;  // Qualcomm Hexagon NPU (QHexRT runtime)
+    INFERENCE_FRAMEWORK_LITERT_LM          = 25;  // Google LiteRT-LM
 
     reserved 8, 9, 10, 17, 18;
 }

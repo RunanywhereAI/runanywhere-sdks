@@ -81,6 +81,8 @@ const char* engine_name_for_framework(runanywhere::v1::InferenceFramework framew
             return RAC_ENGINE_ID_LLAMACPP;
         case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
             return RAC_ENGINE_ID_QHEXRT;
+        case runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM:
+            return RAC_ENGINE_ID_LITERTLM;
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
             return RAC_ENGINE_ID_ONNX;
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
@@ -990,18 +992,20 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     }
 
     // NPU placement is a hard capability boundary this build CAN verify:
-    // QHexRT is the only engine that ever executes on the Hexagon NPU. Every
+    // QHexRT and LiteRT-LM are the only engines that ever execute on an NPU,
+    // and LiteRT-LM fails the load of a bundle not compiled for one. Every
     // other accelerator_policy value is advisory (see load_options_json())
     // because commons cannot prove today whether e.g. llama.cpp's GPU
     // offload actually engaged for a given load.
     if (vt && request.has_accelerator_policy() &&
         request.accelerator_policy() == detail::kAcceleratorPolicyNpu &&
-        (!vt->metadata.name || std::string(vt->metadata.name) != RAC_ENGINE_ID_QHEXRT)) {
+        (!vt->metadata.name || (std::string(vt->metadata.name) != RAC_ENGINE_ID_QHEXRT &&
+                                std::string(vt->metadata.name) != RAC_ENGINE_ID_LITERTLM))) {
         const std::string message =
             "ModelLoadRequest.accelerator_policy=NPU was requested but the selected engine '" +
             std::string(vt->metadata.name ? vt->metadata.name : "?") +
-            "' is not the NPU (QHexRT) engine; rejected rather than silently loading on a "
-            "different accelerator";
+            "' is not an NPU engine (QHexRT, LiteRT-LM); rejected rather than silently loading "
+            "on a different accelerator";
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
                                      artifact_resolution.artifacts, 0, message, placement);

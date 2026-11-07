@@ -77,6 +77,7 @@ constexpr int32_t kProtoIfwAll[] = {
     22,  // UNKNOWN            → RAC_FRAMEWORK_UNKNOWN
     23,  // SHERPA             → RAC_FRAMEWORK_SHERPA
     24,  // QHEXRT             → RAC_FRAMEWORK_QHEXRT
+    25,  // LITERT_LM          → RAC_FRAMEWORK_LITERTLM
 };
 
 // All defined C inference framework values.
@@ -91,6 +92,7 @@ constexpr rac_inference_framework_t kCAllFrameworks[] = {
     RAC_FRAMEWORK_MLX,
     RAC_FRAMEWORK_COREML,
     RAC_FRAMEWORK_QHEXRT,
+    RAC_FRAMEWORK_LITERTLM,
     RAC_FRAMEWORK_SHERPA,
     RAC_FRAMEWORK_UNKNOWN,
 };
@@ -113,8 +115,8 @@ constexpr rac_model_category_t kCAllCategories[] = {
     RAC_MODEL_CATEGORY_UNKNOWN,
 };
 
-// ModelFormat — proto 0..15.
-constexpr int32_t kProtoMfAll[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+// ModelFormat — proto 0..16.
+constexpr int32_t kProtoMfAll[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 
 constexpr rac_model_format_t kCAllFormats[] = {
     RAC_MODEL_FORMAT_UNSPECIFIED, RAC_MODEL_FORMAT_GGUF,        RAC_MODEL_FORMAT_GGML,
@@ -122,7 +124,7 @@ constexpr rac_model_format_t kCAllFormats[] = {
     RAC_MODEL_FORMAT_COREML,      RAC_MODEL_FORMAT_MLMODEL,     RAC_MODEL_FORMAT_MLPACKAGE,
     RAC_MODEL_FORMAT_TFLITE,      RAC_MODEL_FORMAT_SAFETENSORS, RAC_MODEL_FORMAT_QNN_CONTEXT,
     RAC_MODEL_FORMAT_ZIP,         RAC_MODEL_FORMAT_FOLDER,      RAC_MODEL_FORMAT_PROPRIETARY,
-    RAC_MODEL_FORMAT_UNKNOWN,
+    RAC_MODEL_FORMAT_UNKNOWN,     RAC_MODEL_FORMAT_LITERTLM,
 };
 
 // ModelSource — proto 0..3.

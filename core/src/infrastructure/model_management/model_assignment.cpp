@@ -233,6 +233,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->format = RAC_MODEL_FORMAT_SAFETENSORS;
         else if (format == "qnn_context" || format == "qnn-context")
             model->format = RAC_MODEL_FORMAT_QNN_CONTEXT;
+        else if (format == "litertlm")
+            model->format = RAC_MODEL_FORMAT_LITERTLM;
         else if (format == "zip")
             model->format = RAC_MODEL_FORMAT_ZIP;
         else if (format == "folder" || format == "directory")
@@ -258,6 +260,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->framework = RAC_FRAMEWORK_FLUID_AUDIO;
         else if (framework == "qhexrt" || framework == "qhx" || framework == "qnn")
             model->framework = RAC_FRAMEWORK_QHEXRT;
+        else if (framework == "litertlm" || framework == "litert-lm" || framework == "litert_lm")
+            model->framework = RAC_FRAMEWORK_LITERTLM;
         else if (framework == "sherpa" || framework == "sherpa_onnx" || framework == "sherpa-onnx")
             model->framework = RAC_FRAMEWORK_SHERPA;
         else
@@ -521,6 +525,8 @@ static ModelFormat infer_proto_format_from_path(const std::string& value) {
         return runanywhere::v1::MODEL_FORMAT_BIN;
     if (ends_with_copy(lower, ".tflite"))
         return runanywhere::v1::MODEL_FORMAT_TFLITE;
+    if (ends_with_copy(lower, ".litertlm"))
+        return runanywhere::v1::MODEL_FORMAT_LITERTLM;
     if (ends_with_copy(lower, ".safetensors"))
         return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
     if (ends_with_copy(lower, ".mlmodel"))
@@ -562,6 +568,8 @@ static InferenceFramework infer_proto_framework_from_format(ModelFormat format) 
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
         case runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT:
             return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
+        case runanywhere::v1::MODEL_FORMAT_LITERTLM:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM;
         case runanywhere::v1::MODEL_FORMAT_TFLITE:
             return runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE;
         default:
@@ -586,6 +594,7 @@ static ModelCategory infer_proto_category_from_framework(InferenceFramework fram
         case runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
         case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
+        case runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM:
         case runanywhere::v1::INFERENCE_FRAMEWORK_EXECUTORCH:
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLC:
         case runanywhere::v1::INFERENCE_FRAMEWORK_PICO_LLM:
@@ -618,6 +627,8 @@ static InferenceFramework proto_framework_from_struct(rac_inference_framework_t 
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
         case RAC_FRAMEWORK_QHEXRT:
             return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
+        case RAC_FRAMEWORK_LITERTLM:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM;
         case RAC_FRAMEWORK_SHERPA:
             return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
         case RAC_FRAMEWORK_UNKNOWN:
@@ -979,6 +990,8 @@ static ModelFormat format_from_assignment_token(const std::string& token) {
     if (lower == "qnn_context" || lower == "qnn-context") {
         return runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT;
     }
+    if (lower == "litertlm")
+        return runanywhere::v1::MODEL_FORMAT_LITERTLM;
     if (lower == "tflite")
         return runanywhere::v1::MODEL_FORMAT_TFLITE;
     if (lower == "safetensors")
@@ -1023,6 +1036,8 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
                 return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
             case 13:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
+            case 14:
+                return runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM;
             default:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
         }
@@ -1051,6 +1066,9 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
     }
     if (lower == "qhexrt" || lower == "qhx" || lower == "qnn") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
+    }
+    if (lower == "litertlm" || lower == "litert-lm" || lower == "litert_lm") {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM;
     }
     if (lower == "sherpa" || lower == "sherpa_onnx" || lower == "sherpa-onnx") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;

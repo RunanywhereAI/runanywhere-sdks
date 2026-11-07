@@ -206,7 +206,7 @@ static bool matches_model_format(const fs::path& path, rac_model_format_t format
                    has_extension(path, "bin") || has_extension(path, "mlmodel") ||
                    has_extension(path, "mlpackage") || has_extension(path, "mlmodelc") ||
                    has_extension(path, "tflite") || has_extension(path, "safetensors") ||
-                   has_extension(path, "zip");
+                   has_extension(path, "zip") || has_extension(path, "litertlm");
         case RAC_MODEL_FORMAT_GGUF:
             return has_extension(path, "gguf");
         case RAC_MODEL_FORMAT_GGML:
@@ -231,6 +231,8 @@ static bool matches_model_format(const fs::path& path, rac_model_format_t format
             return has_extension(path, "safetensors");
         case RAC_MODEL_FORMAT_ZIP:
             return has_extension(path, "zip");
+        case RAC_MODEL_FORMAT_LITERTLM:
+            return has_extension(path, "litertlm");
         case RAC_MODEL_FORMAT_FOLDER: {
             std::error_code ec;
             return fs::is_directory(path, ec);
@@ -870,6 +872,8 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "FluidAudio";
         case RAC_FRAMEWORK_QHEXRT:
             return "QHexRT";
+        case RAC_FRAMEWORK_LITERTLM:
+            return "LiteRTLM";
         case RAC_FRAMEWORK_BUILTIN:
             return "BuiltIn";
         case RAC_FRAMEWORK_NONE:
@@ -1377,7 +1381,7 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     // framework name (observed previously for Sherpa which was missing here).
     const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "MLX",    "FoundationModels",
                                 "SystemTTS", "FluidAudio", "BuiltIn",  "CoreML", "QHexRT",
-                                "None",      "Unknown"};
+                                "LiteRTLM",  "None",       "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;
@@ -1462,6 +1466,9 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
         return RAC_SUCCESS;
     } else if (nextComponent == "QHexRT") {
         *out_framework = RAC_FRAMEWORK_QHEXRT;
+        return RAC_SUCCESS;
+    } else if (nextComponent == "LiteRTLM") {
+        *out_framework = RAC_FRAMEWORK_LITERTLM;
         return RAC_SUCCESS;
     }
 

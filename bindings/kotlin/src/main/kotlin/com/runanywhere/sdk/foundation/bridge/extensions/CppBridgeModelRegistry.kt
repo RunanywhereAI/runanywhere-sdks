@@ -64,6 +64,7 @@ object CppBridgeModelRegistry {
         const val COREML = 8 // RAC_FRAMEWORK_COREML
         const val SHERPA = 12 // RAC_FRAMEWORK_SHERPA (Sherpa-ONNX speech engine)
         const val QHEXRT = 13 // RAC_FRAMEWORK_QHEXRT (Qualcomm Hexagon NPU)
+        const val LITERTLM = 14 // RAC_FRAMEWORK_LITERTLM (Google LiteRT-LM)
         const val UNKNOWN = 99 // RAC_FRAMEWORK_UNKNOWN
     }
 

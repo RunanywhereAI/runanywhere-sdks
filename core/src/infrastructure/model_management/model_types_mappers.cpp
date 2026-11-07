@@ -45,6 +45,7 @@ constexpr int32_t kProtoIfwNone = 21;
 constexpr int32_t kProtoIfwUnknown = 22;
 constexpr int32_t kProtoIfwSherpa = 23;
 constexpr int32_t kProtoIfwQhexrt = 24;
+constexpr int32_t kProtoIfwLitertLm = 25;
 
 // ModelCategory
 constexpr int32_t kProtoMcUnspecified = 0;
@@ -87,7 +88,7 @@ constexpr int32_t kProtoAsUnknown = 4;
 // ModelFormat — these already match rac_model_format_t value-for-value via
 // RAC_MODEL_FORMAT_ID_*, so listing them here is for documentation.
 constexpr int32_t kProtoMfUnspecified = 0;
-constexpr int32_t kProtoMfUnknown = 15;
+constexpr int32_t kProtoMfLast = 16;  // MODEL_FORMAT_LITERTLM
 
 }  // namespace
 
@@ -141,6 +142,9 @@ rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
             return RAC_SUCCESS;
         case kProtoIfwQhexrt:
             *out = RAC_FRAMEWORK_QHEXRT;
+            return RAC_SUCCESS;
+        case kProtoIfwLitertLm:
+            *out = RAC_FRAMEWORK_LITERTLM;
             return RAC_SUCCESS;
         // Proto values defined in idl/model_types.proto but without a
         // corresponding rac_inference_framework_t case: TFLITE, EXECUTORCH,
@@ -199,6 +203,9 @@ rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value, i
             return RAC_SUCCESS;
         case RAC_FRAMEWORK_QHEXRT:
             *out = kProtoIfwQhexrt;
+            return RAC_SUCCESS;
+        case RAC_FRAMEWORK_LITERTLM:
+            *out = kProtoIfwLitertLm;
             return RAC_SUCCESS;
         case RAC_FRAMEWORK_UNKNOWN:
             *out = kProtoIfwUnknown;
@@ -330,7 +337,7 @@ rac_result_t rac_model_format_from_proto(int32_t proto_value, rac_model_format_t
     }
     // rac_model_format_t values are 1:1 with proto (via RAC_MODEL_FORMAT_ID_*).
     // We still validate the range explicitly so unknown ints fail closed.
-    if (proto_value < kProtoMfUnspecified || proto_value > kProtoMfUnknown) {
+    if (proto_value < kProtoMfUnspecified || proto_value > kProtoMfLast) {
         *out = RAC_MODEL_FORMAT_UNSPECIFIED;
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -343,7 +350,7 @@ rac_result_t rac_model_format_to_proto(rac_model_format_t value, int32_t* out) {
         return RAC_ERROR_NULL_POINTER;
     }
     const int32_t v = static_cast<int32_t>(value);
-    if (v < kProtoMfUnspecified || v > kProtoMfUnknown) {
+    if (v < kProtoMfUnspecified || v > kProtoMfLast) {
         *out = kProtoMfUnspecified;
         return RAC_ERROR_INVALID_ARGUMENT;
     }

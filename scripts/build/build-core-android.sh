@@ -30,6 +30,7 @@ KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-lla
 KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-onnx/src/main/jniLibs"
 KOTLIN_QHEXRT_JNI_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs"
 KOTLIN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-qhexrt/src/main/assets/runanywhere/qhexrt/skels"
+KOTLIN_LITERTLM_JNI_DEST="${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-litertlm/src/main/jniLibs"
 RN_CORE_JNI_DEST="${REPO_ROOT}/bindings/react-native/packages/core/android/src/main/jniLibs"
 RN_LLAMA_JNI_DEST="${REPO_ROOT}/bindings/react-native/packages/llamacpp/android/src/main/jniLibs"
 RN_ONNX_JNI_DEST="${REPO_ROOT}/bindings/react-native/packages/onnx/android/src/main/jniLibs"
@@ -47,6 +48,8 @@ FLUTTER_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/bindings/flutter/packages/runanywhe
 
 COMMONS_INCLUDE_SRC="${REPO_ROOT}/core/include"
 QHEXRT_INCLUDE_SRC="${REPO_ROOT}/engines/qhexrt/include"
+# The C API tree from scripts/build/build-litertlm-android.sh, or LITERTLM_ROOT.
+LITERTLM_PREBUILT="${LITERTLM_ROOT:-${REPO_ROOT}/engines/litertlm/prebuilt/current}"
 SHERPA_ANDROID_JNI_SRC="${REPO_ROOT}/core/third_party/sherpa-onnx-android/jniLibs"
 
 if [ -z "${ANDROID_NDK_HOME:-}" ]; then
@@ -125,6 +128,7 @@ mkdir -p \
     "${KOTLIN_ONNX_JNI_DEST}" \
     "${KOTLIN_QHEXRT_JNI_DEST}" \
     "${KOTLIN_QHEXRT_SKEL_ASSET_DEST}" \
+    "${KOTLIN_LITERTLM_JNI_DEST}" \
     "${RN_CORE_JNI_DEST}" \
     "${RN_LLAMA_JNI_DEST}" \
     "${RN_ONNX_JNI_DEST}" \
@@ -472,6 +476,14 @@ for ABI in "${ABIS[@]}"; do
     else
         CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=OFF" "-UQHEXRT_ROOT")
     fi
+    # LiteRT-LM is routable only for an ABI with a staged C API tree.
+    LITERTLM_ENABLED=0
+    if [ -f "${LITERTLM_PREBUILT}/lib/${ABI}/liblitert-lm.so" ]; then
+        LITERTLM_ENABLED=1
+        CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_LITERTLM=ON" "-DLITERTLM_ROOT=${LITERTLM_PREBUILT}")
+    else
+        CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_LITERTLM=OFF" "-ULITERTLM_ROOT")
+    fi
     cmake "${CMAKE_CONFIGURE_ARGS[@]}"
     # Full host parallelism by default (repo resource discipline: builds use
     # full local capacity; scale down with RAC_BUILD_JOBS only under real
@@ -485,6 +497,7 @@ for ABI in "${ABIS[@]}"; do
     KOTLIN_ONNX_DEST="${KOTLIN_ONNX_JNI_DEST}/${ABI}"
     KOTLIN_QHEXRT_DEST="${KOTLIN_QHEXRT_JNI_DEST}/${ABI}"
     KOTLIN_QHEXRT_SKEL_DEST="${KOTLIN_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
+    KOTLIN_LITERTLM_DEST="${KOTLIN_LITERTLM_JNI_DEST}/${ABI}"
     RN_CORE_DEST="${RN_CORE_JNI_DEST}/${ABI}"
     RN_LLAMA_DEST="${RN_LLAMA_JNI_DEST}/${ABI}"
     RN_ONNX_DEST="${RN_ONNX_JNI_DEST}/${ABI}"
@@ -512,9 +525,16 @@ for ABI in "${ABIS[@]}"; do
             "${KOTLIN_QHEXRT_SKEL_DEST}" "${RN_QHEXRT_SKEL_DEST}" "${FLUTTER_QHEXRT_SKEL_DEST}"
     fi
 
+    if [ "${LITERTLM_ENABLED}" -eq 1 ]; then
+        mkdir -p "${KOTLIN_LITERTLM_DEST}"
+    else
+        rm -rf "${KOTLIN_LITERTLM_DEST}"
+    fi
+
     # Clean everything we manage before re-staging so stale artifacts from a
     # previous run (e.g. a dropped backend) don't linger.
     rm -f \
+        "${KOTLIN_LITERTLM_DEST}"/*.so \
         "${KOTLIN_DEST}"/*.so \
         "${KOTLIN_LLAMA_DEST}"/*.so \
         "${KOTLIN_ONNX_DEST}"/*.so \
@@ -596,6 +616,16 @@ for ABI in "${ABIS[@]}"; do
             "${QHEXRT_SELECTED}" \
             "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
     fi
+    if [ "${LITERTLM_ENABLED}" -eq 1 ]; then
+        LIB_LITERTLM="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_litertlm.so" -print -quit || true)"
+        LIB_LITERTLM_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_litertlm_jni.so" -print -quit || true)"
+        copy_if_exists "${LIB_LITERTLM}" "${KOTLIN_LITERTLM_DEST}"
+        copy_if_exists "${LIB_LITERTLM_JNI}" "${KOTLIN_LITERTLM_DEST}"
+        # The C API library, the libraries it links, the GPU accelerators it opens, and the
+        # Google Tensor dispatch library.
+        cp -v "${LITERTLM_PREBUILT}/lib/${ABI}"/*.so "${KOTLIN_LITERTLM_DEST}/"
+        cp -v "${NDK_SYSROOT_LIB}/${TRIPLE}/libc++_shared.so" "${KOTLIN_LITERTLM_DEST}/"
+    fi
     # Sherpa is the long-term owner of Sherpa-ONNX-backed STT/TTS/VAD; ship
     # it alongside the onnx plugin on every ONNX-enabled SDK package. Routed
     # to the Kotlin ONNX module (not core).
@@ -652,6 +682,7 @@ for ABI in "${ABIS[@]}"; do
 
     validate_staged_abi_16kb_alignment "${ABI}" \
         "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
+        "${KOTLIN_LITERTLM_DEST}" \
         "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
         "${FLUTTER_QHEXRT_DEST}"

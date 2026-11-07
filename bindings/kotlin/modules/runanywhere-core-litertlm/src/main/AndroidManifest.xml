@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Android 17 denies the NPU to an app that targets API 37 and does not declare this. -->
+    <uses-feature
+        android:name="android.hardware.npu"
+        android:required="false" />
+    <application>
+        <!-- Vendor GPU libraries the LiteRT-LM accelerators open. Apps targeting
+             API 31+ cannot reach them without these. Absent on some devices: the
+             engine then runs on CPU. -->
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+        <!-- The Google Tensor NPU's libraries, as LiteRT's own manifest lists them. -->
+        <uses-native-library
+            android:name="libedgetpu_util.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libedgetpu_litert.so"
+            android:required="false" />
+    </application>
+</manifest>

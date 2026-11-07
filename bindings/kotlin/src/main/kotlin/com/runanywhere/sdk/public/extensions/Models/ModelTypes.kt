@@ -104,6 +104,7 @@ val InferenceFramework.Companion.knownCases: List<InferenceFramework>
             InferenceFramework.INFERENCE_FRAMEWORK_COREML,
             InferenceFramework.INFERENCE_FRAMEWORK_MLX,
             InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+            InferenceFramework.INFERENCE_FRAMEWORK_LITERT_LM,
             InferenceFramework.INFERENCE_FRAMEWORK_TFLITE,
             InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH,
             InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE,

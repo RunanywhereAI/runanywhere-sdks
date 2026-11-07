@@ -43,6 +43,12 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/mlx/CMakeLists.txt")
     add_subdirectory(mlx)
 endif()
 
+# LiteRT-LM: LLM over Google's LiteRT-LM C API (.litertlm bundles). OFF by default;
+# compiles a not-routable shell unless the C API library is under LITERTLM_ROOT.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/litertlm/CMakeLists.txt")
+    add_subdirectory(litertlm)
+endif()
+
 # QHexRT — RunAnywhere's PRIVATE Qualcomm Hexagon NPU runtime. OFF by default —
 # consumed as a prebuilt static archive under QHEXRT_ROOT (gitignored); compiles
 # a not-routable shell when the archive is absent (public repo builds clean),

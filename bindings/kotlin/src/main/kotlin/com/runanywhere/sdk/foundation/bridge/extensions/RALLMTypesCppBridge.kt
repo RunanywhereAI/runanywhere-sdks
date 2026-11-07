@@ -122,6 +122,7 @@ val InferenceFramework.wireString: String
             InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "coreml"
             InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "mlx"
             InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "qhexrt"
+            InferenceFramework.INFERENCE_FRAMEWORK_LITERT_LM -> "litertlm"
             InferenceFramework.INFERENCE_FRAMEWORK_TFLITE -> "tflite"
             InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH -> "executorch"
             InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE -> "mediapipe"

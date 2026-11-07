@@ -139,7 +139,7 @@ Primitive enum → vtable field → who implements it today:
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
-| `RAC_PRIMITIVE_GENERATE_TEXT` | `llm_ops` | llamacpp, platform, qhexrt, neurt (Apple) |
+| `RAC_PRIMITIVE_GENERATE_TEXT` | `llm_ops` | llamacpp, platform, qhexrt, neurt (Apple), litertlm |
 | `RAC_PRIMITIVE_TRANSCRIBE` | `stt_ops` | sherpa, qhexrt |
 | `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | sherpa, platform, qhexrt |
 | `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | sherpa (Silero), energy-based (built-in) |
@@ -214,6 +214,7 @@ these, especially RAG, which has "do not relitigate" design rules:
 | **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
 | **onnx** | Segment; Embed when RAG is enabled | ONNX | `runtimes/onnxrt` Session | `rac_plugin_entry_onnx()` |
 | **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |
+| **litertlm** | LLM | `.litertlm` bundle | LiteRT-LM C API | `rac_backend_litertlm_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
 
 Backends themselves live one level up, in `../engines/<name>/`, not inside `core/`. To add a new

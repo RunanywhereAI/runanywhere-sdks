@@ -33,7 +33,7 @@ namespace rac::llm {
  * token, so for them the decision falls to the MODEL gate below.
  */
 inline bool engine_handles_disable_thinking_natively(rac_inference_framework_t framework) {
-    return framework == RAC_FRAMEWORK_QHEXRT;
+    return framework == RAC_FRAMEWORK_QHEXRT || framework == RAC_FRAMEWORK_LITERTLM;
 }
 
 /**

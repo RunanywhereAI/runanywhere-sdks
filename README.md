@@ -50,7 +50,7 @@ actually execute — enum presence alone does not mean an engine is installed.
 - **RAG**: local document ingestion and retrieval-augmented answers, with streaming
 - **Image generation**: Stable Diffusion on Core ML, plus inpainting on the Hexagon NPU (platform/backend gated)
 
-Your code rarely picks hardware. Engines register what they can run, and the highest-priority engine that fits the device wins: **QHexRT** on the Snapdragon Hexagon NPU, **MLX** on Apple silicon, **llama.cpp** everywhere (Metal on Apple, CUDA on NVIDIA as an opt-in build, WebGPU in the browser), **sherpa + ONNX** for speech and embeddings, and **Core ML** for diffusion. LiteRT and ExecuTorch are reserved framework values only — they are not integrated runtimes yet.
+Your code rarely picks hardware. Engines register what they can run, and the highest-priority engine that fits the device wins: **QHexRT** on the Snapdragon Hexagon NPU, **MLX** on Apple silicon, **llama.cpp** everywhere (Metal on Apple, CUDA on NVIDIA as an opt-in build, WebGPU in the browser), **sherpa + ONNX** for speech and embeddings, **Core ML** for diffusion, and **LiteRT-LM** for `.litertlm` models on Android (opt-in build). ExecuTorch and plain LiteRT (TensorFlow Lite) are reserved framework values only — they are not integrated runtimes yet.
 
 ---
 
@@ -488,6 +488,7 @@ Every SDK is a thin binding over `runanywhere-commons`, a single C++ core behind
 | **QHexRT** | LLM, VLM, STT, TTS, embeddings, inpainting | Snapdragon Hexagon NPU (v75 / v79 / v81) | RunAnywhere's own NPU runtime, [details below](#hexagon-npu-acceleration-qhexrt) |
 | **MLX** | LLM, VLM, STT, TTS, embeddings | Apple silicon | Apple-native inference via mlx-swift, safetensors models |
 | **llama.cpp** | LLM, VLM | Everywhere: Metal on Apple, CUDA opt-in on Windows/Linux, WebGPU + WASM in the browser, CPU with NEON/AVX | GGUF models |
+| **LiteRT-LM** | LLM | Android arm64, on CPU, GPU or Google Tensor NPU (opt-in build) | `.litertlm` models |
 | **sherpa + ONNX** | STT, TTS, VAD, embeddings | All platforms | sherpa-onnx for speech, ONNX Runtime for embeddings and RAG |
 | **Core ML** | Image generation (diffusion) | iOS, macOS | Core ML dispatches each layer across CPU, GPU, and the Apple Neural Engine |
 | **Platform** | Apple Foundation Models, system TTS | iOS, macOS, Android | Native OS capabilities behind the same API |
@@ -594,6 +595,7 @@ Prebuilt bundles published on [Hugging Face](https://huggingface.co/runanywhere/
 |---|---|---|
 | LLM | SmolLM2, Qwen 3 / 2.5, Llama 3.2, LFM2, Mistral 7B (GGUF) | llama.cpp |
 | LLM / VLM (Apple) | Qwen3, SmolVLM2, and other mlx-community safetensors models | MLX |
+| LLM (Android) | Gemma 4, Qwen 3, LFM2.5, SmolLM2 (`.litertlm`) | LiteRT-LM |
 | VLM | SmolVLM2, LFM2-VL, Qwen2-VL (GGUF + mmproj) | llama.cpp |
 | Speech-to-Text | Whisper Tiny / Base, Moonshine | sherpa + ONNX |
 | Text-to-Speech | Piper voices, Kokoro, Kitten TTS | sherpa + ONNX |
@@ -661,7 +663,7 @@ runanywhere-sdks/
 │   └── shared-apple/               # Apple transport shared by the RN + Flutter bindings
 │                                   # (iOS/Android/Web/Electron consumer apps live in their own repos)
 │
-├── engines/                        # llamacpp, mlx, sherpa, onnx, neurt, qhexrt, cloud
+├── engines/                        # llamacpp, mlx, sherpa, onnx, neurt, qhexrt, litertlm, cloud
 ├── runtimes/                       # cpu, coreml, onnxrt compute adapters
 ├── idl/                            # Protobuf schemas, generated bindings per language
 └── docs/                           # Documentation

@@ -210,6 +210,8 @@ const char* framework_proto_to_string(int32_t framework) {
             return "mlx";
         case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
             return "qhexrt";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM:
+            return "litertlm";
         default:
             return "unknown";
     }

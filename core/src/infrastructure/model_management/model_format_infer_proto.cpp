@@ -88,6 +88,8 @@ runanywhere::v1::ModelFormat format_from_suffix(const std::string& lower_url) {
         return runanywhere::v1::MODEL_FORMAT_BIN;
     if (ends_with(lower_url, ".tflite"))
         return runanywhere::v1::MODEL_FORMAT_TFLITE;
+    if (ends_with(lower_url, ".litertlm"))
+        return runanywhere::v1::MODEL_FORMAT_LITERTLM;
     if (ends_with(lower_url, ".safetensors"))
         return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
     if (ends_with(lower_url, ".mlmodelc"))

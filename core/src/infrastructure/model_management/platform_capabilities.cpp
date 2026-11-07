@@ -11,6 +11,10 @@
 #include "model_types.pb.h"
 #endif
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 namespace {
 
 // Wire values of runanywhere.v1.InferenceFramework (idl/model_types.proto).
@@ -22,6 +26,7 @@ constexpr int32_t kFrameworkCoreML = 6;
 constexpr int32_t kFrameworkMLX = 7;
 constexpr int32_t kFrameworkSwiftTransformers = 19;
 constexpr int32_t kFrameworkQHexRT = 24;
+constexpr int32_t kFrameworkLiteRtLm = 25;
 
 #ifdef RAC_HAVE_PROTOBUF
 static_assert(kFrameworkFoundationModels == runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS);
@@ -31,6 +36,7 @@ static_assert(kFrameworkMLX == runanywhere::v1::INFERENCE_FRAMEWORK_MLX);
 static_assert(kFrameworkSwiftTransformers ==
               runanywhere::v1::INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS);
 static_assert(kFrameworkQHexRT == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT);
+static_assert(kFrameworkLiteRtLm == runanywhere::v1::INFERENCE_FRAMEWORK_LITERT_LM);
 #endif
 
 }  // namespace
@@ -69,6 +75,15 @@ rac_bool_t rac_framework_supported_on_platform(int32_t inference_framework) {
         case kFrameworkQHexRT:
 #if (defined(__ANDROID__) && defined(__aarch64__)) || \
     (defined(_WIN32) && (defined(_M_ARM64) || defined(__aarch64__)))
+            return RAC_TRUE;
+#else
+            return RAC_FALSE;
+#endif
+
+        // LiteRT-LM: the hosts engines/litertlm/CMakeLists.txt finds a C API library for.
+        // Duplicated for the same reason as QHexRT's condition above.
+        case kFrameworkLiteRtLm:
+#if (defined(__ANDROID__) && defined(__aarch64__)) || (defined(__APPLE__) && TARGET_OS_OSX)
             return RAC_TRUE;
 #else
             return RAC_FALSE;

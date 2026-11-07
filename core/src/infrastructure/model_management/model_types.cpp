@@ -111,6 +111,7 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
     // Mirrors Swift's ModelCategory.from(framework:)
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
+        case RAC_FRAMEWORK_LITERTLM:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return RAC_MODEL_CATEGORY_LANGUAGE;
         case RAC_FRAMEWORK_MLX:
@@ -199,6 +200,7 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
     static const rac_model_format_t mlx_formats[] = {RAC_MODEL_FORMAT_SAFETENSORS,
                                                      RAC_MODEL_FORMAT_FOLDER};
     static const rac_model_format_t qhexrt_formats[] = {RAC_MODEL_FORMAT_QNN_CONTEXT};
+    static const rac_model_format_t litertlm_formats[] = {RAC_MODEL_FORMAT_LITERTLM};
 
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
@@ -214,6 +216,8 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
             return copy_supported_formats(mlx_formats, 2, out_formats, out_count);
         case RAC_FRAMEWORK_QHEXRT:
             return copy_supported_formats(qhexrt_formats, 1, out_formats, out_count);
+        case RAC_FRAMEWORK_LITERTLM:
+            return copy_supported_formats(litertlm_formats, 1, out_formats, out_count);
         default:
             return copy_supported_formats(nullptr, 0, out_formats, out_count);
     }
@@ -232,6 +236,8 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
                                                                                         : RAC_FALSE;
         case RAC_FRAMEWORK_QHEXRT:
             return (format == RAC_MODEL_FORMAT_QNN_CONTEXT) ? RAC_TRUE : RAC_FALSE;
+        case RAC_FRAMEWORK_LITERTLM:
+            return (format == RAC_MODEL_FORMAT_LITERTLM) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_COREML:
             return (format == RAC_MODEL_FORMAT_COREML || format == RAC_MODEL_FORMAT_MLMODEL ||
                     format == RAC_MODEL_FORMAT_MLPACKAGE)
@@ -268,6 +274,7 @@ rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
         case RAC_FRAMEWORK_QHEXRT:
+        case RAC_FRAMEWORK_LITERTLM:
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
         case RAC_FRAMEWORK_MLX:
@@ -341,6 +348,8 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "FluidAudio";
         case RAC_FRAMEWORK_QHEXRT:
             return "QHexRT";
+        case RAC_FRAMEWORK_LITERTLM:
+            return "LiteRT-LM";
         case RAC_FRAMEWORK_BUILTIN:
             return "Built-in";
         case RAC_FRAMEWORK_NONE:
@@ -373,6 +382,8 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "fluid_audio";
         case RAC_FRAMEWORK_QHEXRT:
             return "qhexrt";
+        case RAC_FRAMEWORK_LITERTLM:
+            return "litertlm";
         case RAC_FRAMEWORK_BUILTIN:
             return "built_in";
         case RAC_FRAMEWORK_NONE:
@@ -421,6 +432,8 @@ const char* model_format_wire_string_value(rac_model_format_t f) {
             return "MODEL_FORMAT_SAFETENSORS";
         case RAC_MODEL_FORMAT_QNN_CONTEXT:
             return "MODEL_FORMAT_QNN_CONTEXT";
+        case RAC_MODEL_FORMAT_LITERTLM:
+            return "MODEL_FORMAT_LITERTLM";
         case RAC_MODEL_FORMAT_ZIP:
             return "MODEL_FORMAT_ZIP";
         case RAC_MODEL_FORMAT_FOLDER:
@@ -455,6 +468,8 @@ const char* inference_framework_wire_string_value(rac_inference_framework_t f) {
             return "INFERENCE_FRAMEWORK_MLX";
         case RAC_FRAMEWORK_QHEXRT:
             return "INFERENCE_FRAMEWORK_QHEXRT";
+        case RAC_FRAMEWORK_LITERTLM:
+            return "INFERENCE_FRAMEWORK_LITERT_LM";
         case RAC_FRAMEWORK_SHERPA:
             return "INFERENCE_FRAMEWORK_SHERPA";
         case RAC_FRAMEWORK_BUILTIN:
@@ -489,6 +504,8 @@ const char* inference_framework_display_name_value(rac_inference_framework_t f) 
             return "MLX";
         case RAC_FRAMEWORK_QHEXRT:
             return "QHexRT";
+        case RAC_FRAMEWORK_LITERTLM:
+            return "LiteRT-LM";
         case RAC_FRAMEWORK_BUILTIN:
             return "Built-in";
         case RAC_FRAMEWORK_NONE:
@@ -521,6 +538,8 @@ const char* inference_framework_analytics_key_value(rac_inference_framework_t f)
             return "mlx";
         case RAC_FRAMEWORK_QHEXRT:
             return "qhexrt";
+        case RAC_FRAMEWORK_LITERTLM:
+            return "litertlm";
         case RAC_FRAMEWORK_BUILTIN:
             return "built_in";
         case RAC_FRAMEWORK_NONE:
@@ -557,7 +576,8 @@ constexpr rac_inference_framework_t kKnownFrameworks[] = {
     RAC_FRAMEWORK_ONNX,       RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_FOUNDATION_MODELS,
     RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_COREML,
     RAC_FRAMEWORK_MLX,        RAC_FRAMEWORK_QHEXRT,      RAC_FRAMEWORK_SHERPA,
-    RAC_FRAMEWORK_BUILTIN,    RAC_FRAMEWORK_NONE,        RAC_FRAMEWORK_UNKNOWN,
+    RAC_FRAMEWORK_LITERTLM,   RAC_FRAMEWORK_BUILTIN,     RAC_FRAMEWORK_NONE,
+    RAC_FRAMEWORK_UNKNOWN,
 };
 
 }  // namespace
@@ -716,6 +736,10 @@ rac_bool_t rac_model_detect_format_from_extension(const char* extension,
         *out_format = RAC_MODEL_FORMAT_GGUF;
         return RAC_TRUE;
     }
+    if (ext == "litertlm") {
+        *out_format = RAC_MODEL_FORMAT_LITERTLM;
+        return RAC_TRUE;
+    }
     if (ext == "ggml") {
         *out_format = RAC_MODEL_FORMAT_GGML;
         return RAC_TRUE;
@@ -782,6 +806,9 @@ rac_bool_t rac_model_detect_framework_from_format(rac_model_format_t format,
         case RAC_MODEL_FORMAT_QNN_CONTEXT:
             *out_framework = RAC_FRAMEWORK_QHEXRT;
             return RAC_TRUE;
+        case RAC_MODEL_FORMAT_LITERTLM:
+            *out_framework = RAC_FRAMEWORK_LITERTLM;
+            return RAC_TRUE;
         default:
             return RAC_FALSE;
     }
@@ -812,6 +839,8 @@ const char* rac_model_format_extension(rac_model_format_t format) {
             return "safetensors";
         case RAC_MODEL_FORMAT_QNN_CONTEXT:
             return "bin";
+        case RAC_MODEL_FORMAT_LITERTLM:
+            return "litertlm";
         case RAC_MODEL_FORMAT_ZIP:
             return "zip";
         default:
@@ -891,6 +920,9 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
             break;
         case RAC_FRAMEWORK_QHEXRT:
             match = matches_any({"bin"});
+            break;
+        case RAC_FRAMEWORK_LITERTLM:
+            match = matches_any({"litertlm"});
             break;
         default:
             // Permissive fallback mirroring Swift's racIsModelFile default
