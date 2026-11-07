@@ -157,6 +157,12 @@ struct Service {
     std::string chat_template;  // empty = the bundle's own
     KeptChat chat;
     bool keep_chats = true;  // false once the library has refused a kept turn of this model
+    // The backend the engine was opened on.
+    const char* backend = nullptr;
+    // LiteRT-LM builds the sampler once per engine, at the first request, from that
+    // conversation's settings (LiteRT-LM issue 2080). These are those settings.
+    bool sampler_built = false;
+    ConversationKey sampler_key;
 
     // Guards the members below. Held for short library calls only, never across a
     // caller callback.
@@ -404,6 +410,8 @@ rac_result_t load_model(Service* service) {
                 service->engine = nullptr;
                 return template_rc;
             }
+            service->backend = backend;
+            service->sampler_built = false;
             RAC_LOG_INFO(LOG_CAT, "loaded %s on %s (context_length=%d)",
                          service->model_path.c_str(), backend, service->context_length);
             return RAC_SUCCESS;
@@ -549,8 +557,8 @@ ConversationKey conversation_key(const rac_llm_options_t& options) {
 }
 
 rac_result_t apply_sampler(LiteRtLmConversationConfig* config, const ConversationKey& key) {
-    // The library seeds a fresh sampler per conversation, so a fixed default would
-    // repeat the same reply. seed 0 means "backend default" in rac_llm_options_t.
+    // seed 0 means "backend default" in rac_llm_options_t. A random one keeps each load
+    // from repeating the same reply, as a fixed default would.
     const int32_t seed = key.seed > 0 ? static_cast<int32_t>(key.seed & 0x7FFFFFFF)
                                       : static_cast<int32_t>(std::random_device{}() >> 1);
 
@@ -572,6 +580,36 @@ rac_result_t apply_sampler(LiteRtLmConversationConfig* config, const Conversatio
     const SessionConfigPtr session(raw_session);
     (void)litert_lm_session_config_set_sampler_params(session.get(), params.get());
     (void)litert_lm_conversation_config_set_session_config(config, session.get());
+    return RAC_SUCCESS;
+}
+
+// True when a request with key gets its settings from the sampler built for built. A fixed
+// seed asks for a reply that repeats, so it needs a sampler no request has used.
+bool sampler_serves(const ConversationKey& built, const ConversationKey& key) {
+    return key.seed == 0 && built.top_k == key.top_k && built.top_p == key.top_p &&
+           built.temperature == key.temperature;
+}
+
+// Opens the model again on its backend, for a request the current sampler cannot serve:
+// LiteRT-LM keeps the first request's sampler, with its random state, for the life of an
+// engine (LiteRT-LM issue 2080). The chat template found at load still holds. A failed
+// open leaves no model loaded.
+rac_result_t reopen_engine(Service* service) {
+    const auto started = std::chrono::steady_clock::now();
+    service->chat.reset();
+    litert_lm_engine_delete(service->engine);
+    service->engine = nullptr;
+    service->sampler_built = false;
+    const rac_result_t rc = open_engine(service, service->backend, &service->engine);
+    if (rc != RAC_SUCCESS) {
+        service->engine = nullptr;
+        return rc;
+    }
+    RAC_LOG_INFO(LOG_CAT, "reopened %s on %s for new sampler settings in %lld ms",
+                 service->model_path.c_str(), service->backend,
+                 static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                            std::chrono::steady_clock::now() - started)
+                                            .count()));
     return RAC_SUCCESS;
 }
 
@@ -929,9 +967,15 @@ rac_result_t run_generation(Service* service, const char* prompt, const rac_llm_
         turn = std::string(effective.history[history_count]) + "\n\n" + turn;
     }
 
-    // A fixed seed asks for a reply that repeats, which only a new conversation gives.
     KeptChat& chat = service->chat;
     const ConversationKey key = conversation_key(effective);
+    if (service->sampler_built && !sampler_serves(service->sampler_key, key)) {
+        const rac_result_t reopen_rc = reopen_engine(service);
+        if (reopen_rc != RAC_SUCCESS) {
+            return reopen_rc;
+        }
+    }
+    // A fixed seed asks for a reply that repeats, which only a new conversation gives.
     bool text_delivered = false;
     if (service->keep_chats && chat.conversation && key.seed == 0 && chat.key == key &&
         holds_history(chat, effective.history, history_count)) {
@@ -951,6 +995,10 @@ rac_result_t run_generation(Service* service, const char* prompt, const rac_llm_
     const rac_result_t start_rc = start_chat(service, key, effective.history, history_count);
     if (start_rc != RAC_SUCCESS) {
         return start_rc;
+    }
+    if (!service->sampler_built) {
+        service->sampler_built = true;
+        service->sampler_key = key;
     }
     return stream_turn(service, request, effective, turn, sink, summary, &text_delivered);
 }
@@ -1098,6 +1146,7 @@ rac_result_t litertlm_llm_cleanup(void* impl) {
     std::lock_guard<std::mutex> operation_lock(service->operation_mutex);
     service->chat.reset();
     service->keep_chats = true;
+    service->sampler_built = false;
     if (service->engine != nullptr) {
         litert_lm_engine_delete(service->engine);
         service->engine = nullptr;
