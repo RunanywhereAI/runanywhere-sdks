@@ -66,9 +66,10 @@ constexpr int kAcceleratorPolicyCpu = 2;
 constexpr int kAcceleratorPolicyGpu = 3;
 constexpr int kAcceleratorPolicyNpu = 4;
 
-// top_k 0 means "no limit" in rac_llm_options_t. LiteRT-LM needs k >= 1 and caps
-// it at the vocabulary size.
-constexpr int32_t kNoTopKLimit = 1 << 24;
+// top_k 0 means "no limit" in rac_llm_options_t. LiteRT-LM needs k >= 1, and its GPU
+// sampler builds work in proportion to k, so 0 maps to 64, LiteRT-LM's default top-k
+// limit for GPU sessions (GpuConfig::max_top_k).
+constexpr int32_t kTopKForNoLimit = 64;
 
 template <typename T, void (*Delete)(T*)>
 struct HandleDeleter {
@@ -540,7 +541,7 @@ ConversationKey conversation_key(const rac_llm_options_t& options) {
     ConversationKey key;
     key.system_prompt = options.system_prompt != nullptr ? options.system_prompt : "";
     key.thinking_disabled = options.disable_thinking != RAC_FALSE;
-    key.top_k = greedy ? 1 : (options.top_k > 0 ? options.top_k : kNoTopKLimit);
+    key.top_k = greedy ? 1 : (options.top_k > 0 ? options.top_k : kTopKForNoLimit);
     key.top_p = greedy ? 0.0f : (options.top_p > 0.0f ? options.top_p : 1.0f);
     key.temperature = greedy ? 1.0f : options.temperature;
     key.seed = options.seed > 0 ? options.seed : 0;
