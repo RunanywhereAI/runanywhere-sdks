@@ -126,7 +126,11 @@ export type { ModalityProtoModule } from './Adapters/ProtoAdapterTypes.js';
 
 export { SDKLogger } from './Foundation/SDKLogger.js';
 export { SDKException, ProtoErrorCode } from './Foundation/SDKException.js';
-export { RAC_ERROR_MODULE_ALREADY_REGISTERED } from './Foundation/RACErrors.js';
+export {
+  RAC_ERROR_MODULE_NOT_FOUND,
+  RAC_ERROR_MODULE_ALREADY_REGISTERED,
+  RAC_ERROR_PLUGIN_BUSY,
+} from './Foundation/RACErrors.js';
 export type { AccelerationMode } from './Foundation/WASMBridge.js';
 
 export { redactResourceURL } from './Foundation/BackendContract.js';

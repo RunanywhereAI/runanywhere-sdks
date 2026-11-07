@@ -79,18 +79,38 @@ object ONNX {
      */
     suspend fun unregister() {
         registrationMutex.withLock {
-            if (!isRegistered) return
+            if (!isRegistered && !isSherpaRegistered) return
 
             if (isSherpaRegistered) {
-                unregisterSherpaNative()
-                isSherpaRegistered = false
-                logger.info("Sherpa backend unregistered")
+                val sherpaResult = unregisterSherpaNative()
+                if (sherpaResult == RunAnywhereBridge.RAC_SUCCESS ||
+                    sherpaResult == RunAnywhereBridge.RAC_ERROR_MODULE_NOT_FOUND
+                ) {
+                    isSherpaRegistered = false
+                    logger.info("Sherpa backend unregistered")
+                } else if (sherpaResult == RunAnywhereBridge.RAC_ERROR_PLUGIN_BUSY) {
+                    logger.warning(
+                        "Sherpa backend still leased by a loaded model; unload it and retry unregistration"
+                    )
+                } else {
+                    logger.warning("Sherpa unregistration failed with code: $sherpaResult")
+                }
             }
 
             if (isRegistered) {
-                unregisterNative()
-                isRegistered = false
-                logger.info("ONNX backend unregistered")
+                val result = unregisterNative()
+                if (result == RunAnywhereBridge.RAC_SUCCESS ||
+                    result == RunAnywhereBridge.RAC_ERROR_MODULE_NOT_FOUND
+                ) {
+                    isRegistered = false
+                    logger.info("ONNX backend unregistered")
+                } else if (result == RunAnywhereBridge.RAC_ERROR_PLUGIN_BUSY) {
+                    logger.warning(
+                        "ONNX backend still leased by a loaded model; unload it and retry unregistration"
+                    )
+                } else {
+                    logger.warning("ONNX unregistration failed with code: $result")
+                }
             }
         }
     }

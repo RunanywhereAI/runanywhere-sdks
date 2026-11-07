@@ -160,10 +160,20 @@ export const ONNX = {
     }
   },
 
-  /** Unregister the proto-byte plugins and release the WASM module. */
+  /**
+   * Unregister the proto-byte plugins and release the WASM module.
+   *
+   * A `PLUGIN_BUSY` result means a loaded model still leases the native
+   * plugin: the bridge keeps the module and registration flags, and this
+   * facade keeps `registrationState` at `'registered'`. Unload the model and
+   * call `unregister()` again to finish the teardown.
+   */
   unregister(): void {
+    if (!SherpaONNXBridge.shared.unregister()) {
+      _registrationState = 'registered';
+      return;
+    }
     clearONNXBackendWorker();
-    SherpaONNXBridge.shared.unregister();
     setOnnxBackendWorkerRequired(false);
     _lastFallbackReason = null;
     setSpeechAccelerationMode({
