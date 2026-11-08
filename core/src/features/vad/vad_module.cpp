@@ -545,7 +545,9 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     // ==========================================================================
 
     // 1. Energy threshold range (Swift lines 64-69)
-    if (config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
+    // Reject NaN (comparisons with NaN are always false) and out-of-range values.
+    if (std::isnan(config->energy_threshold) ||
+        config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
         RAC_LOG_ERROR("VAD.Component",
                       "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05");
         return RAC_ERROR_INVALID_PARAMETER;
@@ -582,6 +584,47 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     // ==========================================================================
 
     component->config = *config;
+
+    // If already initialized, rebuild the energy VAD service with the new config
+    // so re-initializing an agent with different VAD settings doesn't silently
+    // keep stale sample rate, frame length, and threshold.
+    if (component->is_initialized) {
+        if (component->vad_service) {
+            rac_energy_vad_stop(component->vad_service);
+            rac_energy_vad_destroy(component->vad_service);
+            component->vad_service = nullptr;
+        }
+
+        rac_energy_vad_config_t vad_config = {};
+        vad_config.sample_rate = component->config.sample_rate;
+        vad_config.frame_length = component->config.frame_length;
+        vad_config.energy_threshold = component->config.energy_threshold;
+
+        rac_result_t result = rac_energy_vad_create(&vad_config, &component->vad_service);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("VAD.Component", "Failed to recreate energy VAD service");
+            return result;
+        }
+
+        result = rac_energy_vad_set_speech_callback(component->vad_service,
+                                                    vad_speech_activity_callback, component);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("VAD.Component", "Failed to set speech callback on recreated VAD");
+            rac_energy_vad_destroy(component->vad_service);
+            component->vad_service = nullptr;
+            return result;
+        }
+
+        result = rac_energy_vad_initialize(component->vad_service);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("VAD.Component", "Failed to initialize recreated energy VAD service");
+            rac_energy_vad_destroy(component->vad_service);
+            component->vad_service = nullptr;
+            return result;
+        }
+
+        RAC_LOG_INFO("VAD.Component", "VAD component reconfigured with new settings");
+    }
 
     RAC_LOG_INFO("VAD.Component", "VAD component configured");
 
