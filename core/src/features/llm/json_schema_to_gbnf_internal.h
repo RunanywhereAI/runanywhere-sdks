@@ -9,7 +9,7 @@ namespace rac::llm {
 // Supports the same subset as bindings/python/runanywhere/grammar.py /
 // bindings/electron/src/grammar.ts: object/array/string/number/integer/
 // boolean/null/enum/const/anyOf plus maxItems via nested optional tails.
-// Returns false on invalid JSON; *out_error is a short reason when provided.
+// Returns false on invalid JSON or unsupported value types; *out_error is a short reason.
 bool json_schema_to_gbnf(const std::string& schema_json, std::string* out_grammar,
                          std::string* out_error = nullptr);
 

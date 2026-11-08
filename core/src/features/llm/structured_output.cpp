@@ -1005,7 +1005,15 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
         } else if (options.has_schema() && !options.schema().empty()) {
             std::string gbnf;
             std::string err;
-            if (rac::llm::json_schema_to_gbnf(options.schema(), &gbnf, &err) && !gbnf.empty()) {
+            if (!rac::llm::json_schema_to_gbnf(options.schema(), &gbnf, &err)) {
+                result.Clear();
+                rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                    RAC_ERROR_INVALID_ARGUMENT);
+                result.mutable_error()->set_message(err);
+                free(prepared_prompt);
+                return copy_serialized_proto(result, out_result, "StructuredOutputPromptResult");
+            }
+            if (!gbnf.empty()) {
                 result.set_grammar(gbnf);
             }
         }

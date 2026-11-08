@@ -236,10 +236,17 @@ bool json_schema_to_gbnf(const std::string& schema_json, std::string* out_gramma
         }
         return false;
     }
-    Builder b;
-    const std::string root = b.build(schema);
-    *out_grammar = b.finish(root);
-    return true;
+    try {
+        Builder b;
+        const std::string root = b.build(schema);
+        *out_grammar = b.finish(root);
+        return true;
+    } catch (const json::type_error& error) {
+        if (out_error) {
+            *out_error = std::string("unsupported schema value type: ") + error.what();
+        }
+        return false;
+    }
 }
 
 std::string structured_output_repair_prompt(const std::string& original_prompt,
