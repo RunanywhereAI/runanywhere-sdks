@@ -33,7 +33,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <charconv>
 #include <cstring>
 #include <memory>
 #include <sstream>
@@ -108,43 +107,18 @@ class YamlParser {
             // keeps us honest for strings containing '#'.
             std::string clean;
             bool in_sq = false, in_dq = false;
-            char last_token_char = '\0';
-            size_t last_token_pos = 0;
-            const size_t first_token_pos = line.find_first_not_of(" \t");
-            bool after_ws = true;
-            for (size_t i = 0; i < line.size(); ++i) {
-                const char c = line[i];
-                if (i > 0) {
-                    const char prev = line[i - 1];
-                    after_ws = prev == ' ' || prev == '\t';
-                    if (!after_ws) {
-                        last_token_char = prev;
-                        last_token_pos = i - 1;
-                    }
-                }
-                const bool can_open =
-                    last_token_char == '\0' ||
-                    (after_ws && (last_token_char == ':' ||
-                                  (last_token_char == '-' && last_token_pos == first_token_pos)));
-                if ((in_sq && c == '\'' && i + 1 < line.size() && line[i + 1] == '\'') ||
-                    (in_dq && c == '\\' && i + 1 < line.size())) {
-                    clean.push_back(c);
-                    clean.push_back(line[++i]);
-                    continue;
-                }
+            for (char c : line) {
                 if (!in_dq && c == '\'') {
-                    if (in_sq || can_open)
-                        in_sq = !in_sq;
+                    in_sq = !in_sq;
                     clean.push_back(c);
                     continue;
                 }
                 if (!in_sq && c == '"') {
-                    if (in_dq || can_open)
-                        in_dq = !in_dq;
+                    in_dq = !in_dq;
                     clean.push_back(c);
                     continue;
                 }
-                if (!in_sq && !in_dq && c == '#' && after_ws)
+                if (!in_sq && !in_dq && c == '#')
                     break;
                 clean.push_back(c);
             }
@@ -202,72 +176,51 @@ class YamlParser {
         return s.substr(a, b - a);
     }
 
-    static void append_utf8(std::string& out, uint32_t cp) {
-        if (cp < 0x80) {
-            out.push_back(static_cast<char>(cp));
-        } else if (cp < 0x800) {
-            out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
-            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-        } else if (cp < 0x10000) {
-            out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
-            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-        } else {
-            out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
-            out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
-            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    static std::string unquote(const std::string& s) {
+        if (s.size() >= 2 &&
+            (s.front() == '"' && s.back() == '"') || (s.front() == 39 && s.back() == 39)) {
+            char quote = s.front();
+            std::string content = s.substr(1, s.size() - 2);
+            if (quote == 39) {
+                // Single-quoted: only '' -> ' is special
+                std::string out;
+                for (size_t i = 0; i < content.size(); ++i) {
+                    if (content[i] == 39 && i + 1 < content.size() && content[i + 1] == 39 ) {
+                        out.push_back(39);
+                        ++i;
+                    } else {
+                        out.push_back(content[i]);
+                    }
+                }
+                return out;
+            } else {
+                // Double-quoted: handle YAML escape sequences
+                std::string out;
+                for (size_t i = 0; i < content.size(); ++i) {
+                    if (content[i] == '\\' && i + 1 < content.size()) {
+                        char next = content[i + 1];
+                        switch (next) {
+                            case '"':  out.push_back('"'); break;
+                            case '\\': out.push_back('\\'); break;
+                            case '/':  out.push_back('/'); break;
+                            case 'n':  out.push_back('\n'); break;
+                            case 't':  out.push_back('\t'); break;
+                            case 'r':  out.push_back('\r'); break;
+                            case 'b':  out.push_back('\b'); break;
+                            case 'f':  out.push_back('\f'); break;
+                            default:   out.push_back(next); break;
+                        }
+                        ++i;
+                    } else {
+                        out.push_back(content[i]);
+                    }
+                }
+                return out;
+            }
         }
+        return s;
     }
 
-    static std::string unquote(const std::string& s) {
-        if (s.size() < 2 || s.front() != s.back() || (s.front() != '"' && s.front() != '\'')) {
-            return s;
-        }
-        const std::string_view body(s.data() + 1, s.size() - 2);
-        std::string out;
-        out.reserve(body.size());
-        if (s.front() == '\'') {
-            for (size_t i = 0; i < body.size(); ++i) {
-                out.push_back(body[i]);
-                if (body[i] == '\'' && i + 1 < body.size() && body[i + 1] == '\'')
-                    ++i;
-            }
-            return out;
-        }
-        constexpr std::string_view kEscapes = "0abt\tnvfre \"/\\";
-        constexpr std::string_view kDecoded("\0\a\b\t\t\n\v\f\r\x1b \"/\\", kEscapes.size());
-        constexpr std::string_view kNamed = "N_LP";
-        constexpr uint32_t kNamedCodePoints[] = {0x85, 0xA0, 0x2028, 0x2029};
-        for (size_t i = 0; i < body.size(); ++i) {
-            if (body[i] != '\\' || i + 1 == body.size()) {
-                out.push_back(body[i]);
-                continue;
-            }
-            const char e = body[++i];
-            if (const size_t k = kEscapes.find(e); k != std::string_view::npos) {
-                out.push_back(kDecoded[k]);
-                continue;
-            }
-            if (const size_t k = kNamed.find(e); k != std::string_view::npos) {
-                append_utf8(out, kNamedCodePoints[k]);
-                continue;
-            }
-            const size_t digits = e == 'x' ? 2 : (e == 'u' ? 4 : (e == 'U' ? 8 : 0));
-            uint32_t cp = 0;
-            const char* first = body.data() + i + 1;
-            if (digits != 0 && i + digits < body.size() &&
-                std::from_chars(first, first + digits, cp, 16).ptr == first + digits &&
-                cp <= 0x10FFFF && (cp < 0xD800 || cp > 0xDFFF)) {
-                append_utf8(out, cp);
-                i += digits;
-                continue;
-            }
-            out.push_back('\\');
-            out.push_back(e);
-        }
-        return out;
-    }
 
     /// Parse the block starting at `idx` whose first line has indent
     /// >= base_indent. Advances idx past the consumed region.

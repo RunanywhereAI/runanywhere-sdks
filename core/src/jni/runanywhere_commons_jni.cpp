@@ -3963,6 +3963,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallValidateProt
 
 // Global reference for file callbacks object
 static jobject g_file_callbacks_obj = nullptr;
+static std::mutex g_file_callbacks_mutex;
 static jmethodID g_fc_create_directory = nullptr;
 static jmethodID g_fc_delete_path = nullptr;
 static jmethodID g_fc_list_directory = nullptr;
@@ -3986,23 +3987,47 @@ static void free_directory_entry_copies(char** entries, size_t count) {
 // JNI file callback implementations
 static rac_result_t jni_fc_create_directory(const char* path, int recursive, void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    jobject obj = nullptr;
+    jmethodID method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (env == nullptr || g_file_callbacks_obj == nullptr)
+            return RAC_ERROR_NOT_INITIALIZED;
+        obj = env->NewGlobalRef(g_file_callbacks_obj);
+        method = g_fc_create_directory;
+    }
+    if (method == nullptr) {
+        env->DeleteGlobalRef(obj);
         return RAC_ERROR_NOT_INITIALIZED;
+    }
     jstring jPath = env->NewStringUTF(path);
-    jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_create_directory, jPath,
+    jint result = env->CallIntMethod(obj, method, jPath,
                                      static_cast<jboolean>(recursive != 0));
     env->DeleteLocalRef(jPath);
+    env->DeleteGlobalRef(obj);
     return static_cast<rac_result_t>(result);
 }
 
 static rac_result_t jni_fc_delete_path(const char* path, int recursive, void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    jobject obj = nullptr;
+    jmethodID method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (env == nullptr || g_file_callbacks_obj == nullptr)
+            return RAC_ERROR_NOT_INITIALIZED;
+        obj = env->NewGlobalRef(g_file_callbacks_obj);
+        method = g_fc_delete_path;
+    }
+    if (method == nullptr) {
+        env->DeleteGlobalRef(obj);
         return RAC_ERROR_NOT_INITIALIZED;
+    }
     jstring jPath = env->NewStringUTF(path);
-    jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_delete_path, jPath,
+    jint result = env->CallIntMethod(obj, method, jPath,
                                      static_cast<jboolean>(recursive != 0));
     env->DeleteLocalRef(jPath);
+    env->DeleteGlobalRef(obj);
     return static_cast<rac_result_t>(result);
 }
 
@@ -4015,19 +4040,31 @@ static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries,
     *out_count = 0;
 
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_list_directory == nullptr)
+    jobject obj = nullptr;
+    jmethodID method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (env == nullptr || g_file_callbacks_obj == nullptr || g_fc_list_directory == nullptr)
+            return RAC_ERROR_NOT_INITIALIZED;
+        obj = env->NewGlobalRef(g_file_callbacks_obj);
+        method = g_fc_list_directory;
+    }
+    if (method == nullptr) {
+        env->DeleteGlobalRef(obj);
         return RAC_ERROR_NOT_INITIALIZED;
-
+    }
     jstring jPath = env->NewStringUTF(path);
     if (jPath == nullptr) {
         if (env->ExceptionCheck() == JNI_TRUE) {
             env->ExceptionClear();
         }
+        env->DeleteGlobalRef(obj);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     jobjectArray jEntries = static_cast<jobjectArray>(
-        env->CallObjectMethod(g_file_callbacks_obj, g_fc_list_directory, jPath));
+        env->CallObjectMethod(obj, method, jPath));
     env->DeleteLocalRef(jPath);
+    env->DeleteGlobalRef(obj);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionClear();
@@ -4106,44 +4143,94 @@ static void jni_fc_free_entries(char** entries, size_t count, void* user_data) {
 static rac_bool_t jni_fc_path_exists(const char* path, rac_bool_t* out_is_directory,
                                      void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    jobject obj = nullptr;
+    jmethodID exists_method = nullptr;
+    jmethodID is_dir_method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (env == nullptr || g_file_callbacks_obj == nullptr)
+            return RAC_FALSE;
+        obj = env->NewGlobalRef(g_file_callbacks_obj);
+        exists_method = g_fc_path_exists;
+        is_dir_method = g_fc_is_directory;
+    }
+    if (exists_method == nullptr) {
+        env->DeleteGlobalRef(obj);
         return RAC_FALSE;
-
+    }
     jstring jPath = env->NewStringUTF(path);
-    jboolean exists = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_path_exists, jPath);
+    jboolean exists = env->CallBooleanMethod(obj, exists_method, jPath);
 
-    if (out_is_directory != nullptr && exists) {
-        jboolean isDir = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_is_directory, jPath);
+    if (out_is_directory != nullptr && exists && is_dir_method != nullptr) {
+        jboolean isDir = env->CallBooleanMethod(obj, is_dir_method, jPath);
         *out_is_directory = isDir ? RAC_TRUE : RAC_FALSE;
     }
 
     env->DeleteLocalRef(jPath);
+    env->DeleteGlobalRef(obj);
     return exists ? RAC_TRUE : RAC_FALSE;
 }
 
 static int64_t jni_fc_get_file_size(const char* path, void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    jobject obj = nullptr;
+    jmethodID method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (env == nullptr || g_file_callbacks_obj == nullptr)
+            return -1;
+        obj = env->NewGlobalRef(g_file_callbacks_obj);
+        method = g_fc_get_file_size;
+    }
+    if (method == nullptr) {
+        env->DeleteGlobalRef(obj);
         return -1;
+    }
     jstring jPath = env->NewStringUTF(path);
-    jlong size = env->CallLongMethod(g_file_callbacks_obj, g_fc_get_file_size, jPath);
+    jlong size = env->CallLongMethod(obj, method, jPath);
     env->DeleteLocalRef(jPath);
+    env->DeleteGlobalRef(obj);
     return static_cast<int64_t>(size);
 }
 
 static int64_t jni_fc_get_available_space(void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    jobject obj = nullptr;
+    jmethodID method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (env == nullptr || g_file_callbacks_obj == nullptr)
+            return -1;
+        obj = env->NewGlobalRef(g_file_callbacks_obj);
+        method = g_fc_get_available_space;
+    }
+    if (method == nullptr) {
+        env->DeleteGlobalRef(obj);
         return -1;
-    return static_cast<int64_t>(
-        env->CallLongMethod(g_file_callbacks_obj, g_fc_get_available_space));
+    }
+    int64_t result = static_cast<int64_t>(env->CallLongMethod(obj, method));
+    env->DeleteGlobalRef(obj);
+    return result;
 }
 
 static int64_t jni_fc_get_total_space(void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_file_callbacks_obj == nullptr)
+    jobject obj = nullptr;
+    jmethodID method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (env == nullptr || g_file_callbacks_obj == nullptr)
+            return -1;
+        obj = env->NewGlobalRef(g_file_callbacks_obj);
+        method = g_fc_get_total_space;
+    }
+    if (method == nullptr) {
+        env->DeleteGlobalRef(obj);
         return -1;
-    return static_cast<int64_t>(env->CallLongMethod(g_file_callbacks_obj, g_fc_get_total_space));
+    }
+    int64_t result = static_cast<int64_t>(env->CallLongMethod(obj, method));
+    env->DeleteGlobalRef(obj);
+    return result;
 }
 
 /**
@@ -4252,24 +4339,27 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerRegist
     if (callbacksObj == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
-    // Store global reference
-    if (g_file_callbacks_obj != nullptr) {
-        env->DeleteGlobalRef(g_file_callbacks_obj);
-    }
-    g_file_callbacks_obj = env->NewGlobalRef(callbacksObj);
+    // Store global reference and cache method IDs under the lock
+    {
+        std::lock_guard<std::mutex> lock(g_file_callbacks_mutex);
+        if (g_file_callbacks_obj != nullptr) {
+            env->DeleteGlobalRef(g_file_callbacks_obj);
+        }
+        g_file_callbacks_obj = env->NewGlobalRef(callbacksObj);
 
-    // Cache method IDs
-    jclass cls = env->GetObjectClass(callbacksObj);
-    g_fc_create_directory = env->GetMethodID(cls, "createDirectory", "(Ljava/lang/String;Z)I");
-    g_fc_delete_path = env->GetMethodID(cls, "deletePath", "(Ljava/lang/String;Z)I");
-    g_fc_list_directory =
-        env->GetMethodID(cls, "listDirectory", "(Ljava/lang/String;)[Ljava/lang/String;");
-    g_fc_path_exists = env->GetMethodID(cls, "pathExists", "(Ljava/lang/String;)Z");
-    g_fc_is_directory = env->GetMethodID(cls, "isDirectory", "(Ljava/lang/String;)Z");
-    g_fc_get_file_size = env->GetMethodID(cls, "getFileSize", "(Ljava/lang/String;)J");
-    g_fc_get_available_space = env->GetMethodID(cls, "getAvailableSpace", "()J");
-    g_fc_get_total_space = env->GetMethodID(cls, "getTotalSpace", "()J");
-    env->DeleteLocalRef(cls);
+        // Cache method IDs
+        jclass cls = env->GetObjectClass(callbacksObj);
+        g_fc_create_directory = env->GetMethodID(cls, "createDirectory", "(Ljava/lang/String;Z)I");
+        g_fc_delete_path = env->GetMethodID(cls, "deletePath", "(Ljava/lang/String;Z)I");
+        g_fc_list_directory =
+            env->GetMethodID(cls, "listDirectory", "(Ljava/lang/String;)[Ljava/lang/String;");
+        g_fc_path_exists = env->GetMethodID(cls, "pathExists", "(Ljava/lang/String;)Z");
+        g_fc_is_directory = env->GetMethodID(cls, "isDirectory", "(Ljava/lang/String;)Z");
+        g_fc_get_file_size = env->GetMethodID(cls, "getFileSize", "(Ljava/lang/String;)J");
+        g_fc_get_available_space = env->GetMethodID(cls, "getAvailableSpace", "()J");
+        g_fc_get_total_space = env->GetMethodID(cls, "getTotalSpace", "()J");
+        env->DeleteLocalRef(cls);
+    }
 
     LOGi("File manager callbacks registered");
     return RAC_SUCCESS;
