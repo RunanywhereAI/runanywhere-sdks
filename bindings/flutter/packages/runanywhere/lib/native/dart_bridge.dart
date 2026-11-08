@@ -564,23 +564,18 @@ class DartBridge {
   /// `rac_log_level_t` in commons (`include/rac/core/rac_types.h`):
   /// `trace=0, debug=1, info=2, warning=3, error=4, fatal=5`.
   static void _configureLogging(SDKEnvironment environment) {
-    int logLevel;
-    switch (environment) {
-      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-        logLevel = RacLogLevel.warning;
-        break;
-      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-      default:
-        logLevel = RacLogLevel.debug;
-        break;
-    }
+    // rac_configure_logging takes a rac_environment_t (0 = development,
+    // 2 = production), not a log level. Passing a log level (1 = debug,
+    // 3 = warning) caused development to silently land in the production
+    // branch, which sets commons to WARNING with stderr off.
+    final envValue = environment._cEnvironment;
 
     try {
       final configureLogging = lib
           .lookupFunction<Void Function(Int32), void Function(int)>(
             'rac_configure_logging',
           );
-      configureLogging(logLevel);
+      configureLogging(envValue);
     } catch (_) {
       _logger.warning('Failed to configure C++ logging');
     }
