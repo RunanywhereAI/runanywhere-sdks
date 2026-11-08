@@ -941,6 +941,8 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
     }
     out->name = copy_string(in.name());
     if (!in.name().empty() && !out->name) {
+        rac_free(out->id);
+        out->id = nullptr;
         return false;
     }
     // Preserve an explicit catalog 0.0; only absent default_scale falls back.
@@ -953,11 +955,26 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
             // Keep the count consistent with the null pointer so the entry never
             // advertises elements that were never allocated.
             out->compatible_model_count = 0;
+            rac_free(out->id);
+            rac_free(out->name);
+            out->id = nullptr;
+            out->name = nullptr;
             return false;
         }
         for (int i = 0; i < in.compatible_models_size(); ++i) {
             out->compatible_model_ids[i] = rac_strdup(in.compatible_models(i).c_str());
             if (!out->compatible_model_ids[i]) {
+                // Free partial allocations and zero the destination.
+                for (int j = 0; j < i; ++j) {
+                    rac_free(out->compatible_model_ids[j]);
+                }
+                std::free(out->compatible_model_ids);
+                out->compatible_model_ids = nullptr;
+                out->compatible_model_count = 0;
+                rac_free(out->id);
+                rac_free(out->name);
+                out->id = nullptr;
+                out->name = nullptr;
                 return false;
             }
         }
