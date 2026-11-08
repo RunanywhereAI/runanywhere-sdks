@@ -65,19 +65,26 @@ rac_result_t posix_file_read(const char* path, void** out_data, size_t* out_size
     *out_size = 0;
     FILE* f = fopen(path, "rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
-    fseek(f, 0, SEEK_END);
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
     long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
     if (n < 0) {
         fclose(f);
         return RAC_ERROR_FILE_READ_FAILED;
     }
-    void* buf = rac_alloc(static_cast<size_t>(n));
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    // Allocate at least 1 byte so empty files don't fail on rac_alloc(0).
+    void* buf = rac_alloc(std::max(static_cast<size_t>(n), static_cast<size_t>(1)));
     if (!buf) {
         fclose(f);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    size_t got = fread(buf, 1, static_cast<size_t>(n), f);
+    size_t got = n > 0 ? fread(buf, 1, static_cast<size_t>(n), f) : 0;
     fclose(f);
     if (got != static_cast<size_t>(n)) {
         rac_free(buf);
@@ -140,10 +147,16 @@ rac_result_t posix_secure_get(const char* key, char** out_value, void*) {
     if (!fs::exists(p, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;  // clean miss contract
     FILE* f = fopen(p.c_str(), "rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
-    fseek(f, 0, SEEK_END);
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
     long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
     if (n < 0) {
+        fclose(f);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
         fclose(f);
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
