@@ -4454,15 +4454,25 @@ static void download_proto_jni_callback(const uint8_t* proto_bytes, size_t proto
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadSetProgressProtoCallback(
     JNIEnv* env, jclass clazz, jobject listener) {
-    std::lock_guard<std::mutex> lock(g_download_proto_listener_mutex);
-    if (g_download_proto_listener != nullptr) {
-        env->DeleteGlobalRef(g_download_proto_listener);
+    // Copy the listener under the lock, then release it before calling the C
+    // function (which takes progress_sink().mutex) to avoid lock-order
+    // inversion with emit_progress (which holds progress_sink().mutex and
+    // calls download_proto_jni_callback, which takes this mutex).
+    jobject old_listener = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_download_proto_listener_mutex);
+        old_listener = g_download_proto_listener;
         g_download_proto_listener = nullptr;
+        if (listener != nullptr) {
+            g_download_proto_listener = env->NewGlobalRef(listener);
+        }
+    }
+    if (old_listener != nullptr) {
+        env->DeleteGlobalRef(old_listener);
     }
     if (listener == nullptr) {
         return static_cast<jint>(rac_download_set_progress_proto_callback(nullptr, nullptr));
     }
-    g_download_proto_listener = env->NewGlobalRef(listener);
     return static_cast<jint>(
         rac_download_set_progress_proto_callback(download_proto_jni_callback, nullptr));
 }
