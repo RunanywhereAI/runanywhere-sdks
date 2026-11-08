@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <limits>
 #include <string>
 #include <system_error>
 
@@ -96,26 +97,38 @@ rac_result_t posix_file_read(const char* path, void** out_data, size_t* out_size
     *out_size = 0;
     FILE* f = fopen(path, "rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
-    fseek(f, 0, SEEK_END);
-    long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (n < 0) {
+    // Both seek results are checked, and the measured position is validated as a
+    // nonnegative value representable in size_t, before any allocation or read.
+    if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
         return RAC_ERROR_FILE_READ_FAILED;
     }
-    void* buf = rac_alloc(static_cast<size_t>(n));
+    long n = ftell(f);
+    if (n < 0 || static_cast<unsigned long long>(n) >
+                     static_cast<unsigned long long>(std::numeric_limits<size_t>::max())) {
+        fclose(f);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    const size_t size = static_cast<size_t>(n);
+    // rac_alloc(0) returns null: allocate one owned byte for an empty file so a
+    // valid zero-byte read reports success (logical size stays 0), not OOM.
+    void* buf = rac_alloc(size > 0 ? size : 1);
     if (!buf) {
         fclose(f);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    size_t got = fread(buf, 1, static_cast<size_t>(n), f);
+    size_t got = fread(buf, 1, size, f);
     fclose(f);
-    if (got != static_cast<size_t>(n)) {
+    if (got != size) {
         rac_free(buf);
         return RAC_ERROR_FILE_READ_FAILED;
     }
     *out_data = buf;
-    *out_size = static_cast<size_t>(n);
+    *out_size = size;
     return RAC_SUCCESS;
 }
 
@@ -171,10 +184,18 @@ rac_result_t posix_secure_get(const char* key, char** out_value, void*) {
     if (!fs::exists(p, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;  // clean miss contract
     FILE* f = fopen(p.c_str(), "rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
-    fseek(f, 0, SEEK_END);
+    // Same seek contract as posix_file_read. The +1 NUL byte must not wrap size_t.
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
     long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (n < 0) {
+    if (n < 0 || static_cast<unsigned long long>(n) >=
+                     static_cast<unsigned long long>(std::numeric_limits<size_t>::max())) {
+        fclose(f);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
         fclose(f);
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
