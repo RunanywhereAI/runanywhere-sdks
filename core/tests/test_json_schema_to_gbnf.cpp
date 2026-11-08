@@ -60,6 +60,33 @@ int test_max_items_nested_optional_tails() {
     return 0;
 }
 
+int test_unsupported_schema_types_fail() {
+    const char* schemas[] = {
+        R"({"type":["string","null"]})",
+        R"({"type":null})",
+        R"({"type":7})",
+        R"({"type":false})",
+        R"({"type":{}})",
+        R"({"type":"object","properties":{"name":{"type":["string","null"]}}})",
+    };
+    for (const char* schema : schemas) {
+        std::string grammar;
+        std::string error;
+        ASSERT_TRUE(!rac::llm::json_schema_to_gbnf(schema, &grammar, &error));
+        ASSERT_TRUE(!error.empty());
+    }
+    return 0;
+}
+
+int test_anyof_schema_still_compiles() {
+    std::string grammar;
+    ASSERT_TRUE(rac::llm::json_schema_to_gbnf(R"({"anyOf":[{"type":"string"},{"type":"null"}]})",
+                                              &grammar, nullptr));
+    ASSERT_SUBSTR(grammar, "root ::= any0");
+    ASSERT_SUBSTR(grammar, "any0 ::= string | \"null\"");
+    return 0;
+}
+
 int test_repair_prompt_is_deterministic() {
     const std::string prompt = rac::llm::structured_output_repair_prompt(
         "Extract the person", "{\"name\":1}",
@@ -80,6 +107,8 @@ int main() {
         {"object_schema_compiles", test_object_schema_compiles},
         {"invalid_json_fails", test_invalid_json_fails},
         {"max_items_nested_optional_tails", test_max_items_nested_optional_tails},
+        {"unsupported_schema_types_fail", test_unsupported_schema_types_fail},
+        {"anyof_schema_still_compiles", test_anyof_schema_still_compiles},
         {"repair_prompt_is_deterministic", test_repair_prompt_is_deterministic},
     };
 

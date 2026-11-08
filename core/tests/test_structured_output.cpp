@@ -225,6 +225,58 @@ int test_prepare_prompt_proto_defaults_schema_into_prompt() {
     return 0;
 }
 
+int test_prepare_prompt_proto_rejects_schema_compile_errors() {
+    const char* schemas[] = {
+        "{not-json",
+        R"({"type":["string","null"]})",
+        R"({"type":null})",
+        R"({"type":7})",
+        R"({"type":"object","properties":{"name":{"type":["string","null"]}}})",
+    };
+    for (const char* schema : schemas) {
+        runanywhere::v1::StructuredOutputParseRequest request;
+        request.set_text("Return a value");
+        request.mutable_options()->set_schema(schema);
+        const std::string bytes = request.SerializeAsString();
+        rac_proto_buffer_t result{};
+        const rac_result_t rc = rac_structured_output_prepare_prompt_proto(
+            reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &result);
+        ASSERT_EQ_INT(rc, RAC_ERROR_INVALID_ARGUMENT);
+        ASSERT_EQ_INT(result.status, RAC_ERROR_INVALID_ARGUMENT);
+        ASSERT_TRUE(result.data == nullptr && result.size == 0);
+        ASSERT_TRUE(result.error_message != nullptr && result.error_message[0] != '\0');
+        rac_proto_buffer_free(&result);
+    }
+    return 0;
+}
+
+int test_prepare_prompt_proto_preserves_constraints() {
+    for (bool explicit_grammar : {false, true}) {
+        runanywhere::v1::StructuredOutputParseRequest request;
+        request.set_text("Return a value");
+        auto* options = request.mutable_options();
+        options->set_include_schema_in_prompt(false);
+        if (explicit_grammar) {
+            options->set_grammar("root ::= \"ok\"");
+        } else {
+            options->set_schema(R"({"anyOf":[{"type":"string"},{"type":"null"}]})");
+        }
+        const std::string bytes = request.SerializeAsString();
+        rac_proto_buffer_t result_bytes{};
+        ASSERT_EQ_INT(
+            rac_structured_output_prepare_prompt_proto(
+                reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &result_bytes),
+            RAC_SUCCESS);
+        runanywhere::v1::StructuredOutputPromptResult result;
+        ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+        ASSERT_EQ_STR(result.prepared_prompt().c_str(), "Return a value");
+        ASSERT_TRUE(result.has_grammar());
+        ASSERT_SUBSTR(result.grammar().c_str(), explicit_grammar ? "root ::= \"ok\"" : "any0 ::=");
+        rac_proto_buffer_free(&result_bytes);
+    }
+    return 0;
+}
+
 int test_validate_proto_uses_generated_contract() {
     // StructuredOutputValidationRequest was deleted outright — the sole
     // request envelope shared by parse/validate/prepare-prompt is now
@@ -300,6 +352,10 @@ int main() {
          .fn = test_prepare_prompt_proto_uses_generated_contract},
         {.name = "prepare_prompt_proto_defaults_schema_into_prompt",
          .fn = test_prepare_prompt_proto_defaults_schema_into_prompt},
+        {.name = "prepare_prompt_proto_rejects_schema_compile_errors",
+         .fn = test_prepare_prompt_proto_rejects_schema_compile_errors},
+        {.name = "prepare_prompt_proto_preserves_constraints",
+         .fn = test_prepare_prompt_proto_preserves_constraints},
         {.name = "validate_proto_uses_generated_contract",
          .fn = test_validate_proto_uses_generated_contract},
     };

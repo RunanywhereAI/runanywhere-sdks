@@ -1005,7 +1005,12 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
         } else if (options.has_schema() && !options.schema().empty()) {
             std::string gbnf;
             std::string err;
-            if (rac::llm::json_schema_to_gbnf(options.schema(), &gbnf, &err) && !gbnf.empty()) {
+            if (!rac::llm::json_schema_to_gbnf(options.schema(), &gbnf, &err)) {
+                free(prepared_prompt);
+                return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                                  err.c_str());
+            }
+            if (!gbnf.empty()) {
                 result.set_grammar(gbnf);
             }
         }
