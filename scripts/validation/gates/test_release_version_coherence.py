@@ -232,7 +232,7 @@ def test_readme_pin_shape_that_matches_nothing_is_rejected(tmp_path):
     assert "no version pin matches '@runanywhere/[a-z-]+@'" in result.stderr
 
 
-def test_unpublished_installs_are_not_pinned_in_the_root_readme():
+def test_unpublished_installs_are_not_pinned_in_the_root_readme(tmp_path):
     # runanywhere is not on PyPI and pub.dev's runanywhere_qhexrt lags the train,
     # so neither install line may be written as a registry pin the gate would
     # then have to hold to a version nobody can install.

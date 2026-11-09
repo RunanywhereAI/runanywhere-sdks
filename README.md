@@ -96,10 +96,12 @@ The fastest way to feel it. Install, load, generate, all local:
 
 ```bash
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-pip install ./runanywhere-sdks/bindings/python
+cd runanywhere-sdks
+./idl/codegen/generate_all.sh --only python   # needs protoc, protobuf and grpcio-tools
+pip install ./bindings/python
 ```
 
-`runanywhere` is not on PyPI yet, so this builds the native runtime from source (CMake and a C++ toolchain required). See the [Python SDK README](bindings/python/).
+`runanywhere` is not on PyPI yet, so this builds the native runtime from source (CMake and a C++ toolchain required). The IDL bindings are generated, not checked in; `./scripts/setup/setup-toolchain.sh` installs the codegen tools on macOS and Ubuntu. See the [Python SDK README](bindings/python/).
 
 ```python
 import runanywhere as ra
@@ -237,9 +239,11 @@ dependencies:
   runanywhere_llamacpp: ^0.20.27  # LLM/VLM text generation
   # runanywhere_onnx: ^0.20.27    # STT, TTS, VAD, voice agent
   # runanywhere_mlx: ^0.20.27     # Apple-native LLM/VLM/STT/TTS/embeddings
-  # Snapdragon Hexagon NPU: runanywhere_qhexrt is not on pub.dev at this version line.
-  # Use a path dependency on bindings/flutter/packages/runanywhere_qhexrt; its README
-  # covers the native payload, which is not in this repo.
+  # Snapdragon Hexagon NPU: runanywhere_qhexrt is not on pub.dev at this version line,
+  # and this tree's runanywhere_qhexrt needs runanywhere ^0.20.37. Use path dependencies
+  # on both bindings/flutter/packages/runanywhere and .../runanywhere_qhexrt (in place
+  # of the pub.dev lines above); the qhexrt README covers the native payload, which is
+  # not in this repo.
 ```
 
 [Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](bindings/flutter/)
@@ -372,9 +376,10 @@ print(result.text, result.tokens_per_second)   # "Paris" 41.2
 
 Namespaces per modality (`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rag`, `models`), an `a`-prefixed async twin for every blocking verb, structured output and tool calling. There are no prebuilt wheels yet, so install from source as below; CUDA is an opt-in source build.
 
-Install from a clone of this repo (`runanywhere` is not on PyPI yet, so there is no wheel to download):
+Install from the root of a clone of this repo (`runanywhere` is not on PyPI yet, so there is no wheel to download), generating the IDL bindings first as in the quick start above:
 
 ```bash
+./idl/codegen/generate_all.sh --only python
 pip install ./bindings/python
 ```
 
@@ -534,7 +539,7 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
 The Python SDK and wally both expose the local runtime as a drop-in OpenAI API, so anything that speaks the OpenAI client works against models running on your machine:
 
 ```bash
-pip install "./bindings/python[server]"   # from a clone of this repo
+pip install "./bindings/python[server]"   # from the root of a clone, after the IDL codegen step
 runanywhere serve        # http://127.0.0.1:8000
 ```
 
