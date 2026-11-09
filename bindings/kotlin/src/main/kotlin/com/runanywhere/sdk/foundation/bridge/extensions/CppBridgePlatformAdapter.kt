@@ -10,6 +10,9 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
@@ -27,7 +30,7 @@ import java.io.IOException
  * @property name UTF-8 entry name (no path component). MUST fit in
  *                [CppBridgePlatformAdapter.NAME_MAX_BYTES] including the
  *                trailing NUL byte that the JNI layer appends; oversized
- *                entries MUST be filtered by the producer (we do this in
+ *                entries MUST make the listing fail (enforced by
  *                [CppBridgePlatformAdapter.fileListDirectory]).
  * @property isDir true when the entry is a directory.
  * @property sizeBytes file size in bytes; 0 for directories or unknown.
@@ -74,10 +77,8 @@ object CppBridgePlatformAdapter {
      * returned via [RacDirectoryEntry]. Mirrors
      * `RAC_DIRECTORY_ENTRY_NAME_MAX` in `rac_platform_adapter.h`.
      *
-     * Per the truncation contract on `rac_directory_entry_t::name`,
-     * oversized entries MUST be skipped rather than truncated so the
-     * no-error path never returns a half-name that could alias a
-     * different on-disk artifact.
+     * Per the contract on `rac_directory_entry_t::name`, oversized entries
+     * make the listing inconclusive. They are never skipped or truncated.
      */
     const val NAME_MAX_BYTES: Int = 512
 
@@ -361,25 +362,56 @@ object CppBridgePlatformAdapter {
      * JNI confirms missing/non-directory paths with an error-aware native probe
      * before returning RAC_ERROR_FILE_NOT_FOUND; denied or inconclusive probes
      * preserve the registered download path. Thrown failures propagate to JNI
-     * as RAC_ERROR_INTERNAL. A successful empty listing remains an empty array.
+     * as RAC_ERROR_FILE_READ_FAILED. A successful empty listing remains an
+     * empty array.
      *
-     * Truncation contract (per `rac_directory_entry_t::name`): entries
-     * whose UTF-8 byte length plus the trailing NUL exceed
-     * [NAME_MAX_BYTES] MUST be skipped rather than silently truncated. We
-     * emit a single WARN log per call that summarises how many entries
-     * were skipped so operators can detect the rare event without flooding
-     * logcat.
+     * Truncation contract (per `rac_directory_entry_t::name`): an entry whose
+     * UTF-8 byte length plus the trailing NUL exceeds [NAME_MAX_BYTES] makes
+     * the listing inconclusive. We log a WARN and throw instead of returning a
+     * partial listing.
      */
     @JvmStatic
     fun fileListDirectoryCallback(dirPath: String): Array<RacDirectoryEntry>? = readDirectoryEntries(File(dirPath))
 
     /**
+     * Probe an entry with stat(2)/lstat(2). A failed probe is inconclusive and
+     * must not be emitted as a regular file; a dangling symlink remains a
+     * non-directory entry. FIFOs, sockets, and device nodes are rejected.
+     */
+    private fun probeDirectoryEntry(child: File): Pair<Boolean, Long> {
+        val path = child.absolutePath
+        val info =
+            try {
+                Os.stat(path)
+            } catch (error: ErrnoException) {
+                if (error.errno == OsConstants.ENOENT || error.errno == OsConstants.ENOTDIR) {
+                    try {
+                        Os.lstat(path)
+                        return false to 0L
+                    } catch (_: ErrnoException) {
+                        throw IOException("Directory entry vanished while listing: '$path'", error)
+                    }
+                }
+                throw IOException("Unable to probe directory entry '$path'", error)
+            }
+        val isDir = OsConstants.S_ISDIR(info.st_mode)
+        if (!isDir && !OsConstants.S_ISREG(info.st_mode)) {
+            throw IOException("Unsupported directory entry type: '$path'")
+        }
+        return isDir to if (isDir) 0L else info.st_size
+    }
+
+    /**
      * Read directory entries, preserving probe and enumeration errors for JNI.
+     * The entry probe is separate so host JVM checks can use their filesystem.
      *
      * @throws IOException if an existing directory cannot be enumerated
      * @throws SecurityException if the filesystem denies a probe or listing
      */
-    internal fun readDirectoryEntries(dir: File): Array<RacDirectoryEntry>? {
+    internal fun readDirectoryEntries(
+        dir: File,
+        probeEntry: (File) -> Pair<Boolean, Long> = ::probeDirectoryEntry,
+    ): Array<RacDirectoryEntry>? {
         if (!dir.exists() || !dir.isDirectory) {
             // JNI rechecks null because Java can hide stat errors behind false.
             return null
@@ -387,24 +419,15 @@ object CppBridgePlatformAdapter {
         // A null listing means I/O failure, not a successful empty directory.
         val children = dir.listFiles() ?: throw IOException("Unable to enumerate directory '${dir.path}'")
         val retained = ArrayList<RacDirectoryEntry>(children.size)
-        var skipped = 0
         for (child in children) {
             val nameBytes = child.name.toByteArray(Charsets.UTF_8)
             if (nameBytes.size + 1 > NAME_MAX_BYTES) {
-                skipped++
-                continue
+                val message = "Oversized directory entry in '${dir.path}'"
+                logCallback(LogLevel.WARN, "PlatformAdapter", message)
+                throw IOException(message)
             }
-            val isDir = child.isDirectory
-            val sizeBytes = if (isDir) 0L else runCatching { child.length() }.getOrDefault(0L)
+            val (isDir, sizeBytes) = probeEntry(child)
             retained.add(RacDirectoryEntry(child.name, isDir, sizeBytes))
-        }
-        if (skipped > 0) {
-            logCallback(
-                LogLevel.WARN,
-                "PlatformAdapter",
-                "Skipped $skipped directory entries in '${dir.path}': name longer than " +
-                    "$NAME_MAX_BYTES bytes (truncation contract).",
-            )
         }
         return retained.toTypedArray()
     }

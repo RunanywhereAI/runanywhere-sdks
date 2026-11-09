@@ -8,6 +8,8 @@
 
 #include "HybridRunAnywhereONNX.hpp"
 
+#include "rac/plugin/rac_plugin_registration.h"
+
 // Backend registration header - always available
 extern "C" {
 #include "rac_plugin_entry_onnx.h"
@@ -34,12 +36,6 @@ static const char* LOG_CATEGORY = "ONNX";
 namespace margelo::nitro::runanywhere::onnx {
 
 namespace {
-
-bool isRegistrationSuccess(rac_result_t result) {
-  return result == RAC_SUCCESS ||
-         result == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
-         result == RAC_ERROR_PLUGIN_DUPLICATE;
-}
 
 std::string describeError(rac_result_t result) {
   const char* message = rac_error_message(result);
@@ -72,7 +68,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
     RAC_LOG_INFO(LOG_CATEGORY, "Registering ONNX backend with C++ registry...");
 
     rac_result_t result = rac_backend_onnx_register();
-    if (!isRegistrationSuccess(result)) {
+    if (!rac_plugin_registration_succeeded(result)) {
       RAC_LOG_ERROR(LOG_CATEGORY, "ONNX registration failed with code: %d", result);
       throw std::runtime_error("ONNX registration failed with error: " + describeError(result));
     }
@@ -88,7 +84,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
     // genuine install failure, not something a redundant rac_plugin_register
     // could recover.
     rac_result_t sherpaResult = rac_backend_sherpa_register();
-    if (isRegistrationSuccess(sherpaResult)) {
+    if (rac_plugin_registration_succeeded(sherpaResult)) {
       isSherpaRegistered_ = true;
       RAC_LOG_INFO(LOG_CATEGORY, "Sherpa engine plugin registered (STT + TTS + VAD)");
     } else {

@@ -20,6 +20,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_registration.h"
 #include "rac/qhexrt/rac_qhexrt.h"
 
 extern "C" RAC_PLUGIN_ENTRY_DECL(qhexrt);
@@ -70,7 +71,7 @@ rac_result_t rac_backend_qhexrt_register(void) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
     rac_result_t rc = rac_plugin_register(vt);
-    if (rc != RAC_SUCCESS && rc != RAC_ERROR_PLUGIN_DUPLICATE) {
+    if (!rac_plugin_registration_succeeded(rc)) {
         RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register(qhexrt) failed: %d", rc);
         return rc;
     }
@@ -82,7 +83,8 @@ rac_result_t rac_backend_qhexrt_register(void) {
 rac_result_t rac_backend_qhexrt_unregister(void) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_registered) {
-        rac_plugin_unregister("qhexrt");
+        rac_result_t rc = rac_plugin_unregister("qhexrt");
+        RAC_PLUGIN_UNREGISTER_BUSY_CHECK("qhexrt", rc);
         g_registered = false;
     }
     // The policy is installed before the device gate, so always remove it even

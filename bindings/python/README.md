@@ -143,9 +143,10 @@ ra.models.state()                   # what is resident + disk used/free
 `models.refresh()` is best-effort and returns `None`; it is a no-op before initialization.
 An older native extension without `rac_model_registry_refresh_proto` raises
 `SDKException` with `NOT_IMPLEMENTED`. Install `runanywhere[rag]` to enable its
-protobuf-backed native registry bridge. The current native refresh API does not implement
-orphan pruning; setting `prune_orphans=True` reports a warning and leaves missing-file rows
-unchanged.
+protobuf-backed native registry bridge. Setting `prune_orphans=True` clears download state
+for models whose recorded path no longer exists, or still exists but holds no finished artifact
+or fails the completeness check; it never deletes files, and warns if the platform adapter lacks
+`file_exists`.
 
 ## Local OpenAI-compatible server
 

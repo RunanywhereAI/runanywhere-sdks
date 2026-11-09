@@ -63,6 +63,8 @@ export const ErrorCategories: Readonly<Record<ErrorCategoryName, ErrorCategory>>
 ) as Readonly<Record<ErrorCategoryName, ErrorCategory>>;
 
 export interface SDKErrorFields {
+  /** Serialized proto retained when a native error crosses utility-process RPC. */
+  sdkError?: Uint8Array;
   code: ErrorCode;
   message: string;
   category?: ErrorCategory;
@@ -85,6 +87,7 @@ export interface SDKErrorFields {
  * Carries the canonical `code` / `category` for cross-SDK-uniform handling.
  */
 export class SDKException extends Error {
+  readonly sdkError?: Uint8Array;
   readonly code: ErrorCode;
   readonly category: ErrorCategory;
   /** Negative rac_result_t equivalent, when applicable. */
@@ -105,6 +108,7 @@ export class SDKException extends Error {
   constructor(fields: SDKErrorFields) {
     super(fields.message || 'SDK error');
     this.name = 'SDKException';
+    this.sdkError = fields.sdkError;
     this.code = fields.code;
     this.category = fields.category ?? categoryForCode(fields.code);
     this.cAbiCode =
@@ -149,7 +153,7 @@ export class SDKException extends Error {
   }
 
   /** Build from a decoded proto `SDKError` payload (the D5 structured-error field). */
-  static fromProto(error: SDKError): SDKException {
+  static fromProto(error: SDKError, sdkError?: Uint8Array): SDKException {
     return fromStructuredError({
       code: error.code,
       message: error.message,
@@ -162,7 +166,8 @@ export class SDKException extends Error {
       requestId: error.requestId,
       severity: error.severity,
       timestampMs: error.timestampMs,
-    });
+      sdkError: sdkError ?? SDKError.encode(error).finish(),
+    }, true);
   }
 
   static notInitialized(component?: string): SDKException {
@@ -269,10 +274,23 @@ type ErrorLike = {
  * `rac_result_to_proto_error`, so when it is present the shared `categoryForCode`
  * table is not consulted at all.
  */
-function fromSerializedSdkError(value: unknown): SDKException | null {
+function fromSerializedSdkError(value: unknown, contextualMessage?: string): SDKException | null {
   if (!(value instanceof Uint8Array) || value.length === 0) return null;
   try {
-    return SDKException.fromProto(SDKError.decode(value));
+    const proto = SDKError.decode(value);
+    // Keep the native bytes untouched: they may contain fields this SDK does
+    // not know yet. Context belongs on the display exception, not in the wire
+    // payload. If it already contains the proto message, this is a second decode
+    // of an RPC error and adding the suffix again would duplicate it.
+    const exception = SDKException.fromProto(proto, value);
+    if (contextualMessage && !contextualMessage.includes(proto.message)) {
+      exception.message = proto.message
+        ? `${contextualMessage} (${proto.message})`
+        : contextualMessage;
+    } else if (contextualMessage) {
+      exception.message = contextualMessage;
+    }
+    return exception;
   } catch {
     return null;
   }
@@ -300,8 +318,8 @@ const KNOWN_ERROR_CODES: ReadonlySet<number> = new Set(
  * counterpart) still reports `UNKNOWN`, with the raw value readable on
  * `cAbiCode`, because typing it as an `ErrorCode` would be a lie.
  *
- * A category is only derived when the wire supplied none — proto3 leaves an
- * unset enum at 0, so `UNSPECIFIED` counts as unset.
+ * Serialized proto categories are authoritative, including UNSPECIFIED. Loose
+ * legacy fields still derive a category when their category is absent or zero.
  */
 function fromStructuredError(args: {
   code: number;
@@ -315,18 +333,25 @@ function fromStructuredError(args: {
   requestId?: string;
   severity?: number;
   timestampMs?: number;
-}): SDKException {
+  sdkError?: Uint8Array;
+}, authoritativeCategory = false): SDKException {
   const magnitude = Math.abs(Math.trunc(args.code));
   const code = (KNOWN_ERROR_CODES.has(magnitude) ? magnitude : ErrorCode.ERROR_CODE_UNKNOWN) as ErrorCode;
-  const wireCategory =
-    args.category != null && Math.trunc(args.category) !== ErrorCategory.ERROR_CATEGORY_UNSPECIFIED
-      ? (Math.trunc(args.category) as ErrorCategory)
-      : undefined;
+  const knownCategory = args.category != null && Number.isInteger(args.category) &&
+    args.category >= ErrorCategory.ERROR_CATEGORY_UNSPECIFIED &&
+    args.category <= ErrorCategory.ERROR_CATEGORY_CONFIGURATION
+    ? args.category as ErrorCategory
+    : ErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
+  const category = authoritativeCategory ||
+    (args.category != null && args.category !== ErrorCategory.ERROR_CATEGORY_UNSPECIFIED)
+    ? knownCategory
+    : categoryForCode(magnitude);
   return new SDKException({
     code,
     message: args.message,
     cAbiCode: args.cAbiCode,
-    category: wireCategory ?? categoryForCode(code),
+    category,
+    sdkError: args.sdkError,
     nestedMessage: args.nestedMessage,
     fieldPath: args.fieldPath,
     component: args.component,
@@ -367,7 +392,8 @@ export function asSDKException(error: unknown): SDKException {
   if (error instanceof SDKException) return error;
   if (error && typeof error === 'object') {
     const candidate = error as ErrorLike;
-    const structured = fromSerializedSdkError(candidate.sdkError);
+    const contextualMessage = stringValue(candidate.message);
+    const structured = fromSerializedSdkError(candidate.sdkError, contextualMessage);
     if (structured) return structured;
     const message =
       stringValue(candidate.message) ??

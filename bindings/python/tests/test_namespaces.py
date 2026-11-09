@@ -32,6 +32,7 @@ from runanywhere import (  # noqa: E402
     VadOptions,
 )
 from runanywhere.audio import encode_wav  # noqa: E402
+from runanywhere.errors import raise_for_rac  # noqa: E402
 from runanywhere.results import ResolvedModel  # noqa: E402
 
 
@@ -360,6 +361,25 @@ def test_segmentation_forwards_confidence_and_preserves_bytes(sdk, tmp_path) -> 
     )
     assert sdk.args_of("segment")[-1] is True
     assert result.confidence_mask == bytes([192]) * 6
+
+
+def test_segmentation_propagates_binding_exception(sdk, monkeypatch, tmp_path) -> None:
+    """An SDKException raised by the native binding must reach the caller unchanged."""
+
+    def segment(*args, **kwargs):
+        raise_for_rac(-331, "segment")
+
+    monkeypatch.setattr(sdk, "segment", segment)
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    with pytest.raises(SDKException) as error:
+        ra.segmentation.segment(
+            ImageInput.raw_rgb(bytes(2 * 3 * 3), 2, 3),
+            SegmentationOptions(model=str(model_dir), include_confidence=True),
+        )
+    assert error.value.c_abi_code == -331
+    assert int(error.value.code) == 331
+    assert "segment" in str(error.value)
 
 
 @pytest.mark.parametrize("include_confidence", [False, True])

@@ -144,6 +144,7 @@ rac_result_t rac_backend_cloud_register(void);  // Cloud STT provider
 // rac_registry_record_plugin_unavailable — the ledger a refused backend lands
 // in, so one engine declining does not have to fail initialize() to be noticed.
 #include "rac/plugin/rac_plugin_loader.h"
+#include "rac/plugin/rac_plugin_registration.h"
 
 namespace {
 
@@ -404,9 +405,17 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
         // simply got there first. Commons' own batch loader counts DUPLICATE as
         // loaded (rac_registry_load_plugins), so recording either here would put
         // a working backend on the unavailability ledger.
+        // BUSY also means an existing plugin is serving a leased model.
+        /**
+         * try_register: handle one backend's registration result from the
+         * Python module bootstrap. SUCCESS, PLUGIN_DUPLICATE, PLUGIN_BUSY and
+         * MODULE_ALREADY_REGISTERED all leave the backend registered and
+         * serving (the active plugin owns any leased model), so none is
+         * recorded as unavailability; every other result is logged onto the
+         * availability ledger under `name`.
+         */
         const auto try_register = [](const char* name, rac_result_t result) {
-            if (result == RAC_SUCCESS || result == RAC_ERROR_PLUGIN_DUPLICATE ||
-                result == RAC_ERROR_MODULE_ALREADY_REGISTERED)
+            if (rac_plugin_registration_succeeded(result))
                 return;
             rac_registry_record_plugin_unavailable(name, nullptr, result);
         };

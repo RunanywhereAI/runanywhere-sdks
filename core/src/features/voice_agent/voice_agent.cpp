@@ -198,7 +198,17 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
     const rac_voice_agent_config_t* cfg = config ? config : &RAC_VOICE_AGENT_CONFIG_DEFAULT;
 
     // Step 1: Initialize VAD (mirrors Swift's initializeVAD)
-    rac_result_t result = rac_vad_component_initialize(handle->vad_handle);
+    rac_vad_config_t vad_config = RAC_VAD_CONFIG_DEFAULT;
+    vad_config.sample_rate = cfg->vad_config.sample_rate;
+    vad_config.frame_length = cfg->vad_config.frame_length;
+    vad_config.energy_threshold = cfg->vad_config.energy_threshold;
+    rac_result_t result = rac_vad_component_configure(handle->vad_handle, &vad_config);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VoiceAgent", "VAD component rejected its configuration");
+        return result;
+    }
+
+    result = rac_vad_component_initialize(handle->vad_handle);
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "VAD component failed to initialize");
         return result;

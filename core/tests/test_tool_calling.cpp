@@ -122,6 +122,112 @@ int test_parse_default_invalid_utf8() {
     return 0;
 }
 
+/** @brief Collisions are rejected at normalization and parse level; valid
+ *         duplicates and non-key JSON text stay accepted. */
+int test_default_repaired_key_collisions() {
+    // Normalization-level rejections. Bare objects carry no tool name, so a
+    // parse-level assertion on them would hold with or without the guard; the
+    // parse contract is covered by `call_collisions` below.
+    const char* normalize_collisions[] = {
+        "{\"x\xFF\":1,\"x\xFE\":2}",
+        "{\"nested\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"items\":[{\"x\xFF\":1,\"x\xFE\":2}]}",
+        "{\"x\xFF\":1,\"x\uFFFD\":2}",
+        "{\"x\uFFFD\":1,\"x\xFF\":2}",
+        "{\"x\\uFFFD\":1,\"x\xFF\":2}",
+        "{\"\\u0078\xFF\":1,\"x\xFE\":2}",
+        "{nested:{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"tool\":\"lookup\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        // Wrapper shapes whose string-encoded arguments the parser decodes.
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"Arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":"
+        "\"\\u007B\\\"x\xFF\\\":1,\\\"x\xFE\\\":2\\u007D\"}}",
+        "{\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"lookup\","
+        "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}]}",
+    };
+    for (const char* input : normalize_collisions) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(input, &normalized), RAC_ERROR_INVALID_ARGUMENT);
+        ASSERT_TRUE(normalized == nullptr);
+    }
+    // The same ambiguity through a full default call must parse to no call.
+    const char* call_collisions[] = {
+        "{\"tool\":\"lookup\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"Arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":"
+        "\"\\u007B\\\"x\xFF\\\":1,\\\"x\xFE\\\":2\\u007D\"}}",
+        "{\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"lookup\","
+        "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}]}",
+    };
+    for (const char* input : call_collisions) {
+        const std::string call_text = std::string("<tool_call>") + input + "</tool_call>";
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(call_text.c_str(), &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
+        ASSERT_TRUE(call.arguments_json == nullptr);
+        rac_tool_call_free(&call);
+    }
+    // Each allowed case pins its exact normalized output, so a silently wrong
+    // value cannot pass by only proving normalization succeeded.
+    struct AllowedCase {
+        const char* input;
+        const char* expected;
+    };
+    const AllowedCase allowed[] = {
+        {"{\"x\":1,\"x\":2,\"value\":\"\xFF\"}", "{\"x\":2,\"value\":\"\xEF\xBF\xBD\"}"},
+        {"{\"x\uFFFD\":1,\"x\uFFFD\":2}", "{\"x\uFFFD\":2}"},
+        {"{\"a\":{\"x\xFF\":1},\"b\":{\"x\xFE\":2}}",
+         "{\"a\":{\"x\uFFFD\":1},\"b\":{\"x\uFFFD\":2}}"},
+        {"{\"items\":[{\"x\xFF\":1},{\"x\xFE\":2}]}",
+         "{\"items\":[{\"x\uFFFD\":1},{\"x\uFFFD\":2}]}"},
+        {"{\"x\xFF\":1,\"y\xFE\":2}", "{\"x\uFFFD\":1,\"y\uFFFD\":2}"},
+        {"{\"path\":\"C:\\\\\",\"x\xFF\":1,\"text\":\"{}\\\"x:\"}",
+         "{\"path\":\"C:\\\\\",\"x\uFFFD\":1,\"text\":\"{}\\\"x:\"}"},
+        // Valid duplicate keys keep last-wins, including inside a decoded
+        // arguments string.
+        {"{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\\\":1,\\\"x\\\":2}\"}}",
+         "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\\\":1,\\\"x\\\":2}\"}}"},
+        // A non-arguments string value is data, not keys: never rejected, and
+        // its bytes are repaired like any other value.
+        {"{\"note\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
+         "{\"note\":\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}"},
+        // The parser wraps top-level string arguments as {"input": ...}; it
+        // never expands them into keys, so this is not ambiguous.
+        {"{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
+         "{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xEF\xBF\xBD\\\":1,"
+         "\\\"x\xEF\xBF\xBD\\\":2}\"}"},
+        // Object-valued arguments are passed through unchanged, so JSON text in
+        // ordinary tool data is data, not keys.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"metadata\":{\"arguments\":"
+         "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"metadata\":{\"arguments\":"
+         "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}}}"},
+        // A tool-alias object nested in tool data is not an envelope the parser
+        // unwraps, so its `arguments` string stays data.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"tool\":{\"arguments\":"
+         "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"tool\":{\"arguments\":"
+         "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}}}"},
+        // Same for a `tool_calls` array nested in tool data.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"tool_calls\":[{\"type\":\"function\","
+         "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}]}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"tool_calls\":[{\"type\":\"function\","
+         "\"arguments\":\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}]}}"},
+    };
+    for (const AllowedCase& test : allowed) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(test.input, &normalized), RAC_SUCCESS);
+        ASSERT_TRUE(normalized != nullptr);
+        const auto parsed = nlohmann::json::parse(normalized, nullptr, false);
+        ASSERT_TRUE(parsed.is_object());
+        ASSERT_TRUE(parsed == nlohmann::json::parse(test.expected, nullptr, false));
+        rac_free(normalized);
+    }
+    return 0;
+}
+
 int test_normalize_json_utf8_preserves_values() {
     struct Case {
         const char* input;
@@ -1382,6 +1488,7 @@ int main(int argc, char** argv) {
     (void)argv;
 
     TestCase cases[] = {
+        {.name = "default_repaired_key_collisions", .fn = test_default_repaired_key_collisions},
         {.name = "parse_default_structured", .fn = test_parse_default_structured},
         {.name = "parse_default_invalid_utf8", .fn = test_parse_default_invalid_utf8},
         {.name = "normalize_json_utf8_preserves_values",

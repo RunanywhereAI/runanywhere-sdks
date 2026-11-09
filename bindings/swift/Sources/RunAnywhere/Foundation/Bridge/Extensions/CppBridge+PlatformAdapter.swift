@@ -435,14 +435,62 @@ private func platformFileDeleteCallback(
 
 // MARK: - Directory Enumeration Callbacks
 
-/// Enumerate a directory into a caller-provided array per the two-call contract
-/// on `rac_file_list_directory_fn`. Powers commons rescan_local + the multi-file
-/// `is_downloaded` probe (rac_path_is_non_empty_directory).
-///
-/// Truncation contract (per `rac_directory_entry_t::name`): entries whose UTF-8
-/// byte length plus the trailing NUL exceed `RAC_DIRECTORY_ENTRY_NAME_MAX` are
-/// skipped rather than truncated so the no-error path never aliases a different
-/// artifact. A single WARN log per call summarises any skipped entries.
+/// Only confirmed missing/non-directory paths map to FILE_NOT_FOUND.
+/// Other probe failures preserve registry state as inconclusive reads.
+private func platformDirectoryProbeResult(_ path: String) -> rac_result_t {
+    var info = stat()
+    guard stat(path, &info) == 0 else {
+        switch errno {
+        case ENOENT, ENOTDIR:
+            return RAC_ERROR_FILE_NOT_FOUND
+        default:
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+    }
+    return (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR)
+        ? RAC_SUCCESS : RAC_ERROR_FILE_NOT_FOUND
+}
+
+/// A failed directory read is never an empty or partial listing.
+private func platformMapDirectoryReadError(_ error: Error) -> rac_result_t {
+    let nsError = error as NSError
+    if let posix = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError)?.toPOSIXError()
+        ?? nsError.toPOSIXError() {
+        switch posix.code {
+        case .ENOENT, .ENOTDIR:
+            return RAC_ERROR_FILE_NOT_FOUND
+        default:
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+    }
+    if nsError.domain == NSCocoaErrorDomain {
+        switch CocoaError.Code(rawValue: nsError.code) {
+        case .fileNoSuchFile, .fileReadNoSuchFile:
+            return RAC_ERROR_FILE_NOT_FOUND
+        default:
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+    }
+    return RAC_ERROR_FILE_READ_FAILED
+}
+
+/// Returns nil on an inconclusive child probe so traversal cannot skip a directory.
+private func platformDirectoryChildInfo(_ path: String) -> (isDirectory: Bool, size: Int64)? {
+    var info = stat()
+    if stat(path, &info) != 0 {
+        // A dangling symlink is non-directory; a failed lstat is inconclusive.
+        guard errno == ENOENT || errno == ENOTDIR else { return nil }
+        var linkInfo = stat()
+        guard lstat(path, &linkInfo) == 0 else { return nil }
+        return (false, Int64(linkInfo.st_size))
+    }
+    let isDirectory = (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR)
+    return (isDirectory, isDirectory ? 0 : Int64(info.st_size))
+}
+
+/// Enumerates entries per `rac_file_list_directory_fn`'s two-call contract.
+/// An entry whose UTF-8 name plus NUL exceeds `RAC_DIRECTORY_ENTRY_NAME_MAX`
+/// causes a warning and FILE_READ_FAILED; partial listings never report success.
 private func platformFileListDirectoryCallback(
     dirPath: UnsafePointer<CChar>?,
     outEntries: UnsafeMutablePointer<rac_directory_entry_t>?,
@@ -454,18 +502,17 @@ private func platformFileListDirectoryCallback(
     }
 
     let pathString = String(cString: dirPath)
-    let fileManager = FileManager.default
-    var isDirectory: ObjCBool = false
-    guard fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory),
-          isDirectory.boolValue else {
-        return RAC_ERROR_FILE_NOT_FOUND
+    let probeResult = platformDirectoryProbeResult(pathString)
+    guard probeResult == RAC_SUCCESS else {
+        return probeResult
     }
 
+    let fileManager = FileManager.default
     let entries: [String]
     do {
         entries = try fileManager.contentsOfDirectory(atPath: pathString)
     } catch {
-        return RAC_ERROR_INTERNAL
+        return platformMapDirectoryReadError(error)
     }
 
     // Capacity-query call: report total entries without filling the buffer.
@@ -477,51 +524,38 @@ private func platformFileListDirectoryCallback(
     let capacity = inOutCount.pointee
     let nameMax = Int(RAC_DIRECTORY_ENTRY_NAME_MAX)
     var written = 0
-    var skipped = 0
 
     for entryName in entries {
-        if written >= capacity { break }
+        if written >= capacity {
+            // Entries beyond the caller's buffer make the listing inconclusive.
+            return RAC_ERROR_FILE_READ_FAILED
+        }
 
-        let didWrite = entryName.withCString { src -> Bool in
-            let length = strlen(src)
-            // strlen excludes NUL — buffer must fit len + NUL.
-            if length + 1 > nameMax {
-                return false
-            }
-            let entryPtr = outEntries.advanced(by: written)
+        // The buffer must fit the name plus NUL; never skip or truncate an entry.
+        if entryName.utf8.count + 1 > nameMax {
+            let logger = SDKLogger(category: "PlatformAdapter")
+            logger.warning("file_list_directory: oversized entry name in \(pathString)")
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+
+        let fullPath = (pathString as NSString).appendingPathComponent(entryName)
+        guard let child = platformDirectoryChildInfo(fullPath) else {
+            return RAC_ERROR_FILE_READ_FAILED
+        }
+
+        let entryPtr = outEntries.advanced(by: written)
+        entryName.withCString { src in
             // Zero-fill the fixed-size name buffer, then copy bytes + NUL.
             withUnsafeMutablePointer(to: &entryPtr.pointee.name) { tuplePtr in
                 tuplePtr.withMemoryRebound(to: CChar.self, capacity: nameMax) { nameBuf in
                     memset(nameBuf, 0, nameMax)
-                    memcpy(nameBuf, src, length + 1)
+                    memcpy(nameBuf, src, strlen(src) + 1)
                 }
             }
-
-            let fullPath = (pathString as NSString).appendingPathComponent(entryName)
-            var childIsDir: ObjCBool = false
-            let exists = FileManager.default.fileExists(atPath: fullPath, isDirectory: &childIsDir)
-            entryPtr.pointee.is_dir = (exists && childIsDir.boolValue) ? RAC_TRUE : RAC_FALSE
-
-            if exists && !childIsDir.boolValue {
-                let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath)
-                let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
-                entryPtr.pointee.size_bytes = size
-            } else {
-                entryPtr.pointee.size_bytes = 0
-            }
-            return true
         }
-
-        if didWrite {
-            written += 1
-        } else {
-            skipped += 1
-        }
-    }
-
-    if skipped > 0 {
-        let logger = SDKLogger(category: "PlatformAdapter")
-        logger.warning("file_list_directory: skipped \(skipped) oversized entry name(s) in \(pathString)")
+        entryPtr.pointee.is_dir = child.isDirectory ? RAC_TRUE : RAC_FALSE
+        entryPtr.pointee.size_bytes = child.size
+        written += 1
     }
 
     inOutCount.pointee = written
