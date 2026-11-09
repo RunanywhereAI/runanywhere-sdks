@@ -23,7 +23,7 @@ import type {
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
-import { Runtime, prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
+import { Runtime, prepareModelLoad, recoverModelLoadFailure, setActiveAccelerationMode } from '../../Foundation/RuntimeConfig.js';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
@@ -560,8 +560,31 @@ async function loadModelViaBackendWorker(
       isConcreteFramework(result.framework) ? result.framework : undefined,
     );
     recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    await publishBackendWorkerAcceleration(backendId, host);
   }
   return result;
+}
+
+/**
+ * Republish the device a worker actually runs on after a successful load.
+ *
+ * A WebGPU worker that Abort()ed restarts on CPU on the next init without
+ * registering again, so the mode published at registration would otherwise
+ * keep reporting WebGPU for CPU inference. Diagnostics only: a failed probe
+ * must never fail the load that already succeeded.
+ */
+async function publishBackendWorkerAcceleration(
+  backendId: 'llamacpp' | 'onnx',
+  host: { health: () => Promise<{ healthy: boolean; details?: unknown }> },
+): Promise<void> {
+  if (backendId !== 'llamacpp') return;
+  try {
+    const health = await host.health();
+    const device = health.healthy ? deviceFromHealthDetails(health.details) : null;
+    if (device) setActiveAccelerationMode(device);
+  } catch {
+    /* keep the previously published mode */
+  }
 }
 
 function registeredLifecycleAdapters(): ModelLifecycleAdapter[] {

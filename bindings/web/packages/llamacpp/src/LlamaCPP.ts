@@ -34,6 +34,7 @@
 import {
   BackendWorkerHost,
   clearLlamaBackendWorkerDead,
+  getActiveAccelerationMode,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
   setModelLoadPreparation,
@@ -46,6 +47,7 @@ import {
   setStreamWorkerFactory,
   setStreamWorkerInit,
   SDKLogger,
+  SDKException,
   type BackendRegistrationState,
   type BackendWorkerFactory,
   type RuntimeModelLoadRequest,
@@ -66,20 +68,7 @@ const logger = new SDKLogger('LlamaCPP');
 let _installedBackendWorkerFactory = false;
 let _backendWorkerFactory: BackendWorkerFactory | null = null;
 let _backendWorkerHost: BackendWorkerHost | null = null;
-/** Acceleration used for LLM inference (worker when present, else bridge). */
-let _inferenceAcceleration: 'cpu' | 'webgpu' = 'cpu';
 let _installedStreamWorker = false;
-
-/**
- * Publish the acceleration mode a switch actually resolved to — the direct
- * bridge's resolved mode, or the worker-owned session's mode. Keeps
- * `LlamaCPP.accelerationMode` and `Runtime.active` in agreement after every
- * resolution, including capability fallback (WebGPU -> CPU).
- */
-function publishResolvedAccelerationMode(mode: 'cpu' | 'webgpu'): void {
-  _inferenceAcceleration = mode;
-  setActiveAccelerationMode(mode);
-}
 
 const MODULE_ID = 'llamacpp';
 
@@ -207,9 +196,13 @@ export const LlamaCPP = {
    * Acceleration used for LLM inference (cpu | webgpu).
    * When the BackendWorker owns the model, this is the worker's resolved mode
    * (WebGPU-first), not the main-thread bridge which may stay on CPU.
+   *
+   * Read from the published mode rather than a local copy: a worker that
+   * Abort()ed on WebGPU restarts on CPU on the next load without registering
+   * again, and only the published mode tracks that recovery.
    */
   get accelerationMode(): 'cpu' | 'webgpu' {
-    return _inferenceAcceleration;
+    return getActiveAccelerationMode() ?? 'cpu';
   },
 
   /**
@@ -233,7 +226,9 @@ export const LlamaCPP = {
    *    After a WebGPU WASM abort, reloading the model can restart the worker
    *    on CPU without registering again.
    *
-   * Idempotent — concurrent callers share the same in-flight promise.
+   * Idempotent — concurrent callers share the same in-flight promise. A
+   * deferred `unregister()` requested while registration is in flight tears
+   * the backend down when it settles and makes this call reject.
    */
   async register(options: LlamaCPPRegisterOptions = {}): Promise<void> {
     if (_isRegistered) {
@@ -286,7 +281,7 @@ export const LlamaCPP = {
           // Publish only the resolved result so `LlamaCPP.accelerationMode`
           // no longer retains its registration-time value after a direct
           // switch (capability detection may resolve WebGPU → CPU).
-          publishResolvedAccelerationMode(bridge.accelerationMode);
+          setActiveAccelerationMode(bridge.accelerationMode);
         });
         setModelLoadPreparation(async ({ request, model }) => {
           // A worker-owned load must not mutate the idle CPU companion
@@ -297,7 +292,7 @@ export const LlamaCPP = {
             `WebGPU VLM load is not stable for ${request.modelId}; loading with the CPU WASM artifact.`,
           );
           await bridge.switchToAcceleration('cpu');
-          publishResolvedAccelerationMode(bridge.accelerationMode);
+          setActiveAccelerationMode(bridge.accelerationMode);
         });
         setModelLoadFailureRecovery(async ({ request, error }) => {
           // Never retry a worker-owned load by pretending the companion
@@ -308,7 +303,7 @@ export const LlamaCPP = {
             `WebGPU model load failed for ${request.modelId}; retrying with the CPU WASM artifact.`,
           );
           await bridge.switchToAcceleration('cpu');
-          publishResolvedAccelerationMode(bridge.accelerationMode);
+          setActiveAccelerationMode(bridge.accelerationMode);
           return true;
         });
 
@@ -355,7 +350,7 @@ export const LlamaCPP = {
             /* keep bridge mode */
           }
         }
-        publishResolvedAccelerationMode(publishedMode);
+        setActiveAccelerationMode(publishedMode);
 
         // VLM is wired alongside LLM by the unified
         // `rac_backend_llamacpp_register()` call, so once `ensureLoaded()`
@@ -389,13 +384,25 @@ export const LlamaCPP = {
         clearLlamaCppStreamWorker();
         bridge.shutdown();
         _isRegistered = false;
-        _registrationState = 'failed';
+        // The cleanup above already honored a deferred unregister: the caller
+        // asked to tear down, so do not leave the state reporting a failure.
+        _registrationState = _unregisterRequested ? 'unregistered' : 'failed';
+        _unregisterRequested = false;
         throw error;
       } finally {
         _registeringPromise = null;
-        const shouldUnregister = _unregisterRequested && _isRegistered;
+      }
+
+      if (_unregisterRequested) {
         _unregisterRequested = false;
-        if (shouldUnregister) LlamaCPP.unregister();
+        LlamaCPP.unregister();
+        // The deferred unregister tore down the backend this call just
+        // registered, so fulfilling would claim a live backend the caller no
+        // longer owns.
+        throw SDKException.invalidState(
+          'LlamaCPP.register() was superseded by unregister() while it was in flight; '
+          + 'retry register() to use the backend.',
+        );
       }
     })();
 
@@ -423,7 +430,6 @@ export const LlamaCPP = {
     clearLlamaCppBackendWorker();
     clearLlamaCppStreamWorker();
     LlamaCppBridge.shared.shutdown();
-    _inferenceAcceleration = 'cpu';
     _isRegistered = false;
     _registrationState = 'unregistered';
     logger.info('LlamaCpp backend unregistered');

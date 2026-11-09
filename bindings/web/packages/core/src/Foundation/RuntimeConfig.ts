@@ -417,6 +417,11 @@ export function setActiveAccelerationMode(mode: 'cpu' | 'webgpu' | null): void {
   }
 }
 
+/** The mode an LLM backend last reported as actually serving inference. */
+export function getActiveAccelerationMode(): 'cpu' | 'webgpu' | null {
+  return _activeMode;
+}
+
 /**
  * Backend hook: report ONNX/Sherpa speech compute mode for UI and diagnostics.
  * Does not mutate LLM `Runtime.active`.
