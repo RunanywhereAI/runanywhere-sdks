@@ -11,7 +11,7 @@ import {
   LLMStreamEventKind,
 } from '@runanywhere/proto-ts/llm_service';
 import { SDKError } from '@runanywhere/proto-ts/errors';
-import { type RAGStreamEvent } from '@runanywhere/proto-ts/rag';
+import { type RAGSearchResult, type RAGStreamEvent } from '@runanywhere/proto-ts/rag';
 import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
@@ -43,6 +43,18 @@ import {
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
 import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule';
+
+/** Build a minimal RAGSearchResult with only text/score/sourceDocument populated. */
+const ragChunk = (text: string, score: number, sourceDocument?: string): RAGSearchResult => ({
+  chunkId: '',
+  text,
+  score,
+  sourceDocument,
+  metadata: {},
+  startOffset: 0,
+  endOffset: text.length,
+  tokenCount: 0,
+});
 
 afterEach(() => {
   __testing__.clearPersistentRAGStore();
@@ -664,17 +676,11 @@ describe('splitRAGText', () => {
 
   it('bounds retrieved CJK context and preserves whole English words in boundedRAGContext (#922)', () => {
     // English context retains full words rather than slicing characters
-    const englishContext = __testing__.boundedRAGContext([{ text: 'Paris France', score: 1 }], 2);
+    const englishContext = __testing__.boundedRAGContext([ragChunk('Paris France', 1)], 2);
     expect(englishContext).toBe('[Source 1: Document]\nParis France');
 
     const cjkText = '人工智能机器学习深度学习自然语言处理计算机视觉强化学习';
-    const chunks = [
-      {
-        text: cjkText,
-        sourceDocument: 'CJKDoc',
-        score: 0.95,
-      },
-    ];
+    const chunks = [ragChunk(cjkText, 0.95, 'CJKDoc')];
     // Request only 10 tokens: should slice only the first 10 CJK code points
     const context = __testing__.boundedRAGContext(chunks, 10);
     expect(context).toContain('[Source 1: CJKDoc]');
@@ -686,13 +692,13 @@ describe('splitRAGText', () => {
     const chunks = __testing__.splitRAGText('Paris人工智能', 4, 0);
     // Latin and CJK are separate budget units now, so the English word is whole in its own chunk.
     expect(chunks.map((c) => c.text)).toEqual(['Paris', '人工智能']);
-    expect(__testing__.boundedRAGContext([{ text: 'Paris人工智能', score: 1 }], 2)).toBe(
+    expect(__testing__.boundedRAGContext([ragChunk('Paris人工智能', 1)], 2)).toBe(
       '[Source 1: Document]\nParis人',
     );
   });
 
   it('charges a long CJK run inside a multi-word chunk against the context budget (#922)', () => {
-    const context = __testing__.boundedRAGContext([{ text: `hello ${'中'.repeat(200)}`, score: 1 }], 2);
+    const context = __testing__.boundedRAGContext([ragChunk(`hello ${'中'.repeat(200)}`, 1)], 2);
     expect(context).toBe('[Source 1: Document]\nhello 中');
   });
 });
