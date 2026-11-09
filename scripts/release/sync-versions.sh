@@ -592,8 +592,8 @@ done
 # the marker and rerun this script once the new version is published.
 # Two installs carry no pin on purpose, because their packages are not on the
 # registry at the train version: the Python SDK (not on PyPI; the README says to
-# install from source) and runanywhere_qhexrt (pub.dev lags; the README says to use
-# a path dependency). Put a shape back in this list and in the gate when each is
+# install from source) and runanywhere_qhexrt (published on its own, older version
+# line; the README points to its package README). Put a shape back in this list and in the gate when each is
 # published at the version line.
 README_TEMP_MARKER_REGEX='(TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v)[^ ]+( is on the package registries\.)'
 if grep -Eq "${README_TEMP_MARKER_REGEX}" "${REPO_ROOT}/README.md"; then

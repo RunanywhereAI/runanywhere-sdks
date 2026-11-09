@@ -97,11 +97,11 @@ The fastest way to feel it. Install, load, generate, all local:
 ```bash
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
-./idl/codegen/generate_all.sh --only python   # needs protoc, protobuf and grpcio-tools
+./idl/codegen/generate_all.sh --only python   # needs grpcio-tools; fetches the pinned protoc and protobuf
 pip install ./bindings/python
 ```
 
-`runanywhere` is not on PyPI yet, so this builds the native runtime from source (CMake and a C++ toolchain required). The IDL bindings are generated, not checked in; `./scripts/setup/setup-toolchain.sh` installs the codegen tools on macOS and Ubuntu. See the [Python SDK README](bindings/python/).
+`runanywhere` is not on PyPI yet, so this builds the native runtime from source (CMake and a C++ toolchain required). The IDL bindings are generated, not checked in. The codegen script fetches the pinned `protoc` and `protobuf` itself and needs `grpcio-tools` (`./scripts/setup/setup-toolchain.sh` installs it on macOS and Ubuntu); without it, the script skips the Python protobuf step and the install stops with a message saying what is missing. See the [Python SDK README](bindings/python/).
 
 ```python
 import runanywhere as ra
@@ -239,11 +239,10 @@ dependencies:
   runanywhere_llamacpp: ^0.20.27  # LLM/VLM text generation
   # runanywhere_onnx: ^0.20.27    # STT, TTS, VAD, voice agent
   # runanywhere_mlx: ^0.20.27     # Apple-native LLM/VLM/STT/TTS/embeddings
-  # Snapdragon Hexagon NPU: runanywhere_qhexrt is not on pub.dev at this version line,
-  # and this tree's runanywhere_qhexrt needs runanywhere ^0.20.37. Use path dependencies
-  # on both bindings/flutter/packages/runanywhere and .../runanywhere_qhexrt (in place
-  # of the pub.dev lines above); the qhexrt README covers the native payload, which is
-  # not in this repo.
+  # Snapdragon Hexagon NPU: runanywhere_qhexrt is published on its own, older version
+  # line; see bindings/flutter/packages/runanywhere_qhexrt/ for the pub.dev version
+  # and the native payload, which is not in this repo. The copy in this tree is a
+  # member of the bindings/flutter workspace and needs runanywhere ^0.20.37.
 ```
 
 [Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](bindings/flutter/)

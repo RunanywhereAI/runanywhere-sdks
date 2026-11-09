@@ -479,8 +479,8 @@ expect_readme_pins() {
 # stay on it until v${VERSION} is out. The marker must name ${VERSION}, so one
 # left over from an earlier release cannot vouch for this one.
 # Not gated: the Python install (runanywhere is not on PyPI, so the README says to
-# install from source) and the commented runanywhere_qhexrt line (pub.dev lags the
-# train, so the README says to use a path dependency). Neither carries a pin.
+# install from source) and the commented runanywhere_qhexrt note (qhexrt is
+# published on its own, older version line). Neither carries a pin.
 README_PIN_VERSION="${VERSION}"
 readme_temp_marker="$(grep -Eo -- "TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v[^ ]+ is on the package registries\." "${REPO_ROOT}/README.md" || true)"
 if [ -n "${readme_temp_marker}" ]; then
