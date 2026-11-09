@@ -532,15 +532,21 @@ for readme in \
   bindings/flutter/packages/runanywhere_onnx/README.md \
   core/README.md \
   core/docs/DEVELOPMENT.md; do
+  if [ ! -f "${REPO_ROOT}/${readme}" ]; then
+    echo "[FAIL] ${readme}: missing (update this list and sync-versions.sh)" >&2
+    FAILURES=$((FAILURES + 1))
+    continue
+  fi
   readme_found=0
   for readme_pin in "${README_PIN_SHAPES[@]}"; do
     # Read each pin whole, as for the root README. The prose shapes (ending in a
     # backtick or bold marker) also open ordinary sentences, so those start at a digit.
     readme_token="[^][:space:]\"'\`(),*]*"
     case "${readme_pin}" in *'`' | *'\*\*') readme_token="[0-9]${readme_token}" ;; esac
-    # qhexrt is published on its own, older version line, so its pins are left
-    # out of the shared check.
-    readme_pins="$(grep -Eo -- "${readme_pin}${readme_token}" "${REPO_ROOT}/${readme}" | grep -v qhexrt || true)"
+    # qhexrt is published on its own, older version line, so lines naming it
+    # are left out of the shared check. Whole lines, as sync-versions.sh skips
+    # them, so the gate never demands a move the sync will not make.
+    readme_pins="$(grep -v qhexrt "${REPO_ROOT}/${readme}" | grep -Eo -- "${readme_pin}${readme_token}" || true)"
     [ -z "${readme_pins}" ] && continue
     readme_found=1
     readme_expected="${README_PIN_VERSION}"

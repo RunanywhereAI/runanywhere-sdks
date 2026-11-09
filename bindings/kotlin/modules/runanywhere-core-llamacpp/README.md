@@ -67,7 +67,7 @@ runs NPU-accelerated bundles, including Gemma 3n/4 and EmbeddingGemma.
 ## Requirements
 
 - Android API 24+ (ARM64 recommended)
-- Core artifact `runanywhere-sdk:0.20.11`
+- Core artifact `runanywhere-sdk` at the same version as the install lines above
 
 ---
 

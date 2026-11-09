@@ -45,7 +45,7 @@ For model registration, TTS, VAD, and voice-agent flows, see the [Kotlin SDK REA
 
 - Android API 24+
 - `RECORD_AUDIO` permission for microphone capture
-- Core artifact `runanywhere-sdk:0.20.11`
+- Core artifact `runanywhere-sdk` at the same version as the install lines above
 
 ---
 

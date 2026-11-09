@@ -121,7 +121,7 @@ QHexRT does not seed or select models. Register the exact model URL intended for
 - Android `arm64-v8a` only (no `armeabi-v7a` / `x86_64` package)
 - Qualcomm Snapdragon device with Hexagon **V75**, **V79**, or **V81** NPU
 - Matching model manifests for the device Hexagon arch (a V81-only bundle will not run on V75)
-- Core artifact `runanywhere-sdk:0.20.37`
+- Core artifact `runanywhere-sdk:0.20.27` or newer
 
 ---
 

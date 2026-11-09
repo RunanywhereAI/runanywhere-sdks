@@ -101,6 +101,7 @@ _LOCK_FILES=()
 _GBUMP_FILES=()
 _GBUMP_PATTERNS=()
 _GBUMP_REPLACEMENTS=()
+_GBUMP_SKIPS=()
 
 bump_line() {
     # Validates now; the edit is applied by flush_pending_edits.
@@ -127,7 +128,8 @@ bump_all_on_line() {
     #   Select version **`X`** (or `from: "X"`) ... if `X` binary assets ...
     # bump_line's sed has no /g, so that line kept two stale versions and the
     # coherence gate then failed on a file the bump had "already handled".
-    local file="$1" pattern="$2" replacement="$3"
+    # An optional fourth argument is an ERE; lines matching it are left alone.
+    local file="$1" pattern="$2" replacement="$3" skip="${4:-}"
     if [ ! -f "$file" ]; then
         echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
         return 1
@@ -140,6 +142,7 @@ bump_all_on_line() {
     _GBUMP_FILES+=("$file")
     _GBUMP_PATTERNS+=("$pattern")
     _GBUMP_REPLACEMENTS+=("$replacement")
+    _GBUMP_SKIPS+=("$skip")
     echo "  bumped: $file"
 }
 
@@ -162,10 +165,12 @@ flush_pending_edits() {
         fi
     done
     for i in "${!_GBUMP_FILES[@]}"; do
+        local address=""
+        [ -n "${_GBUMP_SKIPS[$i]}" ] && address="/${_GBUMP_SKIPS[$i]}/!"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' -E "s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
+            sed -i '' -E "${address}s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
         else
-            sed -i -E "s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
+            sed -i -E "${address}s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
         fi
     done
     for i in "${!_LOCK_FILES[@]}"; do
@@ -653,9 +658,13 @@ for readme in \
             if [ "$README_TEMP_PINNED" -eq 1 ] && [ "$readme_pin" != 'currently \*\*' ]; then
                 continue
             fi
+            # qhexrt is published on its own, older version line, so its pins
+            # (each on a line of its own) are left where they are, as the gate
+            # leaves them out of its check.
             bump_all_on_line "$readme" \
                 "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
-                "\1${NEW_VERSION}"
+                "\1${NEW_VERSION}" \
+                'qhexrt'
         fi
     done
     if [ "$readme_pinned" -eq 0 ]; then
