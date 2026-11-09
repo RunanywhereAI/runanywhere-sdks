@@ -174,7 +174,7 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
     _signature: string,
   ): number => {
     const id = nextCallbackId++;
-    callbackTable.set(id, fn);
+    callbackTable.set(id, fn as (...args: Array<number | bigint>) => unknown);
     liveCallbackIds.add(id);
     return id;
   };
@@ -226,7 +226,7 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
     addFunction,
     removeFunction,
     UTF8ToString: () => '',
-    stringToUTF8: () => undefined,
+    stringToUTF8: () => 0,
     lengthBytesUTF8: () => 0,
     capturedCreateRequest: undefined,
     capturedStepRequests: [],

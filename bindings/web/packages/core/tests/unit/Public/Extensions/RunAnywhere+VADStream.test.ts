@@ -37,7 +37,7 @@ interface VADStreamCounters {
   fedByteLengths: number[];
 }
 
-interface FakeVADModule extends EmscriptenRunanywhereModule, ModalityProtoModule {
+type FakeVADModule = EmscriptenRunanywhereModule & ModalityProtoModule & {
   _rac_backend_onnx_register(): number;
   _rac_backend_sherpa_register(): number;
   _rac_vad_component_create(outHandlePtr: number): number;
@@ -51,7 +51,7 @@ interface FakeVADModule extends EmscriptenRunanywhereModule, ModalityProtoModule
   _rac_vad_component_start(handle: number): number;
   _rac_vad_component_stop(handle: number): number;
   _rac_vad_component_destroy(handle: number): void;
-}
+};
 
 interface FakeVADHarness {
   module: FakeVADModule;
@@ -98,7 +98,7 @@ function fakeVADModule(): FakeVADHarness {
     return new TextDecoder().decode(heapU8.subarray(ptr, end));
   };
 
-  const module: FakeVADModule = {
+  const partial: Partial<FakeVADModule> = {
     HEAPU8: heapU8,
     HEAPU32: heapU32,
     HEAP32: new Int32Array(heap),
@@ -108,10 +108,10 @@ function fakeVADModule(): FakeVADHarness {
       return ptr;
     },
     _free: () => undefined,
-    addFunction(callback: (...args: number[]) => void | number): number {
+    addFunction(callback: (...args: never[]) => number | bigint | void): number {
       const ptr = nextCallback;
       nextCallback += 1;
-      callbacks.set(ptr, callback);
+      callbacks.set(ptr, callback as (...args: number[]) => void | number);
       return ptr;
     },
     removeFunction(ptr: number): void {
@@ -237,7 +237,7 @@ function fakeVADModule(): FakeVADHarness {
     },
   };
 
-  installCurrentModelRegistryExports(module);
+  const module = installCurrentModelRegistryExports(partial) as unknown as FakeVADModule;
 
   return { module, counters };
 }
