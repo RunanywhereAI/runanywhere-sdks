@@ -16,6 +16,7 @@
 #include <thread>
 #include <vector>
 
+#include "features/voice_agent/voice_agent_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -1131,6 +1132,33 @@ int test_voice_agent_d7_component_create_destroy_proto() {
           "D-7 component_destroy_proto accepts handle");
     CHECK(rac_voice_agent_component_destroy_proto(nullptr) == RAC_SUCCESS,
           "D-7 component_destroy_proto is null-safe");
+
+    runanywhere::v1::VoiceAgentComposeConfig config;
+    config.mutable_vad_config()->set_activation_threshold(0.02f);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(config, &bytes), "VoiceAgentComposeConfig serializes");
+    rac_voice_agent_handle_t configured = nullptr;
+    CHECK(rac_voice_agent_component_create_proto(bytes.data(), bytes.size(), &configured) ==
+              RAC_SUCCESS,
+          "D-7 component_create_proto with a VAD config succeeds");
+    CHECK(rac_vad_component_get_energy_threshold(configured->vad_handle) == 0.02f,
+          "D-7 create applies activation_threshold to the VAD component");
+    rac_voice_agent_component_destroy_proto(configured);
+
+    config.mutable_vad_config()->set_activation_threshold(1.5f);
+    CHECK(serialize(config, &bytes), "out-of-range VoiceAgentComposeConfig serializes");
+    rac_voice_agent_handle_t rejected = nullptr;
+    CHECK(rac_voice_agent_component_create_proto(bytes.data(), bytes.size(), &rejected) ==
+              RAC_ERROR_INVALID_PARAMETER,
+          "D-7 create reports an invalid VAD config");
+    CHECK(rac_voice_agent_create_standalone(&rejected) == RAC_SUCCESS, "voice agent creates");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    CHECK(rac_voice_agent_initialize_proto(rejected, bytes.data(), bytes.size(), &out) ==
+              RAC_ERROR_INVALID_PARAMETER,
+          "initialize_proto reports an invalid VAD config");
+    rac_proto_buffer_free(&out);
+    rac_voice_agent_destroy(rejected);
     return 0;
 }
 
