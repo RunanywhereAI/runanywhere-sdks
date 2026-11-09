@@ -62,9 +62,42 @@ RAC_API uint32_t rac_plugin_api_version(void);
  *
  * On any failure, the underlying handle is `dlclose`'d before return.
  *
+ * This is the raw entry point: `RAC_ERROR_PLUGIN_DUPLICATE` and
+ * `RAC_ERROR_PLUGIN_BUSY` are returned unchanged. Use
+ * `rac_registry_load_plugin_named()` when the caller needs the SDK-facing
+ * "already registered counts as success" policy and the exact registry key.
+ *
  * Thread-safe.
  */
 RAC_API rac_result_t rac_registry_load_plugin(const char* path);
+
+/**
+ * @brief Load a plugin and return the exact registry key.
+ *
+ * Shares the loader implementation with `rac_registry_load_plugin`, then
+ * normalizes the SDK-facing result: `RAC_ERROR_PLUGIN_DUPLICATE`,
+ * `RAC_ERROR_PLUGIN_BUSY`, and `RAC_ERROR_MODULE_ALREADY_REGISTERED` mean a
+ * plugin with the same key is still registered and serving, so they are
+ * reported as `RAC_SUCCESS`. Genuine load failures are returned unchanged.
+ *
+ * On success, `*out_name` receives a caller-owned copy of the plugin's exact
+ * `metadata.name` (the registry key that `rac_registry_unload_plugin` accepts).
+ * Free it with `rac_free()`. `*out_name` is set to NULL before loading and is
+ * left NULL on failure.
+ *
+ * The returned key remains unloadable, but `rac_registry_unload_plugin` may
+ * still return `RAC_ERROR_PLUGIN_BUSY` while a model lease holds the plugin.
+ *
+ * On hosts built with `RAC_STATIC_PLUGINS=ON`, returns
+ * `RAC_ERROR_FEATURE_NOT_AVAILABLE` and leaves `*out_name` NULL.
+ *
+ * @param path     Absolute or relative path to the shared library. Must NOT be NULL.
+ * @param out_name Optional output pointer for the registry key. May be NULL when
+ *                 the caller only needs the normalized result.
+ *
+ * Thread-safe.
+ */
+RAC_API rac_result_t rac_registry_load_plugin_named(const char* path, char** out_name);
 
 /**
  * @brief Unregister a plugin by name. If the plugin was loaded via

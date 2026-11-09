@@ -18,10 +18,11 @@ export type { PluginInfo };
 interface PluginLoaderModule extends EmscriptenRunanywhereModule {
   _rac_plugin_api_version?(): number;
   _rac_registry_plugin_count?(): number;
-  _rac_registry_load_plugin?(pathPtr: number): number;
+  _rac_registry_load_plugin_named?(pathPtr: number, outNamePtr: number): number;
   _rac_registry_unload_plugin?(namePtr: number): number;
   _rac_registry_list_plugins?(outNamesPtr: number, outCountPtr: number): number;
   _rac_registry_free_plugin_list?(namesPtr: number, count: number): void;
+  _rac_free?(ptr: number): void;
 }
 
 function activeModule(): PluginLoaderModule | null {
@@ -112,15 +113,39 @@ export const PluginLoader = {
       throw SDKException.validationFailed('Plugin path is required');
     }
     const module = activeModule();
-    if (!module || typeof module._rac_registry_load_plugin !== 'function') {
+    if (
+      !module ||
+      typeof module._rac_registry_load_plugin_named !== 'function' ||
+      typeof module._rac_free !== 'function'
+    ) {
       missing('pluginLoader.load');
     }
-    const rc = withUtf8(module, path, (ptr) => module._rac_registry_load_plugin!(ptr));
-    if (rc !== 0) {
-      throw SDKException.fromRACResult(rc, `pluginLoader.load failed for ${path}`);
+
+    const outNamePtr = module._malloc(4);
+    module.HEAPU32[outNamePtr >>> 2] = 0;
+    let namePtr = 0;
+    try {
+      const rc = withUtf8(module, path, (ptr) =>
+        module._rac_registry_load_plugin_named!(ptr, outNamePtr)
+      );
+      if (rc !== 0) {
+        throw SDKException.fromRACResult(rc, `pluginLoader.load failed for ${path}`);
+      }
+      namePtr = module.HEAPU32[outNamePtr >>> 2] ?? 0;
+    } finally {
+      module._free(outNamePtr);
     }
-    const stem = path.split('/').pop()?.replace(/\.[^.]+$/, '').replace(/^lib/, '') ?? path;
-    return { name: stem, path };
+
+    if (!namePtr) {
+      throw SDKException.processingFailed(
+        `pluginLoader.load returned no registry key for ${path}`
+      );
+    }
+    try {
+      return { name: module.UTF8ToString(namePtr), path };
+    } finally {
+      module._rac_free!(namePtr);
+    }
   },
 
   unload(name: string): void {

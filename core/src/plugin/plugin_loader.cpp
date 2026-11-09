@@ -207,7 +207,9 @@ uint32_t rac_plugin_api_version(void) {
 
 #if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
 
-rac_result_t rac_registry_load_plugin(const char* path) {
+static rac_result_t load_plugin_impl(const char* path, char** out_name) {
+    if (out_name != nullptr)
+        *out_name = nullptr;
     if (path == nullptr)
         return RAC_ERROR_NULL_POINTER;
     RAC_LOG_DEBUG(LOG_CAT,
@@ -220,7 +222,9 @@ rac_result_t rac_registry_load_plugin(const char* path) {
 
 #else /* RAC_PLUGIN_MODE_SHARED — real dlopen path */
 
-rac_result_t rac_registry_load_plugin(const char* path) {
+static rac_result_t load_plugin_impl(const char* path, char** out_name) {
+    if (out_name != nullptr)
+        *out_name = nullptr;
     if (path == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
@@ -258,6 +262,22 @@ rac_result_t rac_registry_load_plugin(const char* path) {
 
     // Copy before publishing: a concurrent unload may unmap vt on success.
     const std::string name(vt->metadata.name);
+    /* The named entry point must return a caller-owned copy that outlives the
+     * plugin mapping. Allocate it BEFORE registration publishes the entry so an
+     * allocation failure cannot turn an already-successful load into a failure
+     * the caller cannot retry safely. */
+    char* name_copy = nullptr;
+    if (out_name != nullptr) {
+        name_copy = rac_strdup(name.c_str());
+        if (name_copy == nullptr) {
+            RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): out of memory copying name",
+                          path);
+            (void)rac_engine_manifest_detach_vtable(vt);
+            rac_registry_record_plugin_unavailable(name.c_str(), path, RAC_ERROR_OUT_OF_MEMORY);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
     void* prior = nullptr;
     /* Registry centralizes ABI + capability + dedup checks. The single log
      * line on ABI mismatch is emitted from there (see
@@ -274,8 +294,19 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         /* The registry recorded the reason under the vtable's own name; add
          * the path, which only the loader knows and which is what makes a
          * "wrong/stale library staged" diagnosis possible. */
-        if (!rac_plugin_registration_succeeded(rc))
+        if (!rac_plugin_registration_succeeded(rc)) {
             rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
+            rac_free(name_copy);
+            return rc;
+        }
+        /* DUPLICATE/BUSY/MODULE_ALREADY_REGISTERED: an entry with this key is
+         * already registered. Keep it, discard the redundant mapping (DlGuard)
+         * and hand the caller the key it already serves. */
+        if (out_name != nullptr) {
+            *out_name = name_copy;
+        } else {
+            rac_free(name_copy);
+        }
         return rc;
     }
 
@@ -288,12 +319,35 @@ rac_result_t rac_registry_load_plugin(const char* path) {
     if (prior != nullptr) {
         rac_dl_close(static_cast<rac_lib_handle_t>(prior));
     }
+    if (out_name != nullptr) {
+        *out_name = name_copy;
+    } else {
+        rac_free(name_copy);
+    }
     RAC_LOG_DEBUG(LOG_CAT, "rac_registry_load_plugin('%s'): registered '%s' from '%s'", path,
                   name.c_str(), sym.c_str());
     return RAC_SUCCESS;
 }
 
 #endif /* RAC_PLUGIN_MODE_STATIC */
+
+rac_result_t rac_registry_load_plugin(const char* path) {
+    /* Raw contract: DUPLICATE/BUSY stay visible to low-level callers. Use
+     * rac_registry_load_plugin_named() for the SDK-facing normalized result. */
+    return load_plugin_impl(path, nullptr);
+}
+
+rac_result_t rac_registry_load_plugin_named(const char* path, char** out_name) {
+    rac_result_t rc = load_plugin_impl(path, out_name);
+    if (rac_plugin_registration_succeeded(rc)) {
+        return RAC_SUCCESS;
+    }
+    if (out_name != nullptr && *out_name != nullptr) {
+        rac_free(*out_name);
+        *out_name = nullptr;
+    }
+    return rc;
+}
 
 rac_result_t rac_registry_load_plugins(const char* const* paths, size_t count, size_t* out_loaded) {
     if (out_loaded != nullptr)

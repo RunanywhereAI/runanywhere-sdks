@@ -60,46 +60,29 @@ public extension RunAnywhere {
         ///
         /// - Parameter path: Absolute or relative path to the shared library.
         /// - Returns: `RAPluginInfo` describing the loaded plugin. The `name`
-        ///            is the actual registry key (vt->metadata.name), so
-        ///            `unload(name: info.name)` always matches.
+        ///            is the exact registry key returned by commons, so
+        ///            `unload(name: info.name)` always matches. A redundant
+        ///            load of an already-registered plugin succeeds and returns
+        ///            the same key.
         /// - Throws: `SDKException` on failure (see error codes below).
         @discardableResult
         public func load(path: String) throws -> RAPluginInfo {
-            // Snapshot existing registry keys so we can identify the newly
-            // registered name after load. The C loader stores the plugin
-            // under vt->metadata.name (e.g. "llamacpp" for the in-tree
-            // librunanywhere_llamacpp.dylib), which is what
-            // rac_registry_unload_plugin expects. Deriving the name from
-            // the file stem locally is fragile because the C++ loader also
-            // strips an optional `runanywhere_` infix, and third-party
-            // plugins may set metadata.name to anything they choose.
-            let before = Set(registeredNames())
+            var registeredName: UnsafeMutablePointer<CChar>?
+            defer { rac_free(registeredName.map { UnsafeMutableRawPointer($0) }) }
 
-            let result = path.withCString { rac_registry_load_plugin($0) }
+            let result = path.withCString {
+                rac_registry_load_plugin_named($0, &registeredName)
+            }
             try throwIfFailed(result, op: "load", context: path)
 
-            let after = registeredNames()
-            let registeredName = after.first { !before.contains($0) } ?? deriveStemName(path: path)
-            return makePluginInfo(name: registeredName, path: path)
-        }
-
-        /// Mirror the C loader's stem derivation (strip directory, the
-        /// optional `lib` prefix, the file extension, and the optional
-        /// `runanywhere_` infix). Used as a last-resort fallback when the
-        /// registry-diff is empty — e.g. when an already-loaded plugin's
-        /// entry is idempotently re-registered and `registeredNames()`
-        /// returns the same set.
-        private func deriveStemName(path: String) -> String {
-            var stem = URL(fileURLWithPath: path)
-                .deletingPathExtension()
-                .lastPathComponent
-            if stem.hasPrefix("lib") {
-                stem.removeFirst("lib".count)
+            guard let registeredName else {
+                throw SDKException.make(
+                    code: .unknown,
+                    message: "pluginLoader.load: native loader returned no name for \(path)",
+                    category: .internal
+                )
             }
-            if stem.hasPrefix("runanywhere_") {
-                stem.removeFirst("runanywhere_".count)
-            }
-            return stem
+            return makePluginInfo(name: String(cString: registeredName), path: path)
         }
 
         /// Unregister a previously-loaded plugin and `dlclose` its handle.

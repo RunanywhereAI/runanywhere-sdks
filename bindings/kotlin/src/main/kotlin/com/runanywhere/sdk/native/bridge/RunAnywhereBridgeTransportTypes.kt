@@ -39,6 +39,21 @@ fun interface NativeRunLoopHandleListener {
 }
 
 /**
+ * Result of [RunAnywhereBridge.racRegistryLoadPluginNamed].
+ *
+ * Fields are `@JvmField` so the JNI layer can construct this object via a
+ * single reflective `NewObject(...)` call with a matching
+ * `(ILjava/lang/String;)V` signature.
+ *
+ * [name] is the exact registry key returned by commons on success. It is empty
+ * on failure or when the native load produced no name.
+ */
+class NativePluginLoadResult(
+    @JvmField val resultCode: Int,
+    @JvmField val name: String,
+)
+
+/**
  * Response descriptor returned by [RunAnywhereBridge.racHttpRequestExecute].
  *
  * Fields are `@JvmField` so the JNI layer can construct this object via a
