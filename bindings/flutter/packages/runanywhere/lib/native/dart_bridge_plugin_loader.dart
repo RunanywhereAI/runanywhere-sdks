@@ -18,7 +18,7 @@ class PluginLoadResult {
   PluginLoadResult({required this.name, required this.resultCode});
   final String name;
   final int resultCode;
-  bool get success => resultCode == RAC_SUCCESS;
+  bool get success => resultCode == RacResultCodes.success;
 }
 
 /// FFI bridge to the `rac_registry_*` C ABI. Owns all `dart:ffi`
@@ -58,7 +58,7 @@ class DartBridgePluginLoader {
     final outCountPtr = calloc<IntPtr>();
     try {
       final rc = fn(outNamesPtr, outCountPtr);
-      if (rc != RAC_SUCCESS) {
+      if (rc != RacResultCodes.success) {
         _logger.warning(
           'rac_registry_list_plugins failed: ${RacResultCodes.message(rc)}',
         );
@@ -108,7 +108,7 @@ class DartBridgePluginLoader {
     try {
       final rc = fn(pathPtr, outNamePtr);
       final namePtr = outNamePtr.value;
-      final name = (rc == RAC_SUCCESS && namePtr != nullptr)
+      final name = (rc == RacResultCodes.success && namePtr != nullptr)
           ? namePtr.toDartString()
           : '';
       if (namePtr != nullptr) {

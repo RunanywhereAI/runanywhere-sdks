@@ -37,8 +37,9 @@ class PluginLoaderNamespace {
             // Commons returns the exact registry key (vt->metadata.name) and
             // normalizes DUPLICATE/BUSY to success. Do not derive a name from the
             // file stem: a third-party plugin may register under any key.
-            val result = RunAnywhereBridge.racRegistryLoadPluginNamed(path)
-                ?: throw SDKException.operation("rac_registry_load_plugin_named returned null")
+            val result =
+                RunAnywhereBridge.racRegistryLoadPluginNamed(path)
+                    ?: throw SDKException.operation("rac_registry_load_plugin_named returned null")
             if (result.resultCode != RunAnywhereBridge.RAC_SUCCESS) {
                 throw SDKException.operation(
                     "rac_registry_load_plugin_named failed with rc=${result.resultCode}",
