@@ -220,7 +220,10 @@ export interface LoadOptions {
   /**
    * Hardware class to run on. `'npu'` fails preflight — unsupported on Web.
    *
-   * On Web, main-thread llama routes honor this per load.
+   * On Web, main-thread llama routes treat this as a per-load preference.
+   * Qwen vision and multimodal loads fall back from WebGPU to CPU.
+   * Check `LoadedModel.actualDevice` for the device used and
+   * `LoadedModel.fallbackReason` for details on an unmet explicit request.
    * `LlamaCPP.register({ acceleration })` selects the initial worker mode, and
    * `ONNX.register({ acceleration })` selects the speech backend mode. Both
    * ignore per-load switches and report explicit mismatches through

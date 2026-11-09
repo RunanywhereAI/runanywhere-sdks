@@ -86,6 +86,7 @@ const MODULE_ID = 'llamacpp';
 let _isRegistered = false;
 let _registeringPromise: Promise<void> | null = null;
 let _registrationState: BackendRegistrationState = 'unregistered';
+let _unregisterRequested = false;
 const lifecycleVLMProvider = new LifecycleVLMProvider();
 
 function modelLoadCategory(
@@ -392,6 +393,9 @@ export const LlamaCPP = {
         throw error;
       } finally {
         _registeringPromise = null;
+        const shouldUnregister = _unregisterRequested && _isRegistered;
+        _unregisterRequested = false;
+        if (shouldUnregister) LlamaCPP.unregister();
       }
     })();
 
@@ -399,11 +403,14 @@ export const LlamaCPP = {
   },
 
   /**
-   * Unregister the backend and release its WASM module once registered.
-   * A pending registration continues to completion.
+   * Unregister the backend and release its WASM module. If registration is
+   * in progress, release the resources when it settles.
    */
   unregister(): void {
-    if (_registrationState === 'registering') return;
+    if (_registrationState === 'registering') {
+      _unregisterRequested = true;
+      return;
+    }
     if (!_isRegistered) {
       _registrationState = 'unregistered';
       return;
