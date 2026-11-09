@@ -502,16 +502,14 @@ export const models = {
    * Load a model now instead of paying the cost on the first generation.
    * contextLength and optional backendPreferences are forwarded on ModelLoadRequest.
    *
-   * Accelerator contract: a resolved llama.cpp route asks the runtime
-   * switcher before loading, but the llama.cpp BackendWorker fixes its
-   * acceleration for the backend session at
-   * `LlamaCPP.register({ acceleration })` — a per-load accelerator only
-   * switches the main-thread bridge when NO BackendWorker is configured,
-   * and an explicit request that conflicts with the worker's fixed mode is
-   * logged and reported through `fallbackReason` rather than switching the
-   * worker. An unresolved route records the preference without a
-   * speculative llama switch, and a speech (ONNX/Sherpa) route never
-   * touches the switcher — its acceleration is fixed at
+   * A resolved llama.cpp route asks the runtime switcher before loading.
+   * A per-load accelerator can switch the main-thread bridge when no
+   * BackendWorker is configured. If the request differs from the worker's
+   * actual mode, the mismatch is logged and reported through `fallbackReason`.
+   * `LlamaCPP.register({ acceleration })` selects the initial worker mode.
+   * After a WebGPU WASM abort, reloading the model can restart the worker on
+   * CPU without registering again. An unresolved route records the preference
+   * without switching. Speech (ONNX/Sherpa) uses the mode selected at
    * `ONNX.register({ acceleration })`. `actualDevice` is the device the
    * actual owner reports: `'cpu'`, `'gpu'`, or `'unknown'` when the owner
    * publishes no device diagnostics.

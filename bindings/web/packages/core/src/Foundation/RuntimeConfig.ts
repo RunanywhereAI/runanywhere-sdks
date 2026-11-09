@@ -84,9 +84,8 @@ const memoryBudget: RuntimeMemoryBudget = Object.freeze({
  * Function installed by a backend (typically the llamacpp bridge) to perform
  * the acceleration switch. Should be idempotent and must report the mode it
  * actually loaded through `setActiveAccelerationMode(...)` before resolving.
- * A backend that fixes acceleration for its session (a llama.cpp
- * BackendWorker) may resolve the call without switching and log the fixed
- * policy instead; it must not replace the actual mode with the requested one.
+ * A backend such as the llama.cpp BackendWorker may accept the preference
+ * without switching. In that case it leaves the published mode alone.
  */
 export type RuntimeAccelerationSwitcher = (mode: 'cpu' | 'webgpu') => Promise<void>;
 export interface RuntimeModelLoadRequest {
@@ -188,12 +187,11 @@ export const Runtime = {
    * package) to have registered a switcher via `setAccelerationSwitcher`.
    * If no switcher is installed, this becomes a no-op.
    *
-   * A backend may legitimately leave this preference-only — a llama.cpp
-   * BackendWorker fixes its acceleration at registration
-   * (`LlamaCPP.register({ acceleration })`) and must not be switched per
-   * load. Resolving this promise therefore does not certify the preference
-   * was honored; the switcher reports the honored mode via
-   * `setActiveAccelerationMode(...)`, which callers should treat as truth.
+   * For a llama.cpp BackendWorker, this call records the preference only.
+   * `LlamaCPP.register({ acceleration })` selects the initial mode. After a
+   * WebGPU WASM abort, reloading the model can restart the worker on CPU
+   * without registering again. For backends that switch, the switcher reports
+   * the resolved mode via `setActiveAccelerationMode(...)`.
    *
    * @param mode 'cpu' | 'webgpu' (no-op if same as active)
    */

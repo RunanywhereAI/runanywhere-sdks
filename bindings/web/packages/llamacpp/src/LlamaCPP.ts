@@ -227,9 +227,10 @@ export const LlamaCPP = {
    * 7. Wires `RunAnywhere.runtime.setAcceleration(mode)` to the bridge's
    *    acceleration switcher. While a BackendWorker is configured, that
    *    switcher (plus the model-load preparation and failure-recovery
-   *    hooks) refuses to mutate either module — the worker's mode is fixed
-   *    for the backend session at `LlamaCPP.register({ acceleration })`,
-   *    and the main-thread bridge stays a CPU companion.
+   *    hooks) refuses to mutate either module. Registration selects the
+   *    worker's initial acceleration, and the main-thread bridge stays on CPU.
+   *    After a WebGPU WASM abort, reloading the model can restart the worker
+   *    on CPU without registering again.
    *
    * Idempotent — concurrent callers share the same in-flight promise.
    */
@@ -260,10 +261,9 @@ export const LlamaCPP = {
         // changes are refused. Per-load switching must not tear down or
         // rebuild either module (a main-thread WebGPU module opened beside
         // a live worker has been correlated with worker generate Abort()).
-        // The worker's mode is selected once, at
-        // `LlamaCPP.register({ acceleration })`, and lasts for the backend
-        // session. When NO worker is configured, the existing direct
-        // bridge switch runs and the actually-resolved mode is published.
+        // The worker's initial mode comes from registration. The host may
+        // restart it on CPU after a WASM abort. Without a worker, the direct
+        // bridge switch runs and publishes the resolved mode.
         //
         // The worker intent is resolved before the hooks are installed
         // because the host object only exists after `ensureLoaded()`: a
@@ -315,10 +315,8 @@ export const LlamaCPP = {
         // bridge on CPU so we do not open a second WebGPU device (dual
         // WebGPU modules have been correlated with worker generate Abort()).
         // The worker still resolves auto → WebGPU when the adapter supports
-        // it. This mode is fixed for the whole backend session: the hooks
-        // installed above refuse runtime acceleration changes for as long
-        // as the host is retained, so changing it means unregistering and
-        // registering a fresh backend session with a new `acceleration`.
+        // it. To request a different worker mode, register a fresh backend
+        // session with a new `acceleration`.
         const requested = options.acceleration ?? 'auto';
         const bridgeAcceleration = preferWorker && requested !== 'cpu'
           ? 'cpu'
@@ -401,9 +399,11 @@ export const LlamaCPP = {
   },
 
   /**
-   * Unregister the backend and release its WASM module.
+   * Unregister the backend and release its WASM module once registered.
+   * A pending registration continues to completion.
    */
   unregister(): void {
+    if (_registrationState === 'registering') return;
     if (!_isRegistered) {
       _registrationState = 'unregistered';
       return;

@@ -220,11 +220,12 @@ export interface LoadOptions {
   /**
    * Hardware class to run on. `'npu'` fails preflight — unsupported on Web.
    *
-   * Web contract: main-thread llama routes honor this per load. A llama.cpp
-   * BackendWorker fixes its acceleration for the backend session at
-   * `LlamaCPP.register({ acceleration })`, and speech acceleration is fixed at
-   * `ONNX.register({ acceleration })`. An explicit per-load mismatch on either
-   * is reported through `LoadedModel.fallbackReason`, not switched.
+   * On Web, main-thread llama routes honor this per load.
+   * `LlamaCPP.register({ acceleration })` selects the initial worker mode, and
+   * `ONNX.register({ acceleration })` selects the speech backend mode. Both
+   * ignore per-load switches and report explicit mismatches through
+   * `LoadedModel.fallbackReason`. After a WebGPU WASM abort, reloading the model
+   * can restart the llama.cpp worker on CPU without registering again.
    */
   accelerator?: AcceleratorPolicy;
   contextLength?: number;
