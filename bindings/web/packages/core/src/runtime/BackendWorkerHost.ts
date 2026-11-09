@@ -18,7 +18,7 @@ import {
   markLlamaBackendWorkerDead,
   markOnnxBackendWorkerDead,
 } from './BackendWorkerModelOwnership.js';
-import { setRuntimeDegradedReason } from '../Foundation/RuntimeConfig.js';
+import { setActiveAccelerationMode, setRuntimeDegradedReason } from '../Foundation/RuntimeConfig.js';
 
 function isWasmAbortMessage(message: string): boolean {
   return /Aborted\s*\(|RuntimeError:\s*Aborted/i.test(message);
@@ -88,6 +88,11 @@ interface StreamPending {
 type PendingRequest = UnaryPending | StreamPending;
 
 const defaultInitTimeoutMs = workerDefaults.handshakeTimeoutMs;
+/**
+ * Diagnostics round trip, not an inference call: a wedged worker must not hold
+ * a model load open while the caller waits for a device report.
+ */
+const defaultHealthTimeoutMs = 2000;
 
 /** Current worker-runtime state for `RunAnywhere.runtime` diagnostics. */
 export function getBackendWorkerRuntimeDiagnostics(): BackendWorkerDiagnostics {
@@ -297,8 +302,12 @@ export class BackendWorkerHost {
     }
   }
 
-  async health(): Promise<BackendWorkerHealthResponse> {
-    return this.request('health', {}) as Promise<BackendWorkerHealthResponse>;
+  /**
+   * Ask the worker for its health/device report, bounded so an unresponsive
+   * worker cannot block a caller that only needs diagnostics.
+   */
+  async health(timeoutMs: number = defaultHealthTimeoutMs): Promise<BackendWorkerHealthResponse> {
+    return this.request('health', {}, undefined, timeoutMs) as Promise<BackendWorkerHealthResponse>;
   }
 
   async teardown(): Promise<void> {
@@ -337,16 +346,38 @@ export class BackendWorkerHost {
     type: 'loadModel' | 'unloadModel' | 'infer' | 'health' | 'teardown',
     fields: Record<string, unknown>,
     transfer?: Transferable[],
+    timeoutMs?: number,
   ): Promise<unknown> {
     await this.init();
     const requestId = this.nextRequestId(type);
     return new Promise<unknown>((resolve, reject) => {
-      this.pending.set(requestId, { kind: 'unary', resolve, reject });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const pending: UnaryPending = {
+        kind: 'unary',
+        resolve: (value) => {
+          if (timer !== undefined) clearTimeout(timer);
+          resolve(value);
+        },
+        reject: (reason) => {
+          if (timer !== undefined) clearTimeout(timer);
+          reject(reason);
+        },
+      };
+      this.pending.set(requestId, pending);
+      if (timeoutMs !== undefined) {
+        timer = setTimeout(() => {
+          if (!this.pending.has(requestId)) return;
+          this.failRequest(
+            requestId,
+            new BackendWorkerError(`${type} request timed out after ${timeoutMs}ms`),
+          );
+        }, timeoutMs);
+      }
       try {
         this.post({ type, requestId, ...fields } as BackendWorkerRequest, transfer);
       } catch (error) {
         this.pending.delete(requestId);
-        reject(error);
+        pending.reject(error);
       }
     });
   }
@@ -424,6 +455,10 @@ export class BackendWorkerHost {
     }
     if (this.backendId === 'llamacpp') {
       markLlamaBackendWorkerDead(message);
+      // The worker that reported the device is gone, so the published LLM
+      // mode no longer describes a live runtime. Clear it instead of letting
+      // `LlamaCPP.accelerationMode` keep claiming the pre-crash device.
+      setActiveAccelerationMode(null);
     } else if (this.backendId === 'onnx') {
       markOnnxBackendWorkerDead(message);
     }

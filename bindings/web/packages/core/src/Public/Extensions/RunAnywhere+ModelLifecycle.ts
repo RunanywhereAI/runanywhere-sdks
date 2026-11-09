@@ -583,7 +583,8 @@ async function publishBackendWorkerAcceleration(
     const device = health.healthy ? deviceFromHealthDetails(health.details) : null;
     if (device) setActiveAccelerationMode(device);
   } catch {
-    /* keep the previously published mode */
+    // Keep the last known mode: the load already succeeded, and a crashed
+    // worker clears the published mode through `handleCrash`.
   }
 }
 

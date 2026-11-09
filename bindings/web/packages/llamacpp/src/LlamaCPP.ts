@@ -193,16 +193,16 @@ export const LlamaCPP = {
   },
 
   /**
-   * Acceleration used for LLM inference (cpu | webgpu).
+   * Acceleration used for LLM inference (cpu | webgpu), or null when no
+   * device is currently published. Null means "unknown": the backend is not
+   * registered, or the owning worker crashed and its device is no longer
+   * reachable until a reload republishes it.
+   *
    * When the BackendWorker owns the model, this is the worker's resolved mode
    * (WebGPU-first), not the main-thread bridge which may stay on CPU.
-   *
-   * Read from the published mode rather than a local copy: a worker that
-   * Abort()ed on WebGPU restarts on CPU on the next load without registering
-   * again, and only the published mode tracks that recovery.
    */
-  get accelerationMode(): 'cpu' | 'webgpu' {
-    return getActiveAccelerationMode() ?? 'cpu';
+  get accelerationMode(): 'cpu' | 'webgpu' | null {
+    return getActiveAccelerationMode();
   },
 
   /**
