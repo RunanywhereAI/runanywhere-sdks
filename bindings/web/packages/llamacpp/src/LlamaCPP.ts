@@ -70,6 +70,17 @@ let _backendWorkerHost: BackendWorkerHost | null = null;
 let _inferenceAcceleration: 'cpu' | 'webgpu' = 'cpu';
 let _installedStreamWorker = false;
 
+/**
+ * Publish the acceleration mode a switch actually resolved to — the direct
+ * bridge's resolved mode, or the worker-owned session's mode. Keeps
+ * `LlamaCPP.accelerationMode` and `Runtime.active` in agreement after every
+ * resolution, including capability fallback (WebGPU -> CPU).
+ */
+function publishResolvedAccelerationMode(mode: 'cpu' | 'webgpu'): void {
+  _inferenceAcceleration = mode;
+  setActiveAccelerationMode(mode);
+}
+
 const MODULE_ID = 'llamacpp';
 
 let _isRegistered = false;
@@ -253,8 +264,16 @@ export const LlamaCPP = {
         // `LlamaCPP.register({ acceleration })`, and lasts for the backend
         // session. When NO worker is configured, the existing direct
         // bridge switch runs and the actually-resolved mode is published.
+        //
+        // The worker intent is resolved before the hooks are installed
+        // because the host object only exists after `ensureLoaded()`: a
+        // concurrent `runtime.setAcceleration()` during that await must not
+        // rebuild the main bridge on WebGPU while the worker is being
+        // configured.
+        const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
+        const preferWorker = options.preferBackendWorker !== false && workerAvailable;
         setAccelerationSwitcher(async (mode) => {
-          if (_backendWorkerHost !== null) {
+          if (_backendWorkerHost !== null || (preferWorker && _registrationState === 'registering')) {
             logger.warning(
               `runtime.setAcceleration('${mode}') recorded as a preference only: runtime acceleration `
               + 'changes are unsupported while the llama.cpp BackendWorker is configured. Select the '
@@ -263,11 +282,10 @@ export const LlamaCPP = {
             return;
           }
           await bridge.switchToAcceleration(mode);
-          setActiveAccelerationMode(bridge.accelerationMode);
           // Publish only the resolved result so `LlamaCPP.accelerationMode`
           // no longer retains its registration-time value after a direct
           // switch (capability detection may resolve WebGPU → CPU).
-          _inferenceAcceleration = bridge.accelerationMode;
+          publishResolvedAccelerationMode(bridge.accelerationMode);
         });
         setModelLoadPreparation(async ({ request, model }) => {
           // A worker-owned load must not mutate the idle CPU companion
@@ -278,7 +296,7 @@ export const LlamaCPP = {
             `WebGPU VLM load is not stable for ${request.modelId}; loading with the CPU WASM artifact.`,
           );
           await bridge.switchToAcceleration('cpu');
-          setActiveAccelerationMode(bridge.accelerationMode);
+          publishResolvedAccelerationMode(bridge.accelerationMode);
         });
         setModelLoadFailureRecovery(async ({ request, error }) => {
           // Never retry a worker-owned load by pretending the companion
@@ -289,7 +307,7 @@ export const LlamaCPP = {
             `WebGPU model load failed for ${request.modelId}; retrying with the CPU WASM artifact.`,
           );
           await bridge.switchToAcceleration('cpu');
-          setActiveAccelerationMode(bridge.accelerationMode);
+          publishResolvedAccelerationMode(bridge.accelerationMode);
           return true;
         });
 
@@ -301,8 +319,6 @@ export const LlamaCPP = {
         // installed above refuse runtime acceleration changes for as long
         // as the host is retained, so changing it means unregistering and
         // registering a fresh backend session with a new `acceleration`.
-        const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
-        const preferWorker = options.preferBackendWorker !== false && workerAvailable;
         const requested = options.acceleration ?? 'auto';
         const bridgeAcceleration = preferWorker && requested !== 'cpu'
           ? 'cpu'
@@ -340,8 +356,7 @@ export const LlamaCPP = {
             /* keep bridge mode */
           }
         }
-        _inferenceAcceleration = publishedMode;
-        setActiveAccelerationMode(publishedMode);
+        publishResolvedAccelerationMode(publishedMode);
 
         // VLM is wired alongside LLM by the unified
         // `rac_backend_llamacpp_register()` call, so once `ensureLoaded()`

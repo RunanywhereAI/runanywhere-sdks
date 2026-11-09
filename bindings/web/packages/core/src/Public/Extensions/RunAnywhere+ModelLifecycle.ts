@@ -308,7 +308,15 @@ export function describeModelLoadBackend(
     };
   }
   const fallbackFramework = request.framework ?? model?.framework;
-  return { backendId: backendIdForFramework(fallbackFramework), framework: fallbackFramework };
+  const fallbackBackend = backendIdForFramework(fallbackFramework);
+  // Route selection already failed, so the load cannot succeed. Report an
+  // unresolved llama route so `models.load` records the preference instead of
+  // rebuilding the llama bridge (which would disturb a resident session)
+  // before the doomed load. ONNX/Sherpa/Piper keep their fallback routing.
+  return {
+    backendId: fallbackBackend === 'llamacpp' ? null : fallbackBackend,
+    framework: fallbackFramework,
+  };
 }
 
 /** Where a successfully loaded model actually runs, as its owner reports it. */
