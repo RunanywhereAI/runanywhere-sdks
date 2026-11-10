@@ -242,7 +242,7 @@ dependencies:
   # Snapdragon Hexagon NPU: runanywhere_qhexrt is published on its own, older version
   # line; see bindings/flutter/packages/runanywhere_qhexrt/ for the pub.dev version
   # and the native payload, which is not in this repo. The copy in this tree is a
-  # member of the bindings/flutter workspace and needs runanywhere ^0.20.37.
+  # member of the bindings/flutter workspace and builds against the core in this checkout.
 ```
 
 [Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](bindings/flutter/)

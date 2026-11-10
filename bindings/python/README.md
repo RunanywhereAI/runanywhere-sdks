@@ -6,14 +6,17 @@ On-device AI for Python — LLM, VLM, STT, TTS, embeddings, and voice pipelines 
 
 ## Install
 
-`runanywhere` is not on PyPI yet, so install from the root of a clone of this repo. The build compiles the native runtime (CMake and a C++ toolchain required), and the IDL bindings it imports are generated, not checked in, so generate them first. The codegen script fetches the pinned `protoc` and `protobuf` itself and needs `grpcio-tools` (`./scripts/setup/setup-toolchain.sh` installs it on macOS and Ubuntu).
+`runanywhere` is not on PyPI yet, so install from the root of a clone of this repo. The build compiles the native runtime (CMake and a C++ toolchain required), and the IDL bindings it imports are generated, not checked in, so generate them first. The codegen script fetches the pinned `protoc` and `protobuf` itself and needs `grpcio-tools`.
 
 ```bash
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
+python3 -m pip install "grpcio-tools==1.71.*"
 ./idl/codegen/generate_all.sh --only python
 pip install ./bindings/python
 ```
+
+On Windows, `pip install ./bindings/python` skips the step that copies `onnxruntime.dll` and `sherpa-onnx-c-api.dll` into the package. Build a wheel and repair it with `delvewheel` instead, as the `python-windows` job in [`pr-build.yml`](../../.github/workflows/pr-build.yml) does; [PACKAGING.md](PACKAGING.md) has the details.
 
 Python **3.9+** and `numpy >= 1.21` are required.
 
