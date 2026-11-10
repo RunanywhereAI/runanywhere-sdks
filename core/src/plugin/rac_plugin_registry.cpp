@@ -199,6 +199,21 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
     }
 }
 
+rac_bool_t rac_plugin_registry_contains(const rac_engine_vtable_t* vtable) noexcept {
+    if (vtable == nullptr) {
+        return RAC_FALSE;
+    }
+    try {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+        const auto accepted = std::ranges::find_if(
+            s.by_name, [vtable](const auto& entry) { return entry.second == vtable; });
+        return accepted == s.by_name.end() ? RAC_FALSE : RAC_TRUE;
+    } catch (...) {
+        return RAC_FALSE;
+    }
+}
+
 void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) noexcept {
     try {
         auto& s = state();

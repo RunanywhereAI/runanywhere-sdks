@@ -52,6 +52,12 @@ rac_result_t rac_plugin_registry_unregister(const char* name,
 rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
                                          const rac_engine_manifest_t** out_manifest)
     RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
+/** True when `vtable` is currently published in the registry, matched by
+ * pointer identity. Used by the loader's cleanup path to avoid detaching an
+ * active manifest when a repeat load fails before registration. */
+rac_bool_t
+rac_plugin_registry_contains(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**

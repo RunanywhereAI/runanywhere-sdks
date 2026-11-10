@@ -1592,9 +1592,9 @@ object RunAnywhereBridge {
 
     /**
      * Load a plugin and return the normalized result plus the exact registry
-     * key. `RAC_ERROR_PLUGIN_DUPLICATE`/`RAC_ERROR_PLUGIN_BUSY` are reported as
-     * success by commons. Returns null only when the JNI bridge cannot build
-     * its result object.
+     * key. `RAC_ERROR_PLUGIN_DUPLICATE`, `RAC_ERROR_PLUGIN_BUSY`, and
+     * `RAC_ERROR_MODULE_ALREADY_REGISTERED` are reported as success by commons.
+     * Returns null only when the JNI bridge cannot build its result object.
      */
     @JvmStatic
     external fun racRegistryLoadPluginNamed(path: String): NativePluginLoadResult?

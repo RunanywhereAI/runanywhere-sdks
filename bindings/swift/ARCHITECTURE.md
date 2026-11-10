@@ -792,7 +792,7 @@ All six methods are `public static` on `RunAnywhere`. None call the C ABI direct
 
 **Path:** `Public/Extensions/RunAnywhere+PluginLoader.swift` (LOC: 142)
 
-`PluginInfo` (lines 19–30) — `Sendable` struct with `name: String` (library stem) and `path: String`.
+`PluginInfo` (lines 19–30) — `Sendable` struct with `name: String` (the exact registry key returned by commons) and `path: String`.
 
 `RunAnywhere.pluginLoader` (lines 43–141) returns a `PluginLoaderNamespace()` Sendable value with a `fileprivate init()`:
 

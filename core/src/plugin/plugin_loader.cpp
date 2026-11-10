@@ -272,8 +272,14 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
         if (name_copy == nullptr) {
             RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): out of memory copying name",
                           path);
-            (void)rac_engine_manifest_detach_vtable(vt);
-            rac_registry_record_plugin_unavailable(name.c_str(), path, RAC_ERROR_OUT_OF_MEMORY);
+            /* A repeat load returns the already-registered vtable. Do not
+             * detach its manifest or put the serving backend on the
+             * unavailability ledger just because the caller's name copy could
+             * not be allocated. */
+            if (rac_plugin_registry_contains(vt) != RAC_TRUE) {
+                (void)rac_engine_manifest_detach_vtable(vt);
+                rac_registry_record_plugin_unavailable(name.c_str(), path, RAC_ERROR_OUT_OF_MEMORY);
+            }
             return RAC_ERROR_OUT_OF_MEMORY;
         }
     }
@@ -289,8 +295,12 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
                           "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d", path,
                           vt->metadata.name, static_cast<int>(rc));
         }
-        // Detach refuses leased vtables, preserving the active manifest on a busy retry.
-        (void)rac_engine_manifest_detach_vtable(vt);
+        /* Only detach a manifest that was never published. A same-library
+         * reload returns the already-registered vtable, and detaching it here
+         * would strip the active plugin's manifest. */
+        if (rac_plugin_registry_contains(vt) != RAC_TRUE) {
+            (void)rac_engine_manifest_detach_vtable(vt);
+        }
         /* The registry recorded the reason under the vtable's own name; add
          * the path, which only the loader knows and which is what makes a
          * "wrong/stale library staged" diagnosis possible. */
