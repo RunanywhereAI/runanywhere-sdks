@@ -36,12 +36,14 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import okhttp3.Call
 import okhttp3.Headers
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -478,13 +480,88 @@ object OkHttpHttpTransport {
         val slot = StreamSlot()
         inFlightStreams[streamId] = slot
         var activeCall: Call? = null
+        var streamResult: StreamResponse? = null
+
+        // Drain the body inside an application interceptor so the synchronous
+        // call stays registered with the OkHttp Dispatcher for the whole
+        // transfer. `Call.execute()` calls `Dispatcher.finished()` before it
+        // returns the response, so a host `dispatcher.cancelAll()` issued
+        // after the headers arrive would otherwise not reach the call.
+        //
+        // Inserting at index 0 keeps this interceptor outermost, so host
+        // interceptors still see the response before the SDK consumes it.
+        val interceptor =
+            Interceptor { chain ->
+                val response = chain.proceed(chain.request())
+                try {
+                    // Range-honored disclosure: surface a synthetic header so
+                    // the C++ download manager can detect when the server
+                    // ignored the Range request and replayed the full file
+                    // (200 instead of 206).
+                    val headerPairs = buildResponseHeaders(response.headers, resumeFromByte, response.code)
+                    val body = response.body
+                    if (body == null) {
+                        streamResult =
+                            StreamResponse(
+                                statusCode = response.code,
+                                headers = headerPairs,
+                                errorMessage = null,
+                                cancelled = false,
+                            )
+                    } else {
+                        // Resume accounting: when the server actually honored
+                        // the Range (206), Content-Length is only the
+                        // *remaining* bytes — add the resume offset so the
+                        // chunk callback sees a monotonic `total_written` that
+                        // tracks absolute file position. For 200 responses the
+                        // server ignored the range and is replaying the full
+                        // file, so we leave the counter at 0 (the caller will
+                        // truncate).
+                        val honoredRange = response.code == 206 && resumeFromByte > 0
+                        val rawContentLength = if (body.contentLength() >= 0) body.contentLength() else 0L
+                        val contentLength =
+                            if (honoredRange && rawContentLength > 0) {
+                                rawContentLength + resumeFromByte
+                            } else {
+                                rawContentLength
+                            }
+                        val totalRead = if (honoredRange) resumeFromByte else 0L
+
+                        val cancelled =
+                            drainBody(
+                                body,
+                                chain.call(),
+                                slot,
+                                contentLength,
+                                totalRead,
+                                nativeCallback,
+                                nativeUserData,
+                            )
+
+                        streamResult =
+                            StreamResponse(
+                                statusCode = response.code,
+                                headers = headerPairs,
+                                errorMessage = null,
+                                cancelled = cancelled,
+                            )
+                    }
+                    response
+                } catch (t: Throwable) {
+                    // Let OkHttp finish its timeout wrapping before
+                    // streamInternal classifies the failure.
+                    response.close()
+                    throw t
+                }
+            }
+
         return try {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             // Streaming downloads use the dedicated streaming client with a
             // 24-hour read timeout (multi-GB GGUFs over slow links can take
             // hours); the buffered client's 60s read / 600s call timeouts
             // would abort them mid-transfer.
-            val clientForCall = resolveStreamingClient(timeoutMs, followRedirects)
+            val clientForCall = resolveStreamingClient(timeoutMs, followRedirects, interceptor)
 
             val call = clientForCall.newCall(request)
             activeCall = call
@@ -501,53 +578,15 @@ object OkHttpHttpTransport {
                 call.cancel()
             }
 
-            call.execute().use { resp ->
-                // Range-honored disclosure: surface a synthetic header so the
-                // C++ download manager can detect when the server ignored the
-                // Range request and replayed the full file (200 instead of 206).
-                val headerPairs = buildResponseHeaders(resp.headers, resumeFromByte, resp.code)
-                val body =
-                    resp.body
-                        ?: return StreamResponse(
-                            statusCode = resp.code,
-                            headers = headerPairs,
-                            errorMessage = null,
-                            cancelled = false,
-                        )
-
-                // Resume accounting: when the server actually honored the
-                // Range (206), Content-Length is only the *remaining* bytes
-                // — add the resume offset so the chunk callback sees a
-                // monotonic `total_written` that tracks absolute file
-                // position. For 200 responses the server ignored the range
-                // and is replaying the full file, so we leave the counter
-                // at 0 (the caller will truncate).
-                val honoredRange = resp.code == 206 && resumeFromByte > 0
-                val rawContentLength = if (body.contentLength() >= 0) body.contentLength() else 0L
-                val contentLength =
-                    if (honoredRange && rawContentLength > 0) {
-                        rawContentLength + resumeFromByte
-                    } else {
-                        rawContentLength
-                    }
-                var totalRead = if (honoredRange) resumeFromByte else 0L
-
-                val cancelled =
-                    drainBody(body, call, slot, contentLength, totalRead, nativeCallback, nativeUserData)
-
-                StreamResponse(
-                    statusCode = resp.code,
-                    headers = headerPairs,
-                    errorMessage = null,
-                    cancelled = cancelled,
-                )
+            call.execute().use {
+                checkNotNull(streamResult) { "streaming interceptor did not capture a result" }
             }
         } catch (e: Throwable) {
             StreamResponse(
                 statusCode = 0,
                 headers = emptyArray(),
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
-                cancelled = activeCall != null && synchronized(slot) { slot.cancelRequested },
+                cancelled = isStreamCancellation(e, activeCall, slot),
             )
         } finally {
             inFlightStreams.remove(streamId)
@@ -556,8 +595,13 @@ object OkHttpHttpTransport {
 
     /**
      * Drains the response body chunk-by-chunk, forwarding each chunk to the
-     * native callback. Returns `true` if the transfer was cancelled (either
-     * by the callback returning false or by `Call.cancel()`).
+     * native callback. Returns `true` if the transfer was cancelled by the SDK
+     * (the callback returned false or [cancelAllStreams] ran).
+     *
+     * Body-read failures other than SDK-owned cancellation are rethrown so
+     * they travel through OkHttp's `timeoutExit`, which wraps expiring call
+     * timeouts as `InterruptedIOException`. The outer [streamInternal] catch
+     * classifies the failure only after that wrapping is complete.
      */
     private fun drainBody(
         body: okhttp3.ResponseBody,
@@ -578,9 +622,9 @@ object OkHttpHttpTransport {
                     try {
                         input.read(buffer)
                     } catch (io: IOException) {
-                        // If the caller cancelled, OkHttp surfaces the abort
-                        // as an IOException — treat that as a clean
-                        // cancellation rather than a transport failure.
+                        // Swallow only SDK-owned cancellation. Everything else
+                        // must propagate through OkHttp's timeout handling so
+                        // a call timeout is not mistaken for cancellation.
                         if (synchronized(slot) { slot.cancelRequested }) {
                             cancelled = true
                             break
@@ -616,6 +660,26 @@ object OkHttpHttpTransport {
     }
 
     // Helpers
+
+    /**
+     * Classifies a streaming failure as cancellation.
+     *
+     * True when the SDK-owned [StreamSlot.cancelRequested] marker is set (the
+     * native chunk callback returned `false`, or [cancelAllStreams] ran), or
+     * the OkHttp [Call] was cancelled by some other owner — e.g. a host
+     * client's shared `Dispatcher.cancelAll()` reached through [setHttpClient].
+     *
+     * OkHttp's own call/read timeouts cancel too, but surface as
+     * [InterruptedIOException] (which `SocketTimeoutException` extends), so
+     * they stay transport errors for JNI to map to `RAC_ERROR_TIMEOUT`.
+     */
+    private fun isStreamCancellation(failure: Throwable, call: Call?, slot: StreamSlot): Boolean {
+        if (synchronized(slot) { slot.cancelRequested }) return true
+        return call != null &&
+            call.isCanceled() &&
+            failure is IOException &&
+            failure !is InterruptedIOException
+    }
 
     private fun buildRequest(
         method: String,
@@ -678,8 +742,16 @@ object OkHttpHttpTransport {
      * If the caller supplied an explicit per-request `timeoutMs`, layer it
      * on as a `callTimeout` — that matches the request_send semantics and
      * still lets the read timeout cap individual stalled reads at 24h.
+     *
+     * [interceptor] is inserted at index 0 so it is the outermost application
+     * interceptor. It must stay outermost so host interceptors process the
+     * response before the SDK drains the body.
      */
-    private fun resolveStreamingClient(timeoutMs: Long, followRedirects: Boolean): OkHttpClient {
+    private fun resolveStreamingClient(
+        timeoutMs: Long,
+        followRedirects: Boolean,
+        interceptor: Interceptor,
+    ): OkHttpClient {
         val base = streamingClient
         return base
             .newBuilder()
@@ -687,6 +759,7 @@ object OkHttpHttpTransport {
             .followSslRedirects(followRedirects)
             .apply {
                 if (timeoutMs > 0) callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                interceptors().add(0, interceptor)
             }.build()
     }
 
@@ -742,9 +815,10 @@ object OkHttpHttpTransport {
      * through [deliverChunkNative]; this struct only carries status + headers
      * metadata back to C++ for the `rac_http_response_t`.
      *
-     * [cancelled] is true only for explicit SDK cancellation: either the native
-     * chunk callback returned false or [cancelAllStreams] requested teardown.
-     * OkHttp-triggered timeouts remain transport errors for JNI to map to
+     * [cancelled] is true for explicit cancellation: the native chunk callback
+     * returned false, [cancelAllStreams] requested teardown, or a host-owned
+     * OkHttp client cancelled the call through its own Dispatcher. OkHttp
+     * call/read timeouts remain transport errors for JNI to map to
      * `RAC_ERROR_TIMEOUT`.
      */
     class StreamResponse(
