@@ -41,6 +41,7 @@ static void rac_batch_add(llama_batch& batch, llama_token id, llama_pos pos,
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "features/common/utf8_stream_boundary.h"
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -97,65 +98,6 @@ static constexpr int32_t kFormattedPromptBufSize = 256 * 1024;
 }  // namespace
 
 namespace runanywhere {
-
-// UTF-8 STATE MACHINE (DFA)
-
-struct Utf8State {
-    uint32_t state = 0;
-
-    // Bjoern Hoehrmann LUT
-    bool process(uint8_t byte) {
-        static const uint8_t
-            utf8d[] =
-                {
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 00..1f
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 20..3f
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 40..5f
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 60..7f
-                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
-                    1,   1,   1,   1,   1,   9,   9,   9,   9,   9,   9,
-                    9,   9,   9,   9,   9,   9,   9,   9,   9,   9,  // 80..9f
-                    7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,
-                    7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,
-                    7,   7,   7,   7,   7,   7,   7,   7,   7,   7,  // a0..bf
-                    8,   8,   2,   2,   2,   2,   2,   2,   2,   2,   2,
-                    2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,
-                    2,   2,   2,   2,   2,   2,   2,   2,   2,   2,  // c0..df
-                    0xa, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3,
-                    0x3, 0x3, 0x4, 0x3, 0x3,  // e0..ef
-                    0xb, 0x6, 0x6, 0x6, 0x5, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8,
-                    0x8, 0x8, 0x8, 0x8, 0x8,  // f0..ff
-                    0x0, 0x1, 0x2, 0x3, 0x5, 0x8, 0x7, 0x1, 0x1, 0x1, 0x4,
-                    0x6, 0x1, 0x1, 0x1, 0x1,  // s0..s0
-                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
-                    1,   1,   1,   1,   1,   1,   0,   1,   1,   1,   1,
-                    1,   0,   1,   0,   1,   1,   1,   1,   1,   1,  // s1..s2
-                    1,   2,   1,   1,   1,   1,   1,   2,   1,   2,   1,
-                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
-                    1,   2,   1,   1,   1,   1,   1,   1,   1,   1,  // s3..s4
-                    1,   2,   1,   1,   1,   1,   1,   1,   1,   2,   1,
-                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
-                    1,   3,   1,   3,   1,   1,   1,   1,   1,   1,  // s5..s6
-                    1,   3,   1,   1,   1,   1,   1,   3,   1,   3,   1,
-                    1,   1,   1,   1,   1,   1,   3,   1,   1,   1,   1,
-                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,  // s7..s8
-                };
-
-        uint32_t type = utf8d[byte];
-        state = utf8d[256 + state * 16 + type];
-        return (state == 0);
-    }
-
-    void reset() { state = 0; }
-};
 
 // =============================================================================
 // SHARED DECODE HELPERS (file-local)
@@ -1024,9 +966,6 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
     std::string partial_utf8_buffer;
     partial_utf8_buffer.reserve(8);
 
-    // Persist UTF-8 scanner across iterations to avoid re-scanning partial bytes
-    Utf8State utf8_scanner;
-
     int n_cur = start_n_cur;
     int tokens_generated = 0;
     bool stop_sequence_hit = false;
@@ -1046,18 +985,9 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
 
         const std::string new_token_chars = common_token_to_piece(context_, new_token_id, false);
 
-        // Only scan newly appended bytes — scanner state persists from prior
-        // iterations
-        const size_t scan_start = partial_utf8_buffer.size();
         partial_utf8_buffer.append(new_token_chars);
-
-        size_t valid_upto = 0;
-        for (size_t i = scan_start; i < partial_utf8_buffer.size(); ++i) {
-            utf8_scanner.process(static_cast<uint8_t>(partial_utf8_buffer[i]));
-            if (utf8_scanner.state == 0) {
-                valid_upto = i + 1;
-            }
-        }
+        const size_t valid_upto =
+            partial_utf8_buffer.size() - rac::tokens::incomplete_utf8_tail(partial_utf8_buffer);
 
         if (valid_upto > 0) {
             std::string valid_chunk = partial_utf8_buffer.substr(0, valid_upto);
