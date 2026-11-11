@@ -330,8 +330,11 @@ If the marker is already there, leave it alone: the script moves it forward by i
 
 ```bash
 git checkout -b release/v<version>
-grep -n "TEMP: install pins stay on" README.md    # must print the marker line; re-add it if not
-./scripts/release/sync-versions.sh <version>      # e.g. 0.20.25 (no 'v' needed, either works)
+if grep -Eq 'TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? until v[^ ]+ is on the package registries\.' README.md; then
+  ./scripts/release/sync-versions.sh <version>    # e.g. 0.20.25 (no 'v' needed, either works)
+else
+  echo "README.md has no valid TEMP install-pin marker: add it as described above, then sync." >&2
+fi
 bash scripts/validation/gates/check_release_version_coherence.sh
 ```
 
