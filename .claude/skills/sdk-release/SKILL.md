@@ -859,6 +859,12 @@ externally live.
 **Hand off to the `sdk-publish` skill** for the actual npm / Maven Central / pub.dev /
 SwiftPM-distribution-repo publishing steps. This skill's job ends here.
 
+If the root `README.md` carries a `TEMP: install pins stay on X until vY is on the package
+registries.` marker, `sync-versions.sh` in step 1 only moved that marker and left the
+README's install pins on the old version. Removing it is `sdk-publish` §8, and it runs only
+after npm, Maven Central and pub.dev serve the new version: do not delete the marker as part
+of the version-bump PR.
+
 ---
 
 ## 10b. MANDATORY, and it turns `main` RED until you do it — cut runanywhere-swift
