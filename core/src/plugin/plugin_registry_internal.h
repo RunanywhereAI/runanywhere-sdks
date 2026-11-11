@@ -53,11 +53,13 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
                                          const rac_engine_manifest_t** out_manifest)
     RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-/** True when `vtable` is currently published in the registry, matched by
- * pointer identity. Used by the loader's cleanup path to avoid detaching an
- * active manifest when a repeat load fails before registration. */
-rac_bool_t
-rac_plugin_registry_contains(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+/** If `vtable` is not published, remove its pending manifest under the
+ * registry lock and return RAC_TRUE. If it is already published (or leased),
+ * return RAC_FALSE and leave the active manifest alone. Used by the loader's
+ * cleanup paths so a publication check and detach cannot race a concurrent
+ * load. */
+rac_bool_t rac_plugin_registry_discard_pending_manifest(const rac_engine_vtable_t* vtable)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
 void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**

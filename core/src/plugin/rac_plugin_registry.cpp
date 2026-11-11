@@ -199,16 +199,37 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
     }
 }
 
-rac_bool_t rac_plugin_registry_contains(const rac_engine_vtable_t* vtable) noexcept {
+rac_bool_t
+rac_plugin_registry_discard_pending_manifest(const rac_engine_vtable_t* vtable) noexcept {
     if (vtable == nullptr) {
         return RAC_FALSE;
     }
     try {
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
+        /* A published vtable owns an active manifest; leave it alone. */
         const auto accepted = std::ranges::find_if(
             s.by_name, [vtable](const auto& entry) { return entry.second == vtable; });
-        return accepted == s.by_name.end() ? RAC_FALSE : RAC_TRUE;
+        if (accepted != s.by_name.end()) {
+            return RAC_FALSE;
+        }
+        /* A lease also implies the manifest is in use. */
+        if (s.model_leases.contains(vtable)) {
+            return RAC_FALSE;
+        }
+        const auto pending = s.manifests_by_vtable.find(vtable);
+        if (pending == s.manifests_by_vtable.end()) {
+            return RAC_TRUE;
+        }
+        const rac_engine_manifest_t* manifest = pending->second;
+        s.manifests_by_vtable.erase(pending);
+        if (manifest != nullptr && vtable->metadata.name != nullptr) {
+            const auto by_name = s.manifests_by_name.find(vtable->metadata.name);
+            if (by_name != s.manifests_by_name.end() && by_name->second == manifest) {
+                s.manifests_by_name.erase(by_name);
+            }
+        }
+        return RAC_TRUE;
     } catch (...) {
         return RAC_FALSE;
     }
