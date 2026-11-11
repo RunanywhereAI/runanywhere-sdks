@@ -303,8 +303,9 @@ export class BackendWorkerHost {
   }
 
   /**
-   * Ask the worker for its health/device report, bounded so an unresponsive
-   * worker cannot block a caller that only needs diagnostics.
+   * Ask the worker for its health/device report. The deadline covers both
+   * initialization and the response. A timeout lets shared initialization
+   * continue for callers that are loading a model.
    */
   async health(timeoutMs: number = defaultHealthTimeoutMs): Promise<BackendWorkerHealthResponse> {
     return this.request('health', {}, undefined, timeoutMs) as Promise<BackendWorkerHealthResponse>;
@@ -342,13 +343,12 @@ export class BackendWorkerHost {
     }
   }
 
-  private async request(
+  private request(
     type: 'loadModel' | 'unloadModel' | 'infer' | 'health' | 'teardown',
     fields: Record<string, unknown>,
     transfer?: Transferable[],
     timeoutMs?: number,
   ): Promise<unknown> {
-    await this.init();
     const requestId = this.nextRequestId(type);
     return new Promise<unknown>((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -373,12 +373,13 @@ export class BackendWorkerHost {
           );
         }, timeoutMs);
       }
-      try {
-        this.post({ type, requestId, ...fields } as BackendWorkerRequest, transfer);
-      } catch (error) {
-        this.pending.delete(requestId);
-        pending.reject(error);
-      }
+      void this.init()
+        .then(() => {
+          if (this.pending.has(requestId)) {
+            this.post({ type, requestId, ...fields } as BackendWorkerRequest, transfer);
+          }
+        })
+        .catch((error: unknown) => this.failRequest(requestId, error));
     });
   }
 

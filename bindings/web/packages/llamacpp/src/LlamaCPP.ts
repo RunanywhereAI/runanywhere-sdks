@@ -198,6 +198,9 @@ export const LlamaCPP = {
    * registered, or the owning worker crashed and its device is no longer
    * reachable until a reload republishes it.
    *
+   * Callers migrating from the non-null return type must handle null before
+   * using this value as a concrete acceleration mode.
+   *
    * When the BackendWorker owns the model, this is the worker's resolved mode
    * (WebGPU-first), not the main-thread bridge which may stay on CPU.
    */
