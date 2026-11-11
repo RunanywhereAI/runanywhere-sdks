@@ -150,6 +150,32 @@ struct DlGuard {
     }
 };
 
+/* Tracks one in-flight loader call so a failed load cannot discard the pending
+ * manifest of a concurrent load of the same library. The registry only
+ * discards the manifest when the last in-flight call for this path finishes
+ * and the vtable was never published. */
+struct PendingLoadGuard {
+    const char* path = nullptr;
+    const rac_engine_vtable_t* vtable = nullptr;
+    bool active = true;
+
+    explicit PendingLoadGuard(const char* load_path) : path(load_path) {
+        rac_plugin_registry_begin_load(path);
+    }
+    ~PendingLoadGuard() {
+        if (active) {
+            (void)rac_plugin_registry_finish_load(path, vtable, RAC_TRUE);
+        }
+    }
+    PendingLoadGuard(const PendingLoadGuard&) = delete;
+    PendingLoadGuard& operator=(const PendingLoadGuard&) = delete;
+
+    rac_bool_t finish(rac_bool_t discard_pending) {
+        active = false;
+        return rac_plugin_registry_finish_load(path, vtable, discard_pending);
+    }
+};
+
 /**
  * Derive the plugin entry-symbol name from a library path.
  *
@@ -228,6 +254,8 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
     if (path == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
+    PendingLoadGuard load_guard(path);
+
     /* Failures below are recorded against the name parsed from the file so the
      * host can name the degraded backend. The registry records its own
      * failures (ABI / capability / manifest) under the vtable's real name. */
@@ -259,6 +287,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
         rac_registry_record_plugin_unavailable(blame.c_str(), path, RAC_ERROR_PLUGIN_LOAD_FAILED);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
+    load_guard.vtable = vt;
 
     // Copy before publishing: a concurrent unload may unmap vt on success.
     const std::string name(vt->metadata.name);
@@ -276,7 +305,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
              * detach its manifest or put the serving backend on the
              * unavailability ledger just because the caller's name copy could
              * not be allocated. */
-            if (rac_plugin_registry_discard_pending_manifest(vt) == RAC_TRUE) {
+            if (load_guard.finish(RAC_TRUE) == RAC_TRUE) {
                 rac_registry_record_plugin_unavailable(name.c_str(), path, RAC_ERROR_OUT_OF_MEMORY);
             }
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -294,15 +323,16 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
                           "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d", path,
                           vt->metadata.name, static_cast<int>(rc));
         }
-        /* Only discard a manifest that was never published. A same-library
-         * reload returns the already-registered vtable; the publication check
-         * and detach happen under one registry lock. */
-        (void)rac_plugin_registry_discard_pending_manifest(vt);
+        /* Only the last in-flight load for this path may discard a pending
+         * manifest, and only if the vtable was never published. */
+        const rac_bool_t last_load = load_guard.finish(RAC_TRUE);
         /* The registry recorded the reason under the vtable's own name; add
          * the path, which only the loader knows and which is what makes a
          * "wrong/stale library staged" diagnosis possible. */
         if (!rac_plugin_registration_succeeded(rc)) {
-            rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
+            if (last_load == RAC_TRUE) {
+                rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
+            }
             rac_free(name_copy);
             return rc;
         }
@@ -326,6 +356,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
     if (prior != nullptr) {
         rac_dl_close(static_cast<rac_lib_handle_t>(prior));
     }
+    (void)load_guard.finish(RAC_FALSE);
     if (out_name != nullptr) {
         *out_name = name_copy;
     } else {

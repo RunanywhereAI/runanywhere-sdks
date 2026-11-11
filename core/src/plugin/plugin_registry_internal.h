@@ -53,13 +53,17 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
                                          const rac_engine_manifest_t** out_manifest)
     RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-/** If `vtable` is not published, remove its pending manifest under the
- * registry lock and return RAC_TRUE. If it is already published (or leased),
- * return RAC_FALSE and leave the active manifest alone. Used by the loader's
- * cleanup paths so a publication check and detach cannot race a concurrent
- * load. */
-rac_bool_t rac_plugin_registry_discard_pending_manifest(const rac_engine_vtable_t* vtable)
-    RAC_PLUGIN_REGISTRY_NOEXCEPT;
+/** Mark an in-flight loader call for `path`. Must be paired with
+ * rac_plugin_registry_finish_load(). Used to keep a failed concurrent load of
+ * the same library from discarding the pending manifest another load owns. */
+void rac_plugin_registry_begin_load(const char* path) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
+/** Finish an in-flight loader call. Returns RAC_FALSE when another load for
+ * `path` is still in flight, or when `vtable` is published/leased. Otherwise
+ * returns RAC_TRUE; if `discard_pending` is RAC_TRUE, also removes the
+ * unpublished pending manifest under the same registry lock. */
+rac_bool_t rac_plugin_registry_finish_load(const char* path, const rac_engine_vtable_t* vtable,
+                                           rac_bool_t discard_pending) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**

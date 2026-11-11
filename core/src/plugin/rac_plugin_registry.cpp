@@ -65,6 +65,9 @@ struct State {
     /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
     std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
     std::unordered_map<const rac_engine_vtable_t*, size_t> model_leases;
+    /** In-flight loader calls keyed by path, so a failed load does not discard
+     *  a pending manifest another concurrent load of the same library owns. */
+    std::unordered_map<std::string, size_t> pending_loads;
 };
 
 State& state() {
@@ -199,34 +202,56 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
     }
 }
 
-rac_bool_t
-rac_plugin_registry_discard_pending_manifest(const rac_engine_vtable_t* vtable) noexcept {
-    if (vtable == nullptr) {
-        return RAC_FALSE;
+void rac_plugin_registry_begin_load(const char* path) noexcept {
+    if (path == nullptr || path[0] == '\0') {
+        return;
     }
     try {
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
+        ++s.pending_loads[std::string(path)];
+    } catch (...) {}
+}
+
+rac_bool_t rac_plugin_registry_finish_load(const char* path, const rac_engine_vtable_t* vtable,
+                                           rac_bool_t discard_pending) noexcept {
+    try {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+
+        if (path != nullptr && path[0] != '\0') {
+            const auto inflight = s.pending_loads.find(path);
+            if (inflight != s.pending_loads.end()) {
+                if (inflight->second > 1) {
+                    --inflight->second;
+                    return RAC_FALSE;
+                }
+                s.pending_loads.erase(inflight);
+            }
+        }
+
+        if (vtable == nullptr) {
+            return RAC_TRUE;
+        }
+
         /* A published vtable owns an active manifest; leave it alone. */
         const auto accepted = std::ranges::find_if(
             s.by_name, [vtable](const auto& entry) { return entry.second == vtable; });
-        if (accepted != s.by_name.end()) {
+        if (accepted != s.by_name.end() || s.model_leases.contains(vtable)) {
             return RAC_FALSE;
         }
-        /* A lease also implies the manifest is in use. */
-        if (s.model_leases.contains(vtable)) {
-            return RAC_FALSE;
-        }
-        const auto pending = s.manifests_by_vtable.find(vtable);
-        if (pending == s.manifests_by_vtable.end()) {
-            return RAC_TRUE;
-        }
-        const rac_engine_manifest_t* manifest = pending->second;
-        s.manifests_by_vtable.erase(pending);
-        if (manifest != nullptr && vtable->metadata.name != nullptr) {
-            const auto by_name = s.manifests_by_name.find(vtable->metadata.name);
-            if (by_name != s.manifests_by_name.end() && by_name->second == manifest) {
-                s.manifests_by_name.erase(by_name);
+
+        if (discard_pending == RAC_TRUE) {
+            const auto pending = s.manifests_by_vtable.find(vtable);
+            if (pending != s.manifests_by_vtable.end()) {
+                const rac_engine_manifest_t* manifest = pending->second;
+                s.manifests_by_vtable.erase(pending);
+                if (manifest != nullptr && vtable->metadata.name != nullptr) {
+                    const auto by_name = s.manifests_by_name.find(vtable->metadata.name);
+                    if (by_name != s.manifests_by_name.end() && by_name->second == manifest) {
+                        s.manifests_by_name.erase(by_name);
+                    }
+                }
             }
         }
         return RAC_TRUE;
@@ -524,12 +549,44 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 }
             }
 
-            // Allocate before changing the accepted plugin so handle publication
-            // below is non-throwing, but only after all refusal checks.
+            /* Prepare every allocation before publishing anything, so a
+             * bad_alloc cannot leave a half-registered vtable whose library
+             * the loader will unload. All of these may throw while the
+             * registry still has no entry for the incoming vtable. */
+            struct PreparedEntry {
+                rac_primitive_t primitive;
+                Entry entry;
+            };
+            std::vector<PreparedEntry> prepared;
+            prepared.reserve(16);
+            each_served_primitive(vtable, [&](rac_primitive_t p) {
+                prepared.push_back(PreparedEntry{
+                    p,
+                    Entry{.name = name, .priority = vtable->metadata.priority, .vtable = vtable}});
+            });
+            for (auto& item : prepared) {
+                auto& bucket = s.by_primitive[item.primitive];
+                bucket.reserve(bucket.size() + 1);
+            }
+            s.by_name.reserve(s.by_name.size() + (replacing_existing ? 0 : 1));
+            s.manifests_by_name.reserve(s.manifests_by_name.size() + 1);
+
+            bool manifest_entry_inserted = false;
+            auto manifest_entry = s.manifests_by_name.end();
+            if (manifest != nullptr) {
+                auto [it, inserted] = s.manifests_by_name.try_emplace(name, nullptr);
+                manifest_entry = it;
+                manifest_entry_inserted = inserted;
+            }
+
+            bool dl_entry_inserted = false;
             auto dl_entry = s.dl_handles.end();
             if (dl_handle) {
-                dl_entry = s.dl_handles.try_emplace(name, nullptr).first;
+                auto [it, inserted] = s.dl_handles.try_emplace(name, nullptr);
+                dl_entry = it;
+                dl_entry_inserted = inserted;
             }
+
             if (replacing_existing) {
                 // Steal the evicted vtable into a local so `on_unload` runs
                 // AFTER the lock is released: the evicted plugin's teardown
@@ -544,19 +601,30 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 evicted_vtable = dup->second;
                 s.manifests_by_vtable.erase(evicted_vtable);
                 erase_from_buckets_locked(s, name);
+                s.by_name[name] = vtable;
+            } else {
+                try {
+                    (void)s.by_name.try_emplace(name, vtable);
+                } catch (...) {
+                    if (manifest_entry_inserted) {
+                        s.manifests_by_name.erase(manifest_entry);
+                    }
+                    if (dl_entry_inserted) {
+                        s.dl_handles.erase(dl_entry);
+                    }
+                    throw;
+                }
             }
 
-            s.by_name[name] = vtable;
             if (manifest != nullptr) {
-                s.manifests_by_name[name] = manifest;
+                manifest_entry->second = manifest;
             } else if (replacing_existing) {
                 s.manifests_by_name.erase(name);
             }
 
-            each_served_primitive(vtable, [&](rac_primitive_t p) {
-                Entry e{.name = name, .priority = vtable->metadata.priority, .vtable = vtable};
-                insert_by_priority(s.by_primitive[p], std::move(e));
-            });
+            for (auto& item : prepared) {
+                insert_by_priority(s.by_primitive[item.primitive], std::move(item.entry));
+            }
 
             if (dl_handle) {
                 *out_previous_handle = dl_entry->second;
