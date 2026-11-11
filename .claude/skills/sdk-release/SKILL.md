@@ -312,8 +312,25 @@ guaranteed across all gh versions — if unsure, run the two label queries separ
 
 Pick a patch/minor/major bump based on the changes since the last tag. Then:
 
+**Before running `sync-versions.sh`, make sure the root `README.md` carries the TEMP
+install-pin marker.** Without it, the script moves every README install command (npm,
+Maven, pub.dev, pip) to `<version>` in this PR, and the README points readers at packages
+no registry serves until `sdk-publish` finishes hours later. If `sdk-publish` §8 removed the
+marker after the last release, put it back on its own line below the
+`All SDKs ship on one version line, currently **...**` sentence, naming the version the
+pins are on now (the current `core/VERSION`) twice:
+
+```
+<!-- TEMP: install pins stay on <current-version> until v<current-version> is on the package registries. -->
+```
+
+`sync-versions.sh` then rewrites only its `until v...` part to `<version>` and leaves the
+pins where they are; `sdk-publish` §8 releases them once the registries have `<version>`.
+If the marker is already there, leave it alone: the script moves it forward by itself.
+
 ```bash
 git checkout -b release/v<version>
+grep -n "TEMP: install pins stay on" README.md    # must print the marker line; re-add it if not
 ./scripts/release/sync-versions.sh <version>      # e.g. 0.20.25 (no 'v' needed, either works)
 bash scripts/validation/gates/check_release_version_coherence.sh
 ```

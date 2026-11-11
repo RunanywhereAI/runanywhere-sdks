@@ -482,6 +482,9 @@ git diff README.md                                # only the pins and the marker
 bash scripts/validation/gates/check_release_version_coherence.sh   # expect [OK]
 ```
 
+The next release puts the marker back before its version bump (`sdk-release` step 1), so
+the README keeps pointing at published versions while that release is in flight.
+
 **Never do this before the registries have the version.** The marker exists precisely so
 the README does not tell readers to install a version npm, Maven Central or pub.dev cannot
 serve yet. If any of them is still missing `$VERSION`, leave the marker in place; the next
