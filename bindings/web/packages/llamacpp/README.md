@@ -37,6 +37,20 @@ for await (const token of stream.stream) {
 
 See the [Web SDK README](../../README.md) for model lifecycle and Vite setup.
 
+`LlamaCPP.accelerationMode` reports `'cpu'`, `'webgpu'`, or `null` when the
+device is unknown. It can be `null` before registration or after a worker
+crash. A healthy device probe after the next successful model load publishes
+the recovered worker mode.
+
+This changes the previous non-null return type. Existing TypeScript callers
+with a `'cpu' | 'webgpu'` annotation must allow `null`, or use the inferred
+type and handle the unknown state.
+
+```typescript
+const mode = LlamaCPP.accelerationMode;
+console.log(mode ?? 'unknown');
+```
+
 ---
 
 ## Support

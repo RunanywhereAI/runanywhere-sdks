@@ -23,7 +23,7 @@ import type {
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
-import { Runtime, prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
+import { Runtime, prepareModelLoad, recoverModelLoadFailure, setActiveAccelerationMode } from '../../Foundation/RuntimeConfig.js';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
@@ -40,6 +40,7 @@ import {
 } from '../../runtime/EmscriptenModule.js';
 import type { EmscriptenRunanywhereModule, WasmCapability } from '../../runtime/EmscriptenModule.js';
 import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
+import { getBackendWorkerHost } from '../../runtime/BackendWorkerHostRegistry.js';
 import type { BackendWorkerModality } from '../../runtime/BackendWorkerProtocol.js';
 import {
   clearModelOwnedByBackendWorker,
@@ -283,11 +284,18 @@ export function describeModelLoadBackend(
   }
   if (route) {
     const workerRoute = backendWorkerLoadRoute(model, request, route.framework);
-    // Prefer the module that will execute the load: a health fallback can
-    // resolve a framework to a module outside that framework's owner (e.g. an
-    // ONNX framework falling back to the llama module), and only llama.cpp
-    // must ever receive `Runtime.setAcceleration`. Falls back through the
-    // worker route and the framework when the record is not a backend kind.
+    // Mirror `loadModelViaBackendWorker` dispatch exactly: when a live host
+    // exists for the worker route, the load executes there, so describe that
+    // backend — even if the last-writer module record would name a sibling.
+    if (workerRoute && getActiveBackendWorkerHost(workerRoute.backendId)) {
+      return { backendId: workerRoute.backendId, framework: route.framework };
+    }
+    // No live worker for that route: fall back to the module that will
+    // execute the load — a health fallback can resolve a framework to a
+    // module outside that framework's owner (e.g. an ONNX framework falling
+    // back to the llama module), and only llama.cpp must ever receive
+    // `Runtime.setAcceleration`. Falls back through the worker route and the
+    // framework when the record is not a backend kind.
     const record = getWasmModuleRecord(lifecycleModuleAsEmscripten(route.adapter));
     const recordBackend = record?.backend === 'llamacpp'
       ? 'llamacpp'
@@ -300,7 +308,15 @@ export function describeModelLoadBackend(
     };
   }
   const fallbackFramework = request.framework ?? model?.framework;
-  return { backendId: backendIdForFramework(fallbackFramework), framework: fallbackFramework };
+  const fallbackBackend = backendIdForFramework(fallbackFramework);
+  // Route selection already failed, so the load cannot succeed. Report an
+  // unresolved llama route so `models.load` records the preference instead of
+  // rebuilding the llama bridge (which would disturb a resident session)
+  // before the doomed load. ONNX/Sherpa/Piper keep their fallback routing.
+  return {
+    backendId: fallbackBackend === 'llamacpp' ? null : fallbackBackend,
+    framework: fallbackFramework,
+  };
 }
 
 /** Where a successfully loaded model actually runs, as its owner reports it. */
@@ -312,6 +328,26 @@ export interface LoadedModelPlacement {
    * publishes no device diagnostics — never a fabricated default.
    */
   device: 'cpu' | 'webgpu' | null;
+  /**
+   * Execution context of the recorded model **owner**: `'worker'` when a
+   * BackendWorker owns the model (Web-specific metadata about which module
+   * records residency, not a health guarantee), `'main'` for a main-thread
+   * WASM module, and `null` when the owner cannot be determined. The
+   * owner's device (and any health caveat) travels separately in `device`.
+   */
+  executionContext: 'worker' | 'main' | null;
+}
+
+/** Deliberately narrow a health `details` blob to a validated device value. */
+function deviceFromHealthDetails(details: unknown): 'cpu' | 'webgpu' | null {
+  if (typeof details !== 'object' || details === null) return null;
+  const acceleration = (details as { acceleration?: unknown }).acceleration;
+  return acceleration === 'webgpu' || acceleration === 'cpu' ? acceleration : null;
+}
+
+/** Deliberately narrow a module-registration acceleration string. */
+function deviceFromModuleRecord(acceleration: string | null | undefined): 'cpu' | 'webgpu' | null {
+  return acceleration === 'webgpu' || acceleration === 'cpu' ? acceleration : null;
 }
 
 /**
@@ -319,10 +355,15 @@ export interface LoadedModelPlacement {
  *
  * Worker-owned models are asked via `host.health()` — `Runtime.active` tracks
  * the main-thread llama bridge and drifts from the worker's device after a
- * bridge-side acceleration switch. Main-thread llama reads `Runtime.active`
- * (that IS the bridge's device); main-thread ONNX/Sherpa reads
- * `Runtime.speech.acceleration`, fixed at `ONNX.register()`. Everything else
- * reports `null` so callers say "unknown" instead of a fake CPU claim.
+ * bridge-side acceleration switch; ownership resolves to a `'worker'`
+ * context even when that health probe is absent or unhealthy (device becomes
+ * unknown, not a substitute mode). A main-thread llama model prefers the
+ * owning module's validated registration acceleration — a llama BackendWorker
+ * may share the backend with a direct-only model, so the global badge can lie
+ * — and falls back to `Runtime.active` only when no llama worker exists.
+ * Main-thread ONNX/Sherpa reads `Runtime.speech.acceleration`, fixed at
+ * `ONNX.register()`. Everything else reports `null` so callers say "unknown"
+ * instead of a fake CPU claim.
  */
 export async function resolveLoadedModelPlacement(
   modelId: string,
@@ -330,26 +371,54 @@ export async function resolveLoadedModelPlacement(
 ): Promise<LoadedModelPlacement> {
   for (const backendId of ['llamacpp', 'onnx'] as const) {
     if (isModelOwnedByBackendWorker(modelId, backendId)) {
+      // Worker ownership stays authoritative even when its host or its
+      // diagnostics are unavailable: never substitute the main bridge's
+      // mode for a worker-owned model.
       const host = getActiveBackendWorkerHost(backendId);
-      if (!host) return { backendId, device: null };
+      if (!host) return { backendId, device: null, executionContext: 'worker' };
       try {
         const health = await host.health();
-        const details = (health.details ?? {}) as { acceleration?: string };
-        const device = details.acceleration === 'webgpu' || details.acceleration === 'cpu'
-          ? details.acceleration
-          : null;
-        return { backendId, device };
+        // Accept CPU/WebGPU only from a healthy response with a shaped
+        // details object; anything else is unknown, never a fabricated mode.
+        if (!health.healthy) return { backendId, device: null, executionContext: 'worker' };
+        return {
+          backendId,
+          device: deviceFromHealthDetails(health.details),
+          executionContext: 'worker',
+        };
       } catch {
         // Device is a diagnostic, not a load contract: a failed health probe
         // reports unknown rather than a stale mode.
-        return { backendId, device: null };
+        return { backendId, device: null, executionContext: 'worker' };
       }
     }
   }
   const backendId = backendIdForFramework(framework);
-  if (backendId === 'llamacpp') return { backendId, device: Runtime.active };
-  if (backendId === 'onnx') return { backendId, device: Runtime.speech.acceleration };
-  return { backendId: null, device: null };
+  if (backendId === 'llamacpp') {
+    // Direct llama: prefer the actual model-owning main module's validated
+    // registration acceleration. A llama BackendWorker may still be
+    // configured beside it (its CPU companion bridge shares the backend),
+    // so the global `Runtime.active` badge — which can describe the
+    // worker — must not stand in for a direct-only model. A model without
+    // a recorded main owner keeps the `Runtime.active` fallback only when
+    // no llama worker exists at all; otherwise the device is unknown.
+    const owningModule = getModuleForModel(modelId);
+    if (owningModule) {
+      return {
+        backendId,
+        device: deviceFromModuleRecord(getWasmModuleRecord(owningModule)?.acceleration),
+        executionContext: 'main',
+      };
+    }
+    if (getBackendWorkerHost('llamacpp') === null) {
+      return { backendId, device: Runtime.active, executionContext: 'main' };
+    }
+    return { backendId, device: null, executionContext: 'main' };
+  }
+  if (backendId === 'onnx') {
+    return { backendId, device: Runtime.speech.acceleration, executionContext: 'main' };
+  }
+  return { backendId: null, device: null, executionContext: null };
 }
 
 function hydratePathsForModel(model: ModelInfo | null): string[] {
@@ -491,8 +560,32 @@ async function loadModelViaBackendWorker(
       isConcreteFramework(result.framework) ? result.framework : undefined,
     );
     recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    await publishBackendWorkerAcceleration(backendId, host);
   }
   return result;
+}
+
+/**
+ * Republish the device a worker actually runs on after a successful load.
+ *
+ * A WebGPU worker that Abort()ed restarts on CPU on the next init without
+ * registering again, so the mode published at registration would otherwise
+ * keep reporting WebGPU for CPU inference. Diagnostics only: a failed probe
+ * must never fail the load that already succeeded.
+ */
+async function publishBackendWorkerAcceleration(
+  backendId: 'llamacpp' | 'onnx',
+  host: { health: () => Promise<{ healthy: boolean; details?: unknown }> },
+): Promise<void> {
+  if (backendId !== 'llamacpp') return;
+  try {
+    const health = await host.health();
+    const device = health.healthy ? deviceFromHealthDetails(health.details) : null;
+    if (device) setActiveAccelerationMode(device);
+  } catch {
+    // Keep the last known mode: the load already succeeded, and a crashed
+    // worker clears the published mode through `handleCrash`.
+  }
 }
 
 function registeredLifecycleAdapters(): ModelLifecycleAdapter[] {

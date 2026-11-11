@@ -84,6 +84,8 @@ const memoryBudget: RuntimeMemoryBudget = Object.freeze({
  * Function installed by a backend (typically the llamacpp bridge) to perform
  * the acceleration switch. Should be idempotent and must report the mode it
  * actually loaded through `setActiveAccelerationMode(...)` before resolving.
+ * A backend such as the llama.cpp BackendWorker may accept the preference
+ * without switching. In that case it leaves the published mode alone.
  */
 export type RuntimeAccelerationSwitcher = (mode: 'cpu' | 'webgpu') => Promise<void>;
 export interface RuntimeModelLoadRequest {
@@ -184,6 +186,12 @@ export const Runtime = {
    * Switch the active acceleration mode. Requires a backend (the llamacpp
    * package) to have registered a switcher via `setAccelerationSwitcher`.
    * If no switcher is installed, this becomes a no-op.
+   *
+   * For a llama.cpp BackendWorker, this call records the preference only.
+   * `LlamaCPP.register({ acceleration })` selects the initial mode. After a
+   * WebGPU WASM abort, reloading the model can restart the worker on CPU
+   * without registering again. For backends that switch, the switcher reports
+   * the resolved mode via `setActiveAccelerationMode(...)`.
    *
    * @param mode 'cpu' | 'webgpu' (no-op if same as active)
    */
@@ -407,6 +415,11 @@ export function setActiveAccelerationMode(mode: 'cpu' | 'webgpu' | null): void {
       { mode },
     );
   }
+}
+
+/** The mode an LLM backend last reported as actually serving inference. */
+export function getActiveAccelerationMode(): 'cpu' | 'webgpu' | null {
+  return _activeMode;
 }
 
 /**

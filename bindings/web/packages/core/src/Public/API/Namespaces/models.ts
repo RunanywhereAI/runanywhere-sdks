@@ -254,6 +254,9 @@ function deviceLabel(device: 'cpu' | 'webgpu'): string {
  * Why one explicit `LoadOptions.accelerator` request ended unmet. Warns are
  * derived from the device the *serving* backend reports — never from the
  * global llama flag, and never carried from an unrelated runtime degradation.
+ * A worker-owned llama mismatch explains the fixed registration-time policy;
+ * an unknown owner context can only confirm that the request could not be
+ * verified, never that it was honored.
  */
 function acceleratorMissReason(
   accelerator: AcceleratorPolicy,
@@ -266,8 +269,17 @@ function acceleratorMissReason(
       ? 'ONNX/Sherpa'
       : frameworkToBackend(framework);
   if (placement.device === null) {
-    return `accelerator "${accelerator}" could not be confirmed: the ${backendName} backend `
+    const owner = placement.executionContext === 'worker'
+      ? 'BackendWorker'
+      : 'backend';
+    return `accelerator "${accelerator}" could not be confirmed: the ${backendName} ${owner} `
       + 'reports no device diagnostics.';
+  }
+  if (placement.backendId === 'llamacpp' && placement.executionContext === 'worker') {
+    return `accelerator "${accelerator}" was not honored: Requested ${accelerator.toUpperCase()}; `
+      + `the llama.cpp BackendWorker remains on ${deviceLabel(placement.device)}. `
+      + 'Per-load accelerator switching is unsupported; select acceleration when registering '
+      + 'a fresh backend session via LlamaCPP.register({ acceleration }).';
   }
   if (placement.backendId === 'onnx') {
     return `accelerator "${accelerator}" was not honored: the ONNX/Sherpa backend is running on ${deviceLabel(placement.device)}; `
@@ -490,14 +502,17 @@ export const models = {
    * Load a model now instead of paying the cost on the first generation.
    * contextLength and optional backendPreferences are forwarded on ModelLoadRequest.
    *
-   * Accelerator contract: the runtime switcher belongs to llama.cpp, so a
-   * llama-served load switches acceleration before loading; a speech
-   * (ONNX/Sherpa) route never touches it — its acceleration is fixed at
-   * `ONNX.register({ acceleration })`. An explicit accelerator the serving
-   * backend did not honor (GPU or CPU, either direction) is logged and
-   * reported through `fallbackReason` rather than dropping silently.
-   * `actualDevice` is the backend-reported device: `'cpu'`, `'gpu'`, or
-   * `'unknown'` when the owner publishes no device diagnostics.
+   * A resolved llama.cpp route asks the runtime switcher before loading.
+   * A per-load accelerator can switch the main-thread bridge when no
+   * BackendWorker is configured. If the request differs from the worker's
+   * actual mode, the mismatch is logged and reported through `fallbackReason`.
+   * `LlamaCPP.register({ acceleration })` selects the initial worker mode.
+   * After a WebGPU WASM abort, reloading the model can restart the worker on
+   * CPU without registering again. An unresolved route records the preference
+   * without switching. Speech (ONNX/Sherpa) uses the mode selected at
+   * `ONNX.register({ acceleration })`. `actualDevice` is the device the
+   * actual owner reports: `'cpu'`, `'gpu'`, or `'unknown'` when the owner
+   * publishes no device diagnostics.
    *
    * @throws SDKException when the model is absent; accelerator npu, threads, an invalid
    *   context length, or a required backend preference is requested; or the backend rejects
@@ -518,14 +533,18 @@ export const models = {
     const request = makeModelLoadRequest(id, model, options, resolved);
     // Scope the global switcher to llama.cpp: the lifecycle router decides
     // which backend serves this load (ordered preferences, registered modules,
-    // capabilities), and re-routing an unrelated speech load through the llama
-    // switcher would rebuild the llama WASM module mid-flight. Routes cores
-    // cannot resolve (null) keep the previous global behavior — preference
-    // recorded, no switcher side effect unless llama.cpp serves it.
+    // capabilities). Only a RESOLVED llama.cpp route may invoke the switcher —
+    // an unresolved route must not rebuild llama speculatively, so it records
+    // the preference without any switcher side effect. The backend's own hook
+    // still enforces the fixed BackendWorker policy for both namespace and
+    // direct runtime callers; speech routes are fixed at ONNX.register().
     if (requestedMode) {
       const route = describeModelLoadBackend(request, model);
-      if (route.backendId !== 'onnx') {
+      if (route.backendId === 'llamacpp') {
         await Runtime.setAcceleration(requestedMode);
+      } else if (route.backendId === null) {
+        // Unresolved route: preference-only recording, no speculative switch.
+        Runtime.preferred = requestedMode;
       }
     }
     const result = await SDKCore.loadModel(request);

@@ -217,7 +217,19 @@ export interface RagQueryOptions {
 export interface LoadOptions {
   /** Ranked backend choices; the first entry the platform can honor wins. */
   backendPreferences?: BackendPreference[];
-  /** Hardware class to run on. `'npu'` fails preflight — unsupported on Web. */
+  /**
+   * Hardware class to run on. `'npu'` fails preflight — unsupported on Web.
+   *
+   * On Web, main-thread llama routes treat this as a per-load preference.
+   * Qwen vision and multimodal loads fall back from WebGPU to CPU.
+   * Check `LoadedModel.actualDevice` for the device used and
+   * `LoadedModel.fallbackReason` for details on an unmet explicit request.
+   * `LlamaCPP.register({ acceleration })` selects the initial worker mode, and
+   * `ONNX.register({ acceleration })` selects the speech backend mode. Both
+   * ignore per-load switches and report explicit mismatches through
+   * `LoadedModel.fallbackReason`. After a WebGPU WASM abort, reloading the model
+   * can restart the llama.cpp worker on CPU without registering again.
+   */
   accelerator?: AcceleratorPolicy;
   contextLength?: number;
   /**

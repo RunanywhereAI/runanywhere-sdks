@@ -29,6 +29,7 @@ export {
 } from './Public/SDKCore.js';
 
 export {
+  getActiveAccelerationMode,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
   setSpeechAccelerationMode,
