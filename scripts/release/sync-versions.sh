@@ -590,9 +590,9 @@ done
 # TEMP marker holds the install commands on the last version the registries have
 # (see check_release_version_coherence.sh), a bump moves only the marker; delete
 # the marker and rerun this script once the new version is published.
-README_TEMP_MARKER_REGEX='(TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v)[^ ]+( is on the package registries\.)'
+README_TEMP_MARKER_REGEX='(TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? until v)[^ ]+( is on the package registries\.)'
 if grep -Eq "${README_TEMP_MARKER_REGEX}" "${REPO_ROOT}/README.md"; then
-    bump_line "${REPO_ROOT}/README.md" "${README_TEMP_MARKER_REGEX}" "\\1${NEW_VERSION}\\2"
+    bump_line "${REPO_ROOT}/README.md" "${README_TEMP_MARKER_REGEX}" "\\1${NEW_VERSION}\\3"
 else
     for readme_pin in \
         'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \

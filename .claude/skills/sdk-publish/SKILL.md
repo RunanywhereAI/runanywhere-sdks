@@ -447,3 +447,65 @@ done
 ```
 
 Only after this pass — every registry shows `$VERSION`, every artifact's contents check out, and nothing regressed in size/file-count versus the previous release — is the release fully published. Do not skip this step just because each individual publish call reported success; a successful upload is not the same claim as "the right bytes are now live."
+
+## 8. Release the root README's install pins — last step, only after the registries have `$VERSION`
+
+The root `README.md` may carry a TEMP marker near its install snippets:
+
+```
+<!-- TEMP: install pins stay on 0.20.27 until v0.20.37 is on the package registries. -->
+```
+
+While that line exists, `scripts/release/sync-versions.sh` leaves the README's install pins
+(npm `@runanywhere/...@`, Maven `io.github.sanchitmonga22:...:`, pub.dev `runanywhere...: ^`,
+pip `runanywhere==`) on the older version and only moves the marker, and
+`check_release_version_coherence.sh` accepts a valid marker indefinitely. Nothing goes red
+if it is never removed, so the README's install commands quietly stay on an old version
+across later releases.
+
+Check for it once every registry above is done, from inside the checkout verified at the top
+(§4 can leave the shell in `/tmp/ra-swift`, whose own README has no marker; the first line
+moves to the checkout's root and stops if the shell is in another repo):
+
+```bash
+cd "$(git rev-parse --show-toplevel)" && git remote -v | grep -q '/runanywhere-sdks' && [ -f core/VERSION ] \
+  || { echo "Not in the runanywhere-sdks checkout: cd back to the one verified at the top, then rerun." >&2; exit 1; }
+grep -n "TEMP: install pins stay on" README.md
+```
+
+If it is there and names `v$VERSION`, and npm, Maven Central and pub.dev **all** serve
+`$VERSION` (the checks in §1, §2, §3 and §7), delete the marker line and re-sync, on a
+branch, through a normal PR. The `runanywhere` Python package is not on PyPI
+(`https://pypi.org/pypi/runanywhere/json` returns 404), so this step does not wait on PyPI;
+the pip pin just moves with the others.
+
+```bash
+cd "$(git rev-parse --show-toplevel)" && git remote -v | grep -q '/runanywhere-sdks' && [ -f core/VERSION ] \
+  || { echo "Not in the runanywhere-sdks checkout: cd back to the one verified at the top, then rerun." >&2; exit 1; }
+marker_regex="^<!-- TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? until v${VERSION//./\\.} is on the package registries\. -->$"
+if ! grep -Eq "$marker_regex" README.md; then
+  echo "README.md has no TEMP install-pin marker naming v$VERSION: leave the pins alone." >&2
+  exit 1
+fi
+if [ "$(grep -c 'TEMP: install pins stay on' README.md)" -ne 1 ]; then   # sync-versions.sh would read any such line as the marker
+  echo "README.md has the TEMP marker text on more than the marker line: remove the extra mention first." >&2
+  exit 1
+fi
+sed -E -i.bak "/${marker_regex}/d" README.md || exit 1
+if ! ./scripts/release/sync-versions.sh "$VERSION"; then   # moves every README install pin to $VERSION
+  mv README.md.bak README.md   # put the marker back so this step can be run again
+  echo "sync-versions.sh failed: README.md restored with its marker." >&2
+  exit 1
+fi
+rm README.md.bak || exit 1
+git diff README.md                                # only the pins and the marker line change
+bash scripts/validation/gates/check_release_version_coherence.sh   # expect [OK]
+```
+
+The next release puts the marker back before its version bump (`sdk-release` step 1), so
+the README keeps pointing at published versions while that release is in flight.
+
+**Never do this before the registries have the version.** The marker exists precisely so
+the README does not tell readers to install a version npm, Maven Central or pub.dev cannot
+serve yet. If any of them is still missing `$VERSION`, leave the marker in place; the next
+bump moves it forward on its own.
