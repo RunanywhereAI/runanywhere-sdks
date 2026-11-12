@@ -13,11 +13,14 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
 python3 -m pip install "grpcio-tools==1.71.*"
 ./idl/codegen/generate_all.sh --only python
-bash core/scripts/macos/download-sherpa-onnx.sh   # Apple Silicon, builds from source. Linux: core/scripts/linux/download-sherpa-onnx.sh
+case "$(uname -s)" in
+  Darwin) bash core/scripts/macos/download-sherpa-onnx.sh ;;
+  Linux)  bash core/scripts/linux/download-sherpa-onnx.sh ;;
+esac
 pip install ./bindings/python
 ```
 
-Speech-to-text, text-to-speech and model-based VAD need the Sherpa-ONNX download. Without it the build still succeeds, but those calls report the Sherpa backend as unavailable. The built-in energy VAD works either way.
+Speech-to-text, text-to-speech and model-based VAD need the Sherpa-ONNX download (on macOS the script builds it from source, for Apple Silicon only). Without it the build still succeeds, but those calls report the Sherpa backend as unavailable. The built-in energy VAD works either way.
 
 On Windows, use `python` in place of `python3`, and run the codegen from Git Bash as `PYTHON_BIN=python ./idl/codegen/generate_all.sh --only python` so it uses the interpreter that has `grpcio-tools`. The Sherpa-ONNX script is `core\scripts\windows\download-sherpa-onnx.bat`. Also, `pip install ./bindings/python` skips the step that copies `onnxruntime.dll` and `sherpa-onnx-c-api.dll` into the package. Build a wheel and repair it with `delvewheel` instead, as the `python-windows` job in [`pr-build.yml`](../../.github/workflows/pr-build.yml) does; [PACKAGING.md](PACKAGING.md) has the details.
 
