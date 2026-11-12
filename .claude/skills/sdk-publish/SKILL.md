@@ -481,8 +481,8 @@ if ! grep -Eq "$marker_regex" README.md; then
   echo "README.md has no TEMP install-pin marker naming v$VERSION: leave the pins alone." >&2
   exit 1
 fi
-sed -E -i.bak "/${marker_regex}/d" README.md && rm README.md.bak
-./scripts/release/sync-versions.sh "$VERSION"     # moves every README install pin to $VERSION
+sed -E -i.bak "/${marker_regex}/d" README.md && rm README.md.bak || exit 1
+./scripts/release/sync-versions.sh "$VERSION" || exit 1   # moves every README install pin to $VERSION
 git diff README.md                                # only the pins and the marker line change
 bash scripts/validation/gates/check_release_version_coherence.sh   # expect [OK]
 ```
