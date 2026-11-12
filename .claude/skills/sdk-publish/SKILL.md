@@ -463,9 +463,11 @@ pip `runanywhere==`) on the older version and only moves the marker, and
 if it is never removed, so the README's install commands quietly stay on an old version
 across later releases.
 
-Check for it once every registry above is done:
+Check for it once every registry above is done, from the monorepo root (§4 can leave the
+shell in `/tmp/ra-swift`, whose own README has no marker):
 
 ```bash
+cd ~/development/ODLM/MONOREPOOO/Qualcomm/runanywhere-sdks   # the repo root; verify it as at the top
 grep -n "TEMP: install pins stay on" README.md
 ```
 
@@ -476,13 +478,19 @@ branch, through a normal PR. The `runanywhere` Python package is not on PyPI
 the pip pin just moves with the others.
 
 ```bash
+[ -f core/VERSION ] && [ -f scripts/release/sync-versions.sh ] || { echo "Not in the runanywhere-sdks root: cd there first." >&2; exit 1; }
 marker_regex="TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? until v${VERSION//./\\.} is on the package registries\."
 if ! grep -Eq "$marker_regex" README.md; then
   echo "README.md has no TEMP install-pin marker naming v$VERSION: leave the pins alone." >&2
   exit 1
 fi
-sed -E -i.bak "/${marker_regex}/d" README.md && rm README.md.bak || exit 1
-./scripts/release/sync-versions.sh "$VERSION" || exit 1   # moves every README install pin to $VERSION
+sed -E -i.bak "/${marker_regex}/d" README.md || exit 1
+if ! ./scripts/release/sync-versions.sh "$VERSION"; then   # moves every README install pin to $VERSION
+  mv README.md.bak README.md   # put the marker back so this step can be run again
+  echo "sync-versions.sh failed: README.md restored with its marker." >&2
+  exit 1
+fi
+rm README.md.bak
 git diff README.md                                # only the pins and the marker line change
 bash scripts/validation/gates/check_release_version_coherence.sh   # expect [OK]
 ```
