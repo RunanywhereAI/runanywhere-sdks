@@ -1017,14 +1017,7 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
 
             if (stop_window.size() > max_stop_length) {
                 size_t safe_len = stop_window.size() - max_stop_length;
-                // Don't cut inside a UTF-8 multi-byte sequence; back up until
-                // we're on a leading-byte boundary. Cast to uint8_t so bytes
-                // >= 0x80 aren't treated as negative signed char (UB on platforms
-                // where char is signed).
-                while (safe_len > 0 &&
-                       (static_cast<uint8_t>(stop_window[safe_len]) & 0xC0) == 0x80) {
-                    safe_len--;
-                }
+                safe_len -= rac::tokens::incomplete_utf8_tail(stop_window.substr(0, safe_len));
                 if (safe_len > 0) {
                     if (!sink(stop_window.substr(0, safe_len))) {
                         RAC_LOG_INFO("LLM.LlamaCpp", "Generation cancelled by callback");
