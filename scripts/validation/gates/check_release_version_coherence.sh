@@ -473,11 +473,14 @@ expect_readme_pins() {
   done < <(grep -Ev -- "${readme_pin}${expected_regex}\.?\$" <<< "${readme_pins}")
 }
 
-# The install commands resolve from npm, Maven Central, pub.dev and PyPI, which
+# The install commands resolve from npm, Maven Central and pub.dev, which
 # can lag the repo version the same way the SwiftPM assets do. README.md records
 # that state with a TEMP marker naming the last published version, and the pins
 # stay on it until v${VERSION} is out. The marker must name ${VERSION}, so one
 # left over from an earlier release cannot vouch for this one.
+# Not gated: the Python install (runanywhere is not on PyPI, so the README says to
+# install from source) and the commented runanywhere_qhexrt note (qhexrt is
+# published on its own, older version line). Neither carries a pin.
 README_PIN_VERSION="${VERSION}"
 readme_temp_marker="$(grep -Eo -- "TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v[^ ]+ is on the package registries\." "${REPO_ROOT}/README.md" || true)"
 if [ -n "${readme_temp_marker}" ]; then
@@ -493,8 +496,7 @@ fi
 for readme_pin in \
   'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
   'runanywhere[a-z_]*: \^' \
-  '@runanywhere/[a-z-]+@' \
-  'runanywhere=='; do
+  '@runanywhere/[a-z-]+@'; do
   expect_readme_pins "${readme_pin}" "${README_PIN_VERSION}"
 done
 expect_readme_pins 'version line, currently \*\*' "${VERSION}"

@@ -6,17 +6,31 @@ On-device AI for Python — LLM, VLM, STT, TTS, embeddings, and voice pipelines 
 
 ## Install
 
+`runanywhere` is not on PyPI yet, so install from the root of a clone of this repo. The build compiles the native runtime (CMake and a C++ toolchain required), and the IDL bindings it imports are generated, not checked in, so generate them first. The codegen script fetches the pinned `protoc` and `protobuf` itself and needs `grpcio-tools`.
+
 ```bash
-pip install runanywhere==0.20.37
+git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+cd runanywhere-sdks
+python3 -m pip install "grpcio-tools==1.71.*"
+./idl/codegen/generate_all.sh --only python
+case "$(uname -s)" in
+  Darwin) bash core/scripts/macos/download-sherpa-onnx.sh ;;
+  Linux)  bash core/scripts/linux/download-sherpa-onnx.sh ;;
+esac
+pip install ./bindings/python
 ```
 
-Wheels bundle the compiled native runtime and dependent libraries on Windows, macOS, and Linux. Python **3.9+** and `numpy >= 1.21` are required.
+Speech-to-text, text-to-speech and model-based VAD need the Sherpa-ONNX download (on macOS the script builds it from source, for Apple Silicon only). Without it the build still succeeds, but those calls report the Sherpa backend as unavailable. The built-in energy VAD works either way.
+
+On Windows, use `python` in place of `python3`, and run the codegen from Git Bash as `PYTHON_BIN=python ./idl/codegen/generate_all.sh --only python` so it uses the interpreter that has `grpcio-tools`. The Sherpa-ONNX script is `core\scripts\windows\download-sherpa-onnx.bat`. Also, `pip install ./bindings/python` skips the step that copies `onnxruntime.dll` and `sherpa-onnx-c-api.dll` into the package. Build a wheel and repair it with `delvewheel` instead, as the `python-windows` job in [`pr-build.yml`](../../.github/workflows/pr-build.yml) does; [PACKAGING.md](PACKAGING.md) has the details.
+
+Python **3.9+** and `numpy >= 1.21` are required.
 
 Optional extras:
 
 ```bash
-pip install "runanywhere[rag]==0.20.37"      # RAG / document Q&A
-pip install "runanywhere[server]==0.20.37"   # OpenAI-compatible local server
+pip install "./bindings/python[rag]"      # RAG / document Q&A
+pip install "./bindings/python[server]"   # OpenAI-compatible local server
 ```
 
 ## Quick start
@@ -151,7 +165,7 @@ or fails the completeness check; it never deletes files, and warns if the platfo
 ## Local OpenAI-compatible server
 
 ```bash
-pip install "runanywhere[server]==0.20.37"
+pip install "./bindings/python[server]"   # from the root of a clone, see Install
 runanywhere serve          # http://127.0.0.1:8000
 runanywhere models         # list catalog + download state
 ```
@@ -169,7 +183,7 @@ print(client.chat.completions.create(model="qwen2.5-0.5b",
 
 ## CLI
 
-`pip install runanywhere` also installs a `runanywhere` command with parity to the C++ `rcli`:
+Installing the package also installs a `runanywhere` command with parity to the C++ `rcli`:
 
 ```bash
 runanywhere run qwen2.5-0.5b "Capital of France?"

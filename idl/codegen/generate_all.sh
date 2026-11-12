@@ -306,7 +306,7 @@ fi
 # completes the upstream codegen; CI installs grpcio-tools and fails on drift.
 if want python; then
 echo "▶ Python proto codegen (RAG)"
-if python3 -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
+if "${PYTHON_BIN:-python3}" -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
     "${SCRIPT_DIR}/generate_python.sh"
 else
     echo "warning: grpcio-tools not installed; skipping generate_python.sh" >&2

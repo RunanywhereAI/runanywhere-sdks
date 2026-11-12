@@ -585,11 +585,16 @@ for release_doc in \
     "${REPO_ROOT}/bindings/kotlin/README.md"; do
     bump_all_on_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
 done
-# The root README pins every install command. Match each pin by its shape rather
+# The root README pins every registry install command. Match each pin by its shape rather
 # than CURRENT_VERSION, so a bump also heals a pin that is already stale. While a
 # TEMP marker holds the install commands on the last version the registries have
 # (see check_release_version_coherence.sh), a bump moves only the marker; delete
 # the marker and rerun this script once the new version is published.
+# Two installs carry no pin on purpose, because their packages are not on the
+# registry at the train version: the Python SDK (not on PyPI; the README says to
+# install from source) and runanywhere_qhexrt (published on its own, older version
+# line; the README points to its package README). Put a shape back in this list and in the gate when each is
+# published at the version line.
 README_TEMP_MARKER_REGEX='(TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v)[^ ]+( is on the package registries\.)'
 if grep -Eq "${README_TEMP_MARKER_REGEX}" "${REPO_ROOT}/README.md"; then
     bump_line "${REPO_ROOT}/README.md" "${README_TEMP_MARKER_REGEX}" "\\1${NEW_VERSION}\\2"
@@ -597,8 +602,7 @@ else
     for readme_pin in \
         'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
         'runanywhere[a-z_]*: \^' \
-        '@runanywhere/[a-z-]+@' \
-        'runanywhere=='; do
+        '@runanywhere/[a-z-]+@'; do
         bump_all_on_line "${REPO_ROOT}/README.md" \
             "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
             "\\1${NEW_VERSION}"
