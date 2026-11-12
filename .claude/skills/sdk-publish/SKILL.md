@@ -463,11 +463,13 @@ pip `runanywhere==`) on the older version and only moves the marker, and
 if it is never removed, so the README's install commands quietly stay on an old version
 across later releases.
 
-Check for it once every registry above is done, from the monorepo root (§4 can leave the
-shell in `/tmp/ra-swift`, whose own README has no marker):
+Check for it once every registry above is done, from inside the checkout verified at the top
+(§4 can leave the shell in `/tmp/ra-swift`, whose own README has no marker; the first line
+moves to the checkout's root and stops if the shell is in another repo):
 
 ```bash
-cd ~/development/ODLM/MONOREPOOO/Qualcomm/runanywhere-sdks   # the repo root; verify it as at the top
+cd "$(git rev-parse --show-toplevel)" && git remote -v | grep -q '/runanywhere-sdks' && [ -f core/VERSION ] \
+  || { echo "Not in the runanywhere-sdks checkout: cd back to the one verified at the top, then rerun." >&2; exit 1; }
 grep -n "TEMP: install pins stay on" README.md
 ```
 
@@ -478,10 +480,15 @@ branch, through a normal PR. The `runanywhere` Python package is not on PyPI
 the pip pin just moves with the others.
 
 ```bash
-[ -f core/VERSION ] && [ -f scripts/release/sync-versions.sh ] || { echo "Not in the runanywhere-sdks root: cd there first." >&2; exit 1; }
-marker_regex="TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? until v${VERSION//./\\.} is on the package registries\."
+cd "$(git rev-parse --show-toplevel)" && git remote -v | grep -q '/runanywhere-sdks' && [ -f core/VERSION ] \
+  || { echo "Not in the runanywhere-sdks checkout: cd back to the one verified at the top, then rerun." >&2; exit 1; }
+marker_regex="^<!-- TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? until v${VERSION//./\\.} is on the package registries\. -->$"
 if ! grep -Eq "$marker_regex" README.md; then
   echo "README.md has no TEMP install-pin marker naming v$VERSION: leave the pins alone." >&2
+  exit 1
+fi
+if [ "$(grep -c 'TEMP: install pins stay on' README.md)" -ne 1 ]; then   # sync-versions.sh would read any such line as the marker
+  echo "README.md has the TEMP marker text on more than the marker line: remove the extra mention first." >&2
   exit 1
 fi
 sed -E -i.bak "/${marker_regex}/d" README.md || exit 1
@@ -490,7 +497,7 @@ if ! ./scripts/release/sync-versions.sh "$VERSION"; then   # moves every README 
   echo "sync-versions.sh failed: README.md restored with its marker." >&2
   exit 1
 fi
-rm README.md.bak
+rm README.md.bak || exit 1
 git diff README.md                                # only the pins and the marker line change
 bash scripts/validation/gates/check_release_version_coherence.sh   # expect [OK]
 ```
