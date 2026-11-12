@@ -21,9 +21,9 @@ The examples below target this source tree (SDK `0.20.37`). For changes not yet
 released, use local SDK packages and Commons native libraries built from the same
 checkout. The private QHexRT native payload is not in this repository: supply it
 separately from a compatible authorized build. A matching version number alone
-does not include unreleased changes. `QHexRT.isRegistered` is public only in this
-source tree; in every release through 0.20.38 it is private. With the published
-`runanywhere-qhexrt-android:0.20.19`, leave out that check and register the model
+does not include unreleased changes. `QHexRT.isRegistered` is public in this
+source tree but private in the published `runanywhere-qhexrt-android:0.20.19`
+(tag `v0.20.19`). With that release, leave out the check and register the model
 after `QHexRT.register()`, which logs a failure rather than throwing.
 
 For local Kotlin builds, stage the private engine payload under
