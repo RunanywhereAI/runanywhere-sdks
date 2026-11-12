@@ -144,6 +144,14 @@ rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_
         }
         return RAC_SUCCESS;
     }
+    if (std::strstr(prompt, "split-utf8-stream") != nullptr) {
+        for (const char* token : {"\xE4\xBD", "\xA0 a\xFF", "b\xF0\x9F"}) {
+            if (callback(token, RAC_FALSE, nullptr, 1, user_data) != RAC_TRUE) {
+                return RAC_ERROR_STREAM_CANCELLED;
+            }
+        }
+        return RAC_SUCCESS;
+    }
     if (std::strstr(prompt, "structured-stream-json") != nullptr) {
         if (callback("{\"ok\"", RAC_FALSE, nullptr, /*tokens_in_delta*/ 1, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
@@ -495,6 +503,32 @@ int test_stream_terminal_once(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+int test_stream_chunks_are_valid_utf8(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for split UTF-8 stream");
+    std::vector<uint8_t> bytes = generate_request_bytes("split-utf8-stream please");
+    CapturedStream capture;
+    const rac_result_t rc =
+        rac_llm_generate_stream_proto(bytes.data(), bytes.size(), stream_callback, &capture);
+    CHECK(rc == RAC_SUCCESS, "split UTF-8 stream succeeds");
+    std::vector<std::string> tokens;
+    for (const auto& event_bytes : capture.events) {
+        runanywhere::v1::LLMStreamEvent event;
+        CHECK(event.ParseFromArray(event_bytes.data(), static_cast<int>(event_bytes.size())),
+              "split UTF-8 stream event parses");
+        if (!event.token().empty()) {
+            tokens.push_back(event.token());
+        }
+        if (is_terminal_event_kind(event.event_kind())) {
+            CHECK(event.result().usage().output_tokens() == 3,
+                  "split UTF-8 terminal counts the held chunk");
+        }
+    }
+    CHECK((tokens == std::vector<std::string>{"\xE4\xBD\xA0 a\xEF\xBF\xBD", "b"}),
+          "split character is rejoined, invalid byte replaced, dangling tail dropped");
+    cleanup_environment();
+    return 0;
+}
+
 int test_stream_producer_finish_reason_stop(rac_model_registry_handle_t registry) {
     CHECK(load_mock_model(registry), "mock lifecycle LLM loads for producer-final stream");
     std::vector<uint8_t> bytes = generate_request_bytes("native-final-stop please");
@@ -708,6 +742,7 @@ int main() {
         test_generate_sampler_defaults(registry);
         test_empty_generation_skips_structured_validation(registry);
         test_stream_terminal_once(registry);
+        test_stream_chunks_are_valid_utf8(registry);
         test_stream_producer_finish_reason_stop(registry);
         test_stream_thinking_envelope(registry);
         test_hidden_thinking_counts_toward_length(registry);
