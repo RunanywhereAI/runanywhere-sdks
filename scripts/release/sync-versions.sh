@@ -101,6 +101,7 @@ _LOCK_FILES=()
 _GBUMP_FILES=()
 _GBUMP_PATTERNS=()
 _GBUMP_REPLACEMENTS=()
+_GBUMP_SKIPS=()
 
 bump_line() {
     # Validates now; the edit is applied by flush_pending_edits.
@@ -127,7 +128,8 @@ bump_all_on_line() {
     #   Select version **`X`** (or `from: "X"`) ... if `X` binary assets ...
     # bump_line's sed has no /g, so that line kept two stale versions and the
     # coherence gate then failed on a file the bump had "already handled".
-    local file="$1" pattern="$2" replacement="$3"
+    # An optional fourth argument is an ERE; lines matching it are left alone.
+    local file="$1" pattern="$2" replacement="$3" skip="${4:-}"
     if [ ! -f "$file" ]; then
         echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
         return 1
@@ -140,6 +142,7 @@ bump_all_on_line() {
     _GBUMP_FILES+=("$file")
     _GBUMP_PATTERNS+=("$pattern")
     _GBUMP_REPLACEMENTS+=("$replacement")
+    _GBUMP_SKIPS+=("$skip")
     echo "  bumped: $file"
 }
 
@@ -162,10 +165,12 @@ flush_pending_edits() {
         fi
     done
     for i in "${!_GBUMP_FILES[@]}"; do
+        local address=""
+        [ -n "${_GBUMP_SKIPS[$i]}" ] && address="/${_GBUMP_SKIPS[$i]}/!"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' -E "s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
+            sed -i '' -E "${address}s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
         else
-            sed -i -E "s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
+            sed -i -E "${address}s|${_GBUMP_PATTERNS[$i]}|${_GBUMP_REPLACEMENTS[$i]}|g" "${_GBUMP_FILES[$i]}"
         fi
     done
     for i in "${!_LOCK_FILES[@]}"; do
@@ -567,22 +572,16 @@ bump_line "${REPO_ROOT}/bindings/python/runanywhere/__init__.py" \
 # and historical changelogs remain untouched.
 echo ""
 echo ">> Release-facing documentation:"
+# The per-SDK READMEs that carry install pins are bumped pin by pin below.
 for release_doc in \
     "${REPO_ROOT}/bindings/react-native/AGENTS.md" \
-    "${REPO_ROOT}/bindings/react-native/packages/mlx/README.md" \
     "${REPO_ROOT}/bindings/flutter/AGENTS.md" \
-    "${REPO_ROOT}/bindings/flutter/README.md" \
-    "${REPO_ROOT}/bindings/flutter/packages/runanywhere/README.md" \
-    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_llamacpp/README.md" \
-    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_mlx/README.md" \
-    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_onnx/README.md" \
     "${REPO_ROOT}/bindings/flutter/docs/ARCHITECTURE.md" \
     "${REPO_ROOT}/bindings/flutter/docs/Documentation.md" \
     "${REPO_ROOT}/bindings/swift/ARCHITECTURE.md" \
     "${REPO_ROOT}/bindings/swift/README.md" \
     "${REPO_ROOT}/bindings/swift/Sources/LlamaCPPRuntime/README.md" \
-    "${REPO_ROOT}/bindings/swift/Sources/ONNXRuntime/README.md" \
-    "${REPO_ROOT}/bindings/kotlin/README.md"; do
+    "${REPO_ROOT}/bindings/swift/Sources/ONNXRuntime/README.md"; do
     bump_all_on_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
 done
 # The root README pins every install command. Match each pin by its shape rather
@@ -607,6 +606,72 @@ fi
 bump_all_on_line "${REPO_ROOT}/README.md" \
     "(version line, currently \*\*)[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
     "\\1${NEW_VERSION}"
+
+# The per-SDK READMEs (and the core docs) repeat the same install pins, in more
+# shapes than the root README: pip extras (runanywhere[rag]==), the plain
+# "Current release" line, and a few prose sentences. Same rule as above, match the
+# shape rather than CURRENT_VERSION so a stale pin heals. Each file has to carry at
+# least one pin, so a reworded README aborts the bump instead of silently dropping
+# out of the sync. While the root README's TEMP marker holds the install pins on
+# the last published version, these install pins stay with it and are left alone;
+# once the marker is gone they move with the release. "currently **x**" describes
+# the repo VERSION file, so it always moves. Keep this list and shape set
+# identical to the gate's.
+README_TEMP_PINNED=0
+grep -Eq "${README_TEMP_MARKER_REGEX}" "${REPO_ROOT}/README.md" && README_TEMP_PINNED=1
+README_PIN_SHAPES=(
+    'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+    'runanywhere[a-z_]*: \^?' \
+    '@runanywhere/[a-z-]+@' \
+    'runanywhere(\[[a-z,]+\])?==' \
+    'Current release:\*\* `' \
+    'currently \*\*' \
+    'Pin to \*\*' \
+    'Use `'
+)
+for readme in \
+    "${REPO_ROOT}/bindings/web/README.md" \
+    "${REPO_ROOT}/bindings/web/packages/core/README.md" \
+    "${REPO_ROOT}/bindings/web/packages/llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/web/packages/onnx/README.md" \
+    "${REPO_ROOT}/bindings/react-native/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/core/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/mlx/README.md" \
+    "${REPO_ROOT}/bindings/react-native/packages/onnx/README.md" \
+    "${REPO_ROOT}/bindings/kotlin/README.md" \
+    "${REPO_ROOT}/bindings/kotlin/docs/Documentation.md" \
+    "${REPO_ROOT}/bindings/kotlin/docs/KOTLIN_MAVEN_CENTRAL_PUBLISHING.md" \
+    "${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/kotlin/modules/runanywhere-core-onnx/README.md" \
+    "${REPO_ROOT}/bindings/flutter/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_llamacpp/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_mlx/README.md" \
+    "${REPO_ROOT}/bindings/flutter/packages/runanywhere_onnx/README.md" \
+    "${REPO_ROOT}/core/README.md" \
+    "${REPO_ROOT}/core/docs/DEVELOPMENT.md"; do
+    readme_pinned=0
+    for readme_pin in "${README_PIN_SHAPES[@]}"; do
+        if grep -Eq "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+" "$readme"; then
+            readme_pinned=1
+            if [ "$README_TEMP_PINNED" -eq 1 ] && [ "$readme_pin" != 'currently \*\*' ]; then
+                continue
+            fi
+            # qhexrt is published on its own, older version line, so its pins
+            # (each on a line of its own) are left where they are, as the gate
+            # leaves them out of its check.
+            bump_all_on_line "$readme" \
+                "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
+                "\1${NEW_VERSION}" \
+                'qhexrt'
+        fi
+    done
+    if [ "$readme_pinned" -eq 0 ]; then
+        echo "ERROR: no version pin found (sync-versions configuration is stale): $readme" >&2
+        exit 1
+    fi
+done
 
 # Every anchor above validated. Only now does anything on disk change, so a
 # stale pattern aborts with the working tree untouched rather than half-bumped.

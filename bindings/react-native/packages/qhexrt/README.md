@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-npm install @runanywhere/core@0.20.37 @runanywhere/qhexrt@0.20.37
+npm install @runanywhere/core@0.20.27 @runanywhere/qhexrt@0.20.19
 ```
 
 See the [React Native SDK README](../../README.md) for Android setup.

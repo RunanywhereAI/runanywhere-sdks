@@ -242,15 +242,29 @@ def test_readme_temp_marker_for_another_release_is_rejected(tmp_path):
     assert f"marker must name v{version}, found 'TEMP: install pins stay on" in result.stderr
 
 
+def _per_sdk_readmes():
+    # The gate's own list, so a README added there is covered here too.
+    gate = (REPO_ROOT / GATE).read_text(encoding="utf-8")
+    block = gate.split("for readme in \\\n", 1)[1].split("; do", 1)[0]
+    return re.findall(r"(?:bindings|core)/\S+\.md", block)
+
+
 def _readme_without_temp_marker(tmp_path, repin):
-    sandbox = _mirror(tmp_path, writable={"README.md"})
+    per_sdk = _per_sdk_readmes() if repin else []
+    sandbox = _mirror(tmp_path, writable={"README.md", *per_sdk})
     readme = sandbox / "README.md"
     lines = readme.read_text(encoding="utf-8").splitlines(keepends=True)
     text = "".join(line for line in lines if "TEMP: install pins stay on" not in line)
     if repin:
         # With the marker line gone, every remaining copy of the held version
-        # is an install pin.
+        # is an install pin, in the root README and in each per-SDK README.
         text = text.replace(_readme_pin_version(), _core_version())
+        for relative in per_sdk:
+            path = sandbox / relative
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(_readme_pin_version(), _core_version()),
+                encoding="utf-8",
+            )
     readme.write_text(text, encoding="utf-8")
     return sandbox
 
@@ -270,6 +284,104 @@ def test_deleting_only_the_temp_marker_rejects_stale_pins(tmp_path):
     result = _run(_readme_without_temp_marker(tmp_path, repin=False))
     assert result.returncode == 1
     assert f"expected {_core_version()}, found 'runanywhere=={pin_version}'" in result.stderr
+
+
+def _mutate_file(tmp_path, relative, old, new):
+    sandbox = _mirror(tmp_path, writable={relative})
+    path = sandbox / relative
+    text = path.read_text(encoding="utf-8")
+    assert text.count(old) >= 1, old
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+    return _run(sandbox)
+
+
+def test_per_sdk_pin_ahead_of_the_registries_is_rejected(tmp_path):
+    # The case this check exists for: a per-SDK README advertising core/VERSION
+    # while the root README's TEMP marker says the registries are still behind.
+    pin_version = _readme_pin_version()
+    if pin_version == _core_version():
+        return  # no marker, so every pin is already on core/VERSION
+    result = _mutate_file(
+        tmp_path,
+        "bindings/flutter/README.md",
+        f"runanywhere: {pin_version}",
+        f"runanywhere: {_core_version()}",
+    )
+    assert result.returncode == 1
+    assert (
+        f"bindings/flutter/README.md: expected {pin_version}, "
+        f"found 'runanywhere: {_core_version()}'" in result.stderr
+    )
+
+
+def test_stale_pin_in_a_kotlin_module_readme_is_rejected(tmp_path):
+    version = _readme_pin_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/kotlin/modules/runanywhere-core-onnx/README.md",
+        f"runanywhere-onnx:{version}",
+        "runanywhere-onnx:0.0.1",
+    )
+    assert result.returncode == 1
+    assert (
+        "bindings/kotlin/modules/runanywhere-core-onnx/README.md: expected "
+        f"{version}, found 'io.github.sanchitmonga22:runanywhere-onnx:0.0.1'" in result.stderr
+    )
+
+
+def test_unpinned_package_in_a_per_sdk_readme_is_rejected(tmp_path):
+    # Same hole as the root README: @runanywhere/core stays pinned, so only a
+    # check of every package reference sees the unpinned backend.
+    version = _readme_pin_version()
+    result = _mutate_file(
+        tmp_path,
+        "bindings/react-native/packages/llamacpp/README.md",
+        f"@runanywhere/llamacpp@{version}",
+        "@runanywhere/llamacpp@latest",
+    )
+    assert result.returncode == 1
+    assert (
+        "bindings/react-native/packages/llamacpp/README.md: expected "
+        f"{version}, found '@runanywhere/llamacpp@latest'" in result.stderr
+    )
+
+
+def test_repo_version_line_in_the_core_docs_tracks_core_version(tmp_path):
+    # "currently **x**" names the repo VERSION file, not an install, so the
+    # TEMP marker does not hold it back.
+    version = _core_version()
+    result = _mutate_file(
+        tmp_path,
+        "core/README.md",
+        f"currently **{version}**",
+        f"currently **{_readme_pin_version()}**" if _readme_pin_version() != version else "currently **0.0.1**",
+    )
+    assert result.returncode == 1
+    assert f"core/README.md: expected {version}, found 'currently **" in result.stderr
+
+
+def test_qhexrt_pins_on_their_own_version_line_pass(tmp_path):
+    # qhexrt is published separately and lags the other packages, so a qhexrt
+    # pin beside the shared ones is not compared to them.
+    result = _mutate_file(
+        tmp_path,
+        "bindings/flutter/README.md",
+        "runanywhere_qhexrt: ",
+        "runanywhere_qhexrt: 0.0.1 # ",
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_per_sdk_readme_with_no_pin_is_rejected(tmp_path):
+    # A reworded README that no shape matches would silently drop out of the gate.
+    result = _mutate_file(
+        tmp_path,
+        "bindings/web/packages/core/README.md",
+        "npm install @runanywhere/web@",
+        "npm install @runanywhere/web ",
+    )
+    assert result.returncode == 1
+    assert "bindings/web/packages/core/README.md: no version pin matches" in result.stderr
 
 
 if __name__ == "__main__":

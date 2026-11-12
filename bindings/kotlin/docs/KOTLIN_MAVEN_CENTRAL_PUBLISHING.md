@@ -286,6 +286,9 @@ free of proprietary QAIRT/QNN redistributables.
 #   QHexRT/tools/scripts/stage_prebuilt_for_sdk.sh ...
 #   RAC_BUILD_JOBS=2 ./scripts/build/build-core-android.sh arm64-v8a
 
+# QHexRT has its own version line: set SDK_VERSION to the QHexRT release being
+# published, not the core version. 0.20.11 below is an example; 0.20.19 was the
+# latest public release when this was written.
 export SDK_VERSION=0.20.11
 export MAVEN_CENTRAL_USERNAME="<USERNAME>"
 export MAVEN_CENTRAL_PASSWORD="<PASSWORD>"
@@ -306,8 +309,8 @@ Then transfer the staging repository with the same manual upload command as the
 core artifacts. Consumers depend on:
 
 ```kotlin
-implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
-implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.27")
+implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.19")
 ```
 
 ---
@@ -323,16 +326,16 @@ repositories {
 // build.gradle.kts
 dependencies {
     // Required: core SDK
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.27")
 
     // Optional: LLM + VLM (add only if you need text/vision generation)
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.27")
 
     // Optional: STT/TTS/VAD (add only if you need speech features)
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.27")
 
     // Optional: Snapdragon Hexagon NPU (arm64-v8a only)
-    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.19")
 }
 ```
 

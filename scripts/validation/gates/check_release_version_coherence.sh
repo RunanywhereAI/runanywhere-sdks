@@ -433,22 +433,16 @@ for package_manifest in \
   expect_spm_version "${package_manifest}"
 done
 
+# The per-SDK READMEs that carry install pins are checked pin by pin below.
 for release_doc in \
   bindings/react-native/AGENTS.md \
-  bindings/react-native/packages/mlx/README.md \
   bindings/flutter/AGENTS.md \
-  bindings/flutter/README.md \
-  bindings/flutter/packages/runanywhere/README.md \
-  bindings/flutter/packages/runanywhere_llamacpp/README.md \
-  bindings/flutter/packages/runanywhere_mlx/README.md \
-  bindings/flutter/packages/runanywhere_onnx/README.md \
   bindings/flutter/docs/ARCHITECTURE.md \
   bindings/flutter/docs/Documentation.md \
   bindings/swift/ARCHITECTURE.md \
   bindings/swift/README.md \
   bindings/swift/Sources/LlamaCPPRuntime/README.md \
-  bindings/swift/Sources/ONNXRuntime/README.md \
-  bindings/kotlin/README.md; do
+  bindings/swift/Sources/ONNXRuntime/README.md; do
   expect_literal "${release_doc}" "${VERSION}"
 done
 
@@ -498,6 +492,75 @@ for readme_pin in \
   expect_readme_pins "${readme_pin}" "${README_PIN_VERSION}"
 done
 expect_readme_pins 'version line, currently \*\*' "${VERSION}"
+
+# The per-SDK READMEs and core docs repeat those pins in more shapes (pip extras,
+# the "Current release" line, a few prose sentences). Each file has to carry at
+# least one pin. Every install pin it carries has to name the same version as the
+# root README's install pins: the TEMP marker's version while one is present,
+# ${VERSION} once it is gone. "currently **x**" describes the repo VERSION file,
+# not an install, so it always names ${VERSION}. Keep this list and shape set
+# identical to sync-versions.sh.
+README_PIN_SHAPES=(
+  'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+  'runanywhere[a-z_]*: \^?' \
+  '@runanywhere/[a-z-]+@' \
+  'runanywhere(\[[a-z,]+\])?==' \
+  'Current release:\*\* `' \
+  'currently \*\*' \
+  'Pin to \*\*' \
+  'Use `'
+)
+for readme in \
+  bindings/web/README.md \
+  bindings/web/packages/core/README.md \
+  bindings/web/packages/llamacpp/README.md \
+  bindings/web/packages/onnx/README.md \
+  bindings/react-native/README.md \
+  bindings/react-native/packages/core/README.md \
+  bindings/react-native/packages/llamacpp/README.md \
+  bindings/react-native/packages/mlx/README.md \
+  bindings/react-native/packages/onnx/README.md \
+  bindings/kotlin/README.md \
+  bindings/kotlin/docs/Documentation.md \
+  bindings/kotlin/docs/KOTLIN_MAVEN_CENTRAL_PUBLISHING.md \
+  bindings/kotlin/modules/runanywhere-core-llamacpp/README.md \
+  bindings/kotlin/modules/runanywhere-core-onnx/README.md \
+  bindings/flutter/README.md \
+  bindings/flutter/packages/runanywhere/README.md \
+  bindings/flutter/packages/runanywhere_llamacpp/README.md \
+  bindings/flutter/packages/runanywhere_mlx/README.md \
+  bindings/flutter/packages/runanywhere_onnx/README.md \
+  core/README.md \
+  core/docs/DEVELOPMENT.md; do
+  if [ ! -f "${REPO_ROOT}/${readme}" ]; then
+    echo "[FAIL] ${readme}: missing (update this list and sync-versions.sh)" >&2
+    FAILURES=$((FAILURES + 1))
+    continue
+  fi
+  readme_found=0
+  for readme_pin in "${README_PIN_SHAPES[@]}"; do
+    # Read each pin whole, as for the root README. The prose shapes (ending in a
+    # backtick or bold marker) also open ordinary sentences, so those start at a digit.
+    readme_token="[^][:space:]\"'\`(),*]*"
+    case "${readme_pin}" in *'`' | *'\*\*') readme_token="[0-9]${readme_token}" ;; esac
+    # qhexrt is published on its own, older version line, so lines naming it
+    # are left out of the shared check. Whole lines, as sync-versions.sh skips
+    # them, so the gate never demands a move the sync will not make.
+    readme_pins="$(grep -v qhexrt "${REPO_ROOT}/${readme}" | grep -Eo -- "${readme_pin}${readme_token}" || true)"
+    [ -z "${readme_pins}" ] && continue
+    readme_found=1
+    readme_expected="${README_PIN_VERSION}"
+    [ "${readme_pin}" = 'currently \*\*' ] && readme_expected="${VERSION}"
+    while IFS= read -r readme_stale; do
+      echo "[FAIL] ${readme}: expected ${readme_expected}, found '${readme_stale}'" >&2
+      FAILURES=$((FAILURES + 1))
+    done < <(grep -Ev -- "${readme_pin}${readme_expected//./\\.}\.?\$" <<< "${readme_pins}")
+  done
+  if [ "${readme_found}" -eq 0 ]; then
+    echo "[FAIL] ${readme}: no version pin matches any known shape" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+done
 
 if [ "${FAILURES}" -ne 0 ]; then
   echo "[FAIL] release version coherence: ${FAILURES} mismatch(es)" >&2

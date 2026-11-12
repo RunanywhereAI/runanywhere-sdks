@@ -40,37 +40,40 @@ ARM64 devices are recommended. Metal on iOS and NEON on Android provide signific
 
 ## Installation
 
-Add the packages you need to `pubspec.yaml`. Pin to **0.20.37**:
+Add the packages you need to `pubspec.yaml`. Pin to **0.20.27**:
 
 **Core + LlamaCpp (LLM):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.37
-  runanywhere_llamacpp: 0.20.37
+  runanywhere: 0.20.27
+  runanywhere_llamacpp: 0.20.27
 ```
 
 **Core + ONNX (STT / TTS / VAD):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.37
-  runanywhere_onnx: 0.20.37
+  runanywhere: 0.20.27
+  runanywhere_onnx: 0.20.27
 ```
 
 **Core + MLX (Apple LLM / VLM / speech on physical iOS devices):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.37
-  runanywhere_mlx: 0.20.37
+  runanywhere: 0.20.27
+  runanywhere_mlx: 0.20.27
 ```
 
 **Optional NPU (Snapdragon Android):**
 
 ```yaml
-  runanywhere_qhexrt: 0.20.37
+dependencies:
+  runanywhere_qhexrt: 0.20.19
 ```
+
+QHexRT is published on its own version line, so its pin differs from the core pin. QHexRT 0.20.19 uses plugin ABI 9, so it needs core 0.20.19 to 0.20.31; core 0.20.32 and later reject it at registration. The pair with core 0.20.27 hasn't been tested on a device.
 
 Then run:
 
