@@ -21,7 +21,10 @@ The examples below target this source tree (SDK `0.20.37`). For changes not yet
 released, use local SDK packages and Commons native libraries built from the same
 checkout. The private QHexRT native payload is not in this repository: supply it
 separately from a compatible authorized build. A matching version number alone
-does not include unreleased changes.
+does not include unreleased changes. `QHexRT.isRegistered` is public only in this
+source tree; in every release through 0.20.38 it is private. With the published
+`runanywhere-qhexrt-android:0.20.19`, leave out that check and register the model
+after `QHexRT.register()`, which logs a failure rather than throwing.
 
 For local Kotlin builds, stage the private engine payload under
 `engines/qhexrt/prebuilt/`, preserving its `versions/` layout and `current`
@@ -121,7 +124,8 @@ QHexRT does not seed or select models. Register the exact model URL intended for
 - Android `arm64-v8a` only (no `armeabi-v7a` / `x86_64` package)
 - Qualcomm Snapdragon device with Hexagon **V75**, **V79**, or **V81** NPU
 - Matching model manifests for the device Hexagon arch (a V81-only bundle will not run on V75)
-- Core artifact `runanywhere-sdk:0.20.27` or newer
+- Core artifact `runanywhere-sdk` 0.20.19 to 0.20.31 for QHexRT 0.20.19. That
+  release uses plugin ABI 9, and cores from 0.20.32 on reject it at registration.
 
 ---
 

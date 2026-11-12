@@ -69,8 +69,11 @@ dependencies:
 **Optional NPU (Snapdragon Android):**
 
 ```yaml
+dependencies:
   runanywhere_qhexrt: 0.20.19
 ```
+
+QHexRT is published on its own version line, so its pin differs from the core pin. QHexRT 0.20.19 uses plugin ABI 9, so it needs core 0.20.19 to 0.20.31; core 0.20.32 and later reject it at registration. The pair with core 0.20.27 hasn't been tested on a device.
 
 Then run:
 
