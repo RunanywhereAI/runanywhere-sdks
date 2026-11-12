@@ -476,7 +476,12 @@ branch, through a normal PR. The `runanywhere` Python package is not on PyPI
 the pip pin just moves with the others.
 
 ```bash
-sed -i.bak '/TEMP: install pins stay on/d' README.md && rm README.md.bak
+marker_regex="TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? until v${VERSION//./\\.} is on the package registries\."
+if ! grep -Eq "$marker_regex" README.md; then
+  echo "README.md has no TEMP install-pin marker naming v$VERSION: leave the pins alone." >&2
+  exit 1
+fi
+sed -E -i.bak "/${marker_regex}/d" README.md && rm README.md.bak
 ./scripts/release/sync-versions.sh "$VERSION"     # moves every README install pin to $VERSION
 git diff README.md                                # only the pins and the marker line change
 bash scripts/validation/gates/check_release_version_coherence.sh   # expect [OK]

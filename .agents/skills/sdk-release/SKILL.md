@@ -334,6 +334,7 @@ if grep -Eq 'TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]
   ./scripts/release/sync-versions.sh <version>    # e.g. 0.20.25 (no 'v' needed, either works)
 else
   echo "README.md has no valid TEMP install-pin marker: add it as described above, then sync." >&2
+  exit 1
 fi
 bash scripts/validation/gates/check_release_version_coherence.sh
 ```
