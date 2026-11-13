@@ -115,7 +115,14 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.20.37"
+//
+// NOTE: v0.20.37 release assets (all 9 iOS XCFramework zips) were re-uploaded on
+// 2026-10-28 after the release was published (2026-09-23), so their on-disk
+// SHA-256 no longer matches the checksums pinned in this manifest. SwiftPM
+// consumers of v0.20.37 cannot resolve. Bump to v0.20.38 with freshly built
+// assets and re-synced checksums via `bindings/swift/scripts/sync-checksums.sh`
+// before tagging. Includes the Xcode 27 fix (#963) from main.
+let sdkVersion = "0.20.38"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
