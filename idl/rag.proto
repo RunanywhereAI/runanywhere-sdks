@@ -56,6 +56,20 @@ message RAGConfiguration {
 
     // Pointwise rerank of the retrieved chunks using the session LLM.
     bool rerank_results = 11;
+
+    // Optional cross-encoder reranker model id. When set, the session loads
+    // the named reranker GGUF and reorders fused candidates by cross-encoder
+    // score before context assembly. If both `rerank_results` and this field
+    // are set, cross-encoder wins and pointwise is skipped. Empty = no
+    // cross-encoder reranking (backward compatible).
+    //
+    // NOTE: Field number 12 is provisional. The open RAG stack (#1017) claims
+    // fields 12-15; adjust to the next free number once that stack lands, and
+    // bump idl/VERSION + regenerate bindings (Swift/Kotlin/Dart/TS/C++/Python).
+    // Full C++ wiring (session-owned handle, pipeline-graph rerank stage,
+    // fail-soft fallback) requires maintainer design sign-off before
+    // implementation.
+    optional string reranker_model_id = 12;
 }
 
 message RAGDocument {
