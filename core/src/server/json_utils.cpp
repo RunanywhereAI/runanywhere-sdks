@@ -194,7 +194,7 @@ Json createErrorResponse(const std::string& message, const std::string& type, in
 
 std::string formatSSE(const Json& chunk) {
     std::ostringstream ss;
-    ss << "data: " << chunk.dump() << "\n\n";
+    ss << "data: " << chunk.dump(-1, ' ', false, Json::error_handler_t::replace) << "\n\n";
     return ss.str();
 }
 

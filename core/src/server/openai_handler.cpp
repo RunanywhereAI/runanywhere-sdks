@@ -484,7 +484,8 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& req, httplib::Re
         {"model", modelId_},
         {"choices", Json::array({{{"index", 0}, {"message", message}, {"finish_reason", finish}}})},
         {"usage", usageObject(generation)}};
-    res.set_content(response.dump(), "application/json");
+    res.set_content(response.dump(-1, ' ', false, Json::error_handler_t::replace),
+                    "application/json");
 }
 
 void OpenAIHandler::processStreaming(const httplib::Request&, httplib::Response& res,
