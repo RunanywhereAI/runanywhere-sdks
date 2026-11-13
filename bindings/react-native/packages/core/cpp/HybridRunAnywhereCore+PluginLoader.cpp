@@ -7,8 +7,6 @@
 
 #include "HybridRunAnywhereCore+Common.hpp"
 
-#include "rac/plugin/rac_plugin_registration.h"
-
 #include "rac/plugin/rac_plugin_loader.h"
 
 #include <cstdio>
@@ -90,19 +88,6 @@ std::string loadedJsonArray() {
     return json;
 }
 
-std::string pluginNameFromPath(const std::string& path) {
-    auto slash = path.find_last_of("/\\");
-    std::string stem = slash == std::string::npos ? path : path.substr(slash + 1);
-    auto dot = stem.find_last_of('.');
-    if (dot != std::string::npos) {
-        stem = stem.substr(0, dot);
-    }
-    if (stem.rfind("lib", 0) == 0) {
-        stem = stem.substr(3);
-    }
-    return stem;
-}
-
 void throwIfPluginFailed(rac_result_t rc, const std::string& operation, const std::string& context) {
     if (rc == RAC_SUCCESS) return;
     throw std::runtime_error(operation + " failed (" + context + "): " + std::to_string(static_cast<int>(rc)));
@@ -136,12 +121,15 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::pluginLoaderListLoa
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::pluginLoaderLoad(const std::string& path) {
     return Promise<std::string>::async([path]() -> std::string {
-        const auto rc = rac_registry_load_plugin(path.c_str());
-        if (!rac_plugin_registration_succeeded(rc)) {
+        char* name = nullptr;
+        const auto rc = rac_registry_load_plugin_named(path.c_str(), &name);
+        if (rc != RAC_SUCCESS) {
+            rac_free(name);
             throwIfPluginFailed(rc, "pluginLoader.load", path);
         }
-        const auto name = pluginNameFromPath(path);
-        return "{\"name\":\"" + jsonEscape(name) + "\",\"path\":\"" + jsonEscape(path) + "\"}";
+        const std::string pluginName = name != nullptr ? name : "";
+        rac_free(name);
+        return "{\"name\":\"" + jsonEscape(pluginName) + "\",\"path\":\"" + jsonEscape(path) + "\"}";
     });
 }
 

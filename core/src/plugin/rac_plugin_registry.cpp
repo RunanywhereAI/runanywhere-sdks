@@ -49,6 +49,13 @@ struct Entry {
     const rac_engine_vtable_t* vtable;  ///< plugin-owned .rodata pointer
 };
 
+struct AttachedManifest {
+    const rac_engine_manifest_t* manifest;
+    void* load_handle;
+};
+
+thread_local rac_plugin_load_context_t* current_load_context = nullptr;
+
 struct State {
     std::mutex mu;
     /** Primitive → descending-priority list of plugins. */
@@ -60,11 +67,13 @@ struct State {
      *  entry here. Populated by the loader, drained by `rac_plugin_unregister`. */
     std::unordered_map<std::string, void*> dl_handles;
     /** Manifest attached by an engine entry before the vtable is registered. */
-    std::unordered_map<const rac_engine_vtable_t*, const rac_engine_manifest_t*>
-        manifests_by_vtable;
+    std::unordered_map<const rac_engine_vtable_t*, AttachedManifest> manifests_by_vtable;
     /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
     std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
     std::unordered_map<const rac_engine_vtable_t*, size_t> model_leases;
+    /** In-flight loader calls keyed by OS handle, so aliases of the same
+     *  mapped library share ownership of its pending manifest. */
+    std::unordered_map<void*, size_t> pending_loads;
 };
 
 State& state() {
@@ -135,7 +144,13 @@ bool valid_manifest_availability(rac_engine_availability_t availability) {
 const rac_engine_manifest_t* attached_manifest_locked(const State& s,
                                                       const rac_engine_vtable_t* vtable) {
     auto it = s.manifests_by_vtable.find(vtable);
-    return it == s.manifests_by_vtable.end() ? nullptr : it->second;
+    return it == s.manifests_by_vtable.end() ? nullptr : it->second.manifest;
+}
+
+bool published_or_leased_locked(const State& s, const rac_engine_vtable_t* vtable) {
+    return s.model_leases.contains(vtable) ||
+           std::ranges::any_of(s.by_name,
+                               [vtable](const auto& entry) { return entry.second == vtable; });
 }
 
 void detach_pending_manifest(const rac_engine_vtable_t* vtable) {
@@ -196,6 +211,62 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
         return RAC_ERROR_OUT_OF_MEMORY;
     } catch (...) {
         return RAC_ERROR_INTERNAL;
+    }
+}
+
+rac_result_t rac_plugin_registry_begin_load(rac_plugin_load_context_t* context) noexcept {
+    if (context == nullptr || context->handle == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    try {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+        ++s.pending_loads[context->handle];
+        context->previous = current_load_context;
+        current_load_context = context;
+        return RAC_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
+}
+
+rac_bool_t rac_plugin_registry_finish_load(rac_plugin_load_context_t* context,
+                                           const rac_engine_vtable_t* vtable) noexcept {
+    if (context == nullptr || current_load_context != context) {
+        return RAC_FALSE;
+    }
+    current_load_context = context->previous;
+    try {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+
+        const auto inflight = s.pending_loads.find(context->handle);
+        if (inflight == s.pending_loads.end()) {
+            return RAC_FALSE;
+        }
+        if (inflight->second > 1) {
+            --inflight->second;
+            return RAC_FALSE;
+        }
+        s.pending_loads.erase(inflight);
+
+        /* Attachment records its owner before entry returns. Only compare
+         * host-owned keys here: a successful publication may already have
+         * transferred and closed the library through a concurrent unload. */
+        for (auto pending = s.manifests_by_vtable.begin();
+             pending != s.manifests_by_vtable.end();) {
+            if (pending->second.load_handle == context->handle &&
+                !published_or_leased_locked(s, pending->first)) {
+                pending = s.manifests_by_vtable.erase(pending);
+            } else {
+                ++pending;
+            }
+        }
+        return vtable == nullptr || !published_or_leased_locked(s, vtable) ? RAC_TRUE : RAC_FALSE;
+    } catch (...) {
+        return RAC_FALSE;
     }
 }
 
@@ -295,7 +366,8 @@ rac_result_t rac_engine_manifest_attach_vtable(const rac_engine_manifest_t* mani
 
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
-        s.manifests_by_vtable[vtable] = manifest;
+        s.manifests_by_vtable[vtable] = AttachedManifest{
+            manifest, current_load_context != nullptr ? current_load_context->handle : nullptr};
         return RAC_SUCCESS;
     } catch (const std::bad_alloc&) {
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -318,7 +390,7 @@ rac_result_t rac_engine_manifest_detach_vtable(const rac_engine_vtable_t* vtable
         }
         auto it = s.manifests_by_vtable.find(vtable);
         if (it != s.manifests_by_vtable.end()) {
-            manifest = it->second;
+            manifest = it->second.manifest;
             s.manifests_by_vtable.erase(it);
         }
         if (manifest != nullptr && vtable->metadata.name != nullptr) {
@@ -488,12 +560,58 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 }
             }
 
-            // Allocate before changing the accepted plugin so handle publication
-            // below is non-throwing, but only after all refusal checks.
-            auto dl_entry = s.dl_handles.end();
-            if (dl_handle) {
-                dl_entry = s.dl_handles.try_emplace(name, nullptr).first;
+            /* Prepare every allocation before publishing anything, so a
+             * bad_alloc cannot leave a half-registered vtable whose library
+             * the loader will unload. All of these may throw while the
+             * registry still has no entry for the incoming vtable. */
+            struct PreparedEntry {
+                rac_primitive_t primitive;
+                Entry entry;
+            };
+            std::vector<PreparedEntry> prepared;
+            prepared.reserve(16);
+            each_served_primitive(vtable, [&](rac_primitive_t p) {
+                prepared.push_back(PreparedEntry{
+                    p,
+                    Entry{.name = name, .priority = vtable->metadata.priority, .vtable = vtable}});
+            });
+            for (auto& item : prepared) {
+                auto& bucket = s.by_primitive[item.primitive];
+                bucket.reserve(bucket.size() + 1);
             }
+            if (!replacing_existing) {
+                s.by_name.reserve(s.by_name.size() + 1);
+            }
+            s.manifests_by_name.reserve(s.manifests_by_name.size() + 1);
+
+            bool manifest_entry_inserted = false;
+            auto manifest_entry = s.manifests_by_name.end();
+            bool dl_entry_inserted = false;
+            auto dl_entry = s.dl_handles.end();
+            try {
+                if (manifest != nullptr) {
+                    auto [it, inserted] = s.manifests_by_name.try_emplace(name, nullptr);
+                    manifest_entry = it;
+                    manifest_entry_inserted = inserted;
+                }
+                if (dl_handle) {
+                    auto [it, inserted] = s.dl_handles.try_emplace(name, nullptr);
+                    dl_entry = it;
+                    dl_entry_inserted = inserted;
+                }
+                if (!replacing_existing) {
+                    (void)s.by_name.try_emplace(name, vtable);
+                }
+            } catch (...) {
+                if (manifest_entry_inserted) {
+                    s.manifests_by_name.erase(manifest_entry);
+                }
+                if (dl_entry_inserted) {
+                    s.dl_handles.erase(dl_entry);
+                }
+                throw;
+            }
+
             if (replacing_existing) {
                 // Steal the evicted vtable into a local so `on_unload` runs
                 // AFTER the lock is released: the evicted plugin's teardown
@@ -508,19 +626,18 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 evicted_vtable = dup->second;
                 s.manifests_by_vtable.erase(evicted_vtable);
                 erase_from_buckets_locked(s, name);
+                s.by_name[name] = vtable;
             }
 
-            s.by_name[name] = vtable;
             if (manifest != nullptr) {
-                s.manifests_by_name[name] = manifest;
+                manifest_entry->second = manifest;
             } else if (replacing_existing) {
                 s.manifests_by_name.erase(name);
             }
 
-            each_served_primitive(vtable, [&](rac_primitive_t p) {
-                Entry e{.name = name, .priority = vtable->metadata.priority, .vtable = vtable};
-                insert_by_priority(s.by_primitive[p], std::move(e));
-            });
+            for (auto& item : prepared) {
+                insert_by_priority(s.by_primitive[item.primitive], std::move(item.entry));
+            }
 
             if (dl_handle) {
                 *out_previous_handle = dl_entry->second;

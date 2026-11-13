@@ -426,6 +426,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # Plugin registry / loader
     "_rac_plugin_api_version"
     "_rac_registry_load_plugin"
+    "_rac_registry_load_plugin_named"
     "_rac_registry_unload_plugin"
     "_rac_registry_plugin_count"
     "_rac_registry_list_plugins"

@@ -12,14 +12,13 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/plugin_loader.pb.dart' show PluginInfo;
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Result of loading a plugin: registered name + return code (0 ok).
 class PluginLoadResult {
   PluginLoadResult({required this.name, required this.resultCode});
   final String name;
   final int resultCode;
-  bool get success => resultCode == RAC_SUCCESS;
+  bool get success => resultCode == RacResultCodes.success;
 }
 
 /// FFI bridge to the `rac_registry_*` C ABI. Owns all `dart:ffi`
@@ -33,7 +32,7 @@ class DartBridgePluginLoader {
   static int apiVersion() {
     final lib = PlatformLoader.loadCommons();
     final fn = lib.lookupFunction<Uint32 Function(), int Function()>(
-      'rac_registry_api_version',
+      'rac_plugin_api_version',
     );
     return fn();
   }
@@ -42,7 +41,7 @@ class DartBridgePluginLoader {
   static int registeredCount() {
     final lib = PlatformLoader.loadCommons();
     final fn = lib.lookupFunction<IntPtr Function(), int Function()>(
-      'rac_registry_registered_count',
+      'rac_registry_plugin_count',
     );
     return fn();
   }
@@ -50,18 +49,18 @@ class DartBridgePluginLoader {
   /// Snapshot of currently-registered plugin names.
   static List<String> registeredNames() {
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(Pointer<Pointer<Pointer<Utf8>>>, Pointer<IntPtr>),
-        int Function(Pointer<Pointer<Pointer<Utf8>>>, Pointer<IntPtr>)>(
-      'rac_registry_registered_names',
-    );
+    final fn = lib
+        .lookupFunction<
+          Int32 Function(Pointer<Pointer<Pointer<Utf8>>>, Pointer<IntPtr>),
+          int Function(Pointer<Pointer<Pointer<Utf8>>>, Pointer<IntPtr>)
+        >('rac_registry_list_plugins');
     final outNamesPtr = calloc<Pointer<Pointer<Utf8>>>();
     final outCountPtr = calloc<IntPtr>();
     try {
       final rc = fn(outNamesPtr, outCountPtr);
-      if (rc != RAC_SUCCESS) {
+      if (rc != RacResultCodes.success) {
         _logger.warning(
-          'rac_registry_registered_names failed: ${RacResultCodes.message(rc)}',
+          'rac_registry_list_plugins failed: ${RacResultCodes.message(rc)}',
         );
         return const <String>[];
       }
@@ -74,17 +73,12 @@ class DartBridgePluginLoader {
           results.add(namePtr.toDartString());
         }
       }
-      // Free the array (and its strings) if a free function exists.
-      try {
-        final freeFn = lib.lookupFunction<
+      final freeFn = lib
+          .lookupFunction<
             Void Function(Pointer<Pointer<Utf8>>, IntPtr),
-            void Function(Pointer<Pointer<Utf8>>, int)>(
-          'rac_registry_names_free',
-        );
-        freeFn(namesArray, count);
-      } catch (_) {
-        // Optional symbol — if missing we leak; harmless once-per-call.
-      }
+            void Function(Pointer<Pointer<Utf8>>, int)
+          >('rac_registry_free_plugin_list');
+      freeFn(namesArray, count);
       return results;
     } finally {
       calloc.free(outNamesPtr);
@@ -93,21 +87,33 @@ class DartBridgePluginLoader {
   }
 
   /// Load a shared library and register its plugin entry-point.
+  ///
+  /// `rac_registry_load_plugin_named` normalizes DUPLICATE/BUSY to success and
+  /// returns the exact registry key, which is what [unloadPlugin] accepts.
   static PluginLoadResult loadPlugin(String path) {
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<
-        Int32 Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>),
-        int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>)>(
-      'rac_registry_load_plugin',
-    );
+    final fn = lib
+        .lookupFunction<
+          Int32 Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>),
+          int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>)
+        >('rac_registry_load_plugin_named');
+    final freeFn = lib
+        .lookupFunction<
+          Void Function(Pointer<Utf8>),
+          void Function(Pointer<Utf8>)
+        >('rac_free');
     final pathPtr = path.toNativeUtf8();
     final outNamePtr = calloc<Pointer<Utf8>>();
+    outNamePtr.value = nullptr;
     try {
       final rc = fn(pathPtr, outNamePtr);
       final namePtr = outNamePtr.value;
-      final name = (rc == RAC_SUCCESS && namePtr != nullptr)
+      final name = (rc == RacResultCodes.success && namePtr != nullptr)
           ? namePtr.toDartString()
           : '';
+      if (namePtr != nullptr) {
+        freeFn(namePtr);
+      }
       return PluginLoadResult(name: name, resultCode: rc);
     } finally {
       calloc.free(pathPtr);
@@ -118,8 +124,11 @@ class DartBridgePluginLoader {
   /// Unregister a previously-loaded plugin and `dlclose` its handle.
   static int unloadPlugin(String name) {
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
-        int Function(Pointer<Utf8>)>('rac_registry_unload_plugin');
+    final fn = lib
+        .lookupFunction<
+          Int32 Function(Pointer<Utf8>),
+          int Function(Pointer<Utf8>)
+        >('rac_registry_unload_plugin');
     final namePtr = name.toNativeUtf8();
     try {
       return fn(namePtr);

@@ -6910,6 +6910,57 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryLoadPlugin(J
     return static_cast<jint>(rc);
 }
 
+JNIEXPORT jobject JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryLoadPluginNamed(
+    JNIEnv* env, jclass clazz, jstring pathStr) {
+    (void)clazz;
+    if (pathStr == nullptr)
+        return nullptr;
+    const char* path = env->GetStringUTFChars(pathStr, nullptr);
+    if (path == nullptr)
+        return nullptr;
+
+    char* name = nullptr;
+    rac_result_t rc = rac_registry_load_plugin_named(path, &name);
+    env->ReleaseStringUTFChars(pathStr, path);
+
+    jclass resultClass = env->FindClass("com/runanywhere/sdk/native/bridge/NativePluginLoadResult");
+    if (resultClass == nullptr) {
+        env->ExceptionClear();
+        rac_free(name);
+        return nullptr;
+    }
+    jmethodID ctor = env->GetMethodID(resultClass, "<init>", "(ILjava/lang/String;)V");
+    if (ctor == nullptr) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(resultClass);
+        rac_free(name);
+        return nullptr;
+    }
+    jstring jname = env->NewStringUTF(name != nullptr ? name : "");
+    if (jname == nullptr || env->ExceptionCheck()) {
+        /* A pending OutOfMemoryError is deliberately left intact so the JVM
+         * surfaces it after the native resources are released. */
+        env->DeleteLocalRef(resultClass);
+        rac_free(name);
+        return nullptr;
+    }
+    jobject result = env->NewObject(resultClass, ctor, static_cast<jint>(rc), jname);
+    if (result == nullptr || env->ExceptionCheck()) {
+        if (result != nullptr) {
+            env->DeleteLocalRef(result);
+        }
+        env->DeleteLocalRef(jname);
+        env->DeleteLocalRef(resultClass);
+        rac_free(name);
+        return nullptr;
+    }
+    env->DeleteLocalRef(jname);
+    env->DeleteLocalRef(resultClass);
+    rac_free(name);
+    return result;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryUnloadPlugin(JNIEnv* env,
                                                                                  jclass clazz,

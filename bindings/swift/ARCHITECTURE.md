@@ -792,7 +792,7 @@ All six methods are `public static` on `RunAnywhere`. None call the C ABI direct
 
 **Path:** `Public/Extensions/RunAnywhere+PluginLoader.swift` (LOC: 142)
 
-`PluginInfo` (lines 19–30) — `Sendable` struct with `name: String` (library stem) and `path: String`.
+`PluginInfo` (lines 19–30) — `Sendable` struct with `name: String` (the exact registry key returned by commons) and `path: String`.
 
 `RunAnywhere.pluginLoader` (lines 43–141) returns a `PluginLoaderNamespace()` Sendable value with a `fileprivate init()`:
 
@@ -802,7 +802,7 @@ All six methods are `public static` on `RunAnywhere`. None call the C ABI direct
 | `registeredCount: Int` | `rac_registry_plugin_count()` | Direct return |
 | `registeredNames() -> [String]` | `rac_registry_list_plugins`, `rac_registry_free_plugin_list` | Allocates a C pointer array; frees in `defer` |
 | `listLoaded() -> [PluginInfo]` | (delegates to `registeredNames()`) | Path is empty because registry does not store it |
-| `load(path:) throws -> PluginInfo` | `rac_registry_load_plugin` | Derives `name` via `URL.deletingPathExtension().lastPathComponent`; strips `lib` prefix |
+| `load(path:) throws -> PluginInfo` | `rac_registry_load_plugin_named` | Returns the exact registry key on success (including a redundant DUPLICATE/BUSY load); frees the C copy with `rac_free` |
 | `unload(name:) throws` | `rac_registry_unload_plugin` | Passes name as C string |
 
 On platforms where `dlopen` is banned (iOS, WASM), the C ABI returns `featureNotAvailable`; Swift propagates via `throwIfFailed`.
