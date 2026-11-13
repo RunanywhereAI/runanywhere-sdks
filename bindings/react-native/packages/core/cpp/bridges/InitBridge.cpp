@@ -17,6 +17,7 @@
 #include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/device/rac_device_identity.h" // rac_device_get_or_create_persistent_id
 #include "rac/infrastructure/device/rac_device_facts.h"
+#include "rac/infrastructure/file_management/rac_directory_probe.h" // rac_classify_null_directory_listing
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
@@ -575,18 +576,10 @@ namespace AndroidBridge {
     // java.io.File.listFiles(). Two-call semantics matching
     // rac_file_list_directory_fn. An oversized name makes the listing
     // inconclusive; Kotlin throws and this layer also defends against one.
+    // Delegates to the shared commons classifier
+    // (rac_classify_null_directory_listing) so JNI and RN apply the same rule.
     static rac_result_t classifyNullDirectoryListing(const char* dir_path) {
-        if (!dir_path) {
-            return RAC_ERROR_INVALID_ARGUMENT;
-        }
-        struct stat info {};
-        if (stat(dir_path, &info) != 0) {
-            return (errno == ENOENT || errno == ENOTDIR) ? RAC_ERROR_FILE_NOT_FOUND
-                                                         : RAC_ERROR_FILE_READ_FAILED;
-        }
-        // An existing directory is inconclusive too: it may have become
-        // readable since the Java probe, so keep its registered path.
-        return S_ISDIR(info.st_mode) ? RAC_ERROR_FILE_READ_FAILED : RAC_ERROR_FILE_NOT_FOUND;
+        return rac_classify_null_directory_listing(dir_path);
     }
 
     // Directory enumeration via
