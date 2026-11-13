@@ -84,7 +84,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
     // genuine install failure, not something a redundant rac_plugin_register
     // could recover.
     rac_result_t sherpaResult = rac_backend_sherpa_register();
-    if (rac_plugin_registration_succeeded(sherpaResult)) {
+    if (rac_plugin_registration_succeeded(sherpaResult) || sherpaResult == RAC_ERROR_MODULE_ALREADY_REGISTERED) {
       isSherpaRegistered_ = true;
       RAC_LOG_INFO(LOG_CATEGORY, "Sherpa engine plugin registered (STT + TTS + VAD)");
     } else {
@@ -116,15 +116,17 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::unregisterBackend() {
         isSherpaRegistered_ = false;
         RAC_LOG_INFO(LOG_CATEGORY, "Sherpa backend unregistered");
       } else {
-        RAC_LOG_WARNING(LOG_CATEGORY, "Sherpa unregistration failed with code: %d", sherpaResult);
+        RAC_LOG_WARNING(LOG_CATEGORY, "Sherpa unregistration failed with code: %d; keeping Sherpa registered flag so re-register can retry", sherpaResult);
       }
     }
 #endif
 
     rac_result_t result = rac_backend_onnx_unregister();
-    isRegistered_ = false;
-    if (result != RAC_SUCCESS) {
-      RAC_LOG_ERROR(LOG_CATEGORY, "ONNX unregistration failed with code: %d", result);
+    if (result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND) {
+      isRegistered_ = false;
+      RAC_LOG_INFO(LOG_CATEGORY, "ONNX backend unregistered");
+    } else {
+      RAC_LOG_ERROR(LOG_CATEGORY, "ONNX unregistration failed with code: %d; keeping ONNX registered flag so re-register can retry", result);
       throw std::runtime_error("ONNX unregistration failed with error: " + describeError(result));
     }
     return true;
