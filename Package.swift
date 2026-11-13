@@ -127,7 +127,9 @@ let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_P
 // fork-local tags ensure every direct and transitive SwiftPM edge resolves the
 // same MLX core instead of silently substituting the public package identity.
 let mlxAudioPackageDependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.5"),
+    // 0.1.9 carries mlx-swift-lm 3.31.11. The tag is what the distribution
+    // repo can consume (it refuses revision pins).
+    .package(url: "https://github.com/RunanywhereAI/mlx-audio-swift.git", exact: "0.1.9"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
@@ -136,7 +138,16 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
 ]
 
 let runAnywhereMLXSwiftVersion: Version = "0.31.8"
-let runAnywhereMLXSwiftLMVersion: Version = "3.31.5"
+let runAnywhereMLXSwiftLMVersion: Version = "3.31.11"
+
+// Local development only: build against an mlx-swift-lm checkout instead of the
+// pinned tag, so a runtime change can be tested end to end before it is released.
+let mlxSwiftLMDependency: Package.Dependency = {
+    if let local = Context.environment["RUNANYWHERE_MLX_SWIFT_LM_PATH"], !local.isEmpty {
+        return .package(path: local)
+    }
+    return .package(url: "https://github.com/RunanywhereAI/mlx-swift-lm.git", exact: runAnywhereMLXSwiftLMVersion)
+}()
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -216,10 +227,7 @@ let package = Package(
             url: "https://github.com/RunanywhereAI/mlx-swift.git",
             exact: runAnywhereMLXSwiftVersion
         ),
-        .package(
-            url: "https://github.com/RunanywhereAI/mlx-swift-lm.git",
-            exact: runAnywhereMLXSwiftLMVersion
-        ),
+        mlxSwiftLMDependency,
         // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS/VAD/diarization.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
         //
@@ -462,6 +470,14 @@ let package = Package(
         // =================================================================
         // RunAnywhere unit tests (e.g. AudioCaptureManager – Issue #198)
         // =================================================================
+        // The MLX adapter layer on its own: model-free checks always, real
+        // checkpoints when MLX_DECIDER_* name local directories. Kept apart from
+        // RunAnywhereTests, which cannot import MLX (see the note there).
+        .testTarget(
+            name: "MLXRuntimeTests",
+            dependencies: ["MLXRuntime"],
+            path: "bindings/swift/Tests/MLXRuntimeTests"
+        ),
         .testTarget(
             name: "RunAnywhereTests",
             dependencies: [

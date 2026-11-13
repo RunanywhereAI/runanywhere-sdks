@@ -729,7 +729,6 @@ class CrossWasmRAGProvider implements RAGProvider {
       );
     }
 
-    this.removeDocumentInternal(normalized.id);
     const nextChunks = textChunks.map((chunk, index): CrossWasmRAGChunk => ({
       id: `${normalized.id}:chunk-${index}`,
       documentId: normalized.id,
@@ -745,7 +744,12 @@ class CrossWasmRAGProvider implements RAGProvider {
       endOffset: chunk.endOffset,
       tokenCount: chunk.tokenCount,
     }));
-    this.chunks.push(...nextChunks);
+    // Build the replacement index fully before touching state, so a failure
+    // anywhere above leaves the previously ingested version intact (#1129).
+    const retained = this.chunks.filter((chunk) => chunk.documentId !== normalized.id);
+    for (const chunk of nextChunks) retained.push(chunk);
+    this.chunks = retained;
+    this.documents.delete(normalized.id);
     this.documents.set(normalized.id, {
       id: normalized.id,
       name: normalized.name,
@@ -985,10 +989,9 @@ class CrossWasmRAGProvider implements RAGProvider {
       nativeStreamDone = true;
     } catch (error) {
       // Producer self-terminated — the native stream is already over, so
-      // cancelling it would be a lie. Swallow the duplicate rejection the
-      // result promise carries before rethrowing the original error.
+      // cancelling it would be a lie. `generateStream` already marks the
+      // result promise handled, so its duplicate rejection needs no guard.
       nativeStreamDone = true;
-      void streaming.result.catch(() => undefined);
       throw error;
     } finally {
       // Only reachable with the stream still live when the consumer abandoned
@@ -1289,25 +1292,116 @@ interface SplitRAGChunk {
   tokenCount: number;
 }
 
+interface RAGTokenSpan {
+  startOffset: number;
+  endOffset: number;
+  /** Budget units this token costs: 1 for an ordinary word, its code-point count for a space-free script run. */
+  weight: number;
+}
+
+/** Scripts written without inter-word spaces, so one whitespace run can hold many words. */
+const SCRIPT_FREE_SPACE_REGEX =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}\p{Script=Lao}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Tibetan}]/u;
+
+/**
+ * Counts the number of Unicode code points in a string, correctly counting surrogate pairs as one code point.
+ */
+function countCodePoints(str: string): number {
+  let count = 0;
+  for (const char of str) {
+    if (char) count++;
+  }
+  return count;
+}
+
+/**
+ * Splits input text into sliding-window chunks bounded by token count and chunk overlap.
+ * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK,
+ * Thai, or long whitespace-free strings exceeding the budget) by Unicode code
+ * points without breaking surrogate pairs. Ordinary words cost one budget unit; space-free
+ * script runs cost one unit per code point, so a chunk never exceeds `size` code points
+ * however those runs are distributed across lines. Iteratively appends chunks to avoid stack limits.
+ */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
   if (matches.length === 0) return [];
   const size = Math.max(1, Math.floor(requestedSize));
   const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
-  const stride = Math.max(1, size - overlap);
+
+  // In whitespace-delimited scripts (English, etc.), each non-whitespace sequence
+  // is roughly one token. In scripts without spaces (CJK, Thai, Lao, Myanmar, Khmer, Tibetan, etc.)
+  // or for oversized runs (long URLs, base64 blobs, or non-spaced words), a single regex
+  // match can exceed the chunk size budget. We enforce a character/code-point
+  // limit by splitting any token whose code-point count exceeds `size` when it represents a
+  // space-free script, or is an oversized run (> 40 code points)
+  // on Unicode code-point boundaries (preventing surrogate pair corruption). Ordinary spaced words
+  // within or slightly exceeding tiny budgets remain atomic tokens, matching the C++ core separator-first behavior.
+  const tokens: RAGTokenSpan[] = [];
+  for (const match of matches) {
+    const matchStart = match.index ?? 0;
+    // A whitespace-free word that mixes Latin text with a space-free script is cut into Latin
+    // and non-Latin pieces first, so an English word beside CJK text is never clipped (#922).
+    const pieces = SCRIPT_FREE_SPACE_REGEX.test(match[0])
+      ? [...match[0].matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9]+/g)].map((m) => ({
+          text: m[0],
+          offset: m.index ?? 0,
+        }))
+      : [{ text: match[0], offset: 0 }];
+    for (const piece of pieces) {
+      const pieceText = piece.text;
+      const pieceStart = matchStart + piece.offset;
+      const cpCount = countCodePoints(pieceText);
+      const isScriptRun = SCRIPT_FREE_SPACE_REGEX.test(pieceText);
+      const isOversized = cpCount > size && (isScriptRun || cpCount > 40);
+
+      if (!isOversized) {
+        tokens.push({
+          startOffset: pieceStart,
+          endOffset: pieceStart + pieceText.length,
+          weight: isScriptRun ? cpCount : 1,
+        });
+      } else {
+        let currentOffset = pieceStart;
+        for (const char of pieceText) {
+          tokens.push({
+            startOffset: currentOffset,
+            endOffset: currentOffset + char.length,
+            weight: 1,
+          });
+          currentOffset += char.length;
+        }
+      }
+    }
+  }
+
+  if (tokens.length === 0) return [];
+
   const chunks: SplitRAGChunk[] = [];
-  for (let start = 0; start < matches.length; start += stride) {
-    const end = Math.min(matches.length, start + size);
-    const startOffset = matches[start]!.index ?? 0;
-    const last = matches[end - 1]!;
-    const endOffset = (last.index ?? 0) + last[0].length;
+  let start = 0;
+  while (start < tokens.length) {
+    let end = start;
+    let used = 0;
+    while (end < tokens.length && (end === start || used + tokens[end]!.weight <= size)) {
+      used += tokens[end]!.weight;
+      end++;
+    }
+    const startOffset = tokens[start]!.startOffset;
+    const endOffset = tokens[end - 1]!.endOffset;
     chunks.push({
       text: text.slice(startOffset, endOffset),
       startOffset,
       endOffset,
       tokenCount: end - start,
     });
-    if (end === matches.length) break;
+    if (end === tokens.length) break;
+    // Next window starts at the earliest token whose tail up to `end` fits the overlap budget.
+    let next = end;
+    let tail = 0;
+    while (next > start + 1 && tail + tokens[next - 1]!.weight <= overlap) {
+      tail += tokens[next - 1]!.weight;
+      next--;
+    }
+    start = next;
   }
   return chunks;
 }
@@ -1320,24 +1414,50 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
   // always just this array's position, so the 1-based index reconstructs it
   // exactly.
   chunks.forEach((chunk, index) => {
-    const available = maxTokens - used;
+    let available = maxTokens - used;
     if (available <= 0) return;
     const words = chunk.text.split(/\s+/).filter(Boolean);
-    const text = words.slice(0, available).join(' ');
+    const kept: string[] = [];
+    // A script-free run costs one budget unit per code point, so a long CJK run inside a
+    // multi-word chunk cannot bypass the budget (#922); ordinary words cost one unit each.
+    for (const word of words) {
+      if (available <= 0) break;
+      // Same piece split as the chunker: a word mixing Latin with a script-free run is costed
+      // piece by piece, so the English part is kept whole and the CJK part is charged per code point.
+      const pieces = SCRIPT_FREE_SPACE_REGEX.test(word)
+        ? [...word.matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9]+/g)].map((m) => m[0])
+        : [word];
+      let keptWord = '';
+      for (const piece of pieces) {
+        if (available <= 0) break;
+        if (SCRIPT_FREE_SPACE_REGEX.test(piece)) {
+          const slice = [...piece].slice(0, available);
+          keptWord += slice.join('');
+          available -= slice.length;
+        } else {
+          keptWord += piece;
+          available -= 1;
+        }
+      }
+      if (keptWord) kept.push(keptWord);
+    }
+    const text = kept.join(' ');
     if (!text) return;
     parts.push(`[Source ${index + 1}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
-    used += Math.min(words.length, available);
+    used = maxTokens - Math.max(available, 0);
   });
   return parts.join('\n\n');
 }
 
 function renderRAGPrompt(template: string | undefined, context: string, query: string): string {
   const fallback = 'Use the context below to answer.\n\nContext:\n{context}\n\nQuestion: {query}';
-  return (template?.trim() || fallback)
-    .replaceAll('{{context}}', context)
-    .replaceAll('{{query}}', query)
-    .replaceAll('{context}', context)
-    .replaceAll('{query}', query);
+  // One pass with a function replacer: substituted text is never re-scanned
+  // for placeholders, and `$` sequences in it are not replacement patterns.
+  return (template?.trim() || fallback).replace(
+    /\{\{(context|query)\}\}|\{(context|query)\}/g,
+    (_match, doubled: string | undefined, single: string | undefined) =>
+      (doubled ?? single) === 'context' ? context : query,
+  );
 }
 
 function nowMs(): number {
@@ -1961,6 +2081,9 @@ export const __testing__ = {
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
   resolveRagExecutionPlan,
+  renderRAGPrompt,
+  splitRAGText,
+  boundedRAGContext,
 };
 
 /**

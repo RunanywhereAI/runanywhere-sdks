@@ -27,6 +27,7 @@ import {
 } from '@runanywhere/proto-ts/llm_service';
 import { FinishReason } from '@runanywhere/proto-ts/finish_reason';
 import { MessageRole } from '@runanywhere/proto-ts/chat';
+import { SDKError } from '@runanywhere/proto-ts/errors';
 
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { SDKException } from '../../../../src/Foundation/SDKException';
@@ -479,5 +480,48 @@ describe('generateStructuredStream', () => {
     if (terminal.kind !== 'completed') throw new Error('expected a completed event');
     expect(terminal.result.json).toBe('{"city":"San Francisco"}');
     expect(terminal.result.validation?.isValid).toBe(true);
+  });
+
+  it('rethrows a mid-stream failure without leaking an unhandled rejection', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const module = makeStructuredOutputModule(
+        () => {
+          throw new Error('parse must not run after a failed stream');
+        },
+        (_request, emit) => {
+          emit(streamingTokenEvent('{"city":'));
+          emit(LLMStreamEvent.fromPartial({
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
+            error: SDKError.fromPartial({ cAbiCode: -42, message: 'forced mid-stream failure' }),
+          }));
+          return 0;
+        },
+      );
+      ModalityProtoAdapter.registerModuleCapabilities(['llm', 'structured-output'], module);
+
+      const events: StructuredOutputStreamEvent[] = [];
+      const consume = async (): Promise<void> => {
+        for await (const event of generateStructuredStream(
+          'weather in SF',
+          { jsonSchema: '{"type":"object","required":["city"]}' },
+        )) {
+          events.push(event);
+        }
+      };
+      await expect(consume()).rejects.toThrow(/forced mid-stream failure/);
+      expect(events.map((event) => event.kind)).toEqual(['token']);
+
+      // Node reports unhandled rejections once the current macrotask's
+      // microtasks drain, so yield a full turn before checking.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+    expect(unhandled).toEqual([]);
   });
 });

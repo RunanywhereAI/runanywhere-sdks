@@ -517,14 +517,15 @@ class FakeCore:
         pixel_format: object = None,
         stride_bytes: object = None,
         include_diagnostic_rgba: object = None,
+        include_confidence: object = None,
     ) -> dict:
         self._record(
             "segment", handle, width, height, pixel_format, stride_bytes,
-            include_diagnostic_rgba,
+            include_diagnostic_rgba, include_confidence,
         )
         mask = np.zeros(width * height, dtype=np.uint16)
         mask[: width * height // 2] = 1
-        return {
+        result = {
             "width": width,
             "height": height,
             "class_mask": mask,
@@ -533,6 +534,9 @@ class FakeCore:
                 {"class_id": 1, "pixel_count": width * height // 2, "fraction": 0.5, "label": "fg"},
             ],
         }
+        if include_confidence:
+            result["confidence_mask"] = bytes([192]) * (width * height)
+        return result
 
     def unload_segmentation_model(self, handle: int) -> None:
         self._record("unload_segmentation_model", handle)
@@ -625,6 +629,13 @@ class FakeCore:
     def remove_model(self, model_id: str) -> None:
         self._record("remove_model", model_id)
         self._registry.pop(model_id, None)
+
+    def refresh_model_registry(self, request_bytes: bytes) -> bytes:
+        """Record a serialized registry refresh request and return an empty result."""
+        from runanywhere._proto import model_types_pb2
+
+        self._record("refresh_model_registry", bytes(request_bytes))
+        return model_types_pb2.ModelRegistryRefreshResult().SerializeToString()
 
     # -- secure store --------------------------------------------------------
     def secure_set(self, key: str, value: str) -> None:

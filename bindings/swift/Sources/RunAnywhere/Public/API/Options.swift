@@ -527,15 +527,19 @@ public struct DiarizationOptions: Sendable {
 public struct SegmentationOptions: Sendable {
     /// Also return an RGBA overlay useful for debugging.
     public var includeDiagnosticImage: Bool = false
+    /// Also return the chosen class probability for each source pixel.
+    public var includeConfidence: Bool = false
 
     /// Build segmentation options.
-    public init(includeDiagnosticImage: Bool = false) {
+    public init(includeDiagnosticImage: Bool = false, includeConfidence: Bool = false) {
         self.includeDiagnosticImage = includeDiagnosticImage
+        self.includeConfidence = includeConfidence
     }
 
     func toProto() -> RASegmentationOptions {
         var proto = RASegmentationOptions()
         proto.includeDiagnosticRgba = includeDiagnosticImage
+        proto.includeConfidence = includeConfidence
         return proto
     }
 }

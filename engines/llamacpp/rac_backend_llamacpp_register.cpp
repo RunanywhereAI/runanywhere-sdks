@@ -21,6 +21,7 @@
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_llamacpp.h"
+#include "rac/plugin/rac_plugin_registration.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
@@ -498,7 +499,7 @@ rac_result_t rac_backend_llamacpp_register(void) {
     const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);
-        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_PLUGIN_DUPLICATE) {
+        if (!rac_plugin_registration_succeeded(plugin_rc)) {
             RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
         } else {
             RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp'");

@@ -78,7 +78,7 @@ export function toComposeConfig(args: {
     ttsVoiceId: args.ttsVoiceId || undefined,
     vadConfig: {
       sampleRate: VOICE_SAMPLE_RATE,
-      activationThreshold: args.vad?.activationThreshold ?? 0,
+      activationThreshold: args.vad?.activationThreshold,
     },
     turnDetection: toTurnDetection(args.vad, args.turnHandling),
     llmGeneration: args.generation

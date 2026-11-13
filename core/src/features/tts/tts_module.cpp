@@ -1157,11 +1157,12 @@ rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_byt
     }
 
     rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
-    if (request.has_options() &&
-        !rac::foundation::rac_tts_options_from_proto(request.options(), &options)) {
-        rac::lifecycle::release_lifecycle_tts(&ref);
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to convert TTSOptions");
+    if (request.has_options()) {
+        rc = rac::foundation::rac_tts_options_from_proto(request.options(), &options);
+        if (rc != RAC_SUCCESS) {
+            rac::lifecycle::release_lifecycle_tts(&ref);
+            return rac_proto_buffer_set_error(out_result, rc, "failed to convert TTSOptions");
+        }
     }
     if (request.has_options() && request.options().sample_rate() > 0) {
         options.sample_rate = request.options().sample_rate();
@@ -1262,11 +1263,13 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     }
 
     rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
-    if (request.has_options() &&
-        !rac::foundation::rac_tts_options_from_proto(request.options(), &options)) {
-        rac::lifecycle::release_lifecycle_tts(&ref);
-        rac_proto_buffer_free(&error_buf);
-        return RAC_ERROR_DECODING_ERROR;
+    if (request.has_options()) {
+        rc = rac::foundation::rac_tts_options_from_proto(request.options(), &options);
+        if (rc != RAC_SUCCESS) {
+            rac::lifecycle::release_lifecycle_tts(&ref);
+            rac_proto_buffer_free(&error_buf);
+            return rc;
+        }
     }
     if (request.has_options() && request.options().sample_rate() > 0) {
         options.sample_rate = request.options().sample_rate();

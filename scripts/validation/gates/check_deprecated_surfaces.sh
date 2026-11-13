@@ -5,7 +5,9 @@
 # hand-written DTOs, JSON bridges, string-based enums, or deprecated facades.
 #
 # Exits 0 when all detected violations are present in the allowlist.
-# Exits 1 when NEW (non-allowlisted) violations are found.
+# Exits 1 when NEW (non-allowlisted) violations are found, or when an allowlist
+# entry matched nothing this run (a stale entry would silently exempt a later
+# reintroduction of that exact surface in that exact file).
 #
 # Can run standalone or as a step within run_global_source_checks.sh.
 set -euo pipefail
@@ -57,7 +59,10 @@ is_allowed() {
 # Counters and temp files for collecting results.
 VIOLATIONS_FILE="$(mktemp)"
 ALLOWLISTED_FILE="$(mktemp)"
-trap 'rm -f "${VIOLATIONS_FILE}" "${ALLOWLISTED_FILE}"' EXIT
+# path|category of every allowlist entry that exempted at least one hit.
+USED_ENTRIES_FILE="$(mktemp)"
+STALE_FILE="$(mktemp)"
+trap 'rm -f "${VIOLATIONS_FILE}" "${ALLOWLISTED_FILE}" "${USED_ENTRIES_FILE}" "${STALE_FILE}"' EXIT
 
 # Record a hit. $1 = relative path from repo root, $2 = category description.
 record_hit() {
@@ -65,6 +70,7 @@ record_hit() {
   local category="$2"
   if is_allowed "${rel_path}" "${category}"; then
     printf "%s  (%s)\n" "${rel_path}" "${category}" >> "${ALLOWLISTED_FILE}"
+    printf "%s|%s\n" "${rel_path}" "${category}" >> "${USED_ENTRIES_FILE}"
   else
     printf "%s  (%s)\n" "${rel_path}" "${category}" >> "${VIOLATIONS_FILE}"
   fi
@@ -345,6 +351,27 @@ if [[ -s "${ALLOWLISTED_FILE}" ]]; then
   printf "\n"
 fi
 
+# An allowlist entry that exempted nothing is stale. Report it before any new
+# violations so a renamed file shows both halves of its fix in a single run.
+if [[ -n "${ALLOWLIST_ENTRIES}" ]]; then
+  while IFS= read -r entry; do
+    grep -qxF "${entry}" "${USED_ENTRIES_FILE}" || printf "%s\n" "${entry}" >> "${STALE_FILE}"
+  done <<< "${ALLOWLIST_ENTRIES}"
+fi
+
+STALE_COUNT=0
+if [[ -s "${STALE_FILE}" ]]; then
+  STALE_COUNT=$(wc -l < "${STALE_FILE}" | tr -d ' ')
+  printf "STALE EXCEPTIONS (%s entries) -- they match no detected surface; delete or correct them:\n" "${STALE_COUNT}"
+  while IFS= read -r entry; do
+    printf "  [FAIL] %s\n" "${entry}"
+  done < "${STALE_FILE}"
+  printf "\n"
+  printf "Stale entries are path|category lines in:\n"
+  printf "  %s\n" "${ALLOWLIST_FILE}"
+  printf "\n"
+fi
+
 VIOLATION_COUNT=0
 if [[ -s "${VIOLATIONS_FILE}" ]]; then
   VIOLATION_COUNT=$(wc -l < "${VIOLATIONS_FILE}" | tr -d ' ')
@@ -355,6 +382,10 @@ if [[ -s "${VIOLATIONS_FILE}" ]]; then
   printf "\n"
   printf "Document unavoidable boundaries as path|category in:\n"
   printf "  %s\n" "${ALLOWLIST_FILE}"
+  exit 1
+fi
+
+if [[ "${STALE_COUNT}" -gt 0 ]]; then
   exit 1
 fi
 

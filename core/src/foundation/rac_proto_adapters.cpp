@@ -15,7 +15,7 @@
  *     owns memory (char `*`, uint8_t `*` with size, T `*` with count), the
  *     adapter uses rac_alloc / rac_strdup so the caller can release with the
  *     matching `_free` helper (or rac_free + rac_free per element).
- *   - NULL inputs return false. We do NOT clear the destination on failure.
+ *   - NULL inputs return false. Destinations are cleared/zeroed on failure.
  */
 
 // Pull in <cstddef> (and friends) BEFORE the protobuf-bearing header so newer
@@ -112,6 +112,27 @@ bool checked_raw_image_size(int32_t width, int32_t height, size_t bytes_per_pixe
     return true;
 }
 
+rac_result_t set_vlm_image_error(rac_proto_buffer_t* out_error, rac_result_t code,
+                                 const std::string& message) {
+    if (!out_error)
+        return code;
+    return rac_proto_buffer_set_error(out_error, code, message.c_str());
+}
+
+std::string raw_image_dimensions_error(const char* field, int32_t width, int32_t height,
+                                       size_t bytes_per_pixel) {
+    return std::string("VLMImage.") + field + " dimensions " + std::to_string(width) + "x" +
+           std::to_string(height) + " cannot produce a valid width*height*" +
+           std::to_string(bytes_per_pixel) + " byte length";
+}
+
+std::string raw_image_length_error(const char* field, size_t actual_size, size_t expected_size,
+                                   size_t bytes_per_pixel) {
+    return std::string("VLMImage.") + field + " length " + std::to_string(actual_size) +
+           " does not match width*height*" + std::to_string(bytes_per_pixel) + " = " +
+           std::to_string(expected_size);
+}
+
 // ---- Audio format enum mapping --------------------------------------------
 // Both enums share the same ordering for the formats they overlap on. The C
 // enum starts at PCM=0; proto starts at UNSPECIFIED=0 with PCM=1. Apply +1 / -1
@@ -198,7 +219,10 @@ bool rac_stt_word_to_proto(const rac_stt_word_t* in, ::runanywhere::v1::WordTime
 bool rac_stt_word_from_proto(const ::runanywhere::v1::WordTimestamp& in, rac_stt_word_t* out) {
     if (!out)
         return false;
+    std::memset(out, 0, sizeof(*out));
     out->text = copy_string_required(in.word());
+    if (!out->text)
+        return false;
     out->start_ms = in.start_ms();
     out->end_ms = in.end_ms();
     out->confidence = in.confidence();
@@ -223,7 +247,10 @@ bool rac_transcription_metadata_from_proto(const ::runanywhere::v1::Transcriptio
                                            rac_transcription_metadata_t* out) {
     if (!out)
         return false;
+    std::memset(out, 0, sizeof(*out));
     out->model_id = copy_string(in.model_id());
+    if (!in.model_id().empty() && !out->model_id)
+        return false;
     out->processing_time_ms = in.processing_time_ms();
     out->audio_length_ms = 0;  // field deleted from the proto; no source left
     return true;
@@ -245,7 +272,10 @@ bool rac_transcription_alternative_from_proto(const ::runanywhere::v1::Transcrip
                                               rac_transcription_alternative_t* out) {
     if (!out)
         return false;
+    std::memset(out, 0, sizeof(*out));
     out->text = copy_string_required(in.text());
+    if (!out->text)
+        return false;
     out->confidence = in.confidence();
     return true;
 }
@@ -272,13 +302,23 @@ bool rac_stt_result_to_proto(const rac_stt_result_t* in, ::runanywhere::v1::STTO
 // TTS
 // ===========================================================================
 
-bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out) {
+rac_result_t rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in,
+                                        rac_tts_options_t* out) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     *out = RAC_TTS_OPTIONS_DEFAULT;
-    out->voice = copy_string(in.voice());
-    if (!in.language_code().empty())
-        out->language = copy_string(in.language_code());
+    out->language = nullptr;
+    char* voice = copy_string(in.voice());
+    if (!in.voice().empty() && !voice)
+        return RAC_ERROR_OUT_OF_MEMORY;
+    char* language = rac_strdup(in.language_code().empty() ? RAC_TTS_OPTIONS_DEFAULT.language
+                                                           : in.language_code().c_str());
+    if (!language) {
+        rac_free(voice);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    out->voice = voice;
+    out->language = language;
     if (in.speed() > 0.0f)
         out->rate = in.speed();
     if (in.pitch() > 0.0f)
@@ -289,7 +329,7 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts
     // enable_ssml deleted from TTSOptions -- no backend parses SSML. use_ssml
     // stays at RAC_TTS_OPTIONS_DEFAULT's value (false).
     // sample_rate has no proto field on TTSOptions; keep default.
-    return true;
+    return RAC_SUCCESS;
 }
 
 // rac_tts_phoneme_timestamp_to_proto / _from_proto deleted: TTSPhonemeTimestamp
@@ -317,8 +357,17 @@ bool rac_tts_synthesis_metadata_from_proto(const ::runanywhere::v1::TTSSynthesis
                                            rac_tts_synthesis_metadata_t* out) {
     if (!out)
         return false;
-    out->voice = copy_string(in.voice_id());
-    out->language = copy_string(in.language_code());
+    *out = {};
+    char* voice = copy_string(in.voice_id());
+    if (!in.voice_id().empty() && !voice)
+        return false;
+    char* language = copy_string(in.language_code());
+    if (!in.language_code().empty() && !language) {
+        rac_free(voice);
+        return false;
+    }
+    out->voice = voice;
+    out->language = language;
     out->processing_time_ms = in.processing_time_ms();
     out->character_count = in.input_bytes();
     // Compute characters_per_second from processing_time_ms.
@@ -565,26 +614,42 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMR
     return true;
 }
 
-bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_image_t* out) {
-    if (!out)
-        return false;
+rac_result_t rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in,
+                                      rac_vlm_image_t* out, rac_proto_buffer_t* out_error) {
+    if (!out) {
+        return set_vlm_image_error(out_error, RAC_ERROR_NULL_POINTER,
+                                   "VLMImage output is required");
+    }
     std::memset(out, 0, sizeof(*out));
     out->width = static_cast<uint32_t>(in.width());
     out->height = static_cast<uint32_t>(in.height());
     if (in.has_file_path()) {
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
         out->file_path = copy_string_required(in.file_path());
+        if (!out->file_path) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.file_path");
+        }
     } else if (in.has_raw_rgb()) {
         // 3 bytes/px, tightly packed -- no alpha to drop.
         const ::std::string& src = in.raw_rgb();
         size_t rgb_size = 0;
-        if (!checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
-            src.size() != rgb_size)
-            return false;
+        if (!checked_raw_image_size(in.width(), in.height(), 3, &rgb_size)) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_dimensions_error("raw_rgb", in.width(), in.height(), 3));
+        }
+        if (src.size() != rgb_size) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_length_error("raw_rgb", src.size(), rgb_size, 3));
+        }
 
         uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
-        if (!buf)
-            return false;
+        if (!buf) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.raw_rgb pixel buffer");
+        }
         std::memcpy(buf, src.data(), rgb_size);
 
         out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
@@ -602,15 +667,21 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         size_t rgba_size = 0;
         size_t rgb_size = 0;
         if (!checked_raw_image_size(in.width(), in.height(), 4, &rgba_size) ||
-            !checked_raw_image_size(in.width(), in.height(), 3, &rgb_size) ||
-            src.size() != rgba_size) {
-            // Dimensions inconsistent with RGBA payload — refuse rather
-            // than read past the buffer.
-            return false;
+            !checked_raw_image_size(in.width(), in.height(), 3, &rgb_size)) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_dimensions_error("raw_rgba", in.width(), in.height(), 4));
+        }
+        if (src.size() != rgba_size) {
+            return set_vlm_image_error(
+                out_error, RAC_ERROR_INVALID_ARGUMENT,
+                raw_image_length_error("raw_rgba", src.size(), rgba_size, 4));
         }
         uint8_t* buf = static_cast<uint8_t*>(rac_alloc(rgb_size));
-        if (!buf)
-            return false;
+        if (!buf) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.raw_rgba RGB buffer");
+        }
 
         const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
         const size_t pixels = rgb_size / 3;
@@ -626,6 +697,10 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
         out->base64_data = copy_string_required(in.base64());
+        if (!out->base64_data) {
+            return set_vlm_image_error(out_error, RAC_ERROR_OUT_OF_MEMORY,
+                                       "failed to allocate VLMImage.base64");
+        }
         out->data_size = in.base64().size();
     } else if (in.has_data()) {
         // `data` (renamed from `encoded`) carries compressed JPEG/PNG/WEBP
@@ -636,13 +711,14 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         // the proto boundary so the caller sees a clean decoding error
         // instead of a backend crash. SDKs must decode containers to
         // RAW_RGB or supply a file path before calling C.
-        return false;
+        return set_vlm_image_error(out_error, RAC_ERROR_DECODING_ERROR,
+                                   "VLMImage.data requires decoding before native VLM dispatch");
     } else {
         // No source set — leave pointers NULL and pick FILE_PATH as the
         // safest default (matches RAC_VLM_IMAGE_FORMAT_FILE_PATH = 0).
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
     }
-    return true;
+    return RAC_SUCCESS;
 }
 
 // ===========================================================================
@@ -977,13 +1053,23 @@ bool rac_embedding_vector_from_proto(const ::runanywhere::v1::EmbeddingVector& i
     if (!out)
         return false;
     std::memset(out, 0, sizeof(*out));
-    out->dimension = static_cast<size_t>(in.values_size());
-    if (out->dimension > 0) {
-        out->data = static_cast<float*>(rac_alloc(sizeof(float) * out->dimension));
-        for (int i = 0; i < in.values_size(); ++i) {
-            out->data[i] = in.values(i);
+    if (in.values_size() < 0)
+        return false;
+    const size_t dimension = static_cast<size_t>(in.values_size());
+    if (dimension > 0) {
+        if (dimension > std::numeric_limits<size_t>::max() / sizeof(float)) {
+            return false;
         }
+        float* data = static_cast<float*>(rac_alloc(sizeof(float) * dimension));
+        if (!data) {
+            return false;
+        }
+        for (int i = 0; i < in.values_size(); ++i) {
+            data[i] = in.values(i);
+        }
+        out->data = data;
     }
+    out->dimension = dimension;
     return true;
 }
 
@@ -1068,6 +1154,8 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
         return false;
     std::memset(out, 0, sizeof(*out));
     out->model_id = copy_string(in.model_id());
+    if (!in.model_id().empty() && !out->model_id)
+        return false;
     out->size_on_disk = in.size_on_disk_bytes();
     return true;
 }
@@ -1077,27 +1165,16 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
 // ===========================================================================
 
 ::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code) {
-    // Non-negative codes (success / invalid) carry no error category.
     if (code >= 0)
         return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
-    if (code <= -150 && code >= -179)
-        return ::runanywhere::v1::ERROR_CATEGORY_NETWORK;
-    if (code <= -250 && code >= -279)
-        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
-    if (code <= -110 && code >= -129)
-        return ::runanywhere::v1::ERROR_CATEGORY_MODEL;
-    if ((code <= -180 && code >= -219) || (code <= -280 && code >= -299))
-        return ::runanywhere::v1::ERROR_CATEGORY_IO;
-    if (code <= -320 && code >= -329)
-        return ::runanywhere::v1::ERROR_CATEGORY_AUTH;
-    if (code <= -100 && code >= -109)
-        return ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
-    if ((code <= -230 && code >= -249) || (code <= -300 && code >= -319))
-        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
-    // Any other negative code is an unmapped error -> INTERNAL (canonical
-    // fallback; rac_error_proto.cpp previously returned UNSPECIFIED here, the
-    // drift this consolidation fixes).
-    return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
+
+    const int64_t magnitude = -static_cast<int64_t>(code);
+#define RAC_ERROR_CATEGORY_RANGE(first, last, category) \
+    if (magnitude >= first && magnitude <= last)        \
+        return ::runanywhere::v1::ERROR_CATEGORY_##category;
+#include "rac/core/rac_error_categories.def"
+#undef RAC_ERROR_CATEGORY_RANGE
+    return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
 }
 
 ::runanywhere::v1::ErrorCategory rac_category_to_proto(rac_error_category_t category) {

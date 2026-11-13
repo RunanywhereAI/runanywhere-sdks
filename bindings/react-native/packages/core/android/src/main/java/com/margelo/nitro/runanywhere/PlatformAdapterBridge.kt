@@ -19,11 +19,15 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import com.margelo.nitro.NitroModules
 import com.runanywhere.sdk.generated.RADefaults
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
@@ -698,18 +702,46 @@ object PlatformAdapterBridge {
 
     /**
      * Maximum entry name length (incl. NUL) per `RAC_DIRECTORY_ENTRY_NAME_MAX`.
-     * Oversized entries are skipped per the truncation contract in
-     * `rac_platform_adapter.h::rac_directory_entry_t::name`.
+     * Oversized entries make the listing inconclusive per the truncation
+     * contract in `rac_platform_adapter.h::rac_directory_entry_t::name`.
      */
     private const val DIRECTORY_ENTRY_NAME_MAX = 512
+
+    /**
+     * Probe an entry with stat(2)/lstat(2). A failed probe is inconclusive and
+     * must not be emitted as a regular file; a dangling symlink remains a
+     * non-directory entry.
+     */
+    private fun probeDirectoryEntry(child: File): Pair<Boolean, Long> {
+        val path = child.absolutePath
+        val info = try {
+            Os.stat(path)
+        } catch (error: ErrnoException) {
+            if (error.errno == OsConstants.ENOENT || error.errno == OsConstants.ENOTDIR) {
+                try {
+                    Os.lstat(path)
+                    return false to 0L
+                } catch (_: ErrnoException) {
+                    throw IOException("Directory entry vanished while listing: '$path'", error)
+                }
+            }
+            throw IOException("Unable to probe directory entry '$path'", error)
+        }
+        val isDir = OsConstants.S_ISDIR(info.st_mode)
+        if (!isDir && !OsConstants.S_ISREG(info.st_mode)) {
+            throw IOException("Unsupported directory entry type: '$path'")
+        }
+        return isDir to if (isDir) 0L else info.st_size
+    }
 
     /**
      * Enumerate directory entries via java.io.File.listFiles().
      *
      * @return Array of RacDirectoryEntry or null if the path does not exist /
-     *         is not a directory. Oversized names (UTF-8 + NUL > 512) are
-     *         filtered out with a single WARN summary; the C++ layer enforces
-     *         the same contract defensively.
+     *         is not a directory.
+     * @throws IOException if an existing directory cannot be enumerated or an
+     *         entry name exceeds [DIRECTORY_ENTRY_NAME_MAX]; the JNI caller
+     *         reports any thrown failure as RAC_ERROR_FILE_READ_FAILED.
      */
     @JvmStatic
     fun fileListDirectory(dirPath: String): Array<RacDirectoryEntry>? {
@@ -717,27 +749,25 @@ object PlatformAdapterBridge {
         if (!dir.exists() || !dir.isDirectory) {
             return null
         }
-        val children = dir.listFiles() ?: return emptyArray()
+        // A null listing means I/O failure, not a successful empty directory.
+        val children = dir.listFiles() ?: throw IOException("Unable to enumerate directory '$dirPath'")
 
-        var skipped = 0
         val entries = ArrayList<RacDirectoryEntry>(children.size)
         for (child in children) {
             val name = child.name
             val utf8Bytes = name.toByteArray(Charsets.UTF_8)
             if (utf8Bytes.size + 1 > DIRECTORY_ENTRY_NAME_MAX) {
-                skipped++
-                continue
+                Log.w(TAG, "fileListDirectory: oversized entry name in $dirPath")
+                throw IOException("Oversized directory entry name in '$dirPath'")
             }
+            val (isDir, sizeBytes) = probeDirectoryEntry(child)
             entries.add(
                 RacDirectoryEntry(
                     name = name,
-                    isDir = child.isDirectory,
-                    sizeBytes = if (child.isFile) child.length() else 0L,
+                    isDir = isDir,
+                    sizeBytes = sizeBytes,
                 ),
             )
-        }
-        if (skipped > 0) {
-            Log.w(TAG, "fileListDirectory: skipped $skipped oversized entry name(s) in $dirPath")
         }
         return entries.toTypedArray()
     }

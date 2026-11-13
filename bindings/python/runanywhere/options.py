@@ -26,6 +26,7 @@ __all__ = [
     "Interruption",
     "LlmOptions",
     "LoadOptions",
+    "ModelRefreshOptions",
     "PoolingMode",
     "RagConfig",
     "RagQueryOptions",
@@ -176,6 +177,21 @@ class VadOptions:
     model: Optional[str] = None
 
 
+@dataclass
+class ModelRefreshOptions:
+    """Controls reconciliation of the native model registry.
+
+    Setting ``prune_orphans`` to ``True`` clears download state for models whose
+    recorded path no longer exists, or still exists but holds no finished artifact or
+    fails the completeness check. It never deletes files, and warns if the platform
+    adapter lacks ``file_exists``.
+    """
+
+    rescan_local: bool = True
+    include_remote_catalog: bool = False
+    prune_orphans: bool = False
+
+
 class PoolingMode(IntEnum):
     """Token-pooling strategy used to build one vector per input."""
 
@@ -245,6 +261,7 @@ class SegmentationOptions:
 
     include_diagnostic_image: bool = False
     model: Optional[str] = None
+    include_confidence: bool = False
 
 
 @dataclass

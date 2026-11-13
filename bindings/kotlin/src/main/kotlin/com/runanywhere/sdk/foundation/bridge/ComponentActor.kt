@@ -252,5 +252,6 @@ private val SDKComponent.label: String
             SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION -> "SemanticSegmentation"
             SDKComponent.SDK_COMPONENT_RERANK -> "Rerank"
             SDKComponent.SDK_COMPONENT_OCR -> "OCR"
+            SDKComponent.SDK_COMPONENT_DECISION -> "Decision"
             SDKComponent.SDK_COMPONENT_UNSPECIFIED -> "UnknownComponent"
         }

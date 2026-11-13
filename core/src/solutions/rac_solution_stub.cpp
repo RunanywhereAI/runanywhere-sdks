@@ -11,7 +11,7 @@
 // Web exports) still reference the rac_solution_* symbols.
 //
 // To keep those bindings linkable, this TU is added to RAC_COMMONS_SOURCES
-// unconditionally and provides minimal stubs for all eight functions in
+// unconditionally and provides minimal stubs for all nine functions in
 // include/rac/solutions/rac_solution.h. Each stub returns
 // RAC_ERROR_FEATURE_NOT_AVAILABLE (which the SDK-side wrappers already
 // surface to callers) so a runtime call into RunAnywhere.solutions on a
@@ -43,6 +43,11 @@ RAC_API rac_result_t rac_solution_create_from_yaml(const char* /*yaml_text*/,
                                                    rac_solution_handle_t* out_handle) {
     if (out_handle)
         *out_handle = nullptr;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+RAC_API rac_result_t rac_solution_attach_rag_session(rac_solution_handle_t /*handle*/,
+                                                     rac_handle_t /*rag_session*/) {
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 

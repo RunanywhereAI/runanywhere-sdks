@@ -2,12 +2,12 @@
 
 On-device AI for Python — LLM, VLM, STT, TTS, embeddings, and voice pipelines run entirely on the host. Inference needs no network; the network is used only to download models.
 
-**Current release:** `0.20.11`
+**Current release:** `0.20.37`
 
 ## Install
 
 ```bash
-pip install runanywhere==0.20.11
+pip install runanywhere==0.20.37
 ```
 
 Wheels bundle the compiled native runtime and dependent libraries on Windows, macOS, and Linux. Python **3.9+** and `numpy >= 1.21` are required.
@@ -15,8 +15,8 @@ Wheels bundle the compiled native runtime and dependent libraries on Windows, ma
 Optional extras:
 
 ```bash
-pip install "runanywhere[rag]==0.20.11"      # RAG / document Q&A
-pip install "runanywhere[server]==0.20.11"   # OpenAI-compatible local server
+pip install "runanywhere[rag]==0.20.37"      # RAG / document Q&A
+pip install "runanywhere[server]==0.20.37"   # OpenAI-compatible local server
 ```
 
 ## Quick start
@@ -134,15 +134,24 @@ for event in ra.models.download("smollm2-360m"):
     if event.kind == DownloadEventKind.PROGRESS:
         print(f"{event.percent}%")
 
+ra.models.refresh()                   # reconcile the native registry with local model files
 ra.models.list(ModelFilter(downloaded=True))
 ra.models.load("smollm2-360m")      # pay the load cost now instead of on first generate
 ra.models.state()                   # what is resident + disk used/free
 ```
 
+`models.refresh()` is best-effort and returns `None`; it is a no-op before initialization.
+An older native extension without `rac_model_registry_refresh_proto` raises
+`SDKException` with `NOT_IMPLEMENTED`. Install `runanywhere[rag]` to enable its
+protobuf-backed native registry bridge. Setting `prune_orphans=True` clears download state
+for models whose recorded path no longer exists, or still exists but holds no finished artifact
+or fails the completeness check; it never deletes files, and warns if the platform adapter lacks
+`file_exists`.
+
 ## Local OpenAI-compatible server
 
 ```bash
-pip install "runanywhere[server]==0.20.11"
+pip install "runanywhere[server]==0.20.37"
 runanywhere serve          # http://127.0.0.1:8000
 runanywhere models         # list catalog + download state
 ```

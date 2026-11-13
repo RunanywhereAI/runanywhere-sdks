@@ -167,5 +167,5 @@ def check_embed_options(options: Optional[EmbedOptions]) -> None:
         return
     if options.pooling != PoolingMode.MEAN:
         raise SDKException.not_implemented(
-            "EmbedOptions.pooling: the bridge binds no rac_embeddings_options_t"
+            "EmbedOptions.pooling: only PoolingMode.MEAN is currently supported"
         )

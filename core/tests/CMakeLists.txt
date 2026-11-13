@@ -98,6 +98,19 @@ set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 # subdirectory of the top-level project.
 include_directories(${CMAKE_CURRENT_LIST_DIR}/../src)
 
+# --- Kotlin JNI directory probe errors -------------------------------------
+# Java's null result must not turn a denied filesystem probe into NOT_FOUND.
+add_executable(test_jni_directory_probe test_jni_directory_probe.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/infrastructure/file_management/directory_probe.cpp)
+target_include_directories(test_jni_directory_probe PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../include
+    # directory_probe.cpp includes core/internal/platform_compat.h on Windows.
+    ${CMAKE_CURRENT_LIST_DIR}/../src
+)
+target_compile_features(test_jni_directory_probe PRIVATE cxx_std_20)
+add_test(NAME jni_directory_probe_tests COMMAND test_jni_directory_probe)
+set_tests_properties(jni_directory_probe_tests PROPERTIES SKIP_RETURN_CODE 77)
+
 # --- Kotlin JNI request cancellation admission ----------------------
 # Header-only relay used by request-scoped VLM/RAG JNI wrappers. Covers
 # cancel-before-entry ownership, backend-publication retry, and the completion
@@ -225,6 +238,17 @@ target_link_libraries(test_vlm_options_defaults PRIVATE rac_commons)
 rac_link_archive_deps(test_vlm_options_defaults)
 target_compile_features(test_vlm_options_defaults PRIVATE cxx_std_17)
 add_test(NAME vlm_options_defaults_tests COMMAND test_vlm_options_defaults)
+
+# --- Direct C-struct VLM raw-image validation -----------------------
+add_executable(test_vlm_image_validation test_vlm_image_validation.cpp)
+target_include_directories(test_vlm_image_validation PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_vlm_image_validation PRIVATE rac_commons)
+rac_link_archive_deps(test_vlm_image_validation)
+target_compile_features(test_vlm_image_validation PRIVATE cxx_std_17)
+add_test(NAME vlm_image_validation_tests COMMAND test_vlm_image_validation)
 
 # --- MemoryPool<T> tests ------------------------------
 # Header-only template; verifies acquire/release, blocking, cancel, and a
@@ -558,6 +582,24 @@ rac_link_archive_deps(test_engine_vtable)
 target_compile_features(test_engine_vtable PRIVATE cxx_std_17)
 add_test(NAME engine_vtable_tests COMMAND test_engine_vtable)
 
+# --- Segmentation confidence payload validation ----------------------------
+# Backend-neutral fake engine: confidence direct/proto paths reject malformed
+# confidence masks. Legacy direct/proto paths validate class-mask and diagnostic
+# payloads; failures release allocated outputs. No ONNX model or backend linkage
+# is required; proto cases compile only when protobuf is enabled.
+add_executable(test_segmentation_confidence test_segmentation_confidence.cpp)
+target_include_directories(test_segmentation_confidence PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_segmentation_confidence PRIVATE rac_commons)
+rac_link_archive_deps(test_segmentation_confidence)
+rac_test_define_have_protobuf(test_segmentation_confidence)
+target_compile_features(test_segmentation_confidence PRIVATE cxx_std_20)
+add_test(NAME segmentation_confidence_tests COMMAND test_segmentation_confidence)
+set_tests_properties(segmentation_confidence_tests PROPERTIES
+    LABELS "native;segmentation;confidence")
+
 add_executable(test_plugin_registry_isolation test_plugin_registry_isolation.cpp)
 target_include_directories(test_plugin_registry_isolation PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -567,6 +609,17 @@ target_link_libraries(test_plugin_registry_isolation PRIVATE rac_commons)
 rac_link_archive_deps(test_plugin_registry_isolation)
 target_compile_features(test_plugin_registry_isolation PRIVATE cxx_std_17)
 add_test(NAME plugin_registry_isolation_tests COMMAND test_plugin_registry_isolation)
+
+# --- Diffusion model strategy error/exception contract ---------------------
+add_executable(test_diffusion_model_registry test_diffusion_model_registry.cpp)
+target_include_directories(test_diffusion_model_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_diffusion_model_registry PRIVATE rac_commons)
+rac_link_archive_deps(test_diffusion_model_registry)
+target_compile_features(test_diffusion_model_registry PRIVATE cxx_std_20)
+add_test(NAME diffusion_model_registry_tests COMMAND test_diffusion_model_registry)
 
 # --- Shared C ABI proto-byte buffer ownership tests -------------------------
 add_executable(test_proto_buffer test_proto_buffer.cpp)
@@ -951,6 +1004,14 @@ target_link_libraries(test_nonllm_lifecycle_proto_abi PRIVATE rac_commons)
 rac_link_archive_deps(test_nonllm_lifecycle_proto_abi)
 target_compile_features(test_nonllm_lifecycle_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_nonllm_lifecycle_proto_abi)
+# A static rac_commons lets the test supply its own rac_alloc/rac_free/rac_strdup
+# (rac_memory.cpp's archive member is then never pulled in) to inject allocation
+# failures; a shared library would keep binding its own copies.
+get_target_property(_rac_commons_type rac_commons TYPE)
+if(_rac_commons_type STREQUAL "STATIC_LIBRARY")
+    target_compile_definitions(test_nonllm_lifecycle_proto_abi PRIVATE
+        RAC_TEST_INTERPOSE_RAC_MEMORY=1)
+endif()
 add_test(NAME nonllm_lifecycle_proto_abi_tests COMMAND test_nonllm_lifecycle_proto_abi)
 
 # --- Standalone speaker-diarization proto/lifecycle/stream ABI tests --------
@@ -1099,6 +1160,21 @@ rac_link_archive_deps(test_engine_uses_runtime)
 target_compile_features(test_engine_uses_runtime PRIVATE cxx_std_17)
 add_test(NAME engine_uses_runtime_tests COMMAND test_engine_uses_runtime)
 
+# Test the real engine wrappers independently of private runtimes and commons.
+# Fake only their external dependencies, including registration results.
+add_executable(test_backend_registration_results
+    test_backend_registration_results.cpp
+    ../../engines/qhexrt/rac_backend_qhexrt_register.cpp
+    ../../engines/mlx/rac_backend_mlx_register.cpp
+)
+target_include_directories(test_backend_registration_results PRIVATE
+    ../include
+    ../../engines/qhexrt/include
+)
+target_link_libraries(test_backend_registration_results PRIVATE Threads::Threads)
+target_compile_features(test_backend_registration_results PRIVATE cxx_std_20)
+add_test(NAME backend_registration_results_tests COMMAND test_backend_registration_results)
+
 # Static registration test (always built — exercises the
 # RAC_STATIC_PLUGIN_REGISTER macro independently of the dlopen path).
 add_executable(test_static_registration test_static_registration.cpp)
@@ -1176,9 +1252,18 @@ if(NOT RAC_STATIC_PLUGINS)
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
     )
-    target_link_libraries(test_plugin_loader_double_load PRIVATE rac_commons)
-    rac_link_archive_deps(test_plugin_loader_double_load)
-    target_compile_features(test_plugin_loader_double_load PRIVATE cxx_std_17)
+    # Compile the production registry/loader slice directly so internal lease
+    # APIs are testable on shared/DLL builds without exporting them publicly.
+    target_sources(test_plugin_loader_double_load PRIVATE
+        ../src/plugin/rac_plugin_registry.cpp
+        ../src/plugin/plugin_loader.cpp
+        ../src/plugin/plugin_availability.cpp
+        ../src/core/rac_memory.cpp
+        fixtures/rac_test_logger.cpp
+    )
+    target_include_directories(test_plugin_loader_double_load PRIVATE ../include)
+    target_link_libraries(test_plugin_loader_double_load PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+    target_compile_features(test_plugin_loader_double_load PRIVATE cxx_std_20)
     target_compile_definitions(test_plugin_loader_double_load PRIVATE
         "RAC_TEST_PLUGIN_PATH=\"${_GAP03_FIXTURE_GOOD}\"")
     add_dependencies(test_plugin_loader_double_load rac_test_plugin)

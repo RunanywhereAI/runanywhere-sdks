@@ -4,6 +4,7 @@
 
 #include "rac/solutions/solution_runner.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -24,6 +25,39 @@ SolutionRunner::SolutionRunner(runanywhere::v1::PipelineSpec spec) : spec_(std::
 SolutionRunner::~SolutionRunner() {
     cancel();
     wait();
+}
+
+rac_result_t SolutionRunner::attach_rag_session(rac_handle_t session) {
+    if (!session) {
+        rac_error_set_details("RAG session handle must not be null");
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    std::lock_guard<std::mutex> lock(mu_);
+    if (started_) {
+        rac_error_set_details("RAG session must be attached before solution start");
+        return RAC_ERROR_INVALID_STATE;
+    }
+
+    const auto session_value = reinterpret_cast<std::uintptr_t>(session);
+    bool found_retrieve = false;
+
+    for (int i = 0; i < spec_.operators_size(); ++i) {
+        auto* op = spec_.mutable_operators(i);
+        if (op->type() != "retrieve")
+            continue;
+
+        (*op->mutable_params())["session_handle_id"] = std::to_string(session_value);
+        found_retrieve = true;
+    }
+
+    if (!found_retrieve) {
+        rac_error_set_details("cannot attach RAG session: solution contains no retrieve operator");
+        return RAC_ERROR_INVALID_CONFIGURATION;
+    }
+
+    rag_session_attached_ = true;
+    return RAC_SUCCESS;
 }
 
 rac_result_t SolutionRunner::start() {
@@ -96,6 +130,16 @@ void SolutionRunner::wait() {
         root_output_payload_type_.clear();
         joined_ = true;
         started_ = false;
+
+        if (rag_session_attached_) {
+            for (int i = 0; i < spec_.operators_size(); ++i) {
+                auto* op = spec_.mutable_operators(i);
+                if (op->type() == "retrieve") {
+                    op->mutable_params()->erase("session_handle_id");
+                }
+            }
+            rag_session_attached_ = false;
+        }
     }
     if (in_edge)
         in_edge->close();

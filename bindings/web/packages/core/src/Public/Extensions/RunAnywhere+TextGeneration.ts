@@ -29,7 +29,7 @@ import type {
   StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
 import type { LLMStreamingResult } from '../../types/index.js';
-import { AsyncQueue } from '../../Foundation/AsyncQueue.js';
+import { AsyncQueue } from '@runanywhere/proto-ts/streams/push';
 import { SDKException } from '../../Foundation/SDKException.js';
 import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
 import {
@@ -147,6 +147,7 @@ function streamingResultFromEvents(
   // backend supports streamed tool-call deltas (libprotobuf-enabled builds);
   // on WASM the field is currently always absent (see syn-010 evidence).
   const accumulatedToolCalls: ToolCall[] = [];
+  let startProducer = (): void => {};
   const result = new Promise<LLMGenerationResult>((resolve, reject) => {
     const start = (): void => {
       if (started) return;
@@ -187,17 +188,24 @@ function streamingResultFromEvents(
       })();
     };
 
-    const originalIterator = queue[Symbol.asyncIterator].bind(queue);
-    queue[Symbol.asyncIterator] = () => {
-      start();
-      return originalIterator();
-    };
+    startProducer = start;
     start();
   });
 
+  const stream: AsyncIterable<string> = {
+    [Symbol.asyncIterator]() {
+      startProducer();
+      return queue[Symbol.asyncIterator]();
+    },
+  };
+  // A mid-stream failure already throws from `stream`/`events`, so a caller
+  // that leaves its `for await` through that throw may never await `result`.
+  // Mark it handled; `await result` still rejects for callers that do.
+  void result.catch(() => undefined);
+
   return {
     events: eventQueue,
-    stream: queue,
+    stream,
     result,
     cancel() {
       if (cancelled) return;
@@ -354,14 +362,13 @@ export async function* generateStructuredStream(
     nativeStreamDone = true;
     // Surface in-flight generation failures as throws before parsing.
     await streaming.result;
-    const result = extractStructuredOutput(accumulated, schema);
+    const result = await extractStructuredOutputAsync(accumulated, schema);
     yield { kind: 'completed', result };
   } catch (error) {
     // Producer self-terminated (stream/result/parse failure) — never fire
-    // the native cancel for it. Swallow the duplicate rejection carried by
-    // the terminal result promise before rethrowing the original error.
+    // the native cancel for it. `generateStream` already marks `result`
+    // handled, so its duplicate rejection needs no guard here.
     nativeStreamDone = true;
-    void streaming.result.catch(() => undefined);
     throw error;
   } finally {
     if (!nativeStreamDone) streaming.cancel();
@@ -384,12 +391,11 @@ export function extractStructuredOutput(
   // This facade is synchronous, whereas BackendWorker RPC is intentionally
   // asynchronous. Do not invoke the main-thread structured-output ABI when
   // the LLM (and therefore its commons heap) belongs to the Llama worker.
-  // A future async facade can route `structured.parse` to that worker.
   if (mustUseLlamaBackendWorker()) {
     throw SDKException.backendNotAvailable(
       'extractStructuredOutput',
       getLlamaBackendWorkerDeadReason()
-        ?? 'Structured-output parsing requires the Llama BackendWorker, but this synchronous API cannot perform worker RPC. Use a main-thread model or an async worker-aware structured-output API.',
+        ?? 'Structured-output parsing requires the Llama BackendWorker, but this synchronous API cannot perform worker RPC. Use a main-thread model or the async worker-aware extractStructuredOutputAsync().',
     );
   }
   const adapter = StructuredOutputProtoAdapter.tryDefault();
@@ -404,6 +410,32 @@ export function extractStructuredOutput(
   }
   throw SDKException.backendNotAvailable(
     'extractStructuredOutput',
+    'This Web WASM build does not export rac_structured_output_parse_proto.',
+  );
+}
+
+/**
+ * Async, worker-aware variant of `extractStructuredOutput` (§3).
+ *
+ * Routes `structured.parse` to the Llama BackendWorker when the model is
+ * worker-owned, and falls back to the sync path for main-thread models.
+ */
+export async function extractStructuredOutputAsync(
+  text: string,
+  schema: JSONSchemaDescriptor,
+): Promise<StructuredOutputResult> {
+  const adapter = StructuredOutputProtoAdapter.tryDefault();
+  if (adapter?.supportsProtoParse()) {
+    const result = await adapter.parseAsync({
+      requestId: '',
+      text,
+      options: structuredOutputOptionsFromSchema(schema),
+      metadata: {},
+    });
+    if (result) return result;
+  }
+  throw SDKException.backendNotAvailable(
+    'extractStructuredOutputAsync',
     'This Web WASM build does not export rac_structured_output_parse_proto.',
   );
 }
@@ -440,4 +472,5 @@ export const TextGeneration = {
 
   generateStructuredStream,
   extractStructuredOutput,
+  extractStructuredOutputAsync,
 };

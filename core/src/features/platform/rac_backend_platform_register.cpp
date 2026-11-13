@@ -122,7 +122,9 @@ static rac_result_t platform_llm_vtable_get_info(void* impl, rac_llm_info_t* out
     out_info->is_ready = RAC_TRUE;  // Always ready (built-in)
     out_info->supports_streaming = RAC_TRUE;
     out_info->current_model = nullptr;
-    out_info->context_length = 4096;
+    // Foundation Models does not expose the initialized session's context window.
+    // Do not mistake a catalog/default value for backend-observed state.
+    out_info->context_length = 0;
 
     return RAC_SUCCESS;
 }

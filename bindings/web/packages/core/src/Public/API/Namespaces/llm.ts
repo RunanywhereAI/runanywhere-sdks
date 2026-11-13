@@ -106,8 +106,12 @@ async function generateWithToolLoop(
   input: string | readonly ChatMessage[],
   options?: LlmOptions,
 ): Promise<GenerationResult> {
-  const { prompt, history } = splitInput(input);
-  const protoOptions = toProtoLlmOptions(options);
+  const { prompt, history, systemPrompt } = splitInput(input);
+  // Same merge as buildRequest: a transcript's system message applies unless
+  // options.systemPrompt overrides it.
+  const protoOptions = toProtoLlmOptions(
+    systemPrompt && !options?.systemPrompt ? { ...options, systemPrompt } : options,
+  );
   const result = await ToolCalling.generateWithTools(
     prompt,
     protoOptions.toolCalling ?? { tools: options?.tools ?? [] },
@@ -313,7 +317,7 @@ export const llm = {
         'This Web WASM build does not export rac_structured_output_parse_proto.',
       );
     }
-    const parsed = adapter.parse({
+    const parsed = await adapter.parseAsync({
       requestId: generation.requestId,
       text: generation.text,
       options: structuredOutput,

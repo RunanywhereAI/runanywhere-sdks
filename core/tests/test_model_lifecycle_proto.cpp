@@ -51,9 +51,11 @@ int g_initialize_count = 0;
 int g_cleanup_count = 0;
 int g_destroy_count = 0;
 std::string g_last_llm_engine;
+std::string g_last_llm_config_json;
 
 struct DummyLlm {
     std::string model_path;
+    int32_t effective_context_length{2048};
     bool initialized{false};
 };
 
@@ -126,11 +128,18 @@ rac_platform_adapter_t make_lifecycle_test_adapter() {
     return adapter;
 }
 
-rac_result_t dummy_llm_create(const char* model_id, const char*, void** out_impl) {
+rac_result_t dummy_llm_create(const char* model_id, const char* config_json, void** out_impl) {
     if (!model_id || !out_impl)
         return RAC_ERROR_NULL_POINTER;
+    g_last_llm_config_json = config_json ? config_json : "";
     auto* impl = new DummyLlm();
     impl->model_path = model_id;
+    int requested_context = 0;
+    if (config_json &&
+        std::sscanf(config_json, "{\"context_length\":%d}", &requested_context) == 1 &&
+        requested_context > 0) {
+        impl->effective_context_length = requested_context;
+    }
     *out_impl = impl;
     ++g_create_count;
     return RAC_SUCCESS;
@@ -153,6 +162,13 @@ rac_result_t dummy_llm_initialize(void* impl, const char* model_path) {
     dummy->initialized = true;
     dummy->model_path = model_path;
     ++g_initialize_count;
+    return RAC_SUCCESS;
+}
+
+rac_result_t dummy_llm_get_info(void* impl, rac_llm_info_t* info) {
+    if (!impl || !info)
+        return RAC_ERROR_NULL_POINTER;
+    info->context_length = static_cast<DummyLlm*>(impl)->effective_context_length;
     return RAC_SUCCESS;
 }
 
@@ -774,6 +790,205 @@ int test_load_replaces_previous_model(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+int test_resident_context_length_change_reloads_model(
+    rac_model_registry_handle_t registry) {
+    g_create_count = g_initialize_count = g_cleanup_count = g_destroy_count = 0;
+    g_last_llm_engine.clear();
+    g_last_llm_config_json.clear();
+    rac_model_lifecycle_reset();
+    rac_sdk_event_clear_queue();
+
+    rac_llm_service_ops_t ops{};
+    ops.create = dummy_llm_create;
+    ops.initialize = dummy_llm_initialize;
+    ops.get_info = dummy_llm_get_info;
+    ops.cleanup = dummy_llm_cleanup;
+    ops.destroy = dummy_llm_destroy;
+
+    const uint32_t formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+    auto vtable = make_dummy_llm_vtable(&ops, formats);
+    (void)rac_plugin_unregister("llamacpp");
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "context-length plugin registers");
+    CHECK(register_model(registry, build_llm_model()), "context-length LLM model registers");
+
+    // Serializes, loads, decodes and frees for every step below; false means the
+    // call itself or the ModelLoadResult decode failed.
+    const auto do_load = [&](const runanywhere::v1::ModelLoadRequest& request,
+                             runanywhere::v1::ModelLoadResult* result) {
+        std::vector<uint8_t> bytes;
+        if (!serialize(request, &bytes)) {
+            return false;
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc =
+            rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
+        const bool ok = rc == RAC_SUCCESS && parse_buffer(out, result);
+        rac_proto_buffer_free(&out);
+        return ok;
+    };
+
+    // (a) Initial load without an explicit context_length: one backend, no config.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "default load returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "default load reports success");
+        CHECK(g_create_count == 1 && g_initialize_count == 1,
+              "default load creates and initializes one backend");
+        CHECK(g_cleanup_count == 0 && g_destroy_count == 0,
+              "default load performs no cleanup or destroy");
+        CHECK(g_last_llm_config_json.empty(), "default load forwards no context config");
+    }
+
+    // (b) The same request again must stay on the READY fast path.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "repeated default load returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "repeated default load reports success");
+        CHECK(g_create_count == 1 && g_initialize_count == 1 && g_cleanup_count == 0 &&
+                  g_destroy_count == 0,
+              "repeated default load is idempotent");
+    }
+
+    // A concrete request matching the observed default context does not reload,
+    // even though the previous request omitted context_length.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(2048);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "effective-match load returns parsable result");
+        CHECK(!result.has_error(), "effective-match load reports success");
+        CHECK(g_create_count == 1 && g_destroy_count == 0,
+              "effective-match reuses the default resident model");
+    }
+
+    // (c) A different explicit context length reloads the resident model.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(4096);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "context_length=4096 load returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "context_length=4096 load reports success");
+        CHECK(g_create_count == 2 && g_initialize_count == 2,
+              "context_length=4096 load creates and initializes a new backend");
+        CHECK(g_cleanup_count == 1 && g_destroy_count == 1,
+              "context_length=4096 load destroys the previous backend once");
+        CHECK(g_last_llm_config_json == "{\"context_length\":4096}",
+              "context_length=4096 load forwards {\"context_length\":4096}");
+    }
+
+    // (d) Repeating the same explicit value stays idempotent.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(4096);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "repeated 4096 load returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "repeated 4096 load reports success");
+        CHECK(g_create_count == 2 && g_initialize_count == 2 && g_cleanup_count == 1 &&
+                  g_destroy_count == 1,
+              "repeated 4096 load is idempotent");
+    }
+
+    // (e) Omitting context_length must not reset the explicitly sized resident.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "omitted after 4096 returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "omitted after 4096 reports success");
+        CHECK(g_create_count == 2 && g_initialize_count == 2 && g_cleanup_count == 1 &&
+                  g_destroy_count == 1,
+              "omitted after 4096 does not reload or destroy");
+        CHECK(g_last_llm_config_json == "{\"context_length\":4096}",
+              "omitted after 4096 keeps the 4096 resident intent");
+    }
+
+    // (f) Another different explicit value reloads exactly once more.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(8192);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "context_length=8192 load returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "context_length=8192 load reports success");
+        CHECK(g_create_count == 3 && g_initialize_count == 3,
+              "context_length=8192 load creates exactly one more backend");
+        CHECK(g_cleanup_count == 2 && g_destroy_count == 2,
+              "context_length=8192 load destroys the previous backend once");
+        CHECK(g_last_llm_config_json == "{\"context_length\":8192}",
+              "context_length=8192 load forwards {\"context_length\":8192}");
+    }
+
+    // (g) Explicit zero asks for model/default context after a nonzero value.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(0);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "context_length=0 load returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "context_length=0 load reports success");
+        CHECK(g_create_count == 4 && g_initialize_count == 4,
+              "context_length=0 load reloads once more");
+        CHECK(g_cleanup_count == 3 && g_destroy_count == 3,
+              "context_length=0 load destroys the previous backend once");
+        CHECK(g_last_llm_config_json == "{\"context_length\":0}",
+              "context_length=0 load forwards {\"context_length\":0}");
+    }
+
+    // (h) Omitted and explicit zero both mean model/default: no further reload.
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result), "omitted after zero returns parsable result");
+        CHECK(!result.has_error() && result.model_id() == "lifecycle.llm",
+              "omitted after zero reports success");
+        CHECK(g_create_count == 4 && g_initialize_count == 4 && g_cleanup_count == 3 &&
+                  g_destroy_count == 3,
+              "omitted after zero is idempotent");
+        CHECK(g_last_llm_config_json == "{\"context_length\":0}",
+              "omitted after zero keeps the model-default intent");
+    }
+
+    // An unobservable backend cannot prove an identical positive request
+    // was honored. Do not reload forever or report a false cache hit.
+    rac_model_lifecycle_reset();
+    ops.get_info = nullptr;
+    const int creates_before_unknown = g_create_count;
+    const int destroys_before_unknown = g_destroy_count;
+    {
+        runanywhere::v1::ModelLoadRequest request;
+        request.set_model_id("lifecycle.llm");
+        request.set_context_length(4096);
+        runanywhere::v1::ModelLoadResult result;
+        CHECK(do_load(request, &result) && !result.has_error(),
+              "initial unknown-context load completes");
+        CHECK(do_load(request, &result) && result.has_error(),
+              "repeating an unverified positive context returns a load error");
+        CHECK(g_create_count == creates_before_unknown + 1 &&
+                  g_destroy_count == destroys_before_unknown,
+              "unknown-context repeat preserves the existing backend");
+    }
+
+    rac_plugin_unregister("llamacpp");
+    rac_model_lifecycle_reset();
+    return 0;
+}
+
 int test_shutdown_resets_lifecycle_for_reinitialize(rac_model_registry_handle_t registry) {
     rac_shutdown();
     g_create_count = g_initialize_count = g_cleanup_count = g_destroy_count = 0;
@@ -872,6 +1087,7 @@ int main() {
         test_foundation_model_pins_platform_over_mlx(registry);
         test_vlm_lifecycle_resolved_artifacts(registry);
         test_load_replaces_previous_model(registry);
+        test_resident_context_length_change_reloads_model(registry);
         test_shutdown_resets_lifecycle_for_reinitialize(registry);
 
         rac_model_registry_destroy(registry);

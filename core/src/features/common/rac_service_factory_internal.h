@@ -17,6 +17,7 @@
 #include <string>
 
 #include "rac/core/rac_core.h"
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -91,11 +92,7 @@ inline rac_result_t resolve_model_reference(const char* model_id,
     }
 
     if (result != RAC_SUCCESS && options.lookup_last_path_component) {
-        const char* last_fwd = strrchr(model_id, '/');
-        const char* last_bck = strrchr(model_id, '\\');
-        const char* last_slash = (last_fwd && last_bck) ? std::max(last_fwd, last_bck)
-                                 : last_fwd             ? last_fwd
-                                                        : last_bck;
+        const char* last_slash = rac::path::find_last_path_separator(model_id);
         if (last_slash && last_slash[1] != '\0') {
             const char* extracted_id = last_slash + 1;
             RAC_LOG_DEBUG(options.log_cat, "Trying extracted model ID from path: %s", extracted_id);
@@ -180,6 +177,9 @@ struct PluginServiceCreateSpec {
     const char* model_id_for_service;
     const char* config_json;
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    // Optional commons-only admission hook, before dereferencing plugin data.
+    rac_result_t (*admit_provider)(const rac_engine_vtable_t*, void*) = nullptr;
+    void* admission_context = nullptr;
 };
 
 /**
@@ -292,6 +292,12 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     }
     if (vt == nullptr) {
         vt = rac_plugin_find(spec.primitive);
+    }
+    if (vt && spec.admit_provider) {
+        const rac_result_t admission = spec.admit_provider(vt, spec.admission_context);
+        if (admission != RAC_SUCCESS) {
+            return admission;
+        }
     }
     const OpsT* ops = (vt && spec.select_ops) ? spec.select_ops(vt) : nullptr;
     if (!vt || !ops || !ops->create) {

@@ -47,6 +47,11 @@ Prerequisites: a C++ toolchain (MSVC on Windows), Node.js, and a `runanywhere-co
 build with backends enabled. See the `electron-*` presets in `CMakePresets.json` for CUDA
 builds, integration tests, and contributor details.
 
+To build the addon with an `electron-*` preset, run `npm install` in `bindings/electron/native`
+first. It installs `node-addon-api` and `node-api-headers`, and CMake configure stops with
+"node deps missing" without them. `.github/workflows/electron-sdk-ci.yml` is the reference
+for the full per-platform sequence, including the Windows-only steps.
+
 ## Quick start (Node)
 
 One `initialize` brings up the native runtime, the model store, and the secure
@@ -184,6 +189,18 @@ When packaging with electron-builder, unpack native artifacts from the asar:
 ## Model catalog
 
 `models.load(id)` and the `model:` option on a generation accept a catalog id (downloaded on first use) or a registered local path. Built-in ids include `smollm2-135m`, `qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-tiny`, and `piper-lessac`.
+
+Reconcile the native registry after model files change outside the SDK:
+
+```ts
+await RunAnywhere.models.refresh();
+```
+
+Refresh rescans local files by default, does not fetch a remote catalog or prune missing files
+by default, and logs failures instead of rejecting. It resolves to `void`. Setting
+`pruneOrphans: true` clears download state for models whose recorded path no longer exists, or
+still exists but holds no finished artifact or fails the completeness check; it never deletes
+files, and warns if the platform adapter lacks `file_exists`.
 
 ## Example application
 

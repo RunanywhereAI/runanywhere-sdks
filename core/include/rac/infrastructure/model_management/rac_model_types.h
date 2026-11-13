@@ -194,6 +194,7 @@ typedef enum rac_model_category {
     RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION = 9,      /**< Standalone speaker diarization */
     RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 10,   /**< Semantic image segmentation */
     RAC_MODEL_CATEGORY_OCR = 11,                     /**< Full-page optical character recognition */
+    RAC_MODEL_CATEGORY_DECISION = 12,                /**< Joint decision scoring (choice/noul/score) */
     RAC_MODEL_CATEGORY_UNKNOWN = 99                  /**< Unknown category */
 } rac_model_category_t;
 

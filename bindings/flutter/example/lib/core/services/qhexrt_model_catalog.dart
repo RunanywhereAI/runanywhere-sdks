@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 
@@ -13,6 +14,7 @@ const _embedding = ModelCategory.MODEL_CATEGORY_EMBEDDING;
 const _stt = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
 const _tts = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
 const _hnpuDescription = 'Qualcomm Hexagon NPU model bundle.';
+final _racErrorNotFound = -ErrorCode.ERROR_CODE_NOT_FOUND.value;
 
 typedef QHexRTCatalogRegistrar =
     Future<ModelInfo?> Function(RegisterModelFromUrlRequest request);
@@ -25,9 +27,12 @@ class QHexRTCatalogModel {
     required this.url,
     required this.category,
     required this.memoryBytes,
+    this.downloadBytes,
     this.contextLength,
     this.supportsThinking = false,
     this.supportsLora = false,
+    this.excludedArchitectures = const <HexagonArch>{},
+    this.pinnedArchitecture,
   });
 
   final String id;
@@ -35,25 +40,40 @@ class QHexRTCatalogModel {
   final String url;
   final ModelCategory category;
   final int memoryBytes;
+  final int? downloadBytes;
   final int? contextLength;
   final bool supportsThinking;
   final bool supportsLora;
+  final Set<HexagonArch> excludedArchitectures;
+  final HexagonArch? pinnedArchitecture;
 
-  RegisterModelFromUrlRequest toRegistrationRequest() =>
-      RegisterModelFromUrlRequest(
-        id: id,
-        name: name,
-        url: url,
-        framework: _qhexrt,
-        category: category,
-        source: ModelSource.MODEL_SOURCE_REMOTE,
-        memoryRequiredBytes: Int64(memoryBytes),
-        downloadSizeBytes: Int64(memoryBytes),
-        contextLength: contextLength,
-        supportsThinking: supportsThinking,
-        supportsLora: supportsLora,
-        description: _hnpuDescription,
-      );
+  bool isEligibleFor(NpuCapability capability) {
+    final architecture = capability.hexagonArch;
+    return capability.supported &&
+        !excludedArchitectures.contains(architecture) &&
+        (pinnedArchitecture == null || pinnedArchitecture == architecture);
+  }
+
+  RegisterModelFromUrlRequest toRegistrationRequest() {
+    final request = RegisterModelFromUrlRequest(
+      id: id,
+      name: name,
+      url: url,
+      framework: _qhexrt,
+      category: category,
+      source: ModelSource.MODEL_SOURCE_REMOTE,
+      memoryRequiredBytes: Int64(memoryBytes),
+      contextLength: contextLength,
+      supportsThinking: supportsThinking,
+      supportsLora: supportsLora,
+      description: _hnpuDescription,
+    );
+    final artifactBytes = downloadBytes;
+    if (artifactBytes != null) {
+      request.downloadSizeBytes = Int64(artifactBytes);
+    }
+    return request;
+  }
 }
 
 @immutable
@@ -82,11 +102,11 @@ class QHexRTCatalogSeedResult {
   final Set<String> registeredModelIds;
 }
 
-/// Flutter's app-owned QHexRT definitions and native registration results.
+/// Flutter's app-owned QHexRT catalog rows and eligibility policy.
 ///
-/// URLs and presentation metadata stay in the example app. Device probing,
-/// architecture selection, model-ID materialization, and registry insertion
-/// stay in QHexRT's native catalog facade.
+/// The app registers eligible rows through the shared SDK model API. Native
+/// QHexRT owns device probing and logical-reference architecture-variant
+/// resolution.
 abstract final class QHexRTModelCatalog {
   static final ValueNotifier<QHexRTCatalogSnapshot> snapshots = ValueNotifier(
     const QHexRTCatalogSnapshot(),
@@ -95,10 +115,13 @@ abstract final class QHexRTModelCatalog {
   static Set<String> get registeredModelIds =>
       snapshots.value.registeredModelIds;
 
-  /// Kept in lockstep with Android's `ModelCatalog.npuCatalog`.
+  /// Curated public examples, preserving the former native architecture masks.
+  /// The private kitten_nano_0_8_varlen variant is deliberately not seeded;
+  /// adding it requires an explicit HF-auth preflight, not just an arch pin.
   static const List<QHexRTCatalogModel> models = [
     QHexRTCatalogModel(
       id: 'qwen3_0_6b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Qwen3 0.6B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
@@ -127,6 +150,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'qwen3_5_4b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Qwen3.5 4B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
@@ -136,6 +160,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'qwen3_vl_2b_text',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Qwen3-VL 2B Text (HNPU)',
       url:
           'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
@@ -173,6 +198,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'llama3_2_1b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Llama 3.2 1B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
@@ -182,13 +208,16 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'phi_tiny_moe',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Phi Tiny MoE (HNPU)',
       url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
       category: _language,
       memoryBytes: 4721494520,
     ),
     QHexRTCatalogModel(
+      // Preserve the native QAIRT restriction: the v79 bundle needs 2.48.
       id: 'gemma3n_e4b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Gemma 3n E4B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
@@ -197,14 +226,15 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'gemma4_e2b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Gemma 4 E2B (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
+      url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
       category: _language,
       memoryBytes: 9252275672,
     ),
     QHexRTCatalogModel(
       id: 'gemma4_e4b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Gemma 4 E4B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
@@ -213,6 +243,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemotron_nano_8b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
@@ -221,6 +252,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemoguard_content_8b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'NemoGuard 8B Content Safety (HNPU)',
       url:
           'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
@@ -229,6 +261,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemoguard_topic_8b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'NemoGuard 8B Topic Control (HNPU)',
       url:
           'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
@@ -237,6 +270,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'ternary_bonsai_1_7b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Ternary Bonsai 1.7B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
@@ -246,6 +280,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'bonsai_1_7b_1bit',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Bonsai-1.7B 1-bit (HNPU, fully-on-NPU)',
       url:
           'https://huggingface.co/runanywhere/bonsai_1_7b_1bit_HNPU/bonsai-1.7b-1bit-1024.json',
@@ -255,6 +290,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'bonsai_4b_1bit',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Bonsai-4B 1-bit (HNPU)',
       url:
           'https://huggingface.co/runanywhere/bonsai_4b_1bit_HNPU/bonsai-4b-1024.json',
@@ -265,6 +301,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'bonsai_8b_1bit',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Bonsai-8B 1-bit (HNPU)',
       url:
           'https://huggingface.co/runanywhere/bonsai_8b_1bit_HNPU/bonsai-8b-1024.json',
@@ -275,6 +312,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'bonsai_27b_1bit',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Bonsai-27B 1-bit (HNPU)',
       url:
           'https://huggingface.co/runanywhere/bonsai_27b_1bit_HNPU/bonsai-27b-1024.json',
@@ -285,6 +323,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'cosmos3_edge_text',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Cosmos3-Edge Text (HNPU)',
       url:
           'https://huggingface.co/runanywhere/cosmos3_edge_HNPU/cosmos3-edge-text.manifest.json',
@@ -294,6 +333,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'deepseek_r1_distill_qwen_1_5b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'DeepSeek R1 Distill Qwen 1.5B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
@@ -303,6 +343,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'deepseek_r1_distill_qwen_7b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'DeepSeek R1 Distill Qwen 7B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
@@ -312,6 +353,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'qwen3_vl',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V81},
       name: 'Qwen3-VL 2B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
@@ -321,6 +363,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'gemma4_e2b_vlm',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Gemma 4 E2B Image (HNPU)',
       url:
           'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
@@ -329,6 +372,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'gemma4_e4b_vlm',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Gemma 4 E4B Image (HNPU)',
       url:
           'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B-vlm.json',
@@ -337,6 +381,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemotron_ocr',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Nemotron OCR (HNPU)',
       url: 'https://huggingface.co/runanywhere/nemotron_ocr_HNPU',
       category: _multimodal,
@@ -344,6 +389,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemotron_ocr_v1',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Nemotron OCR v1 (HNPU)',
       url: 'https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU',
       category: _multimodal,
@@ -351,6 +397,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemotron_parse',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Nemotron Parse (HNPU)',
       url: 'https://huggingface.co/runanywhere/nemotron_parse_HNPU',
       category: _multimodal,
@@ -358,6 +405,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemotron_nano_vl_8b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
@@ -366,6 +414,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'cosmos3_edge_vlm',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Cosmos3-Edge Vision (HNPU)',
       url:
           'https://huggingface.co/runanywhere/cosmos3_edge_HNPU/cosmos3-edge-vlm.json',
@@ -390,6 +439,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemotron_3_embed_1b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V75,
       name: 'Nemotron-3-Embed 1B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/nemotron_3_embed_1b_HNPU/nemotron-3-embed-1b.json',
@@ -398,6 +448,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nv_embedqa_1b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'NV-EmbedQA 1B (HNPU)',
       url: 'https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU',
       category: _embedding,
@@ -405,6 +456,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nv_rerankqa_1b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'NV-RerankQA 1B (HNPU)',
       url: 'https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU',
       category: _embedding,
@@ -412,6 +464,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nv_embedcode_7b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'NV-EmbedCode 7B (HNPU)',
       url: 'https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU',
       category: _embedding,
@@ -419,6 +472,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'llama_embed_nemotron_8b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
       name: 'Llama Embed Nemotron 8B (HNPU)',
       url: 'https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU',
       category: _embedding,
@@ -433,6 +487,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'canary_180m_flash',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V75,
       name: 'Canary 180M Flash (HNPU)',
       url:
           'https://huggingface.co/runanywhere/canary_180m_flash_HNPU/canary-180m-flash.json',
@@ -441,6 +496,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'canary_1b_flash',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Canary-1B-flash (HNPU)',
       url:
           'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
@@ -454,6 +510,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json',
       category: _stt,
       memoryBytes: 5491333979,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'moonshine_tiny',
@@ -473,6 +530,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'nemotron_asr_streaming',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Nemotron ASR Streaming 0.6B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
@@ -481,6 +539,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'parakeet_tdt_0_6b_v2',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Parakeet TDT 0.6B v2 (HNPU)',
       url:
           'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
@@ -489,6 +548,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'parakeet_tdt_0_6b_v3',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Parakeet TDT 0.6B v3 (HNPU)',
       url:
           'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
@@ -497,6 +557,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'parakeet_ctc_1_1b',
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V75,
       name: 'Parakeet CTC 1.1B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/parakeet_ctc_1.1b_HNPU/parakeet-ctc-1.1b.json',
@@ -505,6 +566,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'parakeet_rnnt_1_1b',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Parakeet RNNT 1.1B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
@@ -528,12 +590,15 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 676713240,
     ),
     QHexRTCatalogModel(
+      // This example deliberately selects the v81 manifest; the native catalog
+      // also allowed v75, which needs a different manifest.
       id: 'kitten_nano_0_8',
       name: 'Kitten-nano-0.8-fp32 (HNPU)',
       url:
           'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
       category: _tts,
       memoryBytes: 44135896,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kitten_micro_0_8',
@@ -542,6 +607,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
       category: _tts,
       memoryBytes: 103930338,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
       id: 'kitten_mini_0_8',
@@ -550,16 +616,20 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
       category: _tts,
       memoryBytes: 184334815,
+      pinnedArchitecture: HexagonArch.HEXAGON_ARCH_V81,
     ),
     QHexRTCatalogModel(
+      // Preserve the native exclusion: v79 requires downloaded executable .so files.
       id: 'kokoro_en',
       name: 'Kokoro-82M EN (HNPU)',
       url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
       category: _tts,
       memoryBytes: 470739484,
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
     ),
     QHexRTCatalogModel(
       id: 'magpie_tts_357m',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V79},
       name: 'Magpie-TTS Multilingual 357M (HNPU)',
       url: 'https://huggingface.co/runanywhere/magpie_tts_357m_HNPU',
       category: _tts,
@@ -568,13 +638,13 @@ abstract final class QHexRTModelCatalog {
     QHexRTCatalogModel(
       id: 'melotts_en',
       name: 'MeloTTS EN (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
+      url: 'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
       category: _tts,
       memoryBytes: 120439053,
     ),
     QHexRTCatalogModel(
       id: 'cosmos3_edge_diffusion',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'Cosmos3-Edge Image (HNPU)',
       url:
           'https://huggingface.co/runanywhere/cosmos3_edge_image_HNPU/cosmos3-edge-diffusion.json',
@@ -583,6 +653,7 @@ abstract final class QHexRTModelCatalog {
     ),
     QHexRTCatalogModel(
       id: 'lama_dilated',
+      excludedArchitectures: {HexagonArch.HEXAGON_ARCH_V75},
       name: 'LaMa Dilated (HNPU)',
       url: 'https://huggingface.co/runanywhere/lama_dilated_HNPU',
       category: _imageGeneration,
@@ -597,11 +668,40 @@ abstract final class QHexRTModelCatalog {
     return !isQHexRT || registeredModelIds.contains(model.id);
   }
 
-  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice() {
-    final eligible = Platform.isAndroid && QHexRT.isAvailable;
+  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice({
+    required bool backendRegistered,
+  }) {
+    var capability = NpuCapability();
+    if (Platform.isAndroid && QHexRT.isAvailable) {
+      try {
+        capability = QHexRT.probeNpu();
+      } catch (error) {
+        debugPrint('QHexRT capability probe failed: $error');
+      }
+    }
     return registerWith(
-      deviceEligible: eligible,
-      registrar: (request) => QHexRT.registerModelForDevice(request: request),
+      deviceEligible: backendRegistered && capability.supported,
+      capability: capability,
+      registrar: (request) => RunAnywhere.models.register(
+        ModelRegistration.url(
+          id: request.id,
+          name: request.name,
+          url: request.url,
+          framework: request.framework,
+          category: request.category,
+          memoryRequirementBytes: request.memoryRequiredBytes.toInt(),
+          downloadSizeBytes: request.hasDownloadSizeBytes()
+              ? request.downloadSizeBytes.toInt()
+              : null,
+          contextLength: request.hasContextLength()
+              ? request.contextLength
+              : null,
+          source: request.source,
+          description: request.description,
+          supportsThinking: request.supportsThinking,
+          supportsLora: request.supportsLora,
+        ),
+      ),
     );
   }
 
@@ -609,6 +709,7 @@ abstract final class QHexRTModelCatalog {
   @visibleForTesting
   static Future<QHexRTCatalogSeedResult> registerWith({
     required bool deviceEligible,
+    NpuCapability? capability,
     required QHexRTCatalogRegistrar registrar,
   }) async {
     var registered = 0;
@@ -620,6 +721,10 @@ abstract final class QHexRTModelCatalog {
       skippedNative = models.length;
     } else {
       for (final model in models) {
+        if (capability != null && !model.isEligibleFor(capability)) {
+          skippedNative++;
+          continue;
+        }
         try {
           final saved = await registrar(model.toRegistrationRequest());
           if (saved == null) {
@@ -629,8 +734,12 @@ abstract final class QHexRTModelCatalog {
             registeredIds.add(saved.id);
           }
         } catch (error) {
-          failed++;
-          debugPrint('QHexRT catalog: ${model.id} failed: $error');
+          if (_isMissingManifest(error)) {
+            skippedNative++;
+          } else {
+            failed++;
+            debugPrint('QHexRT catalog: ${model.id} failed: $error');
+          }
         }
       }
     }
@@ -652,4 +761,7 @@ abstract final class QHexRTModelCatalog {
   static void resetForTesting() {
     snapshots.value = const QHexRTCatalogSnapshot();
   }
+
+  static bool _isMissingManifest(Object error) =>
+      error is SDKException && error.error.cAbiCode == _racErrorNotFound;
 }

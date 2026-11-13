@@ -1,6 +1,6 @@
 ---
 name: sdk-publish
-description: Manually publish an already-tagged, already-released (non-draft GitHub Release) RunAnywhere SDK version to every package registry (npm, Maven Central, pub.dev, Swift SPM dist repo) plus macOS rcli notarization, with heavy verification that nothing fake/stubbed/broken ships.
+description: Manually publish an already-tagged, already-released (non-draft GitHub Release) RunAnywhere SDK version to every package registry (npm, Maven Central, pub.dev, Swift SPM dist repo), with heavy verification that nothing fake/stubbed/broken ships.
 ---
 
 # SDK Publish
@@ -37,7 +37,9 @@ gh release view v$VERSION --json assets --jq '.assets[].name' | sort >/tmp/actua
 diff /tmp/expected.txt /tmp/actual.txt
 ```
 
-As of the last verified run (**v0.20.25, 65 assets** — up from 55 at v0.20.24 because the 5 public Electron tarballs and their sidecars joined the release; see §6), the full set is: `MANIFEST.txt`; per-platform `RACommons-{android-arm64-v8a,android-armeabi-v7a,android-x86_64,ios,linux-x86_64,web,windows-x64}-v$VERSION.{zip,tar.gz}` + `.sha256`; iOS backend zips `RABackend{LLAMACPP,MLX,NeuRT,ONNX,Sherpa}-ios-v$VERSION.zip` + `.sha256`; `RunAnywhereMLX{Metal,Resources,Runtime}-ios-v$VERSION.zip` + `.sha256`; `rcli-{linux-x86_64,macos-arm64,windows-x86_64}-v$VERSION.tar.gz`/`.zip` + `.sha256`; the 8 npm tarballs `runanywhere-{core,llamacpp,mlx,onnx,proto-ts,web,web-llamacpp,web-onnx}-$VERSION.tgz` + `.sha256`; the **5 Electron npm tarballs** `runanywhere-electron{,-llamacpp,-onnx,-sherpa,-neurt}-$VERSION.tgz` + `.sha256` (new as of v0.20.25); and `runanywhere-kotlin-maven-v$VERSION.zip` + `.sha256`. There is **no** Flutter tarball in the release (Flutter packages are staged from the native archives above, not from a dedicated release asset) and **no** `.dmg` asset in the baseline set (the macOS rcli tarball is what ships; see the notarization section for when a `.dmg` does get produced). If a `qhexrt`-named asset appears anywhere in this list, stop — that would mean `release.yml`'s own manifest assertion should have hard-failed and something is very wrong; do not publish anything from that release.
+If `<PREVIOUS_VERSION>` is `0.20.27`, expect the three `rcli-*` archives and their `.sha256` files to show up only in `expected.txt` (see §5).
+
+As of the last verified run (**v0.20.25, 65 assets** — up from 55 at v0.20.24 because the 5 public Electron tarballs and their sidecars joined the release; see §6), the full set is: `MANIFEST.txt`; per-platform `RACommons-{android-arm64-v8a,android-armeabi-v7a,android-x86_64,ios,linux-x86_64,web,windows-x64}-v$VERSION.{zip,tar.gz}` + `.sha256`; iOS backend zips `RABackend{LLAMACPP,MLX,NeuRT,ONNX,Sherpa}-ios-v$VERSION.zip` + `.sha256`; `RunAnywhereMLX{Metal,Resources,Runtime}-ios-v$VERSION.zip` + `.sha256`; `rcli-{linux-x86_64,macos-arm64,windows-x86_64}-v$VERSION.tar.gz`/`.zip` + `.sha256` (only through v0.20.27, see §5); the 8 npm tarballs `runanywhere-{core,llamacpp,mlx,onnx,proto-ts,web,web-llamacpp,web-onnx}-$VERSION.tgz` + `.sha256`; the **5 Electron npm tarballs** `runanywhere-electron{,-llamacpp,-onnx,-sherpa,-neurt}-$VERSION.tgz` + `.sha256` (new as of v0.20.25); and `runanywhere-kotlin-maven-v$VERSION.zip` + `.sha256`. There is **no** Flutter tarball in the release (Flutter packages are staged from the native archives above, not from a dedicated release asset) and **no** `.dmg` asset in the baseline set. If a `qhexrt`-named asset appears anywhere in this list, stop — that would mean `release.yml`'s own manifest assertion should have hard-failed and something is very wrong; do not publish anything from that release.
 
 ## 0. MANDATORY GATE — verify the ENTIRE release before pushing anything to any registry
 
@@ -218,7 +220,7 @@ cd /tmp/sdk-publish-$VERSION && shasum -a 256 -c '<file>.sha256'
 ```bash
 npm pack <tgz-or-package-dir> --dry-run     # npm packages: prints the exact file list it would publish
 unzip -l  <file.zip>                        # AARs, Maven repo zip, native archives
-tar -tzf  <file.tar.gz>                     # rcli, RACommons tarballs
+tar -tzf  <file.tar.gz>                     # RACommons tarballs
 ```
 
 Sanity-check what comes back:
@@ -375,21 +377,24 @@ This is enforced, not just documented: once `v$VERSION` is tagged on `runanywher
 
 **If you force-move a tag, SwiftPM/Xcode consumers cache the OLD commit in several places — clearing just `Package.resolved` is not enough.** Verifying your own fix (or having a downstream consumer verify it) can silently keep failing even after the fix is correctly pushed, because: (1) any consumer repo's own tracked `*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` pins the exact old resolution and `xcodebuild -resolvePackageDependencies` respects it rather than re-resolving; (2) `~/Library/Caches/org.swift.swiftpm/repositories/<pkg>-<hash>/` is a global shared clone cache keyed by repo, oblivious to a moved tag; (3) `~/Library/org.swift.swiftpm/security/fingerprints/<pkg>-<hash>.json` records the fingerprint SwiftPM saw for that tag and can silently keep using it after a mismatch instead of failing loud. To actually re-resolve after moving a tag: delete the consumer's tracked `Package.resolved`, `rm -rf .build .swiftpm` and any `~/Library/Developer/Xcode/DerivedData/<Scheme>-*`, AND clear the matching entries under both global `org.swift.swiftpm` cache directories for every affected package identity — then resolve fresh.
 
-## 5. macOS rcli notarization
+## 5. The CLI (wally, formerly rcli) ships from RunanywhereAI/wally, not from this release
 
-CI (`native_rcli_macos` in `release.yml`) usually already produces a notarized, stapled artifact when Developer ID + notary secrets are configured in repo secrets. **Check the release assets first** before assuming you need to notarize anything yourself locally:
+The CLI is not built, versioned, or released here. `release.yml` says so in its own header,
+under the old names: official CLI bottles ship from `RunanywhereAI/RCLI`, which now
+redirects to `RunanywhereAI/wally` and consumes this repo's desktop kits via
+`find_package(RunAnywhere)`.
+
+So when cutting a release of *this* repo:
+
+- **Do not look for CLI assets on `v$VERSION`.** `v0.20.27` was the last release that carried any (three `rcli-*-v0.20.27` archives plus their `.sha256` files); `v0.20.28` onward carry none, and there is no `native_rcli_macos` job in `release.yml` to produce them.
+- **wally has its own version line and its own asset naming.** It is on `v0.8.x` while this repo is on `0.20.x`, and its assets are `wally-<version>-<platform>.tar.gz` (+ `.sha256`), e.g. `wally-0.8.12-macos-arm64.tar.gz`. Neither the version nor the filename shape can be derived from `$VERSION` here.
+- **Signing and notarization are wally's, and only its docs describe them.** Read `docs/RELEASING.md` and `scripts/build/package-wally.sh` in that repo rather than a copy kept here. Its `WALLY_*` names are maintained there, and the copy this file used to carry had already drifted: it named `RCLI_MACOS_FULL_RELEASE`, `RCLI_MACOS_SWIFT_BIN_DIR` and a `build-mlx-cli.sh`, none of which appear anywhere in that repo.
+
+What this repo still owes wally is the desktop kit it consumes, so check those assets are present instead:
 
 ```bash
-gh release view v$VERSION --json assets --jq '.assets[].name' | grep -iE 'rcli-macos|\.dmg'
+gh release view v$VERSION --json assets --jq '.assets[].name' | grep cpp-desktop
 ```
-Baseline expectation is `rcli-macos-arm64-v$VERSION.tar.gz` (+ `.sha256`); a `.dmg` only appears when `RCLI_MACOS_FULL_RELEASE=1` was set for that build (see below). If a plain tarball is already present and its contents pass the general verification discipline, there is usually nothing further to do here.
-
-**If you do need to notarize locally**, everything lives in `rcli/scripts/package-rcli.sh` (read its header comment — it documents its own contract in detail):
-
-- One-time setup, check before redoing: `xcrun notarytool history --keychain-profile runanywhere-notary` (confirmed configured on this machine — a fresh submission history returns without error). If missing: `xcrun notarytool store-credentials "runanywhere-notary" --apple-id <email> --team-id <team> --password <app-specific-password>`.
-- Codesign identity: `security find-identity -v -p codesigning | grep "Developer ID Application"` — confirmed present on this machine as `"Developer ID Application: RunAnywhere, Inc (<TEAM_ID>)"`. Grep for it fresh rather than hardcoding the team-id suffix, it can rotate.
-- Invocation contract (env vars, from the script header): `RCLI_CODESIGN_IDENTITY`, `RCLI_MACOS_NOTARIZE=1`, `RCLI_MACOS_FULL_RELEASE=1`, `RCLI_MACOS_SWIFT_BIN_DIR=<output of build-mlx-cli.sh>`. `RCLI_MACOS_FULL_RELEASE=1` is what additionally stages `mlx.metallib` and SwiftPM resource bundles and is what causes a notarized, stapled `.dmg` to be emitted alongside the Homebrew-style tarball. `RCLI_CODESIGN_KEYCHAIN` / `RCLI_NOTARYTOOL_KEYCHAIN` matter only if the identity/profile live in a non-default keychain.
-- Call shape: `rcli/scripts/package-rcli.sh <build-dir> macos-arm64` with the env vars above exported.
 
 ## 6. Electron — build AND packaging are now in `release.yml`; publish is still manual
 

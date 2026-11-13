@@ -146,7 +146,11 @@ export interface RefreshOptions {
   includeRemoteCatalog?: boolean;
   /** Rescan the model store for artifacts on disk. On by default. */
   rescanLocal?: boolean;
-  /** Clear downloaded state for rows whose files are gone. On by default. */
+  /**
+   * Clear download state for models whose recorded path no longer exists, or still exists
+   * but holds no finished artifact or fails the completeness check. Never deletes files;
+   * warns if the platform adapter lacks `file_exists`. Off by default.
+   */
   pruneOrphans?: boolean;
 }
 
@@ -186,11 +190,11 @@ export interface ModelsNamespace {
    */
   unregister(id: string): Promise<void>;
   /**
-   * Re-read the registry: rescan the model store for artifacts that arrived or
-   * vanished outside the SDK, and clear the downloaded flag on rows whose files
-   * are gone.
+   * Re-read the registry and rescan the model store for artifacts that arrived
+   * outside the SDK. With `pruneOrphans`, also clear download state for models
+   * whose files have vanished or are unfinished.
    */
-  refresh(options?: RefreshOptions): Promise<ModelInfo[]>;
+  refresh(options?: RefreshOptions): Promise<void>;
   /**
    * Fetch a model, reporting progress and completion in one stream.
    *
@@ -561,16 +565,27 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     },
 
     async refresh(options = {}) {
-      const result = await abi.refresh({
-        includeRemoteCatalog: options.includeRemoteCatalog ?? false,
-        rescanLocal: options.rescanLocal ?? true,
-        pruneOrphans: options.pruneOrphans ?? true,
-        catalogUri: '',
-        forceRefresh: false,
-        includeDownloadedState: true,
-      });
-      if (result.error) throw SDKException.fromProto(result.error);
-      return (result.models?.models ?? []).map(toPublicModelInfo);
+      try {
+        const result = await abi.refresh({
+          includeRemoteCatalog: options.includeRemoteCatalog ?? false,
+          rescanLocal: options.rescanLocal ?? true,
+          pruneOrphans: options.pruneOrphans ?? false,
+          catalogUri: '',
+          forceRefresh: false,
+          includeDownloadedState: true,
+        });
+        if (result.error) {
+          console.warn(`[runanywhere] models.refresh failed: ${result.error.message}`);
+        }
+        for (const warning of result.warnings) {
+          console.warn(`[runanywhere] models.refresh: ${warning}`);
+        }
+      } catch (error: unknown) {
+        console.warn(
+          '[runanywhere] models.refresh failed:',
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     },
 
     download(id) {
@@ -1407,6 +1422,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
         toSegmentationRequest(input.rgb, input.width, input.height, {
           includeDiagnosticImage:
             options.includeDiagnosticImage ?? SEGMENTATION_DEFAULTS.includeDiagnosticImage,
+          includeConfidence: options.includeConfidence ?? SEGMENTATION_DEFAULTS.includeConfidence,
         })
       );
       // Commons owns SegmentationClassSummary.fraction (tag 5).
@@ -1420,6 +1436,9 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
           pixelCount: c.pixelCount,
           fraction: c.fraction ?? 0,
         })),
+        ...(native.confidenceMaskU8?.byteLength
+          ? { confidenceMask: native.confidenceMaskU8 }
+          : {}),
       };
     },
   };

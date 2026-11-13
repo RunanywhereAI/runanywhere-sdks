@@ -21,12 +21,58 @@ import 'package:runanywhere/generated/logging.pb.dart'
         LoggingConfiguration;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;
+import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 // Re-export the canonical generated severity enum so the ~40 call sites that
 // `import '.../sdk_logger.dart'` keep resolving `LogLevel`. The hand-written
 // `enum LogLevel { debug, info, warning, error, fault }` was deleted in favour
 // of the generated `LogLevel` (LOG_LEVEL_TRACE = 0 … LOG_LEVEL_FATAL = 5).
 export 'package:runanywhere/generated/logging.pbenum.dart' show LogLevel;
+
+/// Bidirectional mapping between generated proto [LogLevel] and C++ commons [RacLogLevel].
+extension LogLevelRacMapping on LogLevel {
+  /// Map generated proto [LogLevel] to C++ commons integer level.
+  int toRacLogLevel() {
+    switch (this) {
+      case LogLevel.LOG_LEVEL_TRACE:
+        return RacLogLevel.trace;
+      case LogLevel.LOG_LEVEL_DEBUG:
+        return RacLogLevel.debug;
+      case LogLevel.LOG_LEVEL_INFO:
+        return RacLogLevel.info;
+      case LogLevel.LOG_LEVEL_WARNING:
+        return RacLogLevel.warning;
+      case LogLevel.LOG_LEVEL_ERROR:
+        return RacLogLevel.error;
+      case LogLevel.LOG_LEVEL_FATAL:
+        return RacLogLevel.fatal;
+      default:
+        return RacLogLevel.info;
+    }
+  }
+}
+
+/// Convert C++ commons integer log level to proto [LogLevel].
+LogLevel racLogLevelToProto(int racLevel) {
+  switch (racLevel) {
+    case RacLogLevel.trace:
+      return LogLevel.LOG_LEVEL_TRACE;
+    case RacLogLevel.debug:
+      return LogLevel.LOG_LEVEL_DEBUG;
+    case RacLogLevel.info:
+      return LogLevel.LOG_LEVEL_INFO;
+    case RacLogLevel.warning:
+      return LogLevel.LOG_LEVEL_WARNING;
+    case RacLogLevel.error:
+      return LogLevel.LOG_LEVEL_ERROR;
+    case RacLogLevel.fatal:
+      return LogLevel.LOG_LEVEL_FATAL;
+    default:
+      return LogLevel.LOG_LEVEL_INFO;
+  }
+}
+
 
 /// Per-environment [LoggingConfiguration] presets. The generated proto message
 /// cannot be `const`-constructed, so the development/production presets
@@ -157,6 +203,7 @@ class SDKLoggerConfig {
 
   void configure(LoggingConfiguration config) {
     _configuration = config;
+    DartBridge.setCommonsMinLogLevel(config.minLogLevel.toRacLogLevel());
   }
 
   /// Apply configuration based on SDK environment. Mirrors Swift
@@ -169,6 +216,7 @@ class SDKLoggerConfig {
 
   void setMinLogLevel(LogLevel level) {
     _configuration = _configuration.deepCopy()..minLogLevel = level;
+    DartBridge.setCommonsMinLogLevel(level.toRacLogLevel());
   }
 
   void setLocalLoggingEnabled(bool enabled) {

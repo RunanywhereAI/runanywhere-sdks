@@ -147,7 +147,7 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* ─────────── Primitive slot groups (10 active) ─────────── */
+    /* ─────────── Primitive slot groups (13 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
     const struct rac_llm_service_ops* llm_ops;
@@ -186,7 +186,8 @@ typedef struct rac_engine_vtable {
      *  exactly as rerank_ops did in v8. */
     const struct rac_image_embedding_service_ops* image_embedding_ops;
 
-    /* ─────────── Reserved slot pool (5 slots) ─────────── */
+    /* ─────────── Reserved slot pool (4 reserved) ─────────── */
+    /* ocr_ops and decision_ops were promoted from this pool. */
     /*
      * Keeps the struct layout binary-stable as new primitives land. Each
      * reserved slot is a `const void*` so the compiler can fill with NULL
@@ -200,7 +201,10 @@ typedef struct rac_engine_vtable {
     /** OCR (`RAC_PRIMITIVE_OCR`). Promoted from reserved_slot_4 in ABI v11 — same binary
      *  offset, so the 17-pointer tail is unchanged and only the ABI version gates it. */
     const struct rac_ocr_service_ops* ocr_ops;
-    const void* reserved_slot_5;
+
+    /** Joint decision scoring (`RAC_PRIMITIVE_DECIDE`). Promoted from reserved_slot_5 in
+     *  ABI v13 — same binary offset, so the 17-pointer tail is unchanged. */
+    const struct rac_decision_service_ops* decision_ops;
     const void* reserved_slot_6;
     const void* reserved_slot_7;
     const void* reserved_slot_8;
@@ -246,7 +250,8 @@ typedef struct rac_engine_vtable {
     X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")    \
     X(RAC_PRIMITIVE_RERANK, rerank_ops, "rerank")           \
     X(RAC_PRIMITIVE_EMBED_IMAGE, image_embedding_ops, "embed_image") \
-    X(RAC_PRIMITIVE_OCR, ocr_ops, "ocr")
+    X(RAC_PRIMITIVE_OCR, ocr_ops, "ocr") \
+    X(RAC_PRIMITIVE_DECIDE, decision_ops, "decide")
 
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by

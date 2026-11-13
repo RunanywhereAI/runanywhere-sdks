@@ -491,6 +491,38 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
     return request;
 }
 
+/** @brief An ambiguous call fails the session with INVALID_ARGUMENT and emits no tool call. */
+int test_session_repaired_key_collision_never_emits_call() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"items\":[{\"x\xFF\":1,\"x\xFE\":2}]}"
+        "}</tool_call>",
+    });
+    EventSink sink;
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "collision session request serializes");
+    uint64_t handle = 0;
+    sink.published_handle = &handle;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 0, "ambiguous session never emits a tool call");
+    CHECK(rc == RAC_SUCCESS, "ambiguous session create succeeds and reports via events");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 1, "ambiguous session emits exactly one error");
+    runanywhere::v1::SDKError error;
+    CHECK(parse_first_error(sink, &error), "ambiguous session error decodes");
+    CHECK(error.c_abi_code() == RAC_ERROR_INVALID_ARGUMENT,
+          "ambiguous session error is invalid argument");
+    if (handle) {
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+    cleanup_environment();
+    return 0;
+}
+
 int test_session_emits_tool_call() {
     if (!load_mock_llm()) {
         std::fprintf(stderr, "FAIL: mock LLM load\n");
@@ -531,11 +563,13 @@ int test_session_emits_tool_call() {
     return 0;
 }
 
-int test_step_with_result_emits_final() {
+int test_step_with_result_emits_final(const char* location = "Tokyo",
+                                      const char* expected_location = "Tokyo") {
     if (!load_mock_llm())
         return 1;
     set_responses({
-        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        std::string("<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"") +
+            location + "\"}}</tool_call>",
         "The weather in Tokyo is sunny, 25C.",
     });
 
@@ -555,8 +589,13 @@ int test_step_with_result_emits_final() {
     runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
     step.set_session_handle(handle);
     const auto* tool_ev = sink.find_first(EvCase::kToolCall);
-    if (tool_ev)
+    CHECK(tool_ev != nullptr, "validated default call reaches the session host");
+    if (tool_ev) {
+        CHECK(tool_ev->tool_call().arguments_json() ==
+                  std::string("{\"location\":\"") + expected_location + "\"}",
+              "session host receives the exact repaired argument");
         step.set_tool_call_id(tool_ev->tool_call().id());
+    }
     step.set_result_json(R"({"temp":25,"condition":"sunny"})");
     std::vector<uint8_t> step_bytes;
     serialize(step, &step_bytes);
@@ -579,6 +618,102 @@ int test_step_with_result_emits_final() {
     }
 
     CHECK(generate_calls() == 2, "generate called twice");
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
+int test_auto_execute_unset_defaults_to_true_and_pauses_for_tool_execution() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny, 25C.",
+    });
+
+    EventSink sink;
+    runanywhere::v1::ToolCallingSessionCreateRequest request;
+    request.set_prompt("What's the weather in Tokyo?");
+    *request.mutable_options()->add_tools() = make_weather_tool();
+    request.mutable_options()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    // Note: request.mutable_options()->set_auto_execute is intentionally NOT called.
+    CHECK(!request.options().has_auto_execute(), "auto_execute field is unset");
+
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+    CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS with unset auto_execute");
+
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 1, "paused on tool_call when auto_execute is unset");
+
+    runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+    step.set_session_handle(handle);
+    const auto* tool_ev = sink.find_first(EvCase::kToolCall);
+    if (tool_ev)
+        step.set_tool_call_id(tool_ev->tool_call().id());
+    step.set_result_json(R"({"temp":25,"condition":"sunny"})");
+    std::vector<uint8_t> step_bytes;
+    serialize(step, &step_bytes);
+
+    rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+    CHECK(rc == RAC_SUCCESS, "step_with_result RAC_SUCCESS");
+
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 1, "one final_result");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 0, "no error");
+
+    const auto* final_ev = sink.find_first(EvCase::kFinalResult);
+    CHECK(final_ev != nullptr, "final captured");
+    if (final_ev) {
+        const auto& result = final_ev->final_result();
+        CHECK(result.is_complete() == true, "is_complete true when auto_execute is unset");
+        CHECK(result.tool_calls_size() == 1, "has tool_call");
+        CHECK(result.tool_results_size() == 1, "has tool_result");
+        CHECK(result.iterations_used() == 2, "iterations_used == 2");
+        CHECK(result.text().find("sunny") != std::string::npos, "text has sunny");
+    }
+
+    CHECK(generate_calls() == 2, "generate called twice");
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
+int test_auto_execute_false_in_session_completes_without_pausing() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    EventSink sink;
+    auto request = make_request("What's the weather in Tokyo?");
+    request.mutable_options()->set_auto_execute(false);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+    CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS with auto_execute=false");
+
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 0, "no tool_call event when auto_execute=false");
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 1, "emits final_result immediately");
+
+    const auto* final_ev = sink.find_first(EvCase::kFinalResult);
+    CHECK(final_ev != nullptr, "final captured");
+    if (final_ev) {
+        const auto& result = final_ev->final_result();
+        CHECK(result.is_complete() == false, "is_complete is false when auto_execute=false");
+        CHECK(result.tool_calls_size() == 1, "has parsed tool_call");
+        CHECK(result.tool_results_size() == 0, "has no tool_results");
+    }
 
     rac_tool_calling_session_destroy_proto(handle);
     cleanup_environment();
@@ -1363,7 +1498,11 @@ int main() {
         return 0;
 #else
         test_session_emits_tool_call();
+        test_session_repaired_key_collision_never_emits_call();
         test_step_with_result_emits_final();
+        test_step_with_result_emits_final("\xC3\x28", "\xEF\xBF\xBD(");
+        test_auto_execute_unset_defaults_to_true_and_pauses_for_tool_execution();
+        test_auto_execute_false_in_session_completes_without_pausing();
         test_max_tool_calls_allows_final_synthesis();
         test_forced_tool_name_only_promotes_session_to_specific();
         test_none_vetoes_forced_name_in_session();

@@ -24,6 +24,18 @@
 namespace runanywhere {
 namespace rag {
 
+constexpr size_t kMaxChunkChars = 360;
+
+/**
+ * @brief Flatten whitespace (newlines/carriage returns/tabs) and truncate text
+ *        to at most `max_chars` bytes while backing off to a valid UTF-8 character boundary.
+ *
+ * @param text Input text to format and truncate.
+ * @param max_chars Maximum byte budget (default: kMaxChunkChars = 360).
+ * @return Formatted string guaranteed to end on a complete UTF-8 code point.
+ */
+std::string flatten_and_truncate(const std::string& text, size_t max_chars = kMaxChunkChars);
+
 /**
  * @brief Parse LLM scorer output into per-candidate scores.
  *
@@ -32,6 +44,9 @@ namespace rag {
  * `score` is clamped to [1, 5]. `scores` is resized to `n` and zero-filled;
  * unmatched entries stay 0.
  *
+ * @param text The raw output string from the LLM.
+ * @param n Number of candidates.
+ * @param scores Output vector to populate with scores.
  * @return number of distinct candidates that received a score.
  */
 size_t parse_rerank_scores(const std::string& text, size_t n, std::vector<int>& scores);
@@ -40,6 +55,9 @@ size_t parse_rerank_scores(const std::string& text, size_t n, std::vector<int>& 
  * @brief Stable-reorder `results` by descending score (ties keep input order).
  *
  * `scores` must be the same length as `results`. No-op if lengths differ.
+ *
+ * @param results Vector of search results to reorder.
+ * @param scores Corresponding score vector matching results in size.
  */
 void reorder_by_scores(std::vector<SearchResult>& results, const std::vector<int>& scores);
 
@@ -48,6 +66,11 @@ void reorder_by_scores(std::vector<SearchResult>& results, const std::vector<int
  *
  * No-op when `llm_handle` is null or `results.size() < 2`. On any failure the
  * fused order is preserved.
+ *
+ * @param llm_handle Native handle to the loaded LLM instance.
+ * @param question The user question/query string.
+ * @param base_options LLM options to use as baseline.
+ * @param results Candidates to score and reorder.
  */
 void rerank_llm_pointwise(rac_handle_t llm_handle, const std::string& question,
                           const rac_llm_options_t& base_options,
