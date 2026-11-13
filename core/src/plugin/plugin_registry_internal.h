@@ -53,18 +53,30 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
                                          const rac_engine_manifest_t** out_manifest)
     RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-/** Mark an in-flight loader call for an opened OS library handle, before
- * calling its entry function. Aliased paths share the same mapped handle.
+/** Stack-owned context for synchronous manifest attachments during a load.
+ * The previous link lets nested loads restore the outer attachment owner. */
+typedef struct rac_plugin_load_context {
+    void* handle;
+    struct rac_plugin_load_context* previous;
+} rac_plugin_load_context_t;
+
+/** Mark an in-flight loader call before calling its entry function and make
+ * `context` the current thread's attachment owner until finish_load.
+ * Aliased paths share the same mapped handle. Keep `context` alive until finish.
  * Pair a successful call with rac_plugin_registry_finish_load(); on failure,
  * close the handle without entering the plugin or finishing an untracked load. */
-rac_result_t rac_plugin_registry_begin_load(void* handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+rac_result_t
+rac_plugin_registry_begin_load(rac_plugin_load_context_t* context) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-/** Finish an in-flight loader call. Returns RAC_FALSE when another load for
- * `handle` is still in flight, or when `vtable` is published/leased. Otherwise
- * returns RAC_TRUE; if `discard_pending` is RAC_TRUE, also removes the
- * unpublished pending manifest under the same registry lock. */
-rac_bool_t rac_plugin_registry_finish_load(void* handle, const rac_engine_vtable_t* vtable,
-                                           rac_bool_t discard_pending) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+/** Restore the previous attachment context and finish this load. The final
+ * load for a mapping removes all of its unpublished manifests, even when an
+ * entry threw before returning its vtable. Published/leased entries are kept.
+ * Returns RAC_FALSE when another load for this mapping is still in flight or
+ * `vtable` is published/leased; otherwise RAC_TRUE. Cleanup never dereferences
+ * plugin memory and also runs when the last concurrent load succeeds. */
+rac_bool_t
+rac_plugin_registry_finish_load(rac_plugin_load_context_t* context,
+                                const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**

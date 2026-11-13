@@ -154,26 +154,27 @@ struct DlGuard {
 
 /* Tracks one in-flight loader call so a failed load cannot discard the pending
  * manifest of a concurrent load of the same library. The registry only
- * discards the manifest when the last in-flight call for this handle finishes
- * and the vtable was never published. */
+ * discards unpublished manifests when the last in-flight call for this mapping
+ * finishes, including when an entry throws before returning its vtable. */
 struct PendingLoadGuard {
-    void* handle = nullptr;
+    rac_plugin_load_context_t& context;
     const rac_engine_vtable_t* vtable = nullptr;
     bool active = true;
 
     // Construct only after begin_load succeeds, and after the library guard.
-    explicit PendingLoadGuard(void* load_handle) noexcept : handle(load_handle) {}
+    explicit PendingLoadGuard(rac_plugin_load_context_t& load_context) noexcept
+        : context(load_context) {}
     ~PendingLoadGuard() {
         if (active) {
-            (void)rac_plugin_registry_finish_load(handle, vtable, RAC_TRUE);
+            (void)rac_plugin_registry_finish_load(&context, vtable);
         }
     }
     PendingLoadGuard(const PendingLoadGuard&) = delete;
     PendingLoadGuard& operator=(const PendingLoadGuard&) = delete;
 
-    rac_bool_t finish(rac_bool_t discard_pending) noexcept {
+    rac_bool_t finish() noexcept {
         active = false;
-        return rac_plugin_registry_finish_load(handle, vtable, discard_pending);
+        return rac_plugin_registry_finish_load(&context, vtable);
     }
 };
 
@@ -268,11 +269,12 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
-    const rac_result_t tracking_rc = rac_plugin_registry_begin_load(guard.h);
+    rac_plugin_load_context_t context{guard.h, nullptr};
+    const rac_result_t tracking_rc = rac_plugin_registry_begin_load(&context);
     if (tracking_rc != RAC_SUCCESS) {
         return tracking_rc;
     }
-    PendingLoadGuard load_guard(guard.h);
+    PendingLoadGuard load_guard(context);
 
     const std::string sym = entry_symbol_from_path(path);
     void* entry_sym = rac_dl_sym(guard.h, sym.c_str());
@@ -310,7 +312,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
              * detach its manifest or put the serving backend on the
              * unavailability ledger just because the caller's name copy could
              * not be allocated. */
-            if (load_guard.finish(RAC_TRUE) == RAC_TRUE) {
+            if (load_guard.finish() == RAC_TRUE) {
                 rac_registry_record_plugin_unavailable(name.c_str(), path, RAC_ERROR_OUT_OF_MEMORY);
             }
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -330,7 +332,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
         }
         /* Only the last in-flight load for this handle may discard a pending
          * manifest, and only if the vtable was never published. */
-        const rac_bool_t last_load = load_guard.finish(RAC_TRUE);
+        const rac_bool_t last_load = load_guard.finish();
         /* The registry recorded the reason under the vtable's own name; add
          * the path, which only the loader knows and which is what makes a
          * "wrong/stale library staged" diagnosis possible. */
@@ -358,7 +360,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
     if (prior != nullptr) {
         rac_dl_close(static_cast<rac_lib_handle_t>(prior));
     }
-    (void)load_guard.finish(RAC_FALSE);
+    (void)load_guard.finish();
     if (out_name != nullptr) {
         *out_name = name_copy.release();
     }

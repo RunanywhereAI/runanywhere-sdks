@@ -49,6 +49,13 @@ struct Entry {
     const rac_engine_vtable_t* vtable;  ///< plugin-owned .rodata pointer
 };
 
+struct AttachedManifest {
+    const rac_engine_manifest_t* manifest;
+    void* load_handle;
+};
+
+thread_local rac_plugin_load_context_t* current_load_context = nullptr;
+
 struct State {
     std::mutex mu;
     /** Primitive → descending-priority list of plugins. */
@@ -60,8 +67,7 @@ struct State {
      *  entry here. Populated by the loader, drained by `rac_plugin_unregister`. */
     std::unordered_map<std::string, void*> dl_handles;
     /** Manifest attached by an engine entry before the vtable is registered. */
-    std::unordered_map<const rac_engine_vtable_t*, const rac_engine_manifest_t*>
-        manifests_by_vtable;
+    std::unordered_map<const rac_engine_vtable_t*, AttachedManifest> manifests_by_vtable;
     /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
     std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
     std::unordered_map<const rac_engine_vtable_t*, size_t> model_leases;
@@ -138,7 +144,13 @@ bool valid_manifest_availability(rac_engine_availability_t availability) {
 const rac_engine_manifest_t* attached_manifest_locked(const State& s,
                                                       const rac_engine_vtable_t* vtable) {
     auto it = s.manifests_by_vtable.find(vtable);
-    return it == s.manifests_by_vtable.end() ? nullptr : it->second;
+    return it == s.manifests_by_vtable.end() ? nullptr : it->second.manifest;
+}
+
+bool published_or_leased_locked(const State& s, const rac_engine_vtable_t* vtable) {
+    return s.model_leases.contains(vtable) ||
+           std::ranges::any_of(s.by_name,
+                               [vtable](const auto& entry) { return entry.second == vtable; });
 }
 
 void detach_pending_manifest(const rac_engine_vtable_t* vtable) {
@@ -202,14 +214,16 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
     }
 }
 
-rac_result_t rac_plugin_registry_begin_load(void* handle) noexcept {
-    if (handle == nullptr) {
+rac_result_t rac_plugin_registry_begin_load(rac_plugin_load_context_t* context) noexcept {
+    if (context == nullptr || context->handle == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
     try {
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
-        ++s.pending_loads[handle];
+        ++s.pending_loads[context->handle];
+        context->previous = current_load_context;
+        current_load_context = context;
         return RAC_SUCCESS;
     } catch (const std::bad_alloc&) {
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -218,13 +232,17 @@ rac_result_t rac_plugin_registry_begin_load(void* handle) noexcept {
     }
 }
 
-rac_bool_t rac_plugin_registry_finish_load(void* handle, const rac_engine_vtable_t* vtable,
-                                           rac_bool_t discard_pending) noexcept {
+rac_bool_t rac_plugin_registry_finish_load(rac_plugin_load_context_t* context,
+                                           const rac_engine_vtable_t* vtable) noexcept {
+    if (context == nullptr || current_load_context != context) {
+        return RAC_FALSE;
+    }
+    current_load_context = context->previous;
     try {
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
 
-        const auto inflight = s.pending_loads.find(handle);
+        const auto inflight = s.pending_loads.find(context->handle);
         if (inflight == s.pending_loads.end()) {
             return RAC_FALSE;
         }
@@ -234,31 +252,19 @@ rac_bool_t rac_plugin_registry_finish_load(void* handle, const rac_engine_vtable
         }
         s.pending_loads.erase(inflight);
 
-        if (vtable == nullptr) {
-            return RAC_TRUE;
-        }
-
-        /* A published vtable owns an active manifest; leave it alone. */
-        const auto accepted = std::ranges::find_if(
-            s.by_name, [vtable](const auto& entry) { return entry.second == vtable; });
-        if (accepted != s.by_name.end() || s.model_leases.contains(vtable)) {
-            return RAC_FALSE;
-        }
-
-        if (discard_pending == RAC_TRUE) {
-            const auto pending = s.manifests_by_vtable.find(vtable);
-            if (pending != s.manifests_by_vtable.end()) {
-                const rac_engine_manifest_t* manifest = pending->second;
-                s.manifests_by_vtable.erase(pending);
-                if (manifest != nullptr && vtable->metadata.name != nullptr) {
-                    const auto by_name = s.manifests_by_name.find(vtable->metadata.name);
-                    if (by_name != s.manifests_by_name.end() && by_name->second == manifest) {
-                        s.manifests_by_name.erase(by_name);
-                    }
-                }
+        /* Attachment records its owner before entry returns. Only compare
+         * host-owned keys here: a successful publication may already have
+         * transferred and closed the library through a concurrent unload. */
+        for (auto pending = s.manifests_by_vtable.begin();
+             pending != s.manifests_by_vtable.end();) {
+            if (pending->second.load_handle == context->handle &&
+                !published_or_leased_locked(s, pending->first)) {
+                pending = s.manifests_by_vtable.erase(pending);
+            } else {
+                ++pending;
             }
         }
-        return RAC_TRUE;
+        return vtable == nullptr || !published_or_leased_locked(s, vtable) ? RAC_TRUE : RAC_FALSE;
     } catch (...) {
         return RAC_FALSE;
     }
@@ -360,7 +366,8 @@ rac_result_t rac_engine_manifest_attach_vtable(const rac_engine_manifest_t* mani
 
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
-        s.manifests_by_vtable[vtable] = manifest;
+        s.manifests_by_vtable[vtable] = AttachedManifest{
+            manifest, current_load_context != nullptr ? current_load_context->handle : nullptr};
         return RAC_SUCCESS;
     } catch (const std::bad_alloc&) {
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -383,7 +390,7 @@ rac_result_t rac_engine_manifest_detach_vtable(const rac_engine_vtable_t* vtable
         }
         auto it = s.manifests_by_vtable.find(vtable);
         if (it != s.manifests_by_vtable.end()) {
-            manifest = it->second;
+            manifest = it->second.manifest;
             s.manifests_by_vtable.erase(it);
         }
         if (manifest != nullptr && vtable->metadata.name != nullptr) {
