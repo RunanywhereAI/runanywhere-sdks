@@ -25,6 +25,7 @@
 #endif
 #include <string>
 
+#include "features/common/utf8_stream_boundary.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 
@@ -515,7 +516,8 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                     return false;  // Cancels the backend generation loop.
                 }
                 if (stop_window.size() > user_stop_max_len) {
-                    const size_t safe_len = stop_window.size() - user_stop_max_len;
+                    size_t safe_len = stop_window.size() - user_stop_max_len;
+                    safe_len -= rac::tokens::incomplete_utf8_tail(stop_window.substr(0, safe_len));
                     return emit_bytes(safe_len) == RAC_TRUE;
                 }
                 return true;
