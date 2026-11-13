@@ -68,7 +68,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
     RAC_LOG_INFO(LOG_CATEGORY, "Registering ONNX backend with C++ registry...");
 
     rac_result_t result = rac_backend_onnx_register();
-    if (!rac_plugin_registration_succeeded(result)) {
+    if (!rac_plugin_registration_succeeded(result) && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
       RAC_LOG_ERROR(LOG_CATEGORY, "ONNX registration failed with code: %d", result);
       throw std::runtime_error("ONNX registration failed with error: " + describeError(result));
     }

@@ -148,7 +148,7 @@ public enum ONNX {
     public static func unregister() {
         if isSherpaRegistered {
             let result = rac_plugin_unregister("sherpa")
-            if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND {
+            if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND || result == RAC_ERROR_NOT_FOUND {
                 isSherpaRegistered = false
                 logger.info("Sherpa engine plugin unregistered")
             } else {
@@ -160,7 +160,7 @@ public enum ONNX {
         guard isRegistered else { return }
 
         let result = rac_backend_onnx_unregister()
-        if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND {
+        if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND || result == RAC_ERROR_NOT_FOUND {
             isRegistered = false
             logger.info("ONNX backend unregistered")
         } else {
