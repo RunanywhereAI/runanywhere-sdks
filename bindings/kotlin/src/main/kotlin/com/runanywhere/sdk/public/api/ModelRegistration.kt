@@ -49,12 +49,12 @@ public class ModelRegistration private constructor(
             id: String? = null,
             memoryBytes: Long? = null,
             downloadBytes: Long? = null,
-            contextLength: Int? = null,
-            source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
-            description: String? = null,
             supportsThinking: Boolean = false,
             supportsLora: Boolean = false,
             cuaProfile: String? = null,
+            contextLength: Int? = null,
+            source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+            description: String? = null,
         ): ModelRegistration =
             ModelRegistration(
                 kind = Kind.URL,
@@ -86,13 +86,13 @@ public class ModelRegistration private constructor(
             category: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
             id: String? = null,
             memoryBytes: Long? = null,
+            supportsThinking: Boolean = false,
+            supportsLora: Boolean = false,
+            cuaProfile: String? = null,
             downloadBytes: Long? = null,
             contextLength: Int? = null,
             source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
             description: String? = null,
-            supportsThinking: Boolean = false,
-            supportsLora: Boolean = false,
-            cuaProfile: String? = null,
         ): ModelRegistration =
             ModelRegistration(
                 kind = Kind.ARCHIVE,
@@ -124,11 +124,11 @@ public class ModelRegistration private constructor(
             memoryBytes: Long? = null,
             downloadBytes: Long? = null,
             contextLength: Int? = null,
+            supportsThinking: Boolean = false,
+            cuaProfile: String? = null,
             source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
             description: String? = null,
-            supportsThinking: Boolean = false,
             supportsLora: Boolean = false,
-            cuaProfile: String? = null,
         ): ModelRegistration =
             ModelRegistration(
                 kind = Kind.MULTI_FILE,
@@ -148,6 +148,92 @@ public class ModelRegistration private constructor(
                 archiveStructure = null,
                 files = files,
                 cuaProfile = cuaProfile,
+            )
+
+        /** Retains the pre-metadata JVM factory and its default-argument bridge. */
+        @Deprecated("Use the URL factory with optional metadata.", level = DeprecationLevel.HIDDEN)
+        public fun url(
+            name: String,
+            url: String,
+            framework: InferenceFramework,
+            category: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            id: String? = null,
+            memoryBytes: Long? = null,
+            downloadBytes: Long? = null,
+            supportsThinking: Boolean = false,
+            supportsLora: Boolean = false,
+            cuaProfile: String? = null,
+        ): ModelRegistration =
+            url(
+                name = name,
+                url = url,
+                framework = framework,
+                category = category,
+                id = id,
+                memoryBytes = memoryBytes,
+                downloadBytes = downloadBytes,
+                supportsThinking = supportsThinking,
+                supportsLora = supportsLora,
+                cuaProfile = cuaProfile,
+                contextLength = null,
+            )
+
+        /** Retains the pre-metadata JVM factory and its default-argument bridge. */
+        @Deprecated("Use the archive factory with optional metadata.", level = DeprecationLevel.HIDDEN)
+        public fun archive(
+            name: String,
+            url: String,
+            framework: InferenceFramework,
+            structure: ArchiveStructure,
+            archiveType: ArchiveType? = null,
+            category: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            id: String? = null,
+            memoryBytes: Long? = null,
+            supportsThinking: Boolean = false,
+            supportsLora: Boolean = false,
+            cuaProfile: String? = null,
+        ): ModelRegistration =
+            archive(
+                name = name,
+                url = url,
+                framework = framework,
+                structure = structure,
+                archiveType = archiveType,
+                category = category,
+                id = id,
+                memoryBytes = memoryBytes,
+                supportsThinking = supportsThinking,
+                supportsLora = supportsLora,
+                cuaProfile = cuaProfile,
+                downloadBytes = null,
+            )
+
+        /** Retains the pre-metadata JVM factory and its default-argument bridge. */
+        @Deprecated("Use the multi-file factory with optional metadata.", level = DeprecationLevel.HIDDEN)
+        public fun multiFile(
+            id: String,
+            name: String,
+            framework: InferenceFramework,
+            files: List<ModelFileDescriptor>,
+            category: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            memoryBytes: Long? = null,
+            downloadBytes: Long? = null,
+            contextLength: Int? = null,
+            supportsThinking: Boolean = false,
+            cuaProfile: String? = null,
+        ): ModelRegistration =
+            multiFile(
+                id = id,
+                name = name,
+                framework = framework,
+                files = files,
+                category = category,
+                memoryBytes = memoryBytes,
+                downloadBytes = downloadBytes,
+                contextLength = contextLength,
+                supportsThinking = supportsThinking,
+                cuaProfile = cuaProfile,
+                supportsLora = false,
             )
     }
 }

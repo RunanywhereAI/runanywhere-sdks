@@ -1378,4 +1378,14 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /** Cancel, join, and release native resources. Idempotent. */
   solutionDestroy(handle: number): Promise<void>;
+
+  // ============================================================================
+  // Logging
+  // ============================================================================
+
+  /** Set the minimum log level in RACommons logger (`rac_logger_set_min_level`). */
+  loggerSetMinLevel(level: number): Promise<void>;
+
+  /** Get the minimum log level from RACommons logger (`rac_logger_get_min_level`). */
+  loggerGetMinLevel(): Promise<number>;
 }

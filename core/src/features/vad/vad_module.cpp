@@ -1210,7 +1210,7 @@ extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
                               ? static_cast<float>(proto.frame_length_ms()) / 1000.0f
                               : RAC_VAD_DEFAULT_FRAME_LENGTH;
     config.energy_threshold =
-        proto.activation_threshold() > 0.0f ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+        proto.has_activation_threshold() ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
     config.enable_auto_calibration = proto.enable_auto_calibration() ? RAC_TRUE : RAC_FALSE;
     return rac_vad_component_configure(handle, &config);
 #endif
@@ -1757,7 +1757,7 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
         proto.frame_length_ms() > 0 ? proto.frame_length_ms()
                                     : static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f);
     const float threshold =
-        proto.activation_threshold() > 0.0f ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+        proto.has_activation_threshold() ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
 
     rac::lifecycle::LifecycleVadRef ref;
     const bool have_model = rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS;

@@ -15,6 +15,17 @@ import {
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
+export type CommonsLogLevelSink = (level: LogLevel) => void;
+let _commonsLogLevelSink: CommonsLogLevelSink | null = null;
+
+/** Register a sink that receives C-ABI minimum log level changes. */
+export function setCommonsLogLevelSink(sink: CommonsLogLevelSink | null): void {
+  _commonsLogLevelSink = sink;
+  if (sink) {
+    sink(LoggingManager.shared.configuration.minLogLevel);
+  }
+}
+
 export interface LogEntry {
   level: LogLevel;
   category: string;
@@ -97,6 +108,7 @@ export class LoggingManager {
     } else if (!this.destinations.has(this.consoleDestination.identifier)) {
       this.addDestination(this.consoleDestination);
     }
+    this.syncCommonsLogLevel(this.config.minLogLevel);
   }
 
   public applyEnvironmentConfiguration(environment: SDKEnvironment): void {
@@ -114,6 +126,17 @@ export class LoggingManager {
 
   public setMinLogLevel(level: LogLevel): void {
     this.config.minLogLevel = level;
+    this.syncCommonsLogLevel(level);
+  }
+
+  private syncCommonsLogLevel(level: LogLevel): void {
+    if (_commonsLogLevelSink) {
+      try {
+        _commonsLogLevelSink(level);
+      } catch {
+        // Sink call failed
+      }
+    }
   }
 
   public addDestination(destination: LogDestination): void {

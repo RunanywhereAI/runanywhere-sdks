@@ -59,6 +59,7 @@ RAC_API uint32_t rac_plugin_api_version(void);
  *   - RAC_ERROR_CAPABILITY_UNSUPPORTED   - plugin's `capability_check()` declined
  *   - RAC_ERROR_PLUGIN_DUPLICATE         - same `metadata.name` already registered with higher
  * priority
+ *   - RAC_ERROR_PLUGIN_BUSY              - existing plugin is serving a leased model
  *   - RAC_ERROR_FEATURE_NOT_AVAILABLE    - host built with RAC_STATIC_PLUGINS=ON
  *
  * On any failure, the underlying handle is `dlclose`'d before return.
@@ -79,8 +80,9 @@ RAC_API rac_result_t rac_registry_load_plugin(const char* path);
  *
  * Every path is attempted. A path that fails is logged and recorded in the
  * unavailability ledger (see `rac_registry_list_unavailable_plugins`); the
- * loop continues to the next one. `RAC_ERROR_PLUGIN_DUPLICATE` counts as
- * loaded — the plugin is in the registry, which is what the caller asked for.
+ * loop continues to the next one. `RAC_ERROR_PLUGIN_DUPLICATE` and
+ * `RAC_ERROR_PLUGIN_BUSY` count as loaded: an existing plugin remains registered
+ * and serving; the rejected replacement has not been installed.
  *
  * @param paths      Array of `count` library paths. NULL/empty entries are skipped.
  * @param count      Number of entries in `paths`.

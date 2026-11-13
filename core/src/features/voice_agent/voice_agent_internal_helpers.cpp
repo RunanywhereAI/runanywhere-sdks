@@ -434,7 +434,7 @@ rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComp
     config.vad_config.frame_length = vad.frame_length_ms() > 0
                                          ? static_cast<float>(vad.frame_length_ms()) / 1000.0f
                                          : RAC_VAD_DEFAULT_FRAME_LENGTH;
-    config.vad_config.energy_threshold = vad.activation_threshold() > 0.0f
+    config.vad_config.energy_threshold = vad.has_activation_threshold()
                                              ? vad.activation_threshold()
                                              : RAC_VOICE_AGENT_VAD_CONFIG_DEFAULT.energy_threshold;
     return config;

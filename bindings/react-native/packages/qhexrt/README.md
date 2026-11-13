@@ -7,10 +7,16 @@
 ## Installation
 
 ```bash
-npm install @runanywhere/core@0.20.27 @runanywhere/qhexrt@0.20.19
+npm install @runanywhere/core@0.20.37 @runanywhere/qhexrt@0.20.37
 ```
 
 See the [React Native SDK README](../../README.md) for Android setup.
+
+The examples below target this source tree (SDK `0.20.37`). For changes not yet
+released, use local SDK packages and Commons native libraries built from the same
+checkout. The private QHexRT native payload is not in this repository: supply it
+separately from a compatible authorized build and stage it into the local backend
+package. A matching version number alone does not include unreleased changes.
 
 ---
 
@@ -52,6 +58,8 @@ When registering a bundle URL through the core model-registration API with the Q
 A known architecture pin in the first repository folder, such as `/v79` or `/v79/model.json`, is checked before network resolution or registry changes. A mismatched pin returns `RAC_ERROR_INVALID_ARGUMENT` with a message naming the bundle and device architectures; a matching pin is kept unchanged. Probe failures and unsupported devices return the same errors as logical references.
 
 Direct `/resolve/` or `/blob/` URLs register a single file and do not receive this bundle-folder check.
+
+Catalog eligibility and any required HF-auth preflight remain application-owned.
 
 ---
 

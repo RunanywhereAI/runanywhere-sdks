@@ -146,14 +146,14 @@ TestResult test_list_directory() {
         result.details = "capacity query failed";
         return result;
     }
-    if (count != 3) {  // a.gguf, b.onnx, sub — dotfiles filtered
-        result.details = "capacity query expected 3 entries, got " + std::to_string(count);
+    if (count != 4) {  // a.gguf, b.onnx, sub, .hidden
+        result.details = "capacity query expected 4 entries, got " + std::to_string(count);
         return result;
     }
 
     std::vector<rac_directory_entry_t> entries(count);
     if (adapter.file_list_directory(dir.c_str(), entries.data(), &count, nullptr) != RAC_SUCCESS ||
-        count != 3) {
+        count != 4) {
         result.details = "fill call failed";
         return result;
     }
@@ -171,7 +171,7 @@ TestResult test_list_directory() {
             return result;
         }
     }
-    if (names != std::set<std::string>{"a.gguf", "b.onnx", "sub"}) {
+    if (names != std::set<std::string>{".hidden", "a.gguf", "b.onnx", "sub"}) {
         result.details = "unexpected entry names";
         return result;
     }

@@ -684,6 +684,11 @@ type NpuSeedResult = Readonly<{
   failed: number;
 }>;
 
+/**
+ * Return the supported device capability only while the QHexRT backend is ready.
+ * Missing registration or a failed optional-backend probe yields null so catalog
+ * seeding can skip NPU rows without aborting the other backend catalogs.
+ */
 async function npuCatalogCapability(): Promise<NpuCapability | null> {
   if (!qhexrtBackendRegistered) return null;
 
@@ -769,6 +774,10 @@ export async function refreshNpuCatalog(): Promise<boolean> {
   return result.registered > 0;
 }
 
+/**
+ * Identify the typed native not-found error used to skip unavailable manifests.
+ * Authentication, network, and untyped failures remain registration failures.
+ */
 function isMissingNpuManifest(error: unknown): boolean {
   return error instanceof SDKException && error.cAbiCode === RAC_ERROR_NOT_FOUND;
 }

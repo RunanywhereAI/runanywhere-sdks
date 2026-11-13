@@ -389,6 +389,12 @@ object CppBridgeModelRegistry {
         return decodeModelInfoList(bytes, "downloaded ModelInfoList")
     }
 
+    /**
+     * Run a native registry refresh and decode its result.
+     *
+     * Returns null when the bridge supplies no bytes or decoding fails. Native
+     * operation failures propagate as [SDKException] before decoding begins.
+     */
     private fun refreshProto(request: ProtoModelRegistryRefreshRequest): ProtoModelRegistryRefreshResult? {
         val bytes =
             withNativeProtoFailure {
@@ -408,6 +414,7 @@ object CppBridgeModelRegistry {
     private fun removeProto(modelId: String): Int =
         RunAnywhereBridge.racModelRegistryRemoveProto(modelId)
 
+    /** Decode a native model record, logging malformed payloads and returning null. */
     private fun decodeProtoModel(bytes: ByteArray): ProtoModelInfo? =
         try {
             ProtoModelInfo.ADAPTER.decode(bytes)
@@ -416,6 +423,7 @@ object CppBridgeModelRegistry {
             null
         }
 
+    /** Decode a native model list; [label] identifies malformed responses in logs. */
     private fun decodeModelInfoList(bytes: ByteArray, label: String): ProtoModelInfoList? =
         try {
             ProtoModelInfoList.ADAPTER.decode(bytes)

@@ -319,7 +319,9 @@ internal object ToolCallingOrchestrator {
         ToolResult(
             tool_call_id = toolCallId,
             name = name,
-            result_json = RAToolValue.jsonString(from = result),
+            // Failure/cancellation results must not retry a failed native
+            // serializer while constructing the error response.
+            result_json = if (success) RAToolValue.jsonString(from = result) else "{}",
             error = error,
             is_error = !success,
             started_at_ms = startedAtMs,
