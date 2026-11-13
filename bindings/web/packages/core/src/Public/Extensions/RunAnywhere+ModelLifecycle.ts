@@ -23,7 +23,7 @@ import type {
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
-import { Runtime, prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
+import { Runtime, prepareModelLoad, recoverModelLoadFailure, awaitInFlightAccelerationSwitch } from '../../Foundation/RuntimeConfig.js';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
@@ -773,6 +773,11 @@ export const WebModelLifecycle = {
   },
 
   async loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
+    // Await any in-flight acceleration switch before route resolution so a
+    // load racing `runtime.setAcceleration()` observes the new adapter instead
+    // of a torn-down WASM module and `backendNotAvailable`.
+    await awaitInFlightAccelerationSwitch();
+
     let modelSnapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
     if (modelSnapshot && !modelSnapshot.localPath) {
       const resolvedPath = await resolveLocalPathFromOpfs(modelSnapshot);

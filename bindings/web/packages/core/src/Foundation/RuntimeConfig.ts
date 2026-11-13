@@ -109,6 +109,7 @@ let _preferred: RuntimeAccelerationMode = 'auto';
 let _activeMode: 'cpu' | 'webgpu' | null = null;
 let _streamingMode: StreamingMode = 'auto';
 let _switcher: RuntimeAccelerationSwitcher | null = null;
+let _inFlightSwitch: Promise<void> | null = null;
 let _modelLoadPreparation: RuntimeModelLoadPreparation | null = null;
 let _modelLoadFailureRecovery: RuntimeModelLoadFailureRecovery | null = null;
 let _degradedReason: string | null = null;
@@ -193,11 +194,13 @@ export const Runtime = {
       logger.debug(`runtime.setAcceleration(${mode}): no switcher registered yet — recorded preference only`);
       return;
     }
-    await _switcher(mode);
+    _inFlightSwitch = _switcher(mode);
+    await _inFlightSwitch;
     // The requested mode is only a preference. A backend may resolve WebGPU
     // to CPU after capability detection or fallback, and the switcher reports
     // that actual result via setActiveAccelerationMode(). Never overwrite it
     // with the request after the switch completes.
+    _inFlightSwitch = null;
   },
 
   /**
@@ -442,6 +445,15 @@ export function setSpeechAccelerationMode(diagnostics: {
 
 export function setModelLoadPreparation(fn: RuntimeModelLoadPreparation | null): void {
   _modelLoadPreparation = fn;
+}
+
+/**
+ * Await any in-flight acceleration switch before route resolution, so a
+ * model load does not observe a torn-down WASM module mid-switch and fail
+ * with `backendNotAvailable`. Resolves immediately when no switch is in flight.
+ */
+export async function awaitInFlightAccelerationSwitch(): Promise<void> {
+  if (_inFlightSwitch) await _inFlightSwitch;
 }
 
 export async function prepareModelLoad(context: RuntimeModelLoadContext): Promise<void> {
