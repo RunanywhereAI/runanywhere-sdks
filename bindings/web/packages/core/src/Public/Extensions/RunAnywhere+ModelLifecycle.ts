@@ -811,6 +811,10 @@ export const WebModelLifecycle = {
     // When the BackendWorker owns LLM load/inference, skip main-thread
     // hydration so we do not keep a second copy of the GGUF in UI-thread
     // MEMFS. The worker hydrates its own MEMFS during loadModel RPC.
+    // Re-await any acceleration switch that started during the async hydration
+    // phases above, so route resolution and loadAsync observe the post-switch
+    // adapter instead of a torn-down WASM module.
+    await awaitInFlightAccelerationSwitch();
     const loadRoute = selectModelLoadRoute(request, modelSnapshot);
     const { adapter } = loadRoute;
     const workerRoute = backendWorkerLoadRoute(modelSnapshot, request, loadRoute.framework);
@@ -899,6 +903,9 @@ export const WebModelLifecycle = {
       if (modelSnapshot) {
         ModelRegistry.registerModel(modelSnapshot);
       }
+      // Re-await any acceleration switch that may have started during recovery,
+      // so the retry route resolves against the post-switch adapter.
+      await awaitInFlightAccelerationSwitch();
       const retryRoute = selectModelLoadRoute(request, modelSnapshot);
       const retryAdapter = retryRoute.adapter;
       const retryWorkerRoute = backendWorkerLoadRoute(

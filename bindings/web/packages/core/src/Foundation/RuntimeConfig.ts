@@ -194,13 +194,19 @@ export const Runtime = {
       logger.debug(`runtime.setAcceleration(${mode}): no switcher registered yet — recorded preference only`);
       return;
     }
-    _inFlightSwitch = _switcher(mode);
-    await _inFlightSwitch;
+    const thisSwitch = _switcher(mode);
+    _inFlightSwitch = thisSwitch;
+    try {
+      await thisSwitch;
+    } finally {
+      // Only clear if this switch is still the current one; a newer switch
+      // may have replaced it while we were awaiting.
+      if (_inFlightSwitch === thisSwitch) _inFlightSwitch = null;
+    }
     // The requested mode is only a preference. A backend may resolve WebGPU
     // to CPU after capability detection or fallback, and the switcher reports
     // that actual result via setActiveAccelerationMode(). Never overwrite it
     // with the request after the switch completes.
-    _inFlightSwitch = null;
   },
 
   /**
@@ -453,7 +459,14 @@ export function setModelLoadPreparation(fn: RuntimeModelLoadPreparation | null):
  * with `backendNotAvailable`. Resolves immediately when no switch is in flight.
  */
 export async function awaitInFlightAccelerationSwitch(): Promise<void> {
-  if (_inFlightSwitch) await _inFlightSwitch;
+  if (_inFlightSwitch) {
+    try {
+      await _inFlightSwitch;
+    } catch {
+      // A failed switch must not fail a model load; the load will resolve its
+      // own route and fail on its own terms if the backend is genuinely gone.
+    }
+  }
 }
 
 export async function prepareModelLoad(context: RuntimeModelLoadContext): Promise<void> {
