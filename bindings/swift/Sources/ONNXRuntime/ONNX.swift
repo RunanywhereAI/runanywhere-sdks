@@ -70,30 +70,29 @@ public enum ONNX {
     /// - Parameter priority: Ignored (C++ uses its own priority system)
     @MainActor
     public static func register(priority _: Int = 100) {
-        guard !isRegistered else {
-            logger.debug("ONNX already registered, returning")
-            return
+        // Register each backend independently so a partial teardown (one
+        // backend released, the other still leased with PLUGIN_BUSY) can be
+        // completed by a subsequent register() call. Checking the combined
+        // `isRegistered` flag alone would short-circuit and leave the
+        // released backend unregistered.
+        if !isRegistered {
+            logger.info("Registering ONNX backend with C++ registry...")
+
+            let result = rac_backend_onnx_register()
+
+            // RAC_ERROR_MODULE_ALREADY_REGISTERED is OK
+            if result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED {
+                let errorMsg = String(cString: rac_error_message(result))
+                logger.error("ONNX registration failed: \(errorMsg)")
+                // Don't throw - registration failure shouldn't crash the app
+            } else {
+                isRegistered = true
+                logger.info("ONNX backend registered successfully (embeddings + plugin)")
+            }
         }
 
-        logger.info("Registering ONNX backend with C++ registry...")
-
-        let result = rac_backend_onnx_register()
-
-        // RAC_ERROR_MODULE_ALREADY_REGISTERED is OK
-        if result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED {
-            let errorMsg = String(cString: rac_error_message(result))
-            logger.error("ONNX registration failed: \(errorMsg)")
-            // Don't throw - registration failure shouldn't crash the app
-            return
-        }
-
-        isRegistered = true
-        logger.info("ONNX backend registered successfully (embeddings + plugin)")
-
-        // Register the Sherpa-ONNX engine plugin for STT / TTS / VAD. The
-        // `rac_backend_sherpa_register` wrapper is not exported from the
-        // shipped RABackendSherpa.xcframework, so we call the plugin
-        // registry directly with the entry symbol that IS exported.
+        // Always (re)attempt Sherpa registration so a Sherpa that was released
+        // while ONNX was leased (PLUGIN_BUSY on unregister) gets reinstalled.
         registerSherpaPlugin()
     }
 
@@ -148,16 +147,26 @@ public enum ONNX {
     @MainActor
     public static func unregister() {
         if isSherpaRegistered {
-            _ = rac_plugin_unregister("sherpa")
-            isSherpaRegistered = false
-            logger.info("Sherpa engine plugin unregistered")
+            let result = rac_plugin_unregister("sherpa")
+            if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND || result == RAC_ERROR_NOT_FOUND {
+                isSherpaRegistered = false
+                logger.info("Sherpa engine plugin unregistered")
+            } else {
+                let errorMsg = String(cString: rac_error_message(result))
+                logger.warning("Sherpa unregistration failed: \(errorMsg) — keeping flag set for re-register")
+            }
         }
 
         guard isRegistered else { return }
 
-        _ = rac_backend_onnx_unregister()
-        isRegistered = false
-        logger.info("ONNX backend unregistered")
+        let result = rac_backend_onnx_unregister()
+        if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_NOT_FOUND || result == RAC_ERROR_NOT_FOUND {
+            isRegistered = false
+            logger.info("ONNX backend unregistered")
+        } else {
+            let errorMsg = String(cString: rac_error_message(result))
+            logger.warning("ONNX unregistration failed: \(errorMsg) — keeping flag set for re-register")
+        }
     }
 
 }

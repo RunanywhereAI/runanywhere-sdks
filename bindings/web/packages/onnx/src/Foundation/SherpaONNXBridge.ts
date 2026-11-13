@@ -150,7 +150,12 @@ export class SherpaONNXBridge {
 
   /** Acquire/load the commons module and register the ONNX backend vtable. */
   async ensureLoaded(options?: SherpaONNXBridgeLoadOptions): Promise<void> {
-    if (this._loaded) return;
+    // Check per-backend flags rather than just _loaded: a partial teardown
+    // (one backend released via PLUGIN_BUSY, the other still leased) can
+    // leave _loaded true while one backend's vtable is gone. Re-registering
+    // only the missing backend restores full coverage without reloading the
+    // module.
+    if (this._onnxBackendRegistered && this._sherpaBackendRegistered) return;
     if (this._loading) {
       await this._loading;
       return;
@@ -229,7 +234,15 @@ export class SherpaONNXBridge {
       this._platformAdapter = null;
     }
 
-    if (module) unregisterWasmModule(module);
+    if (module) {
+      try {
+        unregisterWasmModule(module);
+      } catch (err) {
+        logger.warning(
+          `unregisterWasmModule threw: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
 
     this._module = null;
     this._onnxBackendRegistered = false;

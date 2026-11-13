@@ -83,9 +83,17 @@ export class ONNXProvider {
       if (success) {
         this.registered = false;
         logger.info('ONNX backend unregistered');
+      } else {
+        // Native reported failure (e.g. PLUGIN_BUSY): the backend may still be
+        // registered natively. Invalidate JS state so the next register() calls
+        // native registration, which will reconcile per-backend state.
+        this.registered = false;
       }
       return success;
     } catch (error) {
+      // Native threw (e.g. PLUGIN_BUSY): invalidate JS state so the next
+      // register() calls native registration to reconcile per-backend state.
+      this.registered = false;
       return false;
     }
   }
