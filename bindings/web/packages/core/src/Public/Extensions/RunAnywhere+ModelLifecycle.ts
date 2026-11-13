@@ -23,7 +23,7 @@ import type {
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
-import { Runtime, prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
+import { Runtime, prepareModelLoad, recoverModelLoadFailure, awaitInFlightAccelerationSwitch } from '../../Foundation/RuntimeConfig.js';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
@@ -773,6 +773,11 @@ export const WebModelLifecycle = {
   },
 
   async loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
+    // Await any in-flight acceleration switch before route resolution so a
+    // load racing `runtime.setAcceleration()` observes the new adapter instead
+    // of a torn-down WASM module and `backendNotAvailable`.
+    await awaitInFlightAccelerationSwitch();
+
     let modelSnapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
     if (modelSnapshot && !modelSnapshot.localPath) {
       const resolvedPath = await resolveLocalPathFromOpfs(modelSnapshot);
@@ -806,6 +811,10 @@ export const WebModelLifecycle = {
     // When the BackendWorker owns LLM load/inference, skip main-thread
     // hydration so we do not keep a second copy of the GGUF in UI-thread
     // MEMFS. The worker hydrates its own MEMFS during loadModel RPC.
+    // Re-await any acceleration switch that started during the async hydration
+    // phases above, so route resolution and loadAsync observe the post-switch
+    // adapter instead of a torn-down WASM module.
+    await awaitInFlightAccelerationSwitch();
     const loadRoute = selectModelLoadRoute(request, modelSnapshot);
     const { adapter } = loadRoute;
     const workerRoute = backendWorkerLoadRoute(modelSnapshot, request, loadRoute.framework);
@@ -894,6 +903,9 @@ export const WebModelLifecycle = {
       if (modelSnapshot) {
         ModelRegistry.registerModel(modelSnapshot);
       }
+      // Re-await any acceleration switch that may have started during recovery,
+      // so the retry route resolves against the post-switch adapter.
+      await awaitInFlightAccelerationSwitch();
       const retryRoute = selectModelLoadRoute(request, modelSnapshot);
       const retryAdapter = retryRoute.adapter;
       const retryWorkerRoute = backendWorkerLoadRoute(
