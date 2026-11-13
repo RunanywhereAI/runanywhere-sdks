@@ -65,9 +65,9 @@ struct State {
     /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
     std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
     std::unordered_map<const rac_engine_vtable_t*, size_t> model_leases;
-    /** In-flight loader calls keyed by path, so a failed load does not discard
-     *  a pending manifest another concurrent load of the same library owns. */
-    std::unordered_map<std::string, size_t> pending_loads;
+    /** In-flight loader calls keyed by OS handle, so aliases of the same
+     *  mapped library share ownership of its pending manifest. */
+    std::unordered_map<void*, size_t> pending_loads;
 };
 
 State& state() {
@@ -202,33 +202,37 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
     }
 }
 
-void rac_plugin_registry_begin_load(const char* path) noexcept {
-    if (path == nullptr || path[0] == '\0') {
-        return;
+rac_result_t rac_plugin_registry_begin_load(void* handle) noexcept {
+    if (handle == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
     }
     try {
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
-        ++s.pending_loads[std::string(path)];
-    } catch (...) {}
+        ++s.pending_loads[handle];
+        return RAC_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
 }
 
-rac_bool_t rac_plugin_registry_finish_load(const char* path, const rac_engine_vtable_t* vtable,
+rac_bool_t rac_plugin_registry_finish_load(void* handle, const rac_engine_vtable_t* vtable,
                                            rac_bool_t discard_pending) noexcept {
     try {
         auto& s = state();
         std::lock_guard<std::mutex> lock(s.mu);
 
-        if (path != nullptr && path[0] != '\0') {
-            const auto inflight = s.pending_loads.find(path);
-            if (inflight != s.pending_loads.end()) {
-                if (inflight->second > 1) {
-                    --inflight->second;
-                    return RAC_FALSE;
-                }
-                s.pending_loads.erase(inflight);
-            }
+        const auto inflight = s.pending_loads.find(handle);
+        if (inflight == s.pending_loads.end()) {
+            return RAC_FALSE;
         }
+        if (inflight->second > 1) {
+            --inflight->second;
+            return RAC_FALSE;
+        }
+        s.pending_loads.erase(inflight);
 
         if (vtable == nullptr) {
             return RAC_TRUE;
@@ -568,23 +572,37 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 auto& bucket = s.by_primitive[item.primitive];
                 bucket.reserve(bucket.size() + 1);
             }
-            s.by_name.reserve(s.by_name.size() + (replacing_existing ? 0 : 1));
+            if (!replacing_existing) {
+                s.by_name.reserve(s.by_name.size() + 1);
+            }
             s.manifests_by_name.reserve(s.manifests_by_name.size() + 1);
 
             bool manifest_entry_inserted = false;
             auto manifest_entry = s.manifests_by_name.end();
-            if (manifest != nullptr) {
-                auto [it, inserted] = s.manifests_by_name.try_emplace(name, nullptr);
-                manifest_entry = it;
-                manifest_entry_inserted = inserted;
-            }
-
             bool dl_entry_inserted = false;
             auto dl_entry = s.dl_handles.end();
-            if (dl_handle) {
-                auto [it, inserted] = s.dl_handles.try_emplace(name, nullptr);
-                dl_entry = it;
-                dl_entry_inserted = inserted;
+            try {
+                if (manifest != nullptr) {
+                    auto [it, inserted] = s.manifests_by_name.try_emplace(name, nullptr);
+                    manifest_entry = it;
+                    manifest_entry_inserted = inserted;
+                }
+                if (dl_handle) {
+                    auto [it, inserted] = s.dl_handles.try_emplace(name, nullptr);
+                    dl_entry = it;
+                    dl_entry_inserted = inserted;
+                }
+                if (!replacing_existing) {
+                    (void)s.by_name.try_emplace(name, vtable);
+                }
+            } catch (...) {
+                if (manifest_entry_inserted) {
+                    s.manifests_by_name.erase(manifest_entry);
+                }
+                if (dl_entry_inserted) {
+                    s.dl_handles.erase(dl_entry);
+                }
+                throw;
             }
 
             if (replacing_existing) {
@@ -602,18 +620,6 @@ static rac_result_t register_plugin(const rac_engine_vtable_t* vtable, void* dl_
                 s.manifests_by_vtable.erase(evicted_vtable);
                 erase_from_buckets_locked(s, name);
                 s.by_name[name] = vtable;
-            } else {
-                try {
-                    (void)s.by_name.try_emplace(name, vtable);
-                } catch (...) {
-                    if (manifest_entry_inserted) {
-                        s.manifests_by_name.erase(manifest_entry);
-                    }
-                    if (dl_entry_inserted) {
-                        s.dl_handles.erase(dl_entry);
-                    }
-                    throw;
-                }
             }
 
             if (manifest != nullptr) {

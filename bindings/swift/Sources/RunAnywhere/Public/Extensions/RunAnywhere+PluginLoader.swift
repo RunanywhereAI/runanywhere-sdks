@@ -87,7 +87,7 @@ public extension RunAnywhere {
 
         /// Unregister a previously-loaded plugin and `dlclose` its handle.
         ///
-        /// - Parameter name: The plugin name (library stem).
+        /// - Parameter name: The exact registry key returned by `load(path:)`.
         /// - Throws: `SDKException` on failure.
         public func unload(name: String) throws {
             let result = name.withCString { rac_registry_unload_plugin($0) }

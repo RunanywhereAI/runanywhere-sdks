@@ -53,16 +53,17 @@ rac_result_t rac_plugin_registry_acquire(const rac_engine_vtable_t* vtable,
                                          const rac_engine_manifest_t** out_manifest)
     RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-/** Mark an in-flight loader call for `path`. Must be paired with
- * rac_plugin_registry_finish_load(). Used to keep a failed concurrent load of
- * the same library from discarding the pending manifest another load owns. */
-void rac_plugin_registry_begin_load(const char* path) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+/** Mark an in-flight loader call for an opened OS library handle, before
+ * calling its entry function. Aliased paths share the same mapped handle.
+ * Pair a successful call with rac_plugin_registry_finish_load(); on failure,
+ * close the handle without entering the plugin or finishing an untracked load. */
+rac_result_t rac_plugin_registry_begin_load(void* handle) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /** Finish an in-flight loader call. Returns RAC_FALSE when another load for
- * `path` is still in flight, or when `vtable` is published/leased. Otherwise
+ * `handle` is still in flight, or when `vtable` is published/leased. Otherwise
  * returns RAC_TRUE; if `discard_pending` is RAC_TRUE, also removes the
  * unpublished pending manifest under the same registry lock. */
-rac_bool_t rac_plugin_registry_finish_load(const char* path, const rac_engine_vtable_t* vtable,
+rac_bool_t rac_plugin_registry_finish_load(void* handle, const rac_engine_vtable_t* vtable,
                                            rac_bool_t discard_pending) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 void rac_plugin_registry_release(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 

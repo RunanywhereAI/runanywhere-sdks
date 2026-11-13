@@ -25,6 +25,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <new>
 #include <string>
 
 #include "rac/core/rac_error.h"
@@ -152,27 +154,26 @@ struct DlGuard {
 
 /* Tracks one in-flight loader call so a failed load cannot discard the pending
  * manifest of a concurrent load of the same library. The registry only
- * discards the manifest when the last in-flight call for this path finishes
+ * discards the manifest when the last in-flight call for this handle finishes
  * and the vtable was never published. */
 struct PendingLoadGuard {
-    const char* path = nullptr;
+    void* handle = nullptr;
     const rac_engine_vtable_t* vtable = nullptr;
     bool active = true;
 
-    explicit PendingLoadGuard(const char* load_path) : path(load_path) {
-        rac_plugin_registry_begin_load(path);
-    }
+    // Construct only after begin_load succeeds, and after the library guard.
+    explicit PendingLoadGuard(void* load_handle) noexcept : handle(load_handle) {}
     ~PendingLoadGuard() {
         if (active) {
-            (void)rac_plugin_registry_finish_load(path, vtable, RAC_TRUE);
+            (void)rac_plugin_registry_finish_load(handle, vtable, RAC_TRUE);
         }
     }
     PendingLoadGuard(const PendingLoadGuard&) = delete;
     PendingLoadGuard& operator=(const PendingLoadGuard&) = delete;
 
-    rac_bool_t finish(rac_bool_t discard_pending) {
+    rac_bool_t finish(rac_bool_t discard_pending) noexcept {
         active = false;
-        return rac_plugin_registry_finish_load(path, vtable, discard_pending);
+        return rac_plugin_registry_finish_load(handle, vtable, discard_pending);
     }
 };
 
@@ -254,8 +255,6 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
     if (path == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
-    PendingLoadGuard load_guard(path);
-
     /* Failures below are recorded against the name parsed from the file so the
      * host can name the degraded backend. The registry records its own
      * failures (ABI / capability / manifest) under the vtable's real name. */
@@ -268,6 +267,12 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
         rac_registry_record_plugin_unavailable(blame.c_str(), path, RAC_ERROR_PLUGIN_LOAD_FAILED);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
+
+    const rac_result_t tracking_rc = rac_plugin_registry_begin_load(guard.h);
+    if (tracking_rc != RAC_SUCCESS) {
+        return tracking_rc;
+    }
+    PendingLoadGuard load_guard(guard.h);
 
     const std::string sym = entry_symbol_from_path(path);
     void* entry_sym = rac_dl_sym(guard.h, sym.c_str());
@@ -295,9 +300,9 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
      * plugin mapping. Allocate it BEFORE registration publishes the entry so an
      * allocation failure cannot turn an already-successful load into a failure
      * the caller cannot retry safely. */
-    char* name_copy = nullptr;
+    std::unique_ptr<char, decltype(&rac_free)> name_copy(nullptr, &rac_free);
     if (out_name != nullptr) {
-        name_copy = rac_strdup(name.c_str());
+        name_copy.reset(rac_strdup(name.c_str()));
         if (name_copy == nullptr) {
             RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): out of memory copying name",
                           path);
@@ -323,7 +328,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
                           "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d", path,
                           vt->metadata.name, static_cast<int>(rc));
         }
-        /* Only the last in-flight load for this path may discard a pending
+        /* Only the last in-flight load for this handle may discard a pending
          * manifest, and only if the vtable was never published. */
         const rac_bool_t last_load = load_guard.finish(RAC_TRUE);
         /* The registry recorded the reason under the vtable's own name; add
@@ -333,16 +338,13 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
             if (last_load == RAC_TRUE) {
                 rac_registry_record_plugin_unavailable(vt->metadata.name, path, rc);
             }
-            rac_free(name_copy);
             return rc;
         }
         /* DUPLICATE/BUSY/MODULE_ALREADY_REGISTERED: an entry with this key is
          * already registered. Keep it, discard the redundant mapping (DlGuard)
          * and hand the caller the key it already serves. */
         if (out_name != nullptr) {
-            *out_name = name_copy;
-        } else {
-            rac_free(name_copy);
+            *out_name = name_copy.release();
         }
         return rc;
     }
@@ -358,9 +360,7 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
     }
     (void)load_guard.finish(RAC_FALSE);
     if (out_name != nullptr) {
-        *out_name = name_copy;
-    } else {
-        rac_free(name_copy);
+        *out_name = name_copy.release();
     }
     RAC_LOG_DEBUG(LOG_CAT, "rac_registry_load_plugin('%s'): registered '%s' from '%s'", path,
                   name.c_str(), sym.c_str());
@@ -369,14 +369,24 @@ static rac_result_t load_plugin_impl(const char* path, char** out_name) {
 
 #endif /* RAC_PLUGIN_MODE_STATIC */
 
+static rac_result_t load_plugin(const char* path, char** out_name) {
+    try {
+        return load_plugin_impl(path, out_name);
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
+}
+
 rac_result_t rac_registry_load_plugin(const char* path) {
     /* Raw contract: DUPLICATE/BUSY stay visible to low-level callers. Use
      * rac_registry_load_plugin_named() for the SDK-facing normalized result. */
-    return load_plugin_impl(path, nullptr);
+    return load_plugin(path, nullptr);
 }
 
 rac_result_t rac_registry_load_plugin_named(const char* path, char** out_name) {
-    rac_result_t rc = load_plugin_impl(path, out_name);
+    rac_result_t rc = load_plugin(path, out_name);
     if (rac_plugin_registration_succeeded(rc)) {
         return RAC_SUCCESS;
     }
