@@ -54,6 +54,14 @@ export interface BackendWorkerInitRequest {
   type: 'init';
   requestId: string;
   payload?: unknown;
+  /** Native rac_log_level_t, independent of backend-specific init options. */
+  logLevel?: number;
+}
+
+export interface BackendWorkerLogLevelRequest {
+  type: 'setLogLevel';
+  requestId: string;
+  logLevel: number;
 }
 
 export interface BackendWorkerLoadModelRequest {
@@ -102,6 +110,7 @@ export interface BackendWorkerHealthRequest {
 
 export type BackendWorkerRequest =
   | BackendWorkerInitRequest
+  | BackendWorkerLogLevelRequest
   | BackendWorkerLoadModelRequest
   | BackendWorkerUnloadModelRequest
   | BackendWorkerUnaryInferenceRequest

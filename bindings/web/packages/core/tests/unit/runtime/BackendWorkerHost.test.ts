@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   BackendWorkerCrashedError,
@@ -11,10 +11,16 @@ import type {
   BackendWorkerResponse,
 } from '../../../src/runtime/BackendWorkerProtocol';
 
+import { clearAllBackendWorkerHosts } from '../../../src/runtime/BackendWorkerHostRegistry';
+import '../../../src/runtime/EmscriptenModule';
+import { SDKLogger, racLogLevelToProto } from '../../../src/Foundation/SDKLogger';
+const setLogLevel = (level: number): void => SDKLogger.setMinLogLevel(racLogLevelToProto(level));
+
 class FakeWorker implements BackendWorkerLike {
   onmessage: ((event: MessageEvent<BackendWorkerResponse>) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
   readonly requests: BackendWorkerRequest[] = [];
+  readonly logLevels: number[] = [];
   private readonly scope: BackendWorkerScope;
 
   constructor(options: { ready?: boolean; crashOnInfer?: boolean } = {}) {
@@ -25,6 +31,7 @@ class FakeWorker implements BackendWorkerLike {
     if (options.ready !== false) {
       runBackendWorker(this.scope, {
         init: () => undefined,
+        setLogLevel: (level) => { this.logLevels.push(level); },
         infer: (_kind, payload) => {
           if (options.crashOnInfer) {
             this.onerror?.({ message: 'simulated crash' } as ErrorEvent);
@@ -50,6 +57,10 @@ class FakeWorker implements BackendWorkerLike {
 }
 
 describe('BackendWorkerHost', () => {
+  afterEach(() => {
+    clearAllBackendWorkerHosts();
+    setLogLevel(2);
+  });
   it('rejects a missing init handshake within its configured timeout', async () => {
     const host = new BackendWorkerHost(() => new FakeWorker({ ready: false }), { initTimeoutMs: 5 });
     await expect(host.init()).rejects.toThrow(/handshake timed out/);
@@ -60,7 +71,25 @@ describe('BackendWorkerHost', () => {
     const worker = new FakeWorker();
     const host = new BackendWorkerHost(() => worker);
 
-    await expect(host.infer('llm.generate', { prompt: 'hello' })).resolves.toEqual({ prompt: 'hello' });
+    setLogLevel(1);
+    expect(worker.requests).toEqual([]);
+    const pending = host.infer('llm.generate', { prompt: 'hello' });
+    expect(worker.logLevels).toEqual([1]);
+    setLogLevel(4);
+    await expect(pending).resolves.toEqual({ prompt: 'hello' });
+    expect(worker.logLevels).toEqual([1, 4]);
+
+    const speechWorker = new FakeWorker();
+    const speechHost = new BackendWorkerHost(() => speechWorker, { backendId: 'onnx' });
+    await speechHost.init();
+    expect(speechWorker.logLevels).toEqual([4]);
+    setLogLevel(0);
+    expect(worker.logLevels.at(-1)).toBe(0);
+    expect(speechWorker.logLevels.at(-1)).toBe(0);
+    speechHost.dispose();
+    setLogLevel(5);
+    expect(worker.logLevels.at(-1)).toBe(5);
+    expect(speechWorker.logLevels.at(-1)).toBe(0);
     expect(host.diagnostics).toEqual({ executionContext: 'worker', queueDepth: 0 });
   });
 
@@ -84,12 +113,17 @@ describe('BackendWorkerHost', () => {
     let calls = 0;
     const host = new BackendWorkerHost(() => (calls++ === 0 ? first : second));
 
+    setLogLevel(1);
     await expect(host.infer('stt.transcribe', { audio: 'first' }))
       .rejects.toBeInstanceOf(BackendWorkerCrashedError);
     expect(host.diagnostics.executionContext).toBe('main');
 
+    setLogLevel(4);
+    expect(second.requests).toEqual([]);
     await expect(host.infer('stt.transcribe', { audio: 'recovered' }))
       .resolves.toEqual({ audio: 'recovered' });
     expect(host.diagnostics.executionContext).toBe('worker');
+    expect(first.logLevels).toEqual([1]);
+    expect(second.logLevels).toEqual([4]);
   });
 });

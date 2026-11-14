@@ -52,6 +52,34 @@ Every canonical `.js` file is mandatory Emscripten runtime glue, but bundlers ma
 
 **The optional ONNX-WebGPU pair is verified at the package level, not yet in the example.** `packages/onnx`'s own `prepack`/`verify:package` gate checks `racommons-onnx-sherpa-webgpu.{js,wasm}` (it ships in the npm package unconditionally). The in-repo minimal example's `vite.config.ts` copy-wasm plugin and `tests/browser/release-app.e2e.spec.ts`, however, currently only build/verify the four mandatory pairs — they do not exercise `ONNX.register({ acceleration: 'webgpu' })`. If you add WebGPU speech acceleration to the example, add this fifth pair to both.
 
+## Worker logging configuration
+
+Core forwards logging-level changes through the backend-neutral worker protocol.
+Each worker receives the current level on initialization (including recreation),
+and existing hosts receive `setLogLevel` without starting an idle worker. The
+LlamaCPP and ONNX runtimes retain the latest level while WASM loads, pass it to
+`rac_init`, and apply it again after initialization so a pending update is not
+lost. Each runtime updates both its JavaScript logger and its own native logger;
+worker modules remain outside the main-thread capability registry.
+
+The public setter remains synchronous. Worker delivery is asynchronous and takes
+effect when the worker processes its message, so a synchronous native call cannot
+be interrupted to change its logging level. Native live updates require artifacts
+exporting `rac_logger_set_min_level`; older artifacts remain loadable but cannot
+apply arbitrary native level changes after initialization.
+
+To verify both real CPU WASM heaps and real LLM generation (downloads SmolLM2),
+build the current LlamaCPP and ONNX artifacts and run:
+
+```bash
+RA_RUN_WORKER_LOGGING_E2E=1 npx playwright test tests/browser/worker-logging.spec.ts
+```
+
+The heap check covers initial, pending-init, live, and recreated-worker levels.
+The inference check verifies native INFO output at DEBUG and suppression at ERROR
+with a production worker. These opt-in checks require current native logging
+exports; the ordinary browser smoke suite also supports older release artifacts.
+
 ## Quality and release gates
 
 TypeScript is strict and builds must fail on type errors. External data begins as `unknown`, is validated, and is narrowed before it reaches SDK or WASM boundaries. Do not add `any`, `@ts-ignore`, unchecked JSON casts, or duplicate hand-written proto DTOs.
