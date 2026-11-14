@@ -18,9 +18,10 @@ facade sits on top of.
 `downloadedModels`, `downloadModel`, `importModel`.
 
 **LLM / structured output / tool calling**
-`RunAnywhere.generate`, `generateStream`, `cancelGeneration`,
-`generateStructured`, `generateStructuredStream`, `extractStructuredOutput`,
-`generateWithTools`.
+`RunAnywhere.llm.generate`, `llm.generateStream`, `llm.generateStructured`,
+`llm.extractStructured` (parse text you already have against a schema; async,
+so it also works when the Llama BackendWorker owns the model), and
+`llm.tools.register`, `llm.tools.unregister`, `llm.tools.list`.
 
 **Speech / VLM / Voice Agent / RAG**
 `RunAnywhere.transcribe`, `transcribeStream`, `synthesize`, `synthesizeStream`,

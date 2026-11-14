@@ -60,6 +60,7 @@ import type {
   RagStats,
   RankedResult,
   SegmentationResult,
+  StructuredExtraction,
   StructuredResult,
   Transcription,
   VadResult,
@@ -324,14 +325,16 @@ export function toProtoStructuredOutputOptions(
   };
 }
 
-/** Convert a proto structured-output result to the public shape. */
-export function toStructuredResult(
+/**
+ * Read the value, raw text, and validity out of a proto structured-output
+ * result. `fallbackText` stands in when commons returns no `rawText`.
+ */
+export function toStructuredExtraction(
   parsed: StructuredOutputResult,
-  generation: GenerationResult,
-  mode: StructuredOutputMode,
+  fallbackText: string,
   parse?: (text: string) => unknown,
-): StructuredResult {
-  const raw = parsed.rawText ?? generation.text;
+): StructuredExtraction {
+  const raw = parsed.rawText ?? fallbackText;
   let value: unknown;
   try {
     value = parse ? parse(raw) : JSON.parse(parsed.json || raw);
@@ -342,6 +345,18 @@ export function toStructuredResult(
     value,
     raw,
     valid: parsed.validation?.isValid ?? value !== undefined,
+  };
+}
+
+/** Convert a proto structured-output result to the public shape. */
+export function toStructuredResult(
+  parsed: StructuredOutputResult,
+  generation: GenerationResult,
+  mode: StructuredOutputMode,
+  parse?: (text: string) => unknown,
+): StructuredResult {
+  return {
+    ...toStructuredExtraction(parsed, generation.text, parse),
     mode,
     inputTokens: generation.inputTokens,
     outputTokens: generation.outputTokens,

@@ -16,10 +16,11 @@ import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../../Adapters
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { ToolCalling, type ToolExecutor } from '../../Extensions/RunAnywhere+ToolCalling.js';
 import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
+import { extractStructuredOutputAsync } from '../../Extensions/RunAnywhere+TextGeneration.js';
 import type { ChatMessage } from '../Inputs.js';
 import type { JsonSchema, LlmOptions, StructuredOutputMode } from '../Options.js';
 import type { GenerationEvent } from '../Events.js';
-import type { GenerationResult, StructuredResult } from '../Results.js';
+import type { GenerationResult, StructuredExtraction, StructuredResult } from '../Results.js';
 import {
   currentDevicePlacement,
   finishReasonFrom,
@@ -29,6 +30,7 @@ import {
   toProtoHistory,
   toProtoLlmOptions,
   toProtoStructuredOutputOptions,
+  toStructuredExtraction,
   toStructuredResult,
 } from '../Mapping.js';
 import { ensureModelForCategory, ensureReady } from '../Runtime/Prerequisites.js';
@@ -327,6 +329,26 @@ export const llm = {
       throw SDKException.processingFailed('Structured-output parsing returned no result.');
     }
     return toStructuredResult(parsed, generation, mode, schema.parse);
+  },
+
+  /**
+   * Parse and validate text you already have against a schema, without
+   * generating anything. Use it on output from `generate`/`generateStream`,
+   * or on text from elsewhere.
+   *
+   * Runs on the Llama BackendWorker when it owns the language model, and on
+   * the main thread otherwise.
+   *
+   * @throws SDKException when no registered backend can parse structured output.
+   *
+   * @example
+   * const schema = { json: '{"type":"object","properties":{"city":{"type":"string"}}}' };
+   * const { value, valid } = await RunAnywhere.llm.extractStructured(result.text, schema);
+   */
+  async extractStructured(text: string, schema: JsonSchema): Promise<StructuredExtraction> {
+    await ensureReady();
+    const parsed = await extractStructuredOutputAsync(text, { jsonSchema: schema.json });
+    return toStructuredExtraction(parsed, text, schema.parse);
   },
 
   /** Tools the model may call during generation. */

@@ -37,11 +37,15 @@ export interface GenerationResult extends GenerationMetrics {
   actualDevice?: string;
 }
 
-/** Completed structured generation, with the parsed value alongside the raw text. */
-export interface StructuredResult extends GenerationMetrics {
+/** A schema-checked value parsed out of text, with the raw text alongside it. */
+export interface StructuredExtraction {
   value: unknown;
   raw: string;
   valid: boolean;
+}
+
+/** Completed structured generation, with the parsed value alongside the raw text. */
+export interface StructuredResult extends StructuredExtraction, GenerationMetrics {
   mode: StructuredOutputMode;
 }
 

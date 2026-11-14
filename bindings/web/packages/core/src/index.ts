@@ -107,6 +107,7 @@ export type {
   SpeakerSegment,
   SpeechHandle,
   StreamingCapabilities,
+  StructuredExtraction,
   StructuredResult,
   SttState,
   SttStream,
