@@ -14,12 +14,12 @@ import { llm } from '../../../../../src/Public/API/Namespaces/llm';
 
 const schema = { json: '{"type":"object","properties":{"city":{"type":"string"}}}' };
 
-describe('llm.extractStructured', () => {
+describe('llm.extractStructured delegation and result mapping', () => {
   beforeEach(() => {
     extractStructuredOutputAsync.mockReset();
   });
 
-  it('parses through the worker-aware async path with the schema JSON', async () => {
+  it('delegates to extractStructuredOutputAsync with the schema JSON', async () => {
     extractStructuredOutputAsync.mockResolvedValue({
       json: '{"city":"Paris"}',
       rawText: 'Sure: {"city":"Paris"}',

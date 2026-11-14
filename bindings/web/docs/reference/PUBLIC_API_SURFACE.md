@@ -33,20 +33,17 @@ so it also works when the Llama BackendWorker owns the model), and
 ## Quick-start shape
 
 ```ts
-import { RunAnywhere, SDKEnvironment } from '@runanywhere/web';
+import { RunAnywhere } from '@runanywhere/web';
 import { LlamaCPP } from '@runanywhere/web-llamacpp';
 
-await RunAnywhere.initialize({
-  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-});
+await RunAnywhere.initialize({ environment: 'development' });
 await LlamaCPP.register({ acceleration: 'auto' });
 
-const stream = await RunAnywhere.generateStream({
-  prompt: 'Write a haiku about local AI.',
-  maxTokens: 128,
+const events = RunAnywhere.llm.generateStream('Write a haiku about local AI.', {
+  maxOutputTokens: 128,
 });
 
-for await (const token of stream.stream) {
-  console.log(token);
+for await (const event of events) {
+  if (event.type === 'textDelta') console.log(event.text);
 }
 ```

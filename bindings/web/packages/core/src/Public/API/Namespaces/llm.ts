@@ -343,6 +343,7 @@ export const llm = {
    *
    * @example
    * const schema = { json: '{"type":"object","properties":{"city":{"type":"string"}}}' };
+   * const result = await RunAnywhere.llm.generate('Where is the Eiffel Tower? Reply as JSON.');
    * const { value, valid } = await RunAnywhere.llm.extractStructured(result.text, schema);
    */
   async extractStructured(text: string, schema: JsonSchema): Promise<StructuredExtraction> {
