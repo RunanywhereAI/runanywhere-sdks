@@ -694,6 +694,65 @@ int test_mocked_vad_and_activity() {
           "unset-threshold VAD configure proto succeeds");
     CHECK(rac_vad_component_get_energy_threshold(threshold_vad) == RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
           "unset activation_threshold falls back to the default");
+
+    const float invalid_thresholds[] = {std::nanf(""), INFINITY, -0.1f, 1.5f};
+    for (const float invalid : invalid_thresholds) {
+        threshold_config.set_activation_threshold(invalid);
+        CHECK(serialize(threshold_config, &threshold_bytes),
+              "invalid-threshold VADConfiguration serializes");
+        CHECK(rac_vad_component_configure_proto(threshold_vad, threshold_bytes.data(),
+                                                threshold_bytes.size()) ==
+                  RAC_ERROR_INVALID_PARAMETER,
+              "component configure rejects a NaN or out-of-range activation_threshold");
+        CHECK(rac_vad_component_set_energy_threshold(threshold_vad, invalid) ==
+                  RAC_ERROR_INVALID_PARAMETER,
+              "set_energy_threshold rejects a NaN or out-of-range threshold");
+        rac_proto_buffer_t rejected;
+        rac_proto_buffer_init(&rejected);
+        CHECK(rac_vad_configure_lifecycle_proto(threshold_bytes.data(), threshold_bytes.size(),
+                                                &rejected) == RAC_ERROR_INVALID_PARAMETER,
+              "lifecycle configure rejects a NaN or out-of-range activation_threshold");
+        rac_proto_buffer_free(&rejected);
+    }
+    CHECK(rac_vad_component_get_energy_threshold(threshold_vad) == RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
+          "a rejected activation_threshold leaves the configured threshold untouched");
+
+    threshold_config.set_activation_threshold(0.0f);
+    CHECK(serialize(threshold_config, &threshold_bytes),
+          "zero-threshold VADConfiguration serializes");
+    CHECK(rac_vad_component_configure_proto(threshold_vad, threshold_bytes.data(),
+                                            threshold_bytes.size()) == RAC_SUCCESS &&
+              rac_vad_component_initialize(threshold_vad) == RAC_SUCCESS,
+          "zero-threshold VAD configures and initializes");
+    const float quiet[] = {0.001f, -0.001f, 0.001f, -0.001f};
+    runanywhere::v1::VADProcessRequest quiet_request;
+    quiet_request.mutable_audio()->set_audio_data(quiet, sizeof(quiet));
+    quiet_request.mutable_audio()->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
+    std::vector<uint8_t> quiet_bytes;
+    CHECK(serialize(quiet_request, &quiet_bytes), "quiet VADProcessRequest serializes");
+    rac_proto_buffer_t quiet_out;
+    rac_proto_buffer_init(&quiet_out);
+    runanywhere::v1::VADResult quiet_result;
+    CHECK(rac_vad_component_process_proto(threshold_vad, quiet_bytes.data(), quiet_bytes.size(),
+                                          &quiet_out) == RAC_SUCCESS &&
+              parse_buffer(quiet_out, &quiet_result),
+          "zero-threshold VAD processes a quiet frame");
+    CHECK(quiet_result.probability() == (quiet_result.is_speech() ? 1.0f : 0.0f),
+          "confidence is computed against the configured 0.0 threshold, not the default");
+    rac_proto_buffer_free(&quiet_out);
+
+    quiet_request.mutable_options()->set_activation_threshold(std::nanf(""));
+    CHECK(serialize(quiet_request, &quiet_bytes), "NaN-override VADProcessRequest serializes");
+    rac_proto_buffer_init(&quiet_out);
+    CHECK(rac_vad_component_process_proto(threshold_vad, quiet_bytes.data(), quiet_bytes.size(),
+                                          &quiet_out) == RAC_ERROR_INVALID_PARAMETER,
+          "component process rejects a NaN activation_threshold override");
+    rac_proto_buffer_free(&quiet_out);
+    rac_proto_buffer_init(&quiet_out);
+    CHECK(rac_vad_process_lifecycle_proto(quiet_bytes.data(), quiet_bytes.size(), &quiet_out) ==
+              RAC_ERROR_INVALID_PARAMETER,
+          "lifecycle process rejects a NaN activation_threshold override");
+    rac_proto_buffer_free(&quiet_out);
     rac_vad_component_destroy(threshold_vad);
 
     rac_handle_t energy_vad = nullptr;
