@@ -124,7 +124,7 @@ export {
 } from './Adapters/ProtoAdapterTypes.js';
 export type { ModalityProtoModule } from './Adapters/ProtoAdapterTypes.js';
 
-export { SDKLogger } from './Foundation/SDKLogger.js';
+export { SDKLogger, racLogLevelToProto } from './Foundation/SDKLogger.js';
 export { SDKException, ProtoErrorCode } from './Foundation/SDKException.js';
 export { RAC_ERROR_MODULE_ALREADY_REGISTERED } from './Foundation/RACErrors.js';
 export type { AccelerationMode } from './Foundation/WASMBridge.js';

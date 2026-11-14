@@ -21,6 +21,7 @@ export interface BackendWorkerScope {
 
 export interface BackendWorkerHandlers {
   init?(payload: unknown): Promise<void> | void;
+  setLogLevel?(level: number): void;
   loadModel?(
     modality: BackendWorkerModality,
     payload: unknown,
@@ -50,6 +51,12 @@ export interface BackendWorkerHandlers {
 export function runBackendWorker(scope: BackendWorkerScope, handlers: BackendWorkerHandlers): void {
   let initialized = false;
   const cancelled = new Set<string>();
+  const setLogLevel = (level: number): void => {
+    if (!Number.isInteger(level) || level < 0 || level > 5) {
+      throw new Error('Backend worker logLevel must be an integer from 0 to 5');
+    }
+    handlers.setLogLevel?.(level);
+  };
 
   const postError = (message: string, requestId?: string): void => {
     scope.postMessage({ type: 'error', requestId, message });
@@ -82,9 +89,14 @@ export function runBackendWorker(scope: BackendWorkerScope, handlers: BackendWor
       try {
         switch (request.type) {
           case 'init':
+            if (request.logLevel !== undefined) setLogLevel(request.logLevel);
             await handlers.init?.(request.payload);
             initialized = true;
             scope.postMessage({ type: 'ready', requestId: request.requestId });
+            return;
+          case 'setLogLevel':
+            setLogLevel(request.logLevel);
+            scope.postMessage({ type: 'complete', requestId: request.requestId });
             return;
           case 'health': {
             const health = await handlers.health?.() ?? { healthy: initialized };

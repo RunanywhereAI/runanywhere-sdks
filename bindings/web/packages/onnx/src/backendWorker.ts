@@ -367,6 +367,7 @@ interface WorkerInitPayload {
 
 const workerScope = self as unknown as BackendWorkerScope;
 runBackendWorker(workerScope, {
+  setLogLevel: (level) => runtime.setLogLevel(level),
   async init(payload?: unknown): Promise<void> {
     const options = (payload ?? {}) as WorkerInitPayload;
     await runtime.ensureLoaded({
