@@ -34,16 +34,30 @@ export async function exerciseWorkerLogging() {
 }
 
 /** Uses the harness's registered real model and the production inference worker. */
-export async function generateWithLogLevel(level: LogLevel) {
+export async function generateWithLogLevel(level?: LogLevel, nextLevel?: LogLevel) {
   const { RunAnywhere } = await import('../../../packages/core/src/index');
-  Logging.setLogLevel(level);
+  if (level !== undefined) {
+    await RunAnywhere.runtime.setAcceleration('cpu');
+    Logging.setLogLevel(level);
+  }
+  let changedDuringStream = false;
   let text = '';
   for await (const event of RunAnywhere.llm.generateStream('Say hello in one short sentence.', {
     model: 'smollm2-360m-q8_0', maxOutputTokens: 16,
   })) {
-    if (event.type === 'textDelta') text += event.text;
+    if (event.type === 'textDelta') {
+      text += event.text;
+      if (!changedDuringStream && nextLevel !== undefined) {
+        Logging.setLogLevel(nextLevel);
+        changedDuringStream = true;
+      }
+    }
     if (event.type === 'failed') throw new Error(event.error.message);
     if (event.type === 'completed') text = event.result.text || text;
   }
-  return { text, executionContext: RunAnywhere.runtime.execution.context };
+  return {
+    text, changedDuringStream,
+    executionContext: RunAnywhere.runtime.execution.context,
+    acceleration: RunAnywhere.runtime.active,
+  };
 }

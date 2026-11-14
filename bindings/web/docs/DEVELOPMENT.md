@@ -76,9 +76,9 @@ RA_RUN_WORKER_LOGGING_E2E=1 npx playwright test tests/browser/worker-logging.spe
 ```
 
 The heap check covers initial, pending-init, live, and recreated-worker levels.
-The inference check verifies native INFO output at DEBUG and suppression at ERROR
-with a production worker. These opt-in checks require current native logging
-exports; the ordinary browser smoke suite also supports older release artifacts.
+The inference check switches from DEBUG to ERROR during a production worker
+stream, then verifies suppression of native INFO output on the next request.
+These opt-in checks require current native logging exports; the ordinary browser smoke suite also supports older release artifacts.
 
 ## Quality and release gates
 
