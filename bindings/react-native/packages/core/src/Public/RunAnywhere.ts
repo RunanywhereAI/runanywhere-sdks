@@ -15,6 +15,7 @@ import {
   LoggingManager,
   LogLevel,
   setCommonsLogLevelSink,
+  whenCommonsLogLevelSynced,
 } from '../Foundation/Logging';
 import { SDKConstants } from '../Foundation/Constants/SDKConstants';
 import {
@@ -341,22 +342,16 @@ async function initializeCore(options: InitializeOptions): Promise<void> {
         }
 
         LoggingManager.shared.applyEnvironmentConfiguration(environment);
+        // Return the native promise so LoggingManager can serialize level
+        // updates (last change wins, in order) and absorb rejections; a throw
+        // here is also caught there, since native logger failure is non-fatal.
         setCommonsLogLevelSink((lvl: LogLevel) => {
-          if (isNativeModuleAvailable()) {
-            try {
-              const nativeModule = requireNativeModule();
-              void nativeModule.loggerSetMinLevel(lvl);
-            } catch {
-              // Native logger setup failure is non-fatal
-            }
-          }
+          if (!isNativeModuleAvailable()) return;
+          return requireNativeModule().loggerSetMinLevel(lvl);
         });
-
-        try {
-          await native.loggerSetMinLevel(LoggingManager.shared.configuration.minLogLevel);
-        } catch {
-          // Native logger setup failure is non-fatal
-        }
+        // Registering the sink pushes the current level through the same
+        // queue; wait for it rather than issuing a second, unordered call.
+        await whenCommonsLogLevelSynced();
 
         requireCurrentLifecycle(generation, 'initialization');
         initState = markCoreInitialized(initState, initParams);

@@ -15,6 +15,7 @@ export {
 export {
   LoggingManager,
   setCommonsLogLevelSink,
+  whenCommonsLogLevelSynced,
   type CommonsLogLevelSink,
   type LogDestination,
   type LogEntry,

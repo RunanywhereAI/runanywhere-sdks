@@ -15,14 +15,110 @@ import {
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
-export type CommonsLogLevelSink = (level: LogLevel) => void;
+/**
+ * Receives C-ABI minimum log level changes. May return a promise (the Nitro
+ * `loggerSetMinLevel` call does); if it does, updates are serialized.
+ */
+export type CommonsLogLevelSink = (level: LogLevel) => void | Promise<void>;
 let _commonsLogLevelSink: CommonsLogLevelSink | null = null;
+
+// Serialization state for async sinks. Nitro runs each `loggerSetMinLevel`
+// on a shared thread pool with no completion ordering, so concurrent calls
+// could land out of order. At most one call is in flight; changes made in
+// the meantime collapse into `_queuedCommonsLevel`, and only the latest is
+// sent once the in-flight call settles, so commons always ends at the last
+// level the app set.
+//
+// The queue is shared across sink replacement on purpose: the sink is only
+// replaced when the SDK re-initializes, and every sink writes the same native
+// logger, so a new sink's first call waits for an older call still in flight
+// rather than racing it (which could leave commons at the stale level).
+let _inFlightCommonsSync: Promise<void> | null = null;
+let _queuedCommonsLevel: LogLevel | null = null;
+
+function isPromiseLike(value: unknown): value is PromiseLike<void> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+/** Describe a thrown value without throwing (e.g. `Object.create(null)` breaks `String()`). */
+function describeFailure(error: unknown): string {
+  try {
+    return error instanceof Error ? error.message : String(error);
+  } catch {
+    return Object.prototype.toString.call(error);
+  }
+}
+
+/**
+ * Native logger failures are non-fatal, but leave a trace so a stale commons
+ * level can be diagnosed. Never throws: it runs inside the sync chain, where a
+ * throw would skip the cleanup and stall every queued update.
+ */
+function reportCommonsSyncFailure(error: unknown): void {
+  try {
+    LoggingManager.shared.log(
+      LogLevel.LOG_LEVEL_WARNING,
+      'Logging',
+      `Commons log level sync failed: ${describeFailure(error)}`
+    );
+  } catch {
+    // Diagnostics must not break the queue.
+  }
+}
+
+function sendCommonsLogLevel(level: LogLevel): void {
+  const sink = _commonsLogLevelSink;
+  if (!sink) return;
+  if (_inFlightCommonsSync) {
+    _queuedCommonsLevel = level;
+    return;
+  }
+  let result: void | Promise<void>;
+  try {
+    result = sink(level);
+  } catch (error) {
+    reportCommonsSyncFailure(error);
+    return;
+  }
+  if (!isPromiseLike(result)) return;
+  _inFlightCommonsSync = Promise.resolve(result)
+    .then(
+      () => undefined,
+      // Handled here so a rejection never surfaces as an unhandled promise
+      // rejection, and the queue keeps moving.
+      reportCommonsSyncFailure
+    )
+    .then(finishCommonsSync, finishCommonsSync);
+}
+
+/** Clear the in-flight call and send the latest queued level, if any. Runs whether or not the call failed. */
+function finishCommonsSync(): void {
+  _inFlightCommonsSync = null;
+  const next = _queuedCommonsLevel;
+  _queuedCommonsLevel = null;
+  if (next !== null) sendCommonsLogLevel(next);
+}
 
 /** Register a sink that receives C-ABI minimum log level changes. */
 export function setCommonsLogLevelSink(sink: CommonsLogLevelSink | null): void {
   _commonsLogLevelSink = sink;
+  _queuedCommonsLevel = null;
   if (sink) {
-    sink(LoggingManager.shared.configuration.minLogLevel);
+    sendCommonsLogLevel(LoggingManager.shared.configuration.minLogLevel);
+  }
+}
+
+/**
+ * Resolves once every pending commons log level update has been applied
+ * (including one queued behind an in-flight call). Never rejects.
+ */
+export async function whenCommonsLogLevelSynced(): Promise<void> {
+  while (_inFlightCommonsSync) {
+    await _inFlightCommonsSync;
   }
 }
 
@@ -130,13 +226,7 @@ export class LoggingManager {
   }
 
   private syncCommonsLogLevel(level: LogLevel): void {
-    if (_commonsLogLevelSink) {
-      try {
-        _commonsLogLevelSink(level);
-      } catch {
-        // Sink call failed
-      }
-    }
+    sendCommonsLogLevel(level);
   }
 
   public addDestination(destination: LogDestination): void {
