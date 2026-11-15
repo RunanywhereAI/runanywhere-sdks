@@ -15,14 +15,77 @@ import {
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
-export type CommonsLogLevelSink = (level: LogLevel) => void;
+/**
+ * Receives C-ABI minimum log level changes. May return a promise (the Nitro
+ * `loggerSetMinLevel` call does); if it does, updates are serialized.
+ */
+export type CommonsLogLevelSink = (level: LogLevel) => void | Promise<void>;
 let _commonsLogLevelSink: CommonsLogLevelSink | null = null;
+
+// Serialization state for async sinks. Nitro runs each `loggerSetMinLevel`
+// on a shared thread pool with no completion ordering, so concurrent calls
+// could land out of order. At most one call is in flight; changes made in
+// the meantime collapse into `_queuedCommonsLevel`, and only the latest is
+// sent once the in-flight call settles, so commons always ends at the last
+// level the app set.
+let _inFlightCommonsSync: Promise<void> | null = null;
+let _queuedCommonsLevel: LogLevel | null = null;
+
+function isPromiseLike(value: unknown): value is PromiseLike<void> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+function sendCommonsLogLevel(level: LogLevel): void {
+  const sink = _commonsLogLevelSink;
+  if (!sink) return;
+  if (_inFlightCommonsSync) {
+    _queuedCommonsLevel = level;
+    return;
+  }
+  let result: void | Promise<void>;
+  try {
+    result = sink(level);
+  } catch {
+    // Native logger setup failure is non-fatal.
+    return;
+  }
+  if (!isPromiseLike(result)) return;
+  _inFlightCommonsSync = Promise.resolve(result)
+    .then(
+      () => undefined,
+      () => {
+        // Native logger setup failure is non-fatal; handled here so the
+        // rejection never surfaces as an unhandled promise rejection.
+      }
+    )
+    .then(() => {
+      _inFlightCommonsSync = null;
+      const next = _queuedCommonsLevel;
+      _queuedCommonsLevel = null;
+      if (next !== null) sendCommonsLogLevel(next);
+    });
+}
 
 /** Register a sink that receives C-ABI minimum log level changes. */
 export function setCommonsLogLevelSink(sink: CommonsLogLevelSink | null): void {
   _commonsLogLevelSink = sink;
+  _queuedCommonsLevel = null;
   if (sink) {
-    sink(LoggingManager.shared.configuration.minLogLevel);
+    sendCommonsLogLevel(LoggingManager.shared.configuration.minLogLevel);
+  }
+}
+
+/**
+ * Resolves once every pending commons log level update has been applied
+ * (including one queued behind an in-flight call). Never rejects.
+ */
+export async function whenCommonsLogLevelSynced(): Promise<void> {
+  while (_inFlightCommonsSync) {
+    await _inFlightCommonsSync;
   }
 }
 
@@ -130,13 +193,7 @@ export class LoggingManager {
   }
 
   private syncCommonsLogLevel(level: LogLevel): void {
-    if (_commonsLogLevelSink) {
-      try {
-        _commonsLogLevelSink(level);
-      } catch {
-        // Sink call failed
-      }
-    }
+    sendCommonsLogLevel(level);
   }
 
   public addDestination(destination: LogDestination): void {
