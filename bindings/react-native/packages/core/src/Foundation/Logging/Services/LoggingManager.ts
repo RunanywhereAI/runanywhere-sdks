@@ -28,6 +28,11 @@ let _commonsLogLevelSink: CommonsLogLevelSink | null = null;
 // the meantime collapse into `_queuedCommonsLevel`, and only the latest is
 // sent once the in-flight call settles, so commons always ends at the last
 // level the app set.
+//
+// The queue is shared across sink replacement on purpose: the sink is only
+// replaced when the SDK re-initializes, and every sink writes the same native
+// logger, so a new sink's first call waits for an older call still in flight
+// rather than racing it (which could leave commons at the stale level).
 let _inFlightCommonsSync: Promise<void> | null = null;
 let _queuedCommonsLevel: LogLevel | null = null;
 
@@ -36,6 +41,16 @@ function isPromiseLike(value: unknown): value is PromiseLike<void> {
     typeof value === 'object' &&
     value !== null &&
     typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+/** Native logger failures are non-fatal, but leave a trace so a stale commons level can be diagnosed. */
+function reportCommonsSyncFailure(error: unknown): void {
+  const reason = error instanceof Error ? error.message : String(error);
+  LoggingManager.shared.log(
+    LogLevel.LOG_LEVEL_WARNING,
+    'Logging',
+    `Commons log level sync failed: ${reason}`
   );
 }
 
@@ -49,18 +64,17 @@ function sendCommonsLogLevel(level: LogLevel): void {
   let result: void | Promise<void>;
   try {
     result = sink(level);
-  } catch {
-    // Native logger setup failure is non-fatal.
+  } catch (error) {
+    reportCommonsSyncFailure(error);
     return;
   }
   if (!isPromiseLike(result)) return;
   _inFlightCommonsSync = Promise.resolve(result)
     .then(
       () => undefined,
-      () => {
-        // Native logger setup failure is non-fatal; handled here so the
-        // rejection never surfaces as an unhandled promise rejection.
-      }
+      // Handled here so a rejection never surfaces as an unhandled promise
+      // rejection, and the queue keeps moving.
+      reportCommonsSyncFailure
     )
     .then(() => {
       _inFlightCommonsSync = null;

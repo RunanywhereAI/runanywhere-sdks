@@ -1,6 +1,8 @@
 import { LoggingConfiguration } from '@runanywhere/proto-ts/logging';
 import { LogLevel } from '../../src/Foundation/Logging/Models/LogLevel';
 import {
+  type LogDestination,
+  type LogEntry,
   LoggingManager,
   setCommonsLogLevelSink,
   whenCommonsLogLevelSynced,
@@ -35,6 +37,27 @@ function fakeNativeLogger() {
       })
   );
   return { sink, calls, state };
+}
+
+/**
+ * Collect log entries in memory and silence the console destination, so a
+ * test can assert what LoggingManager recorded. afterEach's configure()
+ * restores the console destination.
+ */
+function captureLogs(): { entries: LogEntry[]; stop: () => void } {
+  const entries: LogEntry[] = [];
+  const destination: LogDestination = {
+    identifier: 'test-capture',
+    isAvailable: true,
+    write: (entry) => entries.push(entry),
+    flush: () => undefined,
+  };
+  LoggingManager.shared.setLocalLoggingEnabled(false);
+  LoggingManager.shared.addDestination(destination);
+  return {
+    entries,
+    stop: () => LoggingManager.shared.removeDestination(destination),
+  };
 }
 
 /** Let queued promise callbacks run. */
@@ -118,9 +141,8 @@ describe('Commons log level sync (React Native)', () => {
     expect(native.state.commonsLevel).toBe(LogLevel.LOG_LEVEL_FATAL);
   });
 
-  test('a rejected native call does not produce an unhandled rejection', async () => {
-    const unhandled = jest.fn();
-    process.on('unhandledRejection', unhandled);
+  test('a rejected native call is handled: logged as a warning, never rethrown', async () => {
+    const logs = captureLogs();
     try {
       const sink = jest.fn(() =>
         Promise.reject(new Error('native logger unavailable'))
@@ -128,13 +150,21 @@ describe('Commons log level sync (React Native)', () => {
       setCommonsLogLevelSink(sink);
       LoggingManager.shared.setMinLogLevel(LogLevel.LOG_LEVEL_WARNING);
 
-      await whenCommonsLogLevelSynced();
-      await flush();
+      // Resolves (does not reject) once the failed call has been handled.
+      await expect(whenCommonsLogLevelSynced()).resolves.toBeUndefined();
 
       expect(sink).toHaveBeenCalledWith(LogLevel.LOG_LEVEL_WARNING);
-      expect(unhandled).not.toHaveBeenCalled();
+      // The warning is written by the rejection handler, so it proves the
+      // rejection was handled rather than left unhandled.
+      expect(logs.entries).toContainEqual(
+        expect.objectContaining({
+          level: LogLevel.LOG_LEVEL_WARNING,
+          category: 'Logging',
+          message: expect.stringContaining('native logger unavailable'),
+        })
+      );
     } finally {
-      process.off('unhandledRejection', unhandled);
+      logs.stop();
     }
   });
 
@@ -152,17 +182,29 @@ describe('Commons log level sync (React Native)', () => {
   });
 
   test('a sink that throws synchronously does not break setMinLogLevel', async () => {
-    setCommonsLogLevelSink(() => {
-      throw new Error('native module missing');
-    });
+    const logs = captureLogs();
+    try {
+      LoggingManager.shared.setMinLogLevel(LogLevel.LOG_LEVEL_WARNING);
+      setCommonsLogLevelSink(() => {
+        throw new Error('native module missing');
+      });
 
-    expect(() =>
-      LoggingManager.shared.setMinLogLevel(LogLevel.LOG_LEVEL_ERROR)
-    ).not.toThrow();
-    await expect(whenCommonsLogLevelSynced()).resolves.toBeUndefined();
-    expect(LoggingManager.shared.configuration.minLogLevel).toBe(
-      LogLevel.LOG_LEVEL_ERROR
-    );
+      expect(() =>
+        LoggingManager.shared.setMinLogLevel(LogLevel.LOG_LEVEL_ERROR)
+      ).not.toThrow();
+      await expect(whenCommonsLogLevelSynced()).resolves.toBeUndefined();
+      expect(LoggingManager.shared.configuration.minLogLevel).toBe(
+        LogLevel.LOG_LEVEL_ERROR
+      );
+      expect(logs.entries).toContainEqual(
+        expect.objectContaining({
+          level: LogLevel.LOG_LEVEL_WARNING,
+          message: expect.stringContaining('native module missing'),
+        })
+      );
+    } finally {
+      logs.stop();
+    }
   });
 
   test('whenCommonsLogLevelSynced waits for a queued change, not just the first call', async () => {
