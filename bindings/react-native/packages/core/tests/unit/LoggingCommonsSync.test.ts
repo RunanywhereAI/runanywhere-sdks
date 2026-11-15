@@ -11,7 +11,7 @@ import {
 interface PendingCall {
   level: LogLevel;
   resolve: () => void;
-  reject: (error: Error) => void;
+  reject: (error: unknown) => void;
 }
 
 /**
@@ -179,6 +179,29 @@ describe('Commons log level sync (React Native)', () => {
     await whenCommonsLogLevelSynced();
 
     expect(native.state.commonsLevel).toBe(LogLevel.LOG_LEVEL_ERROR);
+  });
+
+  test('a queued change still runs after a rejection that cannot be stringified', async () => {
+    const native = await registerFake();
+    const logs = captureLogs();
+    try {
+      LoggingManager.shared.setMinLogLevel(LogLevel.LOG_LEVEL_WARNING);
+      LoggingManager.shared.setMinLogLevel(LogLevel.LOG_LEVEL_ERROR);
+
+      // No prototype, so String(value) throws a TypeError.
+      native.calls[0].reject(Object.create(null));
+      await flush();
+      expect(native.calls.map((c) => c.level)).toEqual([
+        LogLevel.LOG_LEVEL_WARNING,
+        LogLevel.LOG_LEVEL_ERROR,
+      ]);
+
+      native.calls[1].resolve();
+      await expect(whenCommonsLogLevelSynced()).resolves.toBeUndefined();
+      expect(native.state.commonsLevel).toBe(LogLevel.LOG_LEVEL_ERROR);
+    } finally {
+      logs.stop();
+    }
   });
 
   test('a sink that throws synchronously does not break setMinLogLevel', async () => {

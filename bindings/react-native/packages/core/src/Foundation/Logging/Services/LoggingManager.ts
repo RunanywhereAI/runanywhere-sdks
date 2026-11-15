@@ -44,14 +44,30 @@ function isPromiseLike(value: unknown): value is PromiseLike<void> {
   );
 }
 
-/** Native logger failures are non-fatal, but leave a trace so a stale commons level can be diagnosed. */
+/** Describe a thrown value without throwing (e.g. `Object.create(null)` breaks `String()`). */
+function describeFailure(error: unknown): string {
+  try {
+    return error instanceof Error ? error.message : String(error);
+  } catch {
+    return Object.prototype.toString.call(error);
+  }
+}
+
+/**
+ * Native logger failures are non-fatal, but leave a trace so a stale commons
+ * level can be diagnosed. Never throws: it runs inside the sync chain, where a
+ * throw would skip the cleanup and stall every queued update.
+ */
 function reportCommonsSyncFailure(error: unknown): void {
-  const reason = error instanceof Error ? error.message : String(error);
-  LoggingManager.shared.log(
-    LogLevel.LOG_LEVEL_WARNING,
-    'Logging',
-    `Commons log level sync failed: ${reason}`
-  );
+  try {
+    LoggingManager.shared.log(
+      LogLevel.LOG_LEVEL_WARNING,
+      'Logging',
+      `Commons log level sync failed: ${describeFailure(error)}`
+    );
+  } catch {
+    // Diagnostics must not break the queue.
+  }
 }
 
 function sendCommonsLogLevel(level: LogLevel): void {
@@ -76,12 +92,15 @@ function sendCommonsLogLevel(level: LogLevel): void {
       // rejection, and the queue keeps moving.
       reportCommonsSyncFailure
     )
-    .then(() => {
-      _inFlightCommonsSync = null;
-      const next = _queuedCommonsLevel;
-      _queuedCommonsLevel = null;
-      if (next !== null) sendCommonsLogLevel(next);
-    });
+    .then(finishCommonsSync, finishCommonsSync);
+}
+
+/** Clear the in-flight call and send the latest queued level, if any. Runs whether or not the call failed. */
+function finishCommonsSync(): void {
+  _inFlightCommonsSync = null;
+  const next = _queuedCommonsLevel;
+  _queuedCommonsLevel = null;
+  if (next !== null) sendCommonsLogLevel(next);
 }
 
 /** Register a sink that receives C-ABI minimum log level changes. */
