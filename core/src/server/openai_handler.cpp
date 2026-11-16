@@ -9,6 +9,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <set>
 #include <stdexcept>

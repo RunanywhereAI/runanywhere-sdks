@@ -295,6 +295,12 @@ void test_validation_and_choices() {
     request = base();
     request["max_tokens"] = 1.5;
     check(fixture.post(request)->status == 400, "fractional token limit rejected");
+    for (const char* key : {"seed", "n", "stream", "stream_options", "tools", "tool_choice",
+                            "parallel_tool_calls"}) {
+        request = base();
+        request[key] = nullptr;
+        check(fixture.post(request)->status == 200, "null optional field treated as omitted");
+    }
     request = base();
     request["model"] = "missing";
     check(fixture.post(request)->status == 404, "unknown model rejected");
