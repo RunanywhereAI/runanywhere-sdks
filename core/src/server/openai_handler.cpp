@@ -9,6 +9,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <set>
 #include <stdexcept>
@@ -422,7 +423,11 @@ void OpenAIHandler::handleHealth(const httplib::Request&, httplib::Response& res
 
 void OpenAIHandler::handleChatCompletions(const httplib::Request& req, httplib::Response& res) {
     try {
-        const auto request = Json::parse(req.body);
+        auto request = Json::parse(req.body);
+        if (request.is_object()) {
+            for (auto it = request.begin(); it != request.end();)
+                it = it->is_null() ? request.erase(it) : std::next(it);
+        }
         validateRequest(request);
         if (request.contains("model") && request["model"] != modelId_) {
             sendError(res, 404,
