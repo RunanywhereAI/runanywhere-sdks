@@ -97,7 +97,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         debugPrint('🔑 Applied persisted HuggingFace token');
       }
 
-      await ModelCatalogBootstrap.registerAll(mlxRegistered: _mlxRegistered);
+      await ModelCatalogBootstrap.registerAll(
+        mlxRegistered: _mlxRegistered,
+        qhexrtRegistered: _qhexrtRegistered,
+      );
       await RunAnywhere.models.list();
 
       stopwatch.stop();
@@ -152,6 +155,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
   static bool _backendsRegistered = false;
   static bool _mlxRegistered = false;
+  static bool _qhexrtRegistered = false;
 
   Future<void> _registerBackends() async {
     if (_backendsRegistered) {
@@ -179,9 +183,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // register() rejects internally on unsupported parts.
     if (QHexRT.isAvailable) {
       try {
-        final registered = await QHexRT.register();
+        _qhexrtRegistered = await QHexRT.register();
         debugPrint(
-          registered
+          _qhexrtRegistered
               ? '✅ QHexRT NPU backend registered (LLM + VLM + STT + TTS)'
               : 'ℹ️ QHexRT NPU backend registration was rejected',
         );

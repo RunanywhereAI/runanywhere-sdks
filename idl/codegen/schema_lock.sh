@@ -78,7 +78,7 @@ sha256_of() {
 compute_digest() {
     local f
     {
-        for f in $(ls "${IDL_DIR}"/*.proto | sort); do
+        for f in "${IDL_DIR}"/*.proto; do
             printf '%s\n' "$(basename "$f")"
             sha256_of "$f"
         done

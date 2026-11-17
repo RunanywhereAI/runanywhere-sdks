@@ -23,6 +23,7 @@
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import { redactResourceURL } from '../Foundation/BackendContract.js';
+import { RAC_ERROR_FILE_READ_FAILED } from '../Foundation/RACErrors.js';
 import { OPFSBridge, type OPFSStreamingWriter } from '../Infrastructure/OPFSBridge.js';
 
 const logger = new SDKLogger('PlatformAdapter');
@@ -400,14 +401,23 @@ export class PlatformAdapter {
         }
 
         const capacity = m.getValue(countPtr, 'i32') >>> 0;
-        const count = Math.min(capacity, entries.length);
+        if (entries.length > capacity) {
+          // A partial fill is not a complete listing.
+          return RAC_ERROR_FILE_READ_FAILED;
+        }
+        const count = entries.length;
         const layout = directoryEntryLayout(m);
         for (let i = 0; i < count; i += 1) {
           const entryPtr = outEntriesPtr + i * layout.size;
           const entry = entries[i];
           const namePtr = entryPtr + layout.nameOffset;
-          const safeName = entry.name.slice(0, RAC_DIRECTORY_ENTRY_NAME_MAX - 1);
-          m.stringToUTF8(safeName, namePtr, RAC_DIRECTORY_ENTRY_NAME_MAX);
+          if (m.lengthBytesUTF8(entry.name) + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
+            // Never truncate a name into a different artifact; make the
+            // listing inconclusive instead.
+            logger.warning(`file_list_directory: oversized entry name in ${dirPath}`);
+            return RAC_ERROR_FILE_READ_FAILED;
+          }
+          m.stringToUTF8(entry.name, namePtr, RAC_DIRECTORY_ENTRY_NAME_MAX);
           m.setValue(entryPtr + layout.isDirOffset, entry.isDir ? 1 : 0, 'i32');
           setI64(m, entryPtr + layout.sizeBytesOffset, entry.sizeBytes);
         }
@@ -415,7 +425,7 @@ export class PlatformAdapter {
         return RAC_OK;
       } catch (error) {
         logger.warning(`file_list_directory failed: ${error instanceof Error ? error.message : String(error)}`);
-        return RAC_ERROR_PLATFORM;
+        return RAC_ERROR_FILE_READ_FAILED;
       }
     }, 'iiiii');
   }
@@ -973,7 +983,7 @@ interface DirectoryEntryLayout {
 }
 
 interface EmscriptenFS {
-  analyzePath(path: string): { exists: boolean };
+  analyzePath(path: string): { exists: boolean; error?: number | { errno?: number } };
   readFile(path: string): Uint8Array;
   writeFile(path: string, data: Uint8Array): void;
   unlink(path: string): void;
@@ -996,18 +1006,40 @@ function listDirectoryEntries(m: PlatformAdapterModule, dirPath: string): Direct
   const fs = fsOf(m);
   if (!fs?.readdir) return null;
   const analyzed = fs.analyzePath(dirPath);
-  if (!analyzed.exists) return null;
-  const names = fs.readdir(dirPath).filter((name) => name !== '.' && name !== '..' && !name.startsWith('.'));
+  if (!analyzed.exists) {
+    const rawError = analyzed.error;
+    const errnoValue = typeof rawError === 'number' ? rawError : rawError?.errno;
+    const errnoCodes = (m as unknown as { ERRNO_CODES?: Record<string, number> }).ERRNO_CODES;
+    const missingCodes = [errnoCodes?.ENOENT ?? 44, errnoCodes?.ENOTDIR ?? 54];
+    if (errnoValue !== undefined && missingCodes.includes(errnoValue)) {
+      return null;
+    }
+    throw new Error(`analyzePath failed for ${dirPath}`);
+  }
+  // analyzePath confirms existence but not the type. A regular file is a
+  // confirmed non-directory and must map to FILE_NOT_FOUND, not a read error.
+  const directoryStat = fs.stat?.(dirPath);
+  if (!directoryStat) {
+    throw new Error(`stat failed for ${dirPath}`);
+  }
+  if (typeof directoryStat.mode === 'number' && typeof fs.isDir === 'function' &&
+      !fs.isDir(directoryStat.mode)) {
+    return null;
+  }
+  const names = fs.readdir(dirPath).filter((name) => name !== '.' && name !== '..');
   return names.map((name) => {
     const path = joinPath(dirPath, name);
     const stat = fs.stat?.(path);
-    const isDir = typeof stat?.mode === 'number' && typeof fs.isDir === 'function'
+    if (!stat) {
+      throw new Error(`stat failed for ${path}`);
+    }
+    const isDir = typeof stat.mode === 'number' && typeof fs.isDir === 'function'
       ? fs.isDir(stat.mode)
       : false;
     return {
       name,
       isDir,
-      sizeBytes: isDir ? 0 : stat?.size ?? 0,
+      sizeBytes: isDir ? 0 : stat.size ?? 0,
     };
   });
 }

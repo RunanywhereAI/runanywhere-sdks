@@ -7,6 +7,8 @@
 
 #include "HybridRunAnywhereCore+Common.hpp"
 
+#include "rac/plugin/rac_plugin_registration.h"
+
 #include "rac/plugin/rac_plugin_loader.h"
 
 #include <cstdio>
@@ -134,7 +136,10 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::pluginLoaderListLoa
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::pluginLoaderLoad(const std::string& path) {
     return Promise<std::string>::async([path]() -> std::string {
-        throwIfPluginFailed(rac_registry_load_plugin(path.c_str()), "pluginLoader.load", path);
+        const auto rc = rac_registry_load_plugin(path.c_str());
+        if (!rac_plugin_registration_succeeded(rc)) {
+            throwIfPluginFailed(rc, "pluginLoader.load", path);
+        }
         const auto name = pluginNameFromPath(path);
         return "{\"name\":\"" + jsonEscape(name) + "\",\"path\":\"" + jsonEscape(path) + "\"}";
     });
