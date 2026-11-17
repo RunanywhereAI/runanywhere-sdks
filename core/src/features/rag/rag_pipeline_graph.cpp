@@ -276,7 +276,7 @@ rac_result_t run_rag_retrieve(const RAGGraphInputs& inputs, RAGGraphResult& out_
                 rankings.push_back(std::move(dense_ids));
 
             if (bm25) {
-                const auto bm = bm25->search(q, fetch_k);
+                const auto bm = bm25->search(q, fetch_k, inputs.bm25_k1, inputs.bm25_b);
                 std::vector<std::string> bm_ids;
                 for (const auto& [id, score] : bm) {
                     (void)score;
@@ -289,7 +289,7 @@ rac_result_t run_rag_retrieve(const RAGGraphInputs& inputs, RAGGraphResult& out_
         }
         (void)embedded_any;
 
-        results = fuse_rankings(rankings, vstore, top_k);
+        results = fuse_rankings(rankings, vstore, top_k, inputs.rrf_k);
         LOGI("RAG retrieve: %zu queries, %zu rankings, %zu fused%s", queries.size(),
              rankings.size(), results.size(), scoped ? " (scoped)" : "");
 
