@@ -2,7 +2,7 @@
  * `RunAnywhere.rag` — retrieval-augmented sessions over an ingested corpus.
  */
 
-import { RAGStreamEventKind } from '@runanywhere/proto-ts/rag';
+import { RAGStreamEventKind, VectorStore } from '@runanywhere/proto-ts/rag';
 import type { RAGQueryOverrides } from '../../Extensions/RunAnywhere+RAG.js';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import {
@@ -66,11 +66,27 @@ function isRagQueryOptions(
 function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQueryOverrides {
   if (!options) return {};
   if (isRagQueryOptions(options)) {
+    const vectorStore: unknown = options.retrieval?.vectorStore;
+    if (vectorStore !== undefined && vectorStore !== 'usearch') {
+      throw SDKException.invalidConfiguration(
+        `RagRetrievalOptions.vectorStore must be 'usearch' (the only on-device store); got ${String(vectorStore)}`,
+      );
+    }
+    const rrfK = options.retrieval?.rrfK;
+    if (rrfK !== undefined && (!Number.isInteger(rrfK) || rrfK < -(2 ** 31) || rrfK >= 2 ** 31)) {
+      throw SDKException.invalidConfiguration(
+        `RagRetrievalOptions.rrfK must be an int32 integer; got ${String(rrfK)}`,
+      );
+    }
     return {
       retrieval: {
         topK: options.retrieval?.topK,
         scoreThreshold: options.retrieval?.similarityThreshold,
         enableMultiQuery: false,
+        bm25K1: options.retrieval?.bm25K1,
+        bm25B: options.retrieval?.bm25B,
+        rrfK: options.retrieval?.rrfK,
+        vectorStore: vectorStore === 'usearch' ? VectorStore.VECTOR_STORE_USEARCH : undefined,
       },
       generation: options.generation ? toProtoLlmOptions(options.generation) : undefined,
     };
@@ -137,9 +153,9 @@ function createSession(): RagSession {
     queryStream(question: string, options?: RagQueryOptions | LlmOptions): AsyncIterable<RagEvent> {
       requireOpen(session, 'queryStream');
       return (async function* answer(): AsyncGenerator<RagEvent> {
-        const events = ragQueryStream(question, normalizeQueryOptions(options));
         let announcedSources = false;
         try {
+          const events = ragQueryStream(question, normalizeQueryOptions(options));
           for await (const event of events) {
             if (event.error) {
               yield { type: 'failed', error: event.error };
