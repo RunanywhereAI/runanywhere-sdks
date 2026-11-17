@@ -411,10 +411,11 @@ std::vector<SearchResult> RAGBackend::search_with_embedding(const std::string& q
         // BM25 keyword search
         std::vector<std::pair<std::string, float>> bm25_results;
         if (bm25_index_) {
-            bm25_results = bm25_index_->search(query_text, top_k);
+            // Same session tuning the query path uses, so this route cannot silently diverge.
+            bm25_results = bm25_index_->search(query_text, top_k, config_.bm25_k1, config_.bm25_b);
         }
 
-        auto fused = fuse_results(dense_results, bm25_results, top_k);
+        auto fused = fuse_results(dense_results, bm25_results, top_k, config_.rrf_k);
         LOGI("Hybrid search: %zu dense, %zu bm25, %zu fused", dense_results.size(),
              bm25_results.size(), fused.size());
 
@@ -433,9 +434,12 @@ std::vector<SearchResult> RAGBackend::search_with_embedding(const std::string& q
 std::vector<SearchResult>
 RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
                          const std::vector<std::pair<std::string, float>>& bm25_results,
-                         size_t top_k) const {
-    static constexpr float kRRFConstant = 60.0f;
-    static constexpr float kMaxRRFScore = 2.0f / 61.0f;
+                         size_t top_k, int32_t rrf_k) const {
+    // rrf_k <= 0 means "unset": fall back to the classic RRF constant of 60.
+    const float kRRFConstant = rrf_k > 0 ? static_cast<float>(rrf_k) : 60.0f;
+    // Best achievable fused score: rank 1 in both lists, so the normaliser must follow the same
+    // constant as the rank terms rather than the hardcoded 60.
+    const float kMaxRRFScore = 2.0f / (kRRFConstant + 1.0f);
 
     if (bm25_results.empty())
         return dense_results;
@@ -578,6 +582,9 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         g_in.max_context_tokens = config_.max_context_tokens;
         g_in.prompt_template = config_.prompt_template;
         g_in.rerank = config_.rerank;
+        g_in.bm25_k1 = config_.bm25_k1;
+        g_in.bm25_b = config_.bm25_b;
+        g_in.rrf_k = config_.rrf_k;
     }
 
     // Per-query overrides from RAGQueryOptions (idl/rag.proto). Zero/unset
@@ -596,6 +603,15 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
             g_in.multi_query_count = static_cast<size_t>(overrides->multi_query_count);
         }
         g_in.scope_prefix = overrides->scope_prefix;
+        if (overrides->bm25_k1 > 0.0f) {
+            g_in.bm25_k1 = overrides->bm25_k1;
+        }
+        if (overrides->bm25_b >= 0.0f) {
+            g_in.bm25_b = overrides->bm25_b;
+        }
+        if (overrides->rrf_k > 0) {
+            g_in.rrf_k = overrides->rrf_k;
+        }
     }
 
     g_in.question = question;
@@ -703,6 +719,9 @@ rac_result_t RAGBackend::retrieve(const std::string& question,
         g_in.max_context_tokens = config_.max_context_tokens;
         g_in.prompt_template = config_.prompt_template;
         g_in.rerank = config_.rerank;
+        g_in.bm25_k1 = config_.bm25_k1;
+        g_in.bm25_b = config_.bm25_b;
+        g_in.rrf_k = config_.rrf_k;
         wants_llm_features = config_.rerank;
     }
 
@@ -718,6 +737,15 @@ rac_result_t RAGBackend::retrieve(const std::string& question,
             g_in.multi_query_count = static_cast<size_t>(overrides->multi_query_count);
         }
         g_in.scope_prefix = overrides->scope_prefix;
+        if (overrides->bm25_k1 > 0.0f) {
+            g_in.bm25_k1 = overrides->bm25_k1;
+        }
+        if (overrides->bm25_b >= 0.0f) {
+            g_in.bm25_b = overrides->bm25_b;
+        }
+        if (overrides->rrf_k > 0) {
+            g_in.rrf_k = overrides->rrf_k;
+        }
         wants_llm_features = wants_llm_features || overrides->enable_multi_query;
     }
 

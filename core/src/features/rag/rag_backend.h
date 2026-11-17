@@ -57,6 +57,10 @@ struct RAGBackendConfig {
     // relevance scoring before context assembly (RAGConfiguration.rerank_results).
     bool rerank = false;
 
+    float bm25_k1 = 1.2f;
+    float bm25_b = 0.75f;
+    int32_t rrf_k = 60;
+
     std::string embedding_model_id;
 };
 
@@ -128,6 +132,12 @@ class RAGBackend {
         // Scoped retrieval: only chunks whose document_id starts with this
         // prefix are eligible. Empty = whole index.
         std::string scope_prefix;
+        // BM25 / RRF retrieval tuning overrides. Each field has its own "unset" sentinel
+        // meaning "use the session config": bm25_k1 <= 0, bm25_b < 0 (so b = 0, no length
+        // normalization, is a real override), rrf_k <= 0.
+        float bm25_k1 = 0.0f;
+        float bm25_b = -1.0f;
+        int32_t rrf_k = 0;
     };
 
     rac_result_t query(const std::string& question, const rac_llm_options_t* options,
@@ -168,8 +178,8 @@ class RAGBackend {
 
     std::vector<SearchResult>
     fuse_results(const std::vector<SearchResult>& dense_results,
-                 const std::vector<std::pair<std::string, float>>& bm25_results,
-                 size_t top_k) const;
+                 const std::vector<std::pair<std::string, float>>& bm25_results, size_t top_k,
+                 int32_t rrf_k) const;
 
     RAGBackendConfig config_;
     std::unique_ptr<VectorStoreUSearch> vector_store_;
