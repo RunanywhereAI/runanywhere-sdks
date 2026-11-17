@@ -102,6 +102,55 @@ RAC_API rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* reque
                                                             size_t request_size,
                                                             rac_proto_buffer_t* out_validation);
 
+/* ===========================================================================
+ * Cluster Orchestration (Issue #541: Local AI Cluster / Pipeline Sharding)
+ * =========================================================================== */
+
+/**
+ * Start a local AI cluster coordinator session from a serialized
+ * runanywhere.v1.ClusterStartRequest. Validates peer assignments and returns
+ * the active ClusterState.
+ */
+RAC_API rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
+                                                     size_t request_size,
+                                                     rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Join a cluster as a peer from a serialized runanywhere.v1.ClusterJoinRequest.
+ * Checks the peer appears in the cluster's layer assignments and, when it advertises
+ * a non-zero max_layers, that its assigned span fits within it; returns a
+ * ClusterStartResponse echoing the peer's capability.
+ */
+RAC_API rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_response);
+
+/**
+ * Stop an active cluster coordinator session and clear peer states.
+ */
+RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Protocol ceiling on one serialized runanywhere.v1.ClusterActivation (256 MiB). A larger
+ * message is rejected before it is parsed, so its tensor_data is never allocated.
+ */
+#define RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES (256u * 1024u * 1024u)
+
+/**
+ * Validate an intermediate activation tensor payload between pipeline stages.
+ * Accepts ClusterActivation and verifies cluster binding, tensor dimensions,
+ * and valid layer boundaries. A request larger than
+ * RAC_CONNECT_MAX_CLUSTER_ACTIVATION_BYTES returns RAC_SUCCESS with a typed
+ * `accepted = false` validation without being parsed. (Validation only; transport
+ * occurs out-of-band).
+ */
+RAC_API rac_result_t
+rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
+                                              size_t request_size,
+                                              rac_proto_buffer_t* out_validation);
+
 #ifdef __cplusplus
 }
 #endif
