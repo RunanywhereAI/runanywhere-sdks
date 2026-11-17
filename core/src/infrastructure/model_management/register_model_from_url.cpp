@@ -397,6 +397,21 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
             // specifics live in the policy — none here.
             const rac_inference_framework_t framework = framework_for(request);
             const rac_bundle_policy_t* policy = bundle_policy_for(framework);
+            if (policy != nullptr && policy->validate_ref != nullptr) {
+                const std::string folder =
+                    hf::bundle_folder_for_ref(request.url(), manifest_leaf_ext_for(policy));
+                if (!folder.empty()) {
+                    char error_message[256] = {};
+                    const rac_result_t validation_rc =
+                        policy->validate_ref(folder.c_str(), error_message, sizeof(error_message));
+                    if (validation_rc != RAC_SUCCESS) {
+                        return rac_proto_buffer_set_error(out_proto, validation_rc,
+                                                          error_message[0] != '\0'
+                                                              ? error_message
+                                                              : "bundle ref validation failed");
+                    }
+                }
+            }
             const rac_result_t variant_rc =
                 maybe_resolve_logical_bundle_ref(policy, &request, out_proto);
             if (variant_rc != RAC_SUCCESS) {
