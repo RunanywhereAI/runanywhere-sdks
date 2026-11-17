@@ -275,6 +275,16 @@ std::string current_rac_error_details() {
     return details ? details : "";
 }
 
+// The native error detail string lives in a thread-local that survives the call
+// that set it. Worker `Execute`s run on reused libuv pool threads and the sync
+// exports run on the long-lived JS main thread, so without a clear, a failure
+// that sets no detail of its own would attach a previous call's detail to its
+// sdkError. Every worker `Execute` and every sync export whose failure
+// serializes an sdkError therefore calls
+// rac_error_clear_details() before its native call, and paths that build an
+// error without any native call clear before building it. (Per-call stream
+// lambdas run on a fresh std::thread, so their thread-local starts empty.)
+
 /** Build a native error with canonical proto details and the operation message. */
 Napi::Error make_rac_error(Napi::Env env, rac_result_t code, const std::string& message,
                            const std::string* worker_details = nullptr) {
@@ -387,6 +397,7 @@ Napi::Value ListPlugins(const Napi::CallbackInfo& info) {
     (void)info;
     const char** names = nullptr;
     size_t count = 0;
+    rac_error_clear_details();
     rac_result_t rc = rac_registry_list_plugins(&names, &count);
     if (rc != RAC_SUCCESS) {
         throw_rac_error(env, rc, "rac_registry_list_plugins");
@@ -409,6 +420,7 @@ Napi::Value ListUnavailablePlugins(const Napi::CallbackInfo& info) {
     (void)info;
     rac_plugin_unavailable_t* items = nullptr;
     size_t count = 0;
+    rac_error_clear_details();
     rac_result_t rc = rac_registry_list_unavailable_plugins(&items, &count);
     if (rc != RAC_SUCCESS) {
         throw_rac_error(env, rc, "rac_registry_list_unavailable_plugins");
@@ -876,6 +888,8 @@ class ControlPlaneWorker : public Napi::AsyncWorker {
     Napi::Promise Promise() { return deferred_.Promise(); }
 
     void Execute() override {
+        // Reused libuv worker thread: no inherited thread-local error detail.
+        rac_error_clear_details();
         const auto env = static_cast<rac_environment_t>(env_);
         const rac_result_t transport_rc = rac_desktop_http_transport_register();
         if (transport_rc != RAC_SUCCESS) {
@@ -2951,6 +2965,7 @@ Napi::Value VadProcess(const Napi::CallbackInfo& info) {
     OpScope op(hid);
     Napi::Float32Array arr = ta.As<Napi::Float32Array>();
     rac_bool_t is_speech = RAC_FALSE;
+    rac_error_clear_details();
     rac_result_t rc = rac_vad_component_process(h, arr.Data(), arr.ElementLength(), &is_speech);
     if (rc != RAC_SUCCESS) {
         throw_rac_error(env, rc, "vad process");
@@ -3086,6 +3101,7 @@ Napi::Value VadSetStreamCallback(const Napi::CallbackInfo& info) {
         std::lock_guard<std::mutex> lock(VadStreamMutex());
         VadStreamSlots()[hid] = ctx;
     }
+    rac_error_clear_details();
     const rac_result_t rc = rac_vad_set_stream_proto_callback(h, ForwardVadStreamEvent, ctx);
     if (rc != RAC_SUCCESS) {
         ClearVadStreamSlot(hid, h);
@@ -3718,6 +3734,8 @@ class RagProtoWorker : public Napi::AsyncWorker {
 
         rac_proto_buffer_t out;
         rac_proto_buffer_init(&out);
+        // Reused libuv worker thread: no inherited thread-local error detail.
+        rac_error_clear_details();
         rac_result_t rc = op_(session_, input_.data(), input_.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
             out.status = rc;
@@ -3849,6 +3867,7 @@ Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
     mi->local_path = rag_dup_cstr(path);
     mi->category = static_cast<rac_model_category_t>(category);
     mi->framework = static_cast<rac_inference_framework_t>(framework);
+    rac_error_clear_details();
     rac_result_t rc = rac_register_model(mi);
     rac_model_info_free(mi);
     if (rc != RAC_SUCCESS) {
@@ -3873,6 +3892,8 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
     Napi::Promise Promise() { return deferred_.Promise(); }
 
     void Execute() override {
+        // Reused libuv worker thread: no inherited thread-local error detail.
+        rac_error_clear_details();
         rac_result_t rc = rac_rag_session_create_proto(config_.data(), config_.size(), &session_);
         code_ = rc;
         if (rc != RAC_SUCCESS || session_ == nullptr) {
@@ -3899,8 +3920,12 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
             if (!g_initialized.load()) {
                 rac_rag_session_destroy_proto(session_);
                 session_ = nullptr;
+                // Locally generated error: no native call produced a detail here, so
+                // pass explicit empty details rather than this thread's ambient value.
+                static const std::string kNoDetails;
                 deferred_.Reject(make_rac_error(Env(), RAC_ERROR_NOT_INITIALIZED,
-                                                "rag session create aborted: SDK shut down")
+                                                "rag session create aborted: SDK shut down",
+                                                &kNoDetails)
                                      .Value());
                 return;
             }
@@ -4079,6 +4104,7 @@ Napi::Value RagClear(const Napi::CallbackInfo& info) {
     OpScope op(hid);
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
+    rac_error_clear_details();
     rac_result_t rc = rac_rag_clear_proto(h, &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
         out.status = rc;
@@ -4100,6 +4126,7 @@ Napi::Value RagStats(const Napi::CallbackInfo& info) {
     OpScope op(hid);
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
+    rac_error_clear_details();
     rac_result_t rc = rac_rag_stats_proto(h, &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS)
         out.status = rc;
@@ -4124,6 +4151,9 @@ Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
 // of a bare TypeError from calling an undefined method).
 Napi::Value RagUnavailable(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
+    // No native call produces a detail here; clear so the structured error
+    // cannot pick up a stale one from an earlier failure on the main thread.
+    rac_error_clear_details();
     throw_rac_error(env, RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag (this build has no RAG pipeline)");
     return env.Undefined();
 }

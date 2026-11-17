@@ -633,12 +633,14 @@ target_compile_features(test_proto_buffer PRIVATE cxx_std_17)
 add_test(NAME proto_buffer_tests COMMAND test_proto_buffer)
 
 # --- rac_result_t -> RASDKError proto parity tests --------------------------
+find_package(Threads REQUIRED)
 add_executable(test_result_to_proto_error test_result_to_proto_error.cpp)
 target_include_directories(test_result_to_proto_error PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
 )
-target_link_libraries(test_result_to_proto_error PRIVATE rac_commons)
+# Threads: the detail-isolation test spawns a std::thread.
+target_link_libraries(test_result_to_proto_error PRIVATE rac_commons Threads::Threads)
 rac_link_archive_deps(test_result_to_proto_error)
 target_compile_features(test_result_to_proto_error PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_result_to_proto_error)

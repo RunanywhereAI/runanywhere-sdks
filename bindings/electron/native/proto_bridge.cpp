@@ -28,10 +28,27 @@ std::string DescribeFailure(const std::string& context, rac_result_t code,
     return message;
 }
 
-Napi::Value SerializedSdkError(Napi::Env env, rac_result_t code) {
+std::string CurrentErrorDetails() {
+    const char* details = rac_error_get_details();
+    return details != nullptr ? details : "";
+}
+
+Napi::Value SerializedSdkError(Napi::Env env, rac_result_t code, const std::string* details) {
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
+    // populate_sdk_error reads the error detail from a thread-local. A worker's
+    // detail lives on its own thread, so publish it here explicitly (empty ->
+    // no nested message) instead of leaking whatever an earlier failure left
+    // on this thread; restore the previous value afterwards.
+    std::string previous_details;
+    if (details != nullptr) {
+        previous_details = CurrentErrorDetails();
+        rac_error_set_details(details->empty() ? nullptr : details->c_str());
+    }
     const rac_result_t status = rac_result_to_proto_error(code, &buffer);
+    if (details != nullptr) {
+        rac_error_set_details(previous_details.empty() ? nullptr : previous_details.c_str());
+    }
     Napi::Value bytes = env.Undefined();
     if (status == RAC_SUCCESS && buffer.data != nullptr && buffer.size > 0) {
         bytes = Napi::Buffer<uint8_t>::Copy(env, buffer.data, buffer.size);
@@ -45,6 +62,7 @@ struct ProtoOutcome {
     rac_result_t code = RAC_SUCCESS;
     std::vector<uint8_t> bytes;
     std::string message;
+    std::string details;
 };
 
 ProtoOutcome Consume(rac_proto_buffer_t* buffer, rac_result_t call_status,
@@ -61,6 +79,7 @@ ProtoOutcome Consume(rac_proto_buffer_t* buffer, rac_result_t call_status,
     } else {
         outcome.code = buffer->status;
         outcome.message = DescribeFailure(context, buffer->status, buffer->error_message);
+        outcome.details = CurrentErrorDetails();
     }
     rac_proto_buffer_free(buffer);
     return outcome;
@@ -101,6 +120,8 @@ class ProtoCallWorker : public Napi::AsyncWorker {
     void Execute() override {
         rac_proto_buffer_t out;
         rac_proto_buffer_init(&out);
+        // Reused libuv worker thread: no inherited thread-local error detail.
+        rac_error_clear_details();
         const rac_result_t status = call_(&out);
         outcome_ = Consume(&out, status, context_);
         lease_->Release();
@@ -113,7 +134,8 @@ class ProtoCallWorker : public Napi::AsyncWorker {
             deferred_.Resolve(
                 Napi::Buffer<uint8_t>::Copy(env, outcome_.bytes.data(), outcome_.bytes.size()));
         } else {
-            deferred_.Reject(ProtoError(env, outcome_.code, context_, nullptr).Value());
+            deferred_.Reject(
+                ProtoError(env, outcome_.code, context_, nullptr, &outcome_.details).Value());
         }
     }
 
@@ -145,7 +167,11 @@ class NativeCallWorker : public Napi::AsyncWorker {
     Napi::Promise Promise() { return deferred_.Promise(); }
 
     void Execute() override {
+        // Reused libuv worker thread: no inherited thread-local error detail.
+        rac_error_clear_details();
         status_ = work_();
+        if (status_ != RAC_SUCCESS)
+            details_ = CurrentErrorDetails();
         lease_->Release();
     }
 
@@ -153,7 +179,7 @@ class NativeCallWorker : public Napi::AsyncWorker {
         Napi::Env env = Env();
         Napi::HandleScope scope(env);
         if (status_ != RAC_SUCCESS) {
-            deferred_.Reject(ProtoError(env, status_, context_, nullptr).Value());
+            deferred_.Reject(ProtoError(env, status_, context_, nullptr, &details_).Value());
             return;
         }
         // The result builder touches native memory the work left behind; a throw
@@ -178,6 +204,7 @@ class NativeCallWorker : public Napi::AsyncWorker {
     NativeResult build_;
     std::unique_ptr<LeaseHolder> lease_;
     rac_result_t status_ = RAC_SUCCESS;
+    std::string details_;
 };
 
 struct ProtoStreamSession {
@@ -188,6 +215,7 @@ struct ProtoStreamSession {
     ProtoStreamStart start;
     std::unique_ptr<LeaseHolder> lease;
     rac_result_t status = RAC_SUCCESS;
+    std::string details;
 
     explicit ProtoStreamSession(Napi::Env env) : deferred(Napi::Promise::Deferred::New(env)) {}
 };
@@ -208,12 +236,12 @@ void ForwardStreamEvent(const uint8_t* bytes, size_t size, void* user_data) {
 }  // namespace
 
 Napi::Error ProtoError(Napi::Env env, rac_result_t code, const std::string& context,
-                       const char* commons_message) {
+                       const char* commons_message, const std::string* details) {
     Napi::Error error = Napi::Error::New(env, DescribeFailure(context, code, commons_message));
     Napi::Object value = error.Value();
     value.Set("code", Napi::Number::New(env, PositiveErrorCode(code)));
     value.Set("cAbiCode", Napi::Number::New(env, static_cast<int>(code)));
-    value.Set("sdkError", SerializedSdkError(env, code));
+    value.Set("sdkError", SerializedSdkError(env, code, details));
     return error;
 }
 
@@ -339,14 +367,17 @@ Napi::Promise RunProtoStream(Napi::Env env, std::string context, ProtoStreamStar
             if (session->status == RAC_SUCCESS) {
                 session->deferred.Resolve(finalizer_env.Undefined());
             } else {
-                session->deferred.Reject(
-                    ProtoError(finalizer_env, session->status, session->context, nullptr).Value());
+                session->deferred.Reject(ProtoError(finalizer_env, session->status,
+                                                    session->context, nullptr, &session->details)
+                                             .Value());
             }
             delete session;
         });
 
     session->runner = std::thread([session]() {
         session->status = session->start(ForwardStreamEvent, session);
+        if (session->status != RAC_SUCCESS)
+            session->details = CurrentErrorDetails();
         session->emit.Release();
     });
 

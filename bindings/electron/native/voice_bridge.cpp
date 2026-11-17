@@ -120,6 +120,9 @@ Napi::Value VoiceEvents(const Napi::CallbackInfo& info) {
     {
         std::lock_guard<std::mutex> lock(StreamMutex());
         if (Streams().count(handle) != 0) {
+            // Local validation failure with no native call: clear so the
+            // structured error cannot pick up a stale thread-local detail.
+            rac_error_clear_details();
             return RejectWithProtoError(info.Env(), RAC_ERROR_INVALID_STATE,
                                         "voice_agent_events (a stream is already open)");
         }
@@ -139,6 +142,7 @@ Napi::Value VoiceEvents(const Napi::CallbackInfo& info) {
         std::lock_guard<std::mutex> lock(StreamMutex());
         Streams()[handle] = stream;
     }
+    rac_error_clear_details();
     const rac_result_t status = rac_voice_agent_set_proto_callback(handle, ForwardVoiceEvent,
                                                                    stream);
     if (status != RAC_SUCCESS) {

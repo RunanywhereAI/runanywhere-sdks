@@ -24,6 +24,7 @@
 #include <utility>
 #include <vector>
 
+#include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_tool_calling.h"
 
 namespace rac_electron {
@@ -73,6 +74,7 @@ struct RunLoopSession {
     std::vector<uint8_t> request;
     std::vector<uint8_t> result;
     std::string failure;
+    std::string details;
     rac_result_t status = RAC_SUCCESS;
 
     explicit RunLoopSession(Napi::Env env) : deferred(Napi::Promise::Deferred::New(env)) {}
@@ -192,7 +194,8 @@ Napi::Value ToolRunLoop(const Napi::CallbackInfo& info) {
             } else {
                 session->deferred.Reject(
                     ProtoError(finalizer_env, session->status, "tool_run_loop",
-                               session->failure.empty() ? nullptr : session->failure.c_str())
+                               session->failure.empty() ? nullptr : session->failure.c_str(),
+                               &session->details)
                         .Value());
             }
             delete session;
@@ -210,8 +213,15 @@ Napi::Value ToolRunLoop(const Napi::CallbackInfo& info) {
         if (out.status == RAC_SUCCESS) {
             if (out.data != nullptr && out.size > 0)
                 session->result.assign(out.data, out.data + out.size);
-        } else if (out.error_message != nullptr) {
-            session->failure = out.error_message;
+        } else {
+            // The error detail string lives in this runner thread's thread-local and
+            // dies with it; capture it here so the finalizer attaches exactly what this
+            // failure produced (empty when it produced none) instead of whatever the
+            // JS thread's ambient thread-local holds.
+            const char* runner_details = rac_error_get_details();
+            session->details = runner_details != nullptr ? runner_details : "";
+            if (out.error_message != nullptr)
+                session->failure = out.error_message;
         }
         rac_proto_buffer_free(&out);
         session->emit.Release();

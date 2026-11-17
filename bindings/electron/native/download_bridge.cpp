@@ -96,6 +96,8 @@ Napi::Value SubscribeProgress(const Napi::CallbackInfo& info) {
         g_progress_emit.Unref(env);
         g_progress_active = true;
     }
+    // Sync path on the JS main thread: no stale thread-local error detail.
+    rac_error_clear_details();
     const rac_result_t rc = rac_download_set_progress_proto_callback(ForwardProgress, nullptr);
     if (rc != RAC_SUCCESS) {
         DetachProgress();
