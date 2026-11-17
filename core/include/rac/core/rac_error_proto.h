@@ -19,8 +19,8 @@
  *
  * The implementation lives in `src/core/rac_error_proto.cpp` and uses the
  * existing internal helpers `rac_error_message()` (in `rac_error.h`) and a
- * code-range based ErrorCategory mapping that mirrors
- * `event_publisher.cpp::error_category_for_code()`.
+ * shared `rac::foundation::rac_result_to_proto_category()` mapper, also used
+ * by the event publisher.
  *
  * Memory ownership: on success the caller owns `out_proto->data` and must
  * release it with `rac_proto_buffer_free()`. On failure `out_proto->data` is
@@ -43,17 +43,18 @@ extern "C" {
  *        proto buffer.
  *
  * Populates `out_proto` with a serialized `runanywhere.v1.SDKError` containing:
- *   - `code`        — proto ErrorCode = abs(`code`); ERROR_CODE_UNSPECIFIED on
- *                     unrecognised values.
- *   - `category`    — proto ErrorCategory derived from the canonical -100..-899
- *                     C ABI ranges (matches event_publisher.cpp).
+ *   - `code`        — proto ErrorCode = abs(`code`), including unknown values;
+ *                     INT32_MIN maps to ERROR_CODE_UNKNOWN because its positive
+ *                     magnitude cannot be represented by the int32 proto enum.
+ *   - `category`    — derived from the 18 ranges in rac_error_categories.def
+ *                     through -999; non-negative and unmapped codes are UNSPECIFIED.
  *   - `message`     — `rac_error_message(code)`; never empty for a valid code.
  *   - `c_abi_code`  — the original signed `code`, for lossless round-tripping.
  *   - `timestamp_ms`— absent (zero) — populated by event publishers, not here.
  *   - `severity`    — ERROR_SEVERITY_ERROR.
  *
- * On `RAC_SUCCESS` input this function writes a default-constructed SDKError
- * into the buffer (proto3 default values) and returns `RAC_SUCCESS`. Callers
+ * On `RAC_SUCCESS` input this function writes an SDKError with code/category
+ * UNSPECIFIED (and the normal message/severity fields), returning `RAC_SUCCESS`. Callers
  * that wish to suppress emission of a "success" SDKError should test
  * `code == RAC_SUCCESS` themselves before calling.
  *

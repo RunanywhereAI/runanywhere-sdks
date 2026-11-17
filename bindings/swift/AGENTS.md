@@ -177,8 +177,9 @@ trampolines are `@convention(c)` free functions (no captures) using
 `Unmanaged.passRetained`/`.release()` for context. Naming: platform impls get an
 explicit prefix (`AndroidTTSService`); `CppBridge+{Domain}.swift` per extension.
 
-Periphery (`.periphery.yml`) scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRuntime`
-(not the MLX/NeuRT targets) with `retain_public: true`, `retain_codable_properties: true`.
+Periphery scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRuntime` (not the MLX/NeuRT
+ targets, excluded via `exclude_targets:` in `.periphery.yml`) with `retain_public: true`,
+ `retain_codable_properties: true`.
 
 ## Key file locations
 
