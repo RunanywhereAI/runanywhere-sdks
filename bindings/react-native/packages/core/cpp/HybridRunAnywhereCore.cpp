@@ -9,6 +9,7 @@
 #include "rac/rac_defaults_generated.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/core/rac_logger.h"
 
 #include <cstdlib>
 #include <stdexcept>
@@ -400,6 +401,26 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isInitialized() {
   return Promise<bool>::async(
       []() { return InitBridge::shared().isInitialized(); });
 }
+
+// ============================================================================
+// Logging
+// ============================================================================
+
+std::shared_ptr<Promise<void>>
+HybridRunAnywhereCore::loggerSetMinLevel(double level) {
+  return Promise<void>::async([level]() {
+    rac_logger_set_min_level(
+        static_cast<rac_log_level_t>(static_cast<int>(level)));
+  });
+}
+
+std::shared_ptr<Promise<double>>
+HybridRunAnywhereCore::loggerGetMinLevel() {
+  return Promise<double>::async([]() {
+    return static_cast<double>(rac_logger_get_min_level());
+  });
+}
+
 
 // ============================================================================
 // Helper Methods

@@ -362,7 +362,7 @@ export async function* generateStructuredStream(
     nativeStreamDone = true;
     // Surface in-flight generation failures as throws before parsing.
     await streaming.result;
-    const result = extractStructuredOutput(accumulated, schema);
+    const result = await extractStructuredOutputAsync(accumulated, schema);
     yield { kind: 'completed', result };
   } catch (error) {
     // Producer self-terminated (stream/result/parse failure) — never fire
@@ -391,12 +391,11 @@ export function extractStructuredOutput(
   // This facade is synchronous, whereas BackendWorker RPC is intentionally
   // asynchronous. Do not invoke the main-thread structured-output ABI when
   // the LLM (and therefore its commons heap) belongs to the Llama worker.
-  // A future async facade can route `structured.parse` to that worker.
   if (mustUseLlamaBackendWorker()) {
     throw SDKException.backendNotAvailable(
       'extractStructuredOutput',
       getLlamaBackendWorkerDeadReason()
-        ?? 'Structured-output parsing requires the Llama BackendWorker, but this synchronous API cannot perform worker RPC. Use a main-thread model or an async worker-aware structured-output API.',
+        ?? 'Structured-output parsing requires the Llama BackendWorker, but this synchronous API cannot perform worker RPC. Use a main-thread model or the async worker-aware extractStructuredOutputAsync().',
     );
   }
   const adapter = StructuredOutputProtoAdapter.tryDefault();
@@ -411,6 +410,32 @@ export function extractStructuredOutput(
   }
   throw SDKException.backendNotAvailable(
     'extractStructuredOutput',
+    'This Web WASM build does not export rac_structured_output_parse_proto.',
+  );
+}
+
+/**
+ * Async, worker-aware variant of `extractStructuredOutput` (§3).
+ *
+ * Routes `structured.parse` to the Llama BackendWorker when the model is
+ * worker-owned, and falls back to the sync path for main-thread models.
+ */
+export async function extractStructuredOutputAsync(
+  text: string,
+  schema: JSONSchemaDescriptor,
+): Promise<StructuredOutputResult> {
+  const adapter = StructuredOutputProtoAdapter.tryDefault();
+  if (adapter?.supportsProtoParse()) {
+    const result = await adapter.parseAsync({
+      requestId: '',
+      text,
+      options: structuredOutputOptionsFromSchema(schema),
+      metadata: {},
+    });
+    if (result) return result;
+  }
+  throw SDKException.backendNotAvailable(
+    'extractStructuredOutputAsync',
     'This Web WASM build does not export rac_structured_output_parse_proto.',
   );
 }
@@ -447,4 +472,5 @@ export const TextGeneration = {
 
   generateStructuredStream,
   extractStructuredOutput,
+  extractStructuredOutputAsync,
 };

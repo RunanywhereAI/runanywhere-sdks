@@ -22,7 +22,7 @@ extension RunAnywhere {
         Logging.shared.setLocalLoggingEnabled(enabled)
     }
 
-    /// Set minimum log level for SDK logging
+    /// Set minimum log level for SDK logging and synchronize with the C++ commons logger
     /// - Parameter level: Minimum log level to capture
     public static func setLogLevel(_ level: RALogLevel) {
         Logging.shared.setMinLogLevel(level)

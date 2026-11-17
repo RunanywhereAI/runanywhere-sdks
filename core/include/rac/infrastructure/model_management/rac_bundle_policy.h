@@ -56,6 +56,17 @@ typedef rac_result_t (*rac_bundle_variant_resolver_fn)(char* out_variant, size_t
                                                        char* out_error_message,
                                                        size_t out_error_message_size);
 
+/**
+ * Validate an explicitly selected Hugging Face bundle folder before resolution.
+ * @p folder is the repository-relative directory, without the organization,
+ * repository, manifest leaf, query or fragment (e.g. "v79"). Logical refs and
+ * direct /resolve/ or /blob/ file URLs are not passed to this callback.
+ * On failure, return an error and optionally write a NUL-terminated explanation
+ * to @p out_error_message. Must be thread-safe; no network access is required.
+ */
+typedef rac_result_t (*rac_bundle_ref_validator_fn)(const char* folder, char* out_error_message,
+                                                    size_t out_error_message_size);
+
 typedef struct rac_bundle_policy {
     /** = sizeof(rac_bundle_policy_t); registration rejects a mismatch. */
     uint32_t struct_size;
@@ -94,7 +105,15 @@ typedef struct rac_bundle_policy {
         rac_bundle_variant_resolver_fn resolve_variant;
         uint64_t reserved_0;
     };
-    uint64_t reserved_1; /**< Must be 0. */
+    /**
+     * Optional engine-owned validation for explicitly selected bundle folders.
+     * Promoted from reserved_1 without changing size, alignment or offsets:
+     * older policies supply zero (no validation), older commons ignores it.
+     */
+    union {
+        rac_bundle_ref_validator_fn validate_ref;
+        uint64_t reserved_1;
+    };
 } rac_bundle_policy_t;
 
 /**

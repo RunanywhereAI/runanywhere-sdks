@@ -3,9 +3,9 @@
  * @brief Explicit registration entry for the MLX engine plugin.
  */
 
-#include <mutex>
-
 #include "mlx_bundle_policy.h"
+
+#include <mutex>
 
 #include "rac/backends/rac_mlx.h"
 #include "rac/core/rac_error.h"
@@ -13,6 +13,7 @@
 #include "rac/infrastructure/model_management/rac_bundle_policy.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_mlx.h"
+#include "rac/plugin/rac_plugin_registration.h"
 
 #define LOG_CAT "MLX"
 
@@ -46,7 +47,7 @@ rac_result_t rac_backend_mlx_register(void) {
         RAC_LOG_DEBUG(LOG_CAT, "MLX not available on this host; skipping registration");
         return rc;
     }
-    if (rc != RAC_SUCCESS && rc != RAC_ERROR_PLUGIN_DUPLICATE) {
+    if (!rac_plugin_registration_succeeded(rc)) {
         RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register(mlx) failed: %d", rc);
         return rc;
     }
@@ -61,7 +62,8 @@ rac_result_t rac_backend_mlx_unregister(void) {
     if (!g_registered) {
         return RAC_SUCCESS;
     }
-    rac_plugin_unregister("mlx");
+    rac_result_t rc = rac_plugin_unregister("mlx");
+    RAC_PLUGIN_UNREGISTER_BUSY_CHECK("mlx", rc);
     rac_bundle_policy_unregister(RAC_FRAMEWORK_MLX);
     g_registered = false;
     return RAC_SUCCESS;

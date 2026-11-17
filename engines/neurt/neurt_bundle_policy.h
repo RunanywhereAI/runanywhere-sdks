@@ -99,7 +99,7 @@ static inline const rac_bundle_policy_t* neurt_bundle_policy(void) {
         /* .manifest_leaf_names_bundle= */ RAC_TRUE,
         /* .is_bundle_manifest        = */ neurt_is_bundle_manifest,
         /* .resolve_variant           = */ {NULL}, /* one portable bundle — see the header note */
-        /* .reserved_1                = */ 0,
+        /* .validate_ref              = */ {NULL},
     };
     return &policy;
 }

@@ -12,6 +12,20 @@
 
 namespace rac::llm::tool_calling {
 
+// Prefer the executor's JSON payload; otherwise expose its error as valid JSON
+// even when the text contains malformed model-derived bytes.
+inline std::string tool_result_payload_json(const runanywhere::v1::ToolResult& value) {
+    if (!value.result_json().empty()) {
+        return value.result_json();
+    }
+    if (value.has_error() && !value.error().empty()) {
+        nlohmann::json error = nlohmann::json::object();
+        error["error"] = value.error();
+        return error.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    }
+    return "{}";
+}
+
 struct WebSearchAttribution {
     std::string summary;
     std::string source_url;

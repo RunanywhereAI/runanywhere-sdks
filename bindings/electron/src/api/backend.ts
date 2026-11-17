@@ -140,6 +140,7 @@ export interface NativeSegmentation {
   classMask: Uint16Array;
   classes: Array<{ classId: number; label?: string; pixelCount: number; fraction: number }>;
   diagnosticRgba?: Uint8Array;
+  confidenceMask?: Uint8Array;
 }
 
 /**
@@ -484,7 +485,7 @@ export interface RaBackend {
   diarize(samples: Float32Array, options: NativeDiarizationOptions): Promise<NativeDiarization>;
   segment(
     image: { data: Uint8Array; width: number; height: number; pixelFormat?: number },
-    options: { includeDiagnosticImage?: boolean }
+    options: { includeDiagnosticImage?: boolean; includeConfidence?: boolean }
   ): Promise<NativeSegmentation>;
 
   // ---- model lifecycle and registry (proto bytes in, proto bytes out) ----
