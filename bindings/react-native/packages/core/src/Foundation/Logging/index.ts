@@ -14,6 +14,8 @@ export {
 } from './Models/LoggingConfiguration';
 export {
   LoggingManager,
+  setCommonsLogLevelSink,
+  type CommonsLogLevelSink,
   type LogDestination,
   type LogEntry,
 } from './Services/LoggingManager';
