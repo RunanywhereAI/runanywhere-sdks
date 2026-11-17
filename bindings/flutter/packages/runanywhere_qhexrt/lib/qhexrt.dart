@@ -103,10 +103,19 @@ class QHexRT {
 
   /// Unregister the QHexRT backend. Async for symmetry with [register].
   static Future<void> unregister() async {
-    if (_isRegistered) {
-      _bindings?.unregister();
+    if (!_isRegistered) return;
+    final result = _bindings?.unregister() ?? RacResultCodes.success;
+    if (result == RacResultCodes.success ||
+        result == RacResultCodes.errorModuleNotFound) {
       _isRegistered = false;
       _logger.info('QHexRT backend unregistered');
+    } else if (result == RacResultCodes.errorPluginBusy) {
+      _logger.warning(
+        'QHexRT backend still leased by a loaded model; '
+        'unload it and retry unregistration',
+      );
+    } else {
+      _logger.warning('QHexRT unregistration failed with code: $result');
     }
   }
 

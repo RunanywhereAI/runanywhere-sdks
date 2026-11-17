@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.withLock
 // RAC_ERROR_* constants (signed C ABI value = negated proto-enum magnitude).
 private val RAC_ERROR_BACKEND_UNAVAILABLE = -ErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE.value
 private val RAC_ERROR_CAPABILITY_UNSUPPORTED = -ErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED.value
+private val RAC_ERROR_PLUGIN_BUSY = -ErrorCode.ERROR_CODE_PLUGIN_BUSY.value
 
 /**
  * QHexRT module — RunAnywhere's Qualcomm Hexagon NPU backend.
@@ -103,9 +104,22 @@ object QHexRT {
     suspend fun unregister() {
         registrationMutex.withLock {
             if (!isRegistered) return
-            unregisterNative()
-            isRegistered = false
-            logger.info("QHexRT backend unregistered")
+            when (val result = unregisterNative()) {
+                RunAnywhereBridge.RAC_SUCCESS,
+                RunAnywhereBridge.RAC_ERROR_MODULE_NOT_FOUND,
+                -> {
+                    isRegistered = false
+                    logger.info("QHexRT backend unregistered")
+                }
+                RAC_ERROR_PLUGIN_BUSY -> {
+                    logger.warning(
+                        "QHexRT backend still leased by a loaded model; unload it and retry unregistration",
+                    )
+                }
+                else -> {
+                    logger.warning("QHexRT unregistration failed with code: $result")
+                }
+            }
         }
     }
 
