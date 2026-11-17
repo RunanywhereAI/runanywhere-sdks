@@ -227,6 +227,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> solutionFeed(double handle, const std::string& item) = 0;
       virtual std::shared_ptr<Promise<bool>> solutionCloseInput(double handle) = 0;
       virtual std::shared_ptr<Promise<void>> solutionDestroy(double handle) = 0;
+      virtual std::shared_ptr<Promise<void>> loggerSetMinLevel(double level) = 0;
+      virtual std::shared_ptr<Promise<double>> loggerGetMinLevel() = 0;
 
     protected:
       // Hybrid Setup

@@ -9,6 +9,8 @@
 #include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/tool_calling_key_repair_internal.h"
+#include "features/llm/utf8_internal.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_llm_types.h"
@@ -317,6 +319,24 @@ inline runanywhere::v1::FinishReason finish_reason_from_raw(const rac_llm_result
 }
 #endif
 
+/**
+ * @brief Runs one constrained generation step for the tool-calling loop.
+ *
+ * Applies the per-step sampling, grammar dialect, and history overrides on
+ * @p generation, drives the loaded engine, and either copies the sanitized
+ * output into @p out_response or reports the failure code through @p out_rc.
+ * Ambiguous repaired-key collisions are rejected here, before the output is
+ * copied or measured, so they can never reach a parser or an executor.
+ *
+ * @param generation Step options and cached thinking-tag state (in/out).
+ * @param cancel_binding Handles exposed to rac_*_cancel while generating.
+ * @param prompt Fully formatted prompt for this step.
+ * @param out_response Sanitized model output on success (may be null).
+ * @param out_rc Receives RAC_SUCCESS or the failure code.
+ * @param agg Optional telemetry accumulator for this loop.
+ * @param out_finish_reason Optional finish-reason output (protobuf builds).
+ * @return true on success; false when the step failed (see @p out_rc).
+ */
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
@@ -459,8 +479,33 @@ inline bool run_generate_once(GenerationState& generation,
         return false;
     }
 
+    if (raw.text) {
+        // Grammar backends strip closed thinking blocks before parsing, so a
+        // collision that only exists inside a think block can never reach a
+        // parser or an executor. Every other backend parses the whole raw
+        // output, so it keeps the full check.
+        std::string body;
+        const std::string full(raw.text);
+        const std::string* check_text = &full;
+        if (ref.supports_grammar) {
+            std::string thinking;
+            split_display_text_and_thinking(full, &body, &thinking, generation);
+            check_text = &body;
+        }
+        if (default_call_has_repaired_key_collision(*check_text)) {
+            rac_llm_result_free(&raw);
+            release_lifecycle_llm(&ref);
+            if (out_rc) {
+                *out_rc = RAC_ERROR_INVALID_ARGUMENT;
+            }
+            return false;
+        }
+    }
+
     if (out_response) {
-        *out_response = raw.text ? raw.text : "";
+        // Both orchestration paths serialize model output into ToolParseRequest
+        // string fields before parsing; repair bytes before that strict boundary.
+        *out_response = rac::llm::sanitize_utf8(raw.text ? raw.text : "");
     }
 #if defined(RAC_HAVE_PROTOBUF)
     if (out_finish_reason) {

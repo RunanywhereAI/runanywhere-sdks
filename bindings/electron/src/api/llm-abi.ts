@@ -21,11 +21,12 @@ import {
   StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
 import { ReasoningMode as ProtoReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
+import type { ReasoningOptions as ProtoReasoningOptions } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import type { RaBackend } from './backend';
 import { bridgeStream } from './iter';
 import { invokeProto } from './proto-abi';
-import type { LlmOptions } from './options';
+import type { LlmOptions, ReasoningOptions } from './options';
 import { FinishReason, ReasoningMode, Role } from './types';
 import type { ChatMessage, GenerationMetrics, JsonSchema } from './types';
 
@@ -40,6 +41,25 @@ const REASONING_TO_PROTO: Record<ReasoningMode, ProtoReasoningMode> = {
   [ReasoningMode.ON]: ProtoReasoningMode.REASONING_MODE_ON,
   [ReasoningMode.OFF]: ProtoReasoningMode.REASONING_MODE_OFF,
 };
+
+/**
+ * The public `reasoning` option as the generated message. Every request that
+ * carries a `reasoning` option (the LLM path here, the RAG query in data.ts)
+ * goes through this one function, so the two cannot encode the option differently.
+ */
+export function toProtoReasoning(reasoning: ReasoningOptions): ProtoReasoningOptions {
+  return {
+    // An unset mode stays UNSPECIFIED, which the IDL defines as "reasoning-capable
+    // models think, others don't": the documented default ON. Commons only acts on OFF.
+    mode: reasoning.mode
+      ? REASONING_TO_PROTO[reasoning.mode]
+      : ProtoReasoningMode.REASONING_MODE_UNSPECIFIED,
+    includeInOutput: reasoning.includeInOutput ?? false,
+    pattern: reasoning.pattern
+      ? { openTag: reasoning.pattern.open, closeTag: reasoning.pattern.close }
+      : undefined,
+  };
+}
 
 /**
  * Collapse commons' finish reasons onto the public surface.
@@ -111,17 +131,7 @@ export function toProtoOptions(
     seed: o.seed,
     stopSequences: o.stopSequences ? [...o.stopSequences] : [],
     systemPrompt: o.systemPrompt,
-    reasoning: o.reasoning
-      ? {
-          mode: o.reasoning.mode
-            ? REASONING_TO_PROTO[o.reasoning.mode]
-            : ProtoReasoningMode.REASONING_MODE_UNSPECIFIED,
-          includeInOutput: o.reasoning.includeInOutput ?? false,
-          pattern: o.reasoning.pattern
-            ? { openTag: o.reasoning.pattern.open, closeTag: o.reasoning.pattern.close }
-            : undefined,
-        }
-      : undefined,
+    reasoning: o.reasoning ? toProtoReasoning(o.reasoning) : undefined,
     // Schema only — commons compiles schema→GBNF and owns repair. Never ship a
     // local grammar shim. `strict: false` asks for validation without
     // constraining the sampler (VALIDATION_ONLY).

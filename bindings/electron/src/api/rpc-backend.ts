@@ -497,7 +497,7 @@ export class RpcBackend implements RaBackend {
   }
   segment(
     image: { data: Uint8Array; width: number; height: number; pixelFormat?: number },
-    options: { includeDiagnosticImage?: boolean }
+    options: { includeDiagnosticImage?: boolean; includeConfidence?: boolean }
   ): Promise<NativeSegmentation> {
     return this.call('segment', [image, options]);
   }

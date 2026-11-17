@@ -34,6 +34,7 @@
 #   bindings/flutter package/plugin/native metadata (Dart, Gradle, Swift, Kotlin)
 #   dependencies/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
 #   SDK AGENTS/architecture/install docs                   (release-facing version examples)
+#   README.md                                              (version line + install-command pins)
 #
 # Does NOT touch (intentional, documented SoT for distinct domains):
 #   - package CHANGELOG prose — release notes require a reviewed, human-written
@@ -584,6 +585,28 @@ for release_doc in \
     "${REPO_ROOT}/bindings/kotlin/README.md"; do
     bump_all_on_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
 done
+# The root README pins every install command. Match each pin by its shape rather
+# than CURRENT_VERSION, so a bump also heals a pin that is already stale. While a
+# TEMP marker holds the install commands on the last version the registries have
+# (see check_release_version_coherence.sh), a bump moves only the marker; delete
+# the marker and rerun this script once the new version is published.
+README_TEMP_MARKER_REGEX='(TEMP: install pins stay on [0-9]+\.[0-9]+\.[0-9]+ until v)[^ ]+( is on the package registries\.)'
+if grep -Eq "${README_TEMP_MARKER_REGEX}" "${REPO_ROOT}/README.md"; then
+    bump_line "${REPO_ROOT}/README.md" "${README_TEMP_MARKER_REGEX}" "\\1${NEW_VERSION}\\2"
+else
+    for readme_pin in \
+        'io\.github\.sanchitmonga22:runanywhere-[a-z-]+:' \
+        'runanywhere[a-z_]*: \^' \
+        '@runanywhere/[a-z-]+@' \
+        'runanywhere=='; do
+        bump_all_on_line "${REPO_ROOT}/README.md" \
+            "(${readme_pin})[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
+            "\\1${NEW_VERSION}"
+    done
+fi
+bump_all_on_line "${REPO_ROOT}/README.md" \
+    "(version line, currently \*\*)[0-9]+\.[0-9]+\.[0-9]+([.-]?[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?" \
+    "\\1${NEW_VERSION}"
 
 # Every anchor above validated. Only now does anything on disk change, so a
 # stale pattern aborts with the working tree untouched rather than half-bumped.

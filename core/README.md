@@ -86,8 +86,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
 # With ML backends
-cmake -B build -DRAC_BUILD_BACKENDS=ON
-cmake --build build
+cmake -S .. -B ../build/backends
+cmake --build ../build/backends
 ```
 
 ### Minimal usage (C)
