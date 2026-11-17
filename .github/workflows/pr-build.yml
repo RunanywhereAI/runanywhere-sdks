@@ -520,6 +520,14 @@ jobs:
           dart run melos run analyze
           dart run melos run test
 
+      # The example is outside the Melos package workspace.
+      - name: Test QHexRT example catalog eligibility
+        working-directory: bindings/flutter/example
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter test --no-pub test/qhexrt_model_catalog_test.dart
+
   rn-typecheck:
     runs-on: ubuntu-22.04
     steps:
