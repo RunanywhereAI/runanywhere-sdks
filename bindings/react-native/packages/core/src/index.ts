@@ -66,6 +66,7 @@ export type {
   RagQueryOptions,
   RagResult,
   RagRetrievalOptions,
+  RagVectorStore,
   RagSession,
   RagStats,
   RankedResult,

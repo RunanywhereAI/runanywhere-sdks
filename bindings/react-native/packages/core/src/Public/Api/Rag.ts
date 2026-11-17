@@ -10,6 +10,7 @@ import {
   RAGSearchRequest,
   RAGStreamEvent,
   RAGStreamEventKind,
+  VectorStore,
 } from '@runanywhere/proto-ts/rag';
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
@@ -95,6 +96,14 @@ function buildQueryOptions(
   options: RagQueryOptions | undefined,
   config: RagConfig | undefined
 ): RAGQueryOptions {
+  const retrievalOverrides = options?.retrieval;
+  const vectorStore: unknown = retrievalOverrides?.vectorStore;
+  if (vectorStore !== undefined && vectorStore !== 'usearch') {
+    // A plain-JS caller can pass any string; dropping it would silently run the default.
+    throw SDKException.invalidConfiguration(
+      `RagRetrievalOptions.vectorStore must be 'usearch' (the only on-device store); got ${String(vectorStore)}`
+    );
+  }
   const topK = options?.retrieval?.topK ?? config?.topK;
   const scoreThreshold =
     options?.retrieval?.similarityThreshold ?? config?.similarityThreshold;
@@ -104,6 +113,10 @@ function buildQueryOptions(
     retrieval: {
       ...(topK !== undefined ? { topK } : {}),
       ...(scoreThreshold !== undefined ? { scoreThreshold } : {}),
+      ...(retrievalOverrides?.bm25K1 !== undefined ? { bm25K1: retrievalOverrides.bm25K1 } : {}),
+      ...(retrievalOverrides?.bm25B !== undefined ? { bm25B: retrievalOverrides.bm25B } : {}),
+      ...(retrievalOverrides?.rrfK !== undefined ? { rrfK: retrievalOverrides.rrfK } : {}),
+      ...(vectorStore === 'usearch' ? { vectorStore: VectorStore.VECTOR_STORE_USEARCH } : {}),
     },
   });
 }
