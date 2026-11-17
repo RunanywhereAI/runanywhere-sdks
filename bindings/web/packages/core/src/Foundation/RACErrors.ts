@@ -32,6 +32,9 @@ export const RAC_ERROR_HTTP_ERROR = -157 as const;
 /** `RAC_ERROR_FILE_NOT_FOUND` — requested browser filesystem path is missing. */
 export const RAC_ERROR_FILE_NOT_FOUND = -183 as const;
 
+/** `RAC_ERROR_FILE_READ_FAILED` — a filesystem read was denied or inconclusive. */
+export const RAC_ERROR_FILE_READ_FAILED = -184 as const;
+
 /** `RAC_ERROR_DELETE_FAILED` — browser filesystem deletion could not be completed. */
 export const RAC_ERROR_DELETE_FAILED = -187 as const;
 

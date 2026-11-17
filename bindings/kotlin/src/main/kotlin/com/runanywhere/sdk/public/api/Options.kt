@@ -229,6 +229,7 @@ public data class DiarizationOptions(
 /** Knobs for one semantic-segmentation call. */
 public data class SegmentationOptions(
     val includeDiagnosticImage: Boolean = false,
+    val includeConfidence: Boolean = false,
 )
 
 /** How long silence must last before a user turn is considered finished. */

@@ -24,6 +24,18 @@ import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 export { LogLevel };
 export type { LoggingConfiguration };
 
+export type CommonsLogLevelSink = (racLevel: number) => void;
+let _commonsLogLevelSink: CommonsLogLevelSink | null = null;
+
+/** Register a sink that receives C-ABI minimum log level changes. */
+export function setCommonsLogLevelSink(sink: CommonsLogLevelSink | null): void {
+  _commonsLogLevelSink = sink;
+  if (sink) {
+    sink(toRacLogLevel(SDKLogger.level));
+  }
+}
+
+
 /**
  * Environment presets — Swift parity: `RALoggingConfiguration.development /
  * .production` (SDKLogger.swift:41-66). Dev logs at debug with
@@ -64,6 +76,33 @@ export const LOG_LEVEL_TO_RAC: Record<LogLevel, number> = {
   [LogLevel.LOG_LEVEL_FATAL]: 5,
   [LogLevel.UNRECOGNIZED]: -1,
 };
+
+/** Map proto LogLevel to commons rac_log_level_t integer. */
+export function toRacLogLevel(level: LogLevel): number {
+  const rac = LOG_LEVEL_TO_RAC[level];
+  return rac !== undefined && rac >= 0 ? rac : 2; // Default to INFO (2)
+}
+
+/** Map commons rac_log_level_t integer back to proto LogLevel. */
+export function racLogLevelToProto(racLevel: number): LogLevel {
+  switch (racLevel) {
+    case 0:
+      return LogLevel.LOG_LEVEL_TRACE;
+    case 1:
+      return LogLevel.LOG_LEVEL_DEBUG;
+    case 2:
+      return LogLevel.LOG_LEVEL_INFO;
+    case 3:
+      return LogLevel.LOG_LEVEL_WARNING;
+    case 4:
+      return LogLevel.LOG_LEVEL_ERROR;
+    case 5:
+      return LogLevel.LOG_LEVEL_FATAL;
+    default:
+      return LogLevel.LOG_LEVEL_INFO;
+  }
+}
+
 
 /**
  * Represents a destination that can receive log entries.
@@ -120,6 +159,7 @@ export class SDKLogger {
 
   static set level(level: LogLevel) {
     SDKLogger._level = level;
+    _commonsLogLevelSink?.(toRacLogLevel(level));
   }
 
   static get enabled(): boolean {
@@ -134,6 +174,7 @@ export class SDKLogger {
   static configure(config: LoggingConfiguration): void {
     SDKLogger._enabled = config.enableLocalLogging;
     SDKLogger._level = config.minLogLevel;
+    _commonsLogLevelSink?.(toRacLogLevel(config.minLogLevel));
   }
 
   /**
@@ -152,6 +193,7 @@ export class SDKLogger {
   /** Set minimum log level. Mirrors Swift `Logging.shared.setMinLogLevel(_:)`. */
   static setMinLogLevel(level: LogLevel): void {
     SDKLogger._level = level;
+    _commonsLogLevelSink?.(toRacLogLevel(level));
   }
 
   /** Register a custom log destination. Mirrors Swift `Logging.shared.addDestination(_:)`. */

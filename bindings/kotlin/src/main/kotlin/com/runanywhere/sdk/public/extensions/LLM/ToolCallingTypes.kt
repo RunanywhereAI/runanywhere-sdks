@@ -24,6 +24,7 @@ package com.runanywhere.sdk.public.extensions.LLM
 
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.ToolValueJSON
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
@@ -150,17 +151,20 @@ val RAToolValue.`object`: Map<String, RAToolValue>? get() = object_value?.fields
 // The recursive walk lives in commons (G3); Kotlin only marshals bytes via
 // the `rac_tool_value_{to,from}_json_proto` JNI thunks, mirroring Swift's
 // ToolCallingTypes.swift. This preserves the integer-vs-double distinction the
-// previous pure-Kotlin walk lost and keeps every SDK byte-identical.
+// previous pure-Kotlin walk lost and keeps successful native encodings aligned.
+// Kotlin's failure handling below intentionally differs from Swift's fallback.
 
 /**
- * Render this value as a JSON string. Mirrors Swift
- * `RAToolValue.toJSONString(pretty:)` — routes through
- * `rac_tool_value_to_json_proto`. `pretty` re-renders the canonical JSON with
- * sorted keys for presentation; null on any failure.
+ * Render this value through `rac_tool_value_to_json_proto`.
+ * `pretty` requests presentation formatting of the canonical JSON. Native
+ * failures throw [SDKException]; an unavailable or undecodable response returns null.
+ * Swift's counterpart currently returns nil for native failures as well;
+ * Kotlin preserves those failures so tool execution can report an error.
  */
 fun RAToolValue.toJSONString(pretty: Boolean = false): String? {
     val resultBytes =
-        RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) ?: return null
+        withNativeProtoFailure { RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) }
+            ?: return null
     val json =
         runCatching { ToolValueJSON.ADAPTER.decode(resultBytes).json }.getOrNull() ?: return null
     if (!pretty) return json
@@ -196,7 +200,7 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
     }
     val wrapper = ToolValueJSON(json = json)
     val valueBytes =
-        RunAnywhereBridge.racToolValueFromJsonProto(ToolValueJSON.ADAPTER.encode(wrapper))
+        withNativeProtoFailure { RunAnywhereBridge.racToolValueFromJsonProto(ToolValueJSON.ADAPTER.encode(wrapper)) }
             ?: throw SDKException.invalidArgument("Malformed tool arguments JSON")
     val decoded =
         runCatching {
@@ -211,13 +215,17 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
 }
 
 /**
- * Serialize a `[String: RAToolValue]` map into a JSON object string. Mirrors
- * Swift `RAToolValue.jsonString(from:)`. Returns `"{}"` when serialization
- * fails so wire-shape callers always get valid JSON.
+ * Serialize a `[String: RAToolValue]` map into a JSON object string.
+ * Serialization failures throw instead of replacing a tool's output or
+ * arguments with an empty JSON object.
+ * This intentionally differs from Swift's current `jsonString(from:)`, which
+ * still substitutes `"{}"` when serialization fails.
  */
 fun ai.runanywhere.proto.v1.ToolValue.Companion.jsonString(
     from: Map<String, RAToolValue>,
-): String = RAToolValue.`object`(from).toJSONString() ?: "{}"
+): String =
+    RAToolValue.`object`(from).toJSONString()
+        ?: throw SDKException.operation("Failed to serialize tool value JSON")
 
 // MARK: Tool Definition Helpers --------------------------------------------
 

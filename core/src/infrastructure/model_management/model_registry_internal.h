@@ -3,7 +3,7 @@
  * @brief Internal layout shared between model-registry implementation TUs.
  *
  * NOT part of the public C ABI; only files under
- * `src/infrastructure/model_management/` may include this header. Public
+ * `src/infrastructure/model_management/` and core tests may include this header. Public
  * callers go through the `rac_model_registry.h` C entry points.
  *
  * SRP split: the original `model_registry.cpp` mixed proto<->C conversion,
@@ -34,9 +34,11 @@
 #define RAC_INFRA_MODEL_MANAGEMENT_MODEL_REGISTRY_INTERNAL_H
 
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -218,6 +220,30 @@ rac_result_t store_proto_snapshot_locked(rac_model_registry_handle_t handle,
 rac_result_t store_parsed_proto_snapshot_locked(rac_model_registry_handle_t handle,
                                                 const std::string& model_id,
                                                 const ModelInfo& parsed);
+// Caller holds the registry mutex and has revalidated the orphan. Keeping the
+// serializer injectable makes failure coverage deterministic without public ABI
+// hooks or global allocation overrides. No live state changes until it succeeds.
+template <typename Serializer>
+bool commit_pruned_download_locked(rac_model_registry_handle_t handle, const std::string& model_id,
+                                   rac_model_info_t* live, int64_t updated_at,
+                                   const ModelInfo& snapshot, Serializer serialize) {
+    try {
+        std::string bytes;
+        if (!serialize(snapshot, &bytes)) {
+            return false;
+        }
+        // Map insertion can allocate. Complete it before the no-throw commit.
+        auto& stored = handle->model_proto_bytes[model_id];
+        stored.swap(bytes);
+        std::free(live->local_path);
+        live->local_path = nullptr;
+        live->updated_at = updated_at;
+        return true;
+    } catch (const std::bad_alloc&) {
+        return false;
+    }
+}
+
 ModelInfo model_snapshot_locked(rac_model_registry_handle_t handle, const std::string& model_id,
                                 const rac_model_info_t* model);
 rac_result_t model_to_proto_bytes_locked(rac_model_registry_handle_t handle,

@@ -153,6 +153,18 @@ abstract class NativeFunctions {
       void Function(Pointer<Void>)>('rac_free');
 
   // ---------------------------------------------------------------------------
+  // Logging (rac_logger.h)
+  // ---------------------------------------------------------------------------
+
+  static final void Function(int) loggerSetMinLevel = _lib.lookupFunction<
+      Void Function(Int32),
+      void Function(int)>('rac_logger_set_min_level');
+
+  static final int Function() loggerGetMinLevel = _lib.lookupFunction<
+      Int32 Function(),
+      int Function()>('rac_logger_get_min_level');
+
+  // ---------------------------------------------------------------------------
   // Solutions runtime (rac/solutions/rac_solution.h).
   //
   // Proto-byte / YAML driven L5 solution runtime. `solutionCreateFromProto`

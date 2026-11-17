@@ -9,6 +9,8 @@
 
 #include "HybridRunAnywhereCore+Common.hpp"
 
+#include "rac/plugin/rac_plugin_registration.h"
+
 #include "rac/core/rac_error.h"
 
 #include <cstdint>
@@ -64,7 +66,8 @@ HybridRunAnywhereCore::mlxRegisterBackend(double priority) {
 
     const auto clampedPriority =
         priority < 0 ? 0 : (priority > 2147483647.0 ? 2147483647.0 : priority);
-    return isRACSuccess(fn(static_cast<int32_t>(clampedPriority)));
+    return rac_plugin_registration_succeeded(
+               fn(static_cast<int32_t>(clampedPriority))) == RAC_TRUE;
   });
 }
 
