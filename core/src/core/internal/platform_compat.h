@@ -219,6 +219,27 @@ inline std::wstring rac_to_wstring(const char* s) {
         return {};
     return rac_to_wstring(std::string(s));
 }
+/* Strict variant for paths: rac_to_wstring() replaces malformed bytes with
+ * U+FFFD, which can silently name a different file. This fails instead.
+ * Returns false (and clears *out) on NULL or malformed UTF-8; an empty string
+ * converts to an empty wstring. May throw std::bad_alloc. */
+inline bool rac_to_wstring_strict(const char* s, std::wstring* out) {
+    out->clear();
+    if (!s)
+        return false;
+    if (!*s)
+        return true;
+    int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, nullptr, 0);
+    if (size <= 0)
+        return false;
+    out->resize(static_cast<size_t>(size));
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, &(*out)[0], size) != size) {
+        out->clear();
+        return false;
+    }
+    out->resize(static_cast<size_t>(size - 1)); /* drop the terminating NUL */
+    return true;
+}
 #endif
 // ONNX Runtime path handling:
 //   - On Windows, use `std::wstring wp = rac_to_wstring(p); session(env, wp.c_str(), opts);`
