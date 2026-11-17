@@ -17,6 +17,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -133,10 +134,12 @@ object CppBridgeVoiceAgent {
         mutex.withLock {
             decodeOrThrow(
                 VoiceAgentComponentStates.ADAPTER,
-                RunAnywhereBridge.racVoiceAgentInitializeProto(
-                    handle,
-                    VoiceAgentComposeConfig.ADAPTER.encode(config),
-                ),
+                withNativeProtoFailure {
+                    RunAnywhereBridge.racVoiceAgentInitializeProto(
+                        handle,
+                        VoiceAgentComposeConfig.ADAPTER.encode(config),
+                    )
+                },
                 "racVoiceAgentInitializeProto",
             )
         }
@@ -145,7 +148,7 @@ object CppBridgeVoiceAgent {
         mutex.withLock {
             decodeOrThrow(
                 VoiceAgentComponentStates.ADAPTER,
-                RunAnywhereBridge.racVoiceAgentComponentStatesProto(handle),
+                withNativeProtoFailure { RunAnywhereBridge.racVoiceAgentComponentStatesProto(handle) },
                 "racVoiceAgentComponentStatesProto",
             )
         }
@@ -178,7 +181,7 @@ object CppBridgeVoiceAgent {
             }
             decodeOrThrow(
                 VoiceAgentResult.ADAPTER,
-                RunAnywhereBridge.racVoiceAgentProcessVoiceTurnProto(h, audioBytes),
+                withNativeProtoFailure { RunAnywhereBridge.racVoiceAgentProcessVoiceTurnProto(h, audioBytes) },
                 "racVoiceAgentProcessVoiceTurnProto",
             )
         }

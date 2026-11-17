@@ -147,11 +147,11 @@ static const rac_engine_vtable_t g_sherpa_engine_vtable = {
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
 
-    /* reserved_slot_2..9 */
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+    /* rerank_ops       */ nullptr,
+    /* image_embedding_ops */ nullptr,
+    /* ocr_ops          */ nullptr,
+    /* decision_ops     */ nullptr,
+    /* reserved_slot_6..9 */
     nullptr,
     nullptr,
     nullptr,

@@ -35,8 +35,6 @@
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/tts/rac_tts_types.h"
-#include "rac/features/vad/rac_vad_component.h"
-#include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
@@ -173,13 +171,6 @@ rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
     }
 
     rac_voice_agent_config_t config = config_from_proto(proto);
-    rac_vad_config_t vad_config = RAC_VAD_CONFIG_DEFAULT;
-    vad_config.sample_rate = config.vad_config.sample_rate;
-    vad_config.frame_length = config.vad_config.frame_length;
-    vad_config.energy_threshold = config.vad_config.energy_threshold;
-    if (handle->vad_handle) {
-        (void)rac_vad_component_configure(handle->vad_handle, &vad_config);
-    }
 
     // Guarantee a VAD model is loaded in the canonical lifecycle before the
     // session starts so the orchestrator's speech-start / speech-end events

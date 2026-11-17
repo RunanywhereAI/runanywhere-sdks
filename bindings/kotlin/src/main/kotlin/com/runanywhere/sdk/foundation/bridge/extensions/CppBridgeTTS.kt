@@ -26,6 +26,7 @@ import ai.runanywhere.proto.v1.TTSVoiceInfo
 import ai.runanywhere.proto.v1.TTSVoiceList
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -110,9 +111,9 @@ object CppBridgeTTS {
      * synthesis is asked to stop.
      */
     suspend fun stop() {
-        // racTtsStopLifecycleProto is safe to call even when no voice is
-        // loaded: the C ABI returns RAC_ERROR_INVALID_STATE in that case.
-        RunAnywhereBridge.racTtsStopLifecycleProto()
+        // With no voice loaded the C ABI returns RAC_ERROR_INVALID_STATE;
+        // withNativeProtoFailure surfaces it as an SDKException.
+        withNativeProtoFailure { RunAnywhereBridge.racTtsStopLifecycleProto() }
     }
 
     /**
@@ -123,7 +124,7 @@ object CppBridgeTTS {
      */
     suspend fun voices(): List<TTSVoiceInfo> {
         val bytes =
-            RunAnywhereBridge.racTtsListVoicesLifecycleProto()
+            withNativeProtoFailure { RunAnywhereBridge.racTtsListVoicesLifecycleProto() }
                 ?: throw SDKException.operation("racTtsListVoicesLifecycleProto returned null")
         return TTSVoiceList.ADAPTER.decode(bytes).voices
     }
@@ -135,7 +136,7 @@ object CppBridgeTTS {
     suspend fun state(): TTSServiceState =
         decodeOrThrow(
             TTSServiceState.ADAPTER,
-            RunAnywhereBridge.racTtsStateLifecycleProto(),
+            withNativeProtoFailure { RunAnywhereBridge.racTtsStateLifecycleProto() },
             "racTtsStateLifecycleProto",
         )
 
@@ -150,9 +151,11 @@ object CppBridgeTTS {
         val request = TTSSynthesisRequest(text = text, options = options)
         return decodeOrThrow(
             TTSOutput.ADAPTER,
-            RunAnywhereBridge.racTtsSynthesizeLifecycleProto(
-                TTSSynthesisRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racTtsSynthesizeLifecycleProto(
+                    TTSSynthesisRequest.ADAPTER.encode(request),
+                )
+            },
             "racTtsSynthesizeLifecycleProto",
         )
     }

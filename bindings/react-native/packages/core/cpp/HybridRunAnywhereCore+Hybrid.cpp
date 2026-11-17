@@ -39,6 +39,8 @@
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 
+#include "rac/plugin/rac_plugin_registration.h"
+
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -251,11 +253,6 @@ rac_bool_t customFilterPredicate(const rac_hybrid_routing_context_t* ctx,
         LOGE("hybrid custom filter '%s' threw unknown; keeping candidate", name.c_str());
         return RAC_TRUE;
     }
-}
-
-bool isRegistrationSuccess(rac_result_t rc) {
-    return rc == RAC_SUCCESS || rc == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
-           rc == RAC_ERROR_PLUGIN_DUPLICATE;
 }
 
 }  // namespace
@@ -664,7 +661,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudRegister() {
             return false;
         }
         rac_result_t rc = fn();
-        if (!isRegistrationSuccess(rc)) {
+        if (!rac_plugin_registration_succeeded(rc)) {
             LOGE("cloudRegister: rc=%d", rc);
             return false;
         }

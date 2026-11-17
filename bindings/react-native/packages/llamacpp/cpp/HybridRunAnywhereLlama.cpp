@@ -10,6 +10,8 @@
 
 #include "HybridRunAnywhereLlama.hpp"
 
+#include "rac/plugin/rac_plugin_registration.h"
+
 // Backend registration headers - always available.
 // Resolve the canonical commons header (RACommons xcframework / jniLibs) rather
 // than a per-package fork, so the full published LlamaCPP ABI stays in sync.
@@ -29,16 +31,6 @@ extern "C" {
 #define LOG_CATEGORY "LLM.LlamaCpp"
 
 namespace margelo::nitro::runanywhere::llama {
-
-namespace {
-
-bool isRegistrationSuccess(rac_result_t result) {
-  return result == RAC_SUCCESS ||
-         result == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
-         result == RAC_ERROR_PLUGIN_DUPLICATE;
-}
-
-} // namespace
 
 // ============================================================================
 // Constructor / Destructor
@@ -69,7 +61,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
     // source-of-truth in bindings/swift/Sources/LlamaCPPRuntime which
     // also relies on the in-engine registration only.
     rac_result_t result = rac_backend_llamacpp_register();
-    if (!isRegistrationSuccess(result)) {
+    if (!rac_plugin_registration_succeeded(result)) {
       RAC_LOG_ERROR(LOG_CATEGORY, "LlamaCPP registration failed with code: %d", result);
       throw std::runtime_error("LlamaCPP registration failed with error: " + std::to_string(result));
     }

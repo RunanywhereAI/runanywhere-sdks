@@ -19,6 +19,7 @@
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
+#include "rac/features/tts/rac_tts_stream.h"
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -31,6 +32,35 @@
 #include "stt_options.pb.h"
 #include "tts_options.pb.h"
 #include "vad_options.pb.h"
+#endif
+
+#if defined(RAC_TEST_INTERPOSE_RAC_MEMORY)
+// rac_commons is linked as a static archive here, so these definitions take the
+// place of core/src/core/rac_memory.cpp. rac_strdup fails for one sentinel
+// string so a test can force an allocation failure inside a proto adapter.
+constexpr char kOomSentinel[] = "rac-test-oom";
+
+extern "C" {
+
+void* rac_alloc(size_t size) {
+    return size == 0 ? nullptr : std::malloc(size);
+}
+
+void rac_free(void* ptr) {
+    std::free(ptr);
+}
+
+char* rac_strdup(const char* str) {
+    if (!str || std::strcmp(str, kOomSentinel) == 0)
+        return nullptr;
+    const size_t len = std::strlen(str) + 1;
+    auto* copy = static_cast<char*>(std::malloc(len));
+    if (copy)
+        std::memcpy(copy, str, len);
+    return copy;
+}
+
+}  // extern "C"
 #endif
 
 namespace {
@@ -170,6 +200,15 @@ rac_result_t mock_tts_synthesize(void*, const char* text, const rac_tts_options_
         options && options->sample_rate > 0 ? options->sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE;
     out_result->duration_ms = 250;
     out_result->processing_time_ms = 7;
+    return RAC_SUCCESS;
+}
+
+rac_result_t mock_tts_synthesize_stream(void*, const char* text, const rac_tts_options_t*,
+                                        rac_tts_stream_callback_t callback, void* user_data) {
+    if (!text || !callback)
+        return RAC_ERROR_NULL_POINTER;
+    const unsigned char audio[4] = {};
+    callback(audio, sizeof(audio), user_data);
     return RAC_SUCCESS;
 }
 
@@ -317,6 +356,7 @@ bool install_mock_plugin() {
     rac_tts_service_ops_t tts_ops{};
     tts_ops.initialize = mock_tts_initialize;
     tts_ops.synthesize = mock_tts_synthesize;
+    tts_ops.synthesize_stream = mock_tts_synthesize_stream;
     tts_ops.cleanup = mock_cleanup;
     tts_ops.destroy = mock_destroy;
     tts_ops.create = mock_create;
@@ -472,6 +512,68 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
           "TTS lifecycle output carries requested voice id");
     CHECK(tts_output.is_final(), "TTS lifecycle output marks one-shot result final");
     rac_proto_buffer_free(&out);
+
+#if defined(RAC_TEST_INTERPOSE_RAC_MEMORY)
+    // An allocation failure while converting TTSOptions is reported as
+    // out-of-memory at every call site, not as a malformed request.
+    {
+        auto noop_stream_cb = [](const uint8_t*, size_t, void*) {};
+        auto expect_oom = [&](const runanywhere::v1::TTSSynthesisRequest& request,
+                              const char* field) {
+            std::vector<uint8_t> oom_bytes;
+            CHECK(serialize(request, &oom_bytes), "TTS OOM request serializes");
+            const std::string prefix = std::string("TTS ") + field + " allocation failure ";
+
+            rac_proto_buffer_t oom_out;
+            rac_proto_buffer_init(&oom_out);
+            const rac_result_t oom_rc =
+                rac_tts_synthesize_lifecycle_proto(oom_bytes.data(), oom_bytes.size(), &oom_out);
+            CHECK(oom_rc == RAC_ERROR_OUT_OF_MEMORY && oom_out.status == RAC_ERROR_OUT_OF_MEMORY,
+                  (prefix + "is OUT_OF_MEMORY on the lifecycle ABI").c_str());
+            rac_proto_buffer_free(&oom_out);
+
+            CHECK(rac_tts_synthesize_stream_lifecycle_proto(oom_bytes.data(), oom_bytes.size(),
+                                                            noop_stream_cb,
+                                                            nullptr) == RAC_ERROR_OUT_OF_MEMORY,
+                  (prefix + "is OUT_OF_MEMORY on the lifecycle stream ABI").c_str());
+
+            int dummy_handle = 0;
+            uint64_t session_id = 0;
+            CHECK(rac_tts_stream_start_proto(&dummy_handle, oom_bytes.data(), oom_bytes.size(),
+                                             &session_id) == RAC_ERROR_OUT_OF_MEMORY &&
+                      session_id == 0,
+                  (prefix + "is OUT_OF_MEMORY on the stream-session ABI").c_str());
+        };
+
+        runanywhere::v1::TTSSynthesisRequest oom_language = tts_request;
+        oom_language.mutable_options()->set_language_code(kOomSentinel);
+        expect_oom(oom_language, "language");
+
+        runanywhere::v1::TTSSynthesisRequest oom_voice = tts_request;
+        oom_voice.mutable_options()->set_voice(kOomSentinel);
+        expect_oom(oom_voice, "voice");
+    }
+#endif
+
+    // Malformed request bytes still surface as a decoding error.
+    {
+        const uint8_t malformed[] = {0x0a, 0x05, 'h'};
+        rac_proto_buffer_t bad_out;
+        rac_proto_buffer_init(&bad_out);
+        CHECK(rac_tts_synthesize_lifecycle_proto(malformed, sizeof(malformed), &bad_out) ==
+                  RAC_ERROR_DECODING_ERROR,
+              "malformed TTS request is DECODING_ERROR on the lifecycle ABI");
+        rac_proto_buffer_free(&bad_out);
+        CHECK(rac_tts_synthesize_stream_lifecycle_proto(
+                  malformed, sizeof(malformed), [](const uint8_t*, size_t, void*) {}, nullptr) ==
+                  RAC_ERROR_DECODING_ERROR,
+              "malformed TTS request is DECODING_ERROR on the lifecycle stream ABI");
+        int dummy_handle = 0;
+        uint64_t session_id = 0;
+        CHECK(rac_tts_stream_start_proto(&dummy_handle, malformed, sizeof(malformed),
+                                         &session_id) == RAC_ERROR_DECODING_ERROR,
+              "malformed TTS request is DECODING_ERROR on the stream-session ABI");
+    }
 
     float vad_samples[] = {0.0f, 0.4f, -0.4f, 0.0f};
     runanywhere::v1::VADProcessRequest vad_request;

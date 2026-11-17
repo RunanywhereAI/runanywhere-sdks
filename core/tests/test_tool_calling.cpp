@@ -20,15 +20,18 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <nlohmann/json.hpp>
 #include <string>
 
+#include "features/llm/tool_calling_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_tool_calling.h"
-#include "features/llm/tool_calling_internal.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
+
+#include "features/llm/tool_calling_result_internal.h"
 #endif
 
 namespace {
@@ -84,6 +87,173 @@ int test_parse_default_structured() {
     ASSERT_SUBSTR(result.arguments_json, "\"Tokyo\"");
     ASSERT_EQ_INT(result.format, RAC_TOOL_FORMAT_DEFAULT);
     rac_tool_call_free(&result);
+    return 0;
+}
+
+// Default-format calls need valid UTF-8 before schema validation, including
+// when the normalizer also repairs unquoted keys.
+int test_parse_default_invalid_utf8() {
+    const char* inputs[] = {
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"\xC3\x28\"}}</"
+        "tool_call>",
+        "<tool_call>{tool:\"get_weather\",arguments:{location:\"\xC3\x28\"}}</tool_call>",
+    };
+    const char* tools_json =
+        R"([{"name":"get_weather","parameters":[{"name":"location","type":"string","required":true}]}])";
+    for (const char* input : inputs) {
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(input, &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+        ASSERT_EQ_INT(call.format, RAC_TOOL_FORMAT_DEFAULT);
+        ASSERT_TRUE(call.tool_name != nullptr);
+        ASSERT_EQ_STR(call.tool_name, "get_weather");
+        ASSERT_TRUE(call.arguments_json != nullptr);
+        const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
+        ASSERT_TRUE(args.is_object());
+        ASSERT_TRUE(args["location"] == "\xEF\xBF\xBD(");
+        rac_tool_call_validation_t validation{};
+        ASSERT_EQ_INT(rac_tool_call_validate_json(&call, tools_json, &validation), RAC_SUCCESS);
+        ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
+        ASSERT_TRUE(validation.normalized_arguments_json != nullptr);
+        ASSERT_EQ_STR(validation.normalized_arguments_json, "{\"location\":\"\xEF\xBF\xBD(\"}");
+        rac_tool_call_validation_free(&validation);
+        rac_tool_call_free(&call);
+    }
+    return 0;
+}
+
+/** @brief Collisions are rejected at normalization and parse level; valid
+ *         duplicates and non-key JSON text stay accepted. */
+int test_default_repaired_key_collisions() {
+    // Normalization-level rejections. Bare objects carry no tool name, so a
+    // parse-level assertion on them would hold with or without the guard; the
+    // parse contract is covered by `call_collisions` below.
+    const char* normalize_collisions[] = {
+        "{\"x\xFF\":1,\"x\xFE\":2}",
+        "{\"nested\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"items\":[{\"x\xFF\":1,\"x\xFE\":2}]}",
+        "{\"x\xFF\":1,\"x\uFFFD\":2}",
+        "{\"x\uFFFD\":1,\"x\xFF\":2}",
+        "{\"x\\uFFFD\":1,\"x\xFF\":2}",
+        "{\"\\u0078\xFF\":1,\"x\xFE\":2}",
+        "{nested:{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"tool\":\"lookup\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        // Wrapper shapes whose string-encoded arguments the parser decodes.
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"Arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":"
+        "\"\\u007B\\\"x\xFF\\\":1,\\\"x\xFE\\\":2\\u007D\"}}",
+        "{\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"lookup\","
+        "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}]}",
+    };
+    for (const char* input : normalize_collisions) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(input, &normalized), RAC_ERROR_INVALID_ARGUMENT);
+        ASSERT_TRUE(normalized == nullptr);
+    }
+    // The same ambiguity through a full default call must parse to no call.
+    const char* call_collisions[] = {
+        "{\"tool\":\"lookup\",\"arguments\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"Arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}",
+        "{\"function\":{\"name\":\"lookup\",\"arguments\":"
+        "\"\\u007B\\\"x\xFF\\\":1,\\\"x\xFE\\\":2\\u007D\"}}",
+        "{\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"lookup\","
+        "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}]}",
+    };
+    for (const char* input : call_collisions) {
+        const std::string call_text = std::string("<tool_call>") + input + "</tool_call>";
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(call_text.c_str(), &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
+        ASSERT_TRUE(call.arguments_json == nullptr);
+        rac_tool_call_free(&call);
+    }
+    // Each allowed case pins its exact normalized output, so a silently wrong
+    // value cannot pass by only proving normalization succeeded.
+    struct AllowedCase {
+        const char* input;
+        const char* expected;
+    };
+    const AllowedCase allowed[] = {
+        {"{\"x\":1,\"x\":2,\"value\":\"\xFF\"}", "{\"x\":2,\"value\":\"\xEF\xBF\xBD\"}"},
+        {"{\"x\uFFFD\":1,\"x\uFFFD\":2}", "{\"x\uFFFD\":2}"},
+        {"{\"a\":{\"x\xFF\":1},\"b\":{\"x\xFE\":2}}",
+         "{\"a\":{\"x\uFFFD\":1},\"b\":{\"x\uFFFD\":2}}"},
+        {"{\"items\":[{\"x\xFF\":1},{\"x\xFE\":2}]}",
+         "{\"items\":[{\"x\uFFFD\":1},{\"x\uFFFD\":2}]}"},
+        {"{\"x\xFF\":1,\"y\xFE\":2}", "{\"x\uFFFD\":1,\"y\uFFFD\":2}"},
+        {"{\"path\":\"C:\\\\\",\"x\xFF\":1,\"text\":\"{}\\\"x:\"}",
+         "{\"path\":\"C:\\\\\",\"x\uFFFD\":1,\"text\":\"{}\\\"x:\"}"},
+        // Valid duplicate keys keep last-wins, including inside a decoded
+        // arguments string.
+        {"{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\\\":1,\\\"x\\\":2}\"}}",
+         "{\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"x\\\":1,\\\"x\\\":2}\"}}"},
+        // A non-arguments string value is data, not keys: never rejected, and
+        // its bytes are repaired like any other value.
+        {"{\"note\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
+         "{\"note\":\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}"},
+        // The parser wraps top-level string arguments as {"input": ...}; it
+        // never expands them into keys, so this is not ambiguous.
+        {"{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}",
+         "{\"tool\":\"lookup\",\"arguments\":\"{\\\"x\xEF\xBF\xBD\\\":1,"
+         "\\\"x\xEF\xBF\xBD\\\":2}\"}"},
+        // Object-valued arguments are passed through unchanged, so JSON text in
+        // ordinary tool data is data, not keys.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"metadata\":{\"arguments\":"
+         "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"metadata\":{\"arguments\":"
+         "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}}}"},
+        // A tool-alias object nested in tool data is not an envelope the parser
+        // unwraps, so its `arguments` string stays data.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"tool\":{\"arguments\":"
+         "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"tool\":{\"arguments\":"
+         "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}}}"},
+        // Same for a `tool_calls` array nested in tool data.
+        {"{\"tool\":\"lookup\",\"arguments\":{\"tool_calls\":[{\"type\":\"function\","
+         "\"arguments\":\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}]}}",
+         "{\"tool\":\"lookup\",\"arguments\":{\"tool_calls\":[{\"type\":\"function\","
+         "\"arguments\":\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2}\"}]}}"},
+    };
+    for (const AllowedCase& test : allowed) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(test.input, &normalized), RAC_SUCCESS);
+        ASSERT_TRUE(normalized != nullptr);
+        const auto parsed = nlohmann::json::parse(normalized, nullptr, false);
+        ASSERT_TRUE(parsed.is_object());
+        ASSERT_TRUE(parsed == nlohmann::json::parse(test.expected, nullptr, false));
+        rac_free(normalized);
+    }
+    return 0;
+}
+
+int test_normalize_json_utf8_preserves_values() {
+    struct Case {
+        const char* input;
+        const char* expected;
+    };
+    const Case cases[] = {
+        {"{\"location\":\"\xC3\x28\"}", "{\"location\":\"\xEF\xBF\xBD(\"}"},
+        {"{filters:{q:\"\xFF\",values:[1,2,true,null]}}",
+         "{\"filters\":{\"q\":\"\xEF\xBF\xBD\",\"values\":[1,2,true,null]}}"},
+        // Sanitize before the fast JSON parse so a string ending in an escaped
+        // backslash does not send otherwise valid JSON through key repair.
+        {"{\"path\":\"C:\\\\\",\"location\":\"\xFF\",\"values\":[1,2]}",
+         "{\"path\":\"C:\\\\\",\"location\":\"\xEF\xBF\xBD\",\"values\":[1,2]}"},
+        {"{\"location\":\"\xE2\x82\"}", "{\"location\":\"\xEF\xBF\xBD\xEF\xBF\xBD\"}"},
+        {"{\"location\":\"\xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80\"}",
+         "{\"location\":\"\xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80\"}"},
+    };
+    for (const auto& c : cases) {
+        char* normalized = nullptr;
+        ASSERT_EQ_INT(rac_tool_call_normalize_json(c.input, &normalized), RAC_SUCCESS);
+        ASSERT_TRUE(normalized != nullptr);
+        const auto parsed = nlohmann::json::parse(normalized, nullptr, false);
+        ASSERT_TRUE(parsed.is_object());
+        ASSERT_TRUE(parsed == nlohmann::json::parse(c.expected));
+        rac_free(normalized);
+    }
     return 0;
 }
 
@@ -167,6 +337,22 @@ int test_parse_lfm2_structured() {
     ASSERT_EQ_STR(result.tool_name, "get_weather");
     ASSERT_SUBSTR(result.arguments_json, "\"location\"");
     ASSERT_SUBSTR(result.arguments_json, "San Francisco");
+    ASSERT_EQ_INT(result.format, RAC_TOOL_FORMAT_LFM2);
+    rac_tool_call_free(&result);
+    return 0;
+}
+
+int test_parse_lfm2_invalid_utf8() {
+    const char* input =
+        "<|tool_call_start|>[get_weather(location='\xC3\x28')]<|tool_call_end|>";
+    rac_tool_call_t result{};
+    const rac_result_t rc = rac_tool_call_parse(input, &result);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result.has_tool_call, RAC_TRUE);
+    ASSERT_TRUE(result.tool_name != nullptr);
+    ASSERT_EQ_STR(result.tool_name, "get_weather");
+    ASSERT_TRUE(result.arguments_json != nullptr);
+    ASSERT_EQ_STR(result.arguments_json, "{\"location\":\"\xEF\xBF\xBD(\"}");
     ASSERT_EQ_INT(result.format, RAC_TOOL_FORMAT_LFM2);
     rac_tool_call_free(&result);
     return 0;
@@ -428,6 +614,16 @@ int test_pythonic_detect_and_parse() {
     ASSERT_EQ_INT(rac_tool_call_detect_format("[a list, of, things]"), RAC_TOOL_FORMAT_DEFAULT);
     ASSERT_EQ_INT(rac_tool_call_detect_format("[link](https://example.com)"),
                   RAC_TOOL_FORMAT_DEFAULT);
+    const char* invalid_arguments[] = {
+        "[inspect(=2)]",          "[inspect(  =2)]",
+        "[inspect(1x=2)]",        "[inspect(x-y=2)]",
+        "[inspect(x,good=2)]",    "[inspect(x)extra=2)]",
+        "[inspect(\xFF,good=2)]", "[inspect(\xFF)=2)]",
+        "[inspect(\xFF]=2)]",     "[inspect(\xFF(other=2))]",
+    };
+    for (const char* input : invalid_arguments) {
+        ASSERT_EQ_INT(rac_tool_call_detect_format(input), RAC_TOOL_FORMAT_DEFAULT);
+    }
     // Tagged formats win (bare check runs last).
     ASSERT_EQ_INT(rac_tool_call_detect_format("<tool_call>{}</tool_call>"),
                   RAC_TOOL_FORMAT_DEFAULT);
@@ -459,6 +655,278 @@ int test_pythonic_detect_and_parse() {
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(call3.has_tool_call, RAC_FALSE);
     rac_tool_call_free(&call3);
+    return 0;
+}
+
+struct Utf8ArgumentCase {
+    const char* value;
+    const char* expected;
+    rac_tool_param_type_t type;
+};
+
+// Check decoded values and schema validation, not just the presence of U+FFFD:
+// repairing only at dump time can leave extra quotes or turn objects into strings.
+int check_pythonic_utf8_arguments(const Utf8ArgumentCase* cases, size_t count) {
+    for (const auto format : {RAC_TOOL_FORMAT_LFM2, RAC_TOOL_FORMAT_PYTHONIC}) {
+        for (size_t i = 0; i < count; ++i) {
+            const auto& c = cases[i];
+            std::string input = "[inspect(value=";
+            input += c.value;
+            input += ")]";
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+            }
+            rac_tool_call_t call{};
+            const rac_result_t rc = rac_tool_call_parse(input.c_str(), &call);
+            ASSERT_EQ_INT(rc, RAC_SUCCESS);
+            ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+            ASSERT_EQ_INT(call.format, format);
+            ASSERT_TRUE(call.tool_name != nullptr);
+            ASSERT_EQ_STR(call.tool_name, "inspect");
+            ASSERT_TRUE(call.arguments_json != nullptr);
+            const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
+            ASSERT_TRUE(args.is_object());
+            ASSERT_TRUE(args.contains("value"));
+            ASSERT_TRUE(args["value"] == nlohmann::json::parse(c.expected));
+
+            rac_tool_parameter_t param{"value", c.type, "Value to inspect", RAC_TRUE, nullptr};
+            rac_tool_definition_t tool{"inspect", "Inspect a value", &param, 1, nullptr};
+            rac_tool_call_validation_t validation{};
+            ASSERT_EQ_INT(rac_tool_call_validate(&call, &tool, 1, &validation), RAC_SUCCESS);
+            ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
+            rac_tool_call_validation_free(&validation);
+            rac_tool_call_free(&call);
+        }
+    }
+    return 0;
+}
+
+int test_pythonic_utf8_strings() {
+    const Utf8ArgumentCase cases[] = {
+        {"'\xC3\x28'", "\"\xEF\xBF\xBD(\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xC3\x28\"", "\"\xEF\xBF\xBD(\"", RAC_TOOL_PARAM_STRING},
+        {"\"quoted \\\"\xFF\\\"\\nline\"", "\"quoted \\\"\xEF\xBF\xBD\\\"\\nline\"",
+         RAC_TOOL_PARAM_STRING},
+        {"\"\xE2\x82\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        // Broken JSON stays a string even if duplicate keys were observed
+        // before the syntax error. Valid ambiguous objects are tested below.
+        {R"({"x":1,"x":2,})", R"("{\"x\":1,\"x\":2,}")", RAC_TOOL_PARAM_STRING},
+        {R"([{"x":1,"x":2},])", R"("[{\"x\":1,\"x\":2},]")", RAC_TOOL_PARAM_STRING},
+        {R"({"x":1,"x":2} trailing)", R"("{\"x\":1,\"x\":2} trailing")", RAC_TOOL_PARAM_STRING},
+        {"{\"x\xFF\":1,\"x\xFE\":2,}", "\"{\\\"x\xEF\xBF\xBD\\\":1,\\\"x\xEF\xBF\xBD\\\":2,}\"",
+         RAC_TOOL_PARAM_STRING},
+    };
+    return check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0]));
+}
+
+int test_pythonic_utf8_nested_values() {
+    const Utf8ArgumentCase cases[] = {
+        {"{\"q\":\"\xFF\",\"count\":2,\"enabled\":true}",
+         "{\"q\":\"\xEF\xBF\xBD\",\"count\":2,\"enabled\":true}", RAC_TOOL_PARAM_OBJECT},
+        {"[1,{\"q\":\"\xC3\x28\"},false,null]", "[1,{\"q\":\"\xEF\xBF\xBD(\"},false,null]",
+         RAC_TOOL_PARAM_ARRAY},
+        {"{\"\xFF\":[\"\xFF\"]}", "{\"\xEF\xBF\xBD\":[\"\xEF\xBF\xBD\"]}", RAC_TOOL_PARAM_OBJECT},
+        {R"({"x":{"x":1},"y":{"x":2}})", R"({"x":{"x":1},"y":{"x":2}})", RAC_TOOL_PARAM_OBJECT},
+        {R"([{"x":1},{"x":2}])", R"([{"x":1},{"x":2}])", RAC_TOOL_PARAM_ARRAY},
+        {"{\"x\xFF\":1,\"x\xC3\x28\":2}", "{\"x\xEF\xBF\xBD\":1,\"x\xEF\xBF\xBD(\":2}",
+         RAC_TOOL_PARAM_OBJECT},
+    };
+    ASSERT_EQ_INT(check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0])), 0);
+
+    // Repaired or escaped names may collide at any object depth, including
+    // inside arrays. Reject the entire call rather than returning a partial
+    // object or accepting the ambiguous value as a raw string.
+    const char* collisions[] = {
+        "{\"x\xFF\":1,\"x\xFE\":2}",
+        "{\"outer\":{\"x\xFF\":1,\"x\xEF\xBF\xBD\":2}}",
+        "{\"outer\":{\"x\xEF\xBF\xBD\":1,\"x\xFF\":2}}",
+        "[{\"x\":0},{\"outer\":[{\"x\xFF\":1,\"x\xFE\":2}]}]",
+        "{\"left\":{\"q\":0},\"right\":{\"x\xFF\":1,\"x\xFE\":2}}",
+        "{\"x\xFF\":1,\"x\\uFFFD\":2}",
+        R"({"x":1,"\u0078":2})",
+        R"({"outer":{"x":1,"x":2}})",
+        "{\"x\xFF\":{\"a\":1},\"x\xFE\":{\"b\":2}}",
+    };
+    for (const auto format : {RAC_TOOL_FORMAT_LFM2, RAC_TOOL_FORMAT_PYTHONIC}) {
+        for (const char* collision : collisions) {
+            std::string input = std::string("[inspect(value=") + collision + ")]";
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+            }
+            rac_tool_call_t call{};
+            ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
+            ASSERT_EQ_INT(call.has_tool_call, RAC_FALSE);
+            ASSERT_TRUE(call.tool_name == nullptr);
+            ASSERT_TRUE(call.arguments_json == nullptr);
+            ASSERT_TRUE(call.clean_text != nullptr);
+            ASSERT_EQ_STR(call.clean_text, input.c_str());
+            rac_tool_call_free(&call);
+        }
+    }
+    return 0;
+}
+
+int test_pythonic_utf8_invalid_scalars() {
+    const Utf8ArgumentCase cases[] = {
+        {"\"\x80\"", "\"\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xC0\xAF\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xE0\x80\x80\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xED\xA0\x80\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\"", RAC_TOOL_PARAM_STRING},
+        {"\"\xF4\x90\x80\x80\"", "\"\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\"",
+         RAC_TOOL_PARAM_STRING},
+    };
+    return check_pythonic_utf8_arguments(cases, sizeof(cases) / sizeof(cases[0]));
+}
+
+int test_pythonic_utf8_valid_unicode() {
+    const char* value =
+        "\"ASCII \xC2\x80\xDF\xBF\xE0\xA0\x80\xED\x9F\xBF\xEE\x80\x80\xEF\xBF\xBF"
+        "\xF0\x90\x80\x80\xF4\x8F\xBF\xBF \xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80\"";
+    const Utf8ArgumentCase cases[] = {{value, value, RAC_TOOL_PARAM_STRING}};
+    return check_pythonic_utf8_arguments(cases, 1);
+}
+
+int test_pythonic_utf8_argument_key() {
+    struct KeyCase {
+        const char* arguments;
+        const char* expected;
+    };
+    const KeyCase cases[] = {
+        {"value=1,bad_\xFF=2", "{\"value\":1,\"bad_\xEF\xBF\xBD\":2}"},
+        {"bad_\xFF=2", "{\"bad_\xEF\xBF\xBD\":2}"},
+        {"\xFF=2", "{\"\xEF\xBF\xBD\":2}"},
+        {"bad_\xC3 =2", "{\"bad_\xEF\xBF\xBD\":2}"},
+        {"\xE6\x9D\xB1\xE4\xBA\xAC=2", "{\"\xE6\x9D\xB1\xE4\xBA\xAC\":2}"},
+    };
+    for (const auto format : {RAC_TOOL_FORMAT_LFM2, RAC_TOOL_FORMAT_PYTHONIC}) {
+        for (const auto& c : cases) {
+            std::string input = std::string("[inspect(") + c.arguments + ")]";
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                input = "<|tool_call_start|>" + input + "<|tool_call_end|>";
+            }
+            ASSERT_EQ_INT(rac_tool_call_detect_format(input.c_str()), format);
+            rac_tool_call_t call{};
+            ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
+            ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+            ASSERT_EQ_INT(call.format, format);
+            ASSERT_TRUE(call.tool_name != nullptr);
+            ASSERT_EQ_STR(call.tool_name, "inspect");
+            ASSERT_TRUE(call.arguments_json != nullptr);
+            const auto args = nlohmann::json::parse(call.arguments_json, nullptr, false);
+            ASSERT_TRUE(args.is_object());
+            ASSERT_TRUE(args == nlohmann::json::parse(c.expected));
+            rac_tool_call_free(&call);
+        }
+
+        // Different raw keys can become identical after UTF-8 repair. Reject
+        // the whole call rather than silently dropping one argument.
+        const char* collisions[] = {
+            "[inspect(x\xFF=1,x\xFE=2)]",         "[inspect(x\xFF=1,x\xEF\xBF\xBD=2)]",
+            "[inspect(x\xEF\xBF\xBD=1,x\xFF=2)]", "[inspect(x\xFF=1,x\xFF=2)]",
+            "[inspect(value=1,value=2)]",
+        };
+        for (const char* collision : collisions) {
+            std::string rejected_input = collision;
+            if (format == RAC_TOOL_FORMAT_LFM2) {
+                rejected_input = "<|tool_call_start|>" + rejected_input + "<|tool_call_end|>";
+            }
+            ASSERT_EQ_INT(rac_tool_call_detect_format(rejected_input.c_str()), format);
+            for (const bool explicit_format : {false, true}) {
+                rac_tool_call_t rejected{};
+                const rac_result_t rc =
+                    explicit_format
+                        ? rac_tool_call_parse_with_format(rejected_input.c_str(), format, &rejected)
+                        : rac_tool_call_parse(rejected_input.c_str(), &rejected);
+                ASSERT_EQ_INT(rc, RAC_SUCCESS);
+                ASSERT_EQ_INT(rejected.has_tool_call, RAC_FALSE);
+                ASSERT_TRUE(rejected.tool_name == nullptr);
+                ASSERT_TRUE(rejected.arguments_json == nullptr);
+                ASSERT_TRUE(rejected.clean_text != nullptr);
+                ASSERT_EQ_STR(rejected.clean_text, rejected_input.c_str());
+                rac_tool_call_free(&rejected);
+            }
+        }
+    }
+    return 0;
+}
+
+// An unknown model-generated name must produce a validation failure, even if
+// its bytes are malformed; it must never throw while serializing the error.
+int test_validate_invalid_utf8_tool_name() {
+    const struct {
+        const char* name;
+        const char* repaired_name;
+    } cases[] = {
+        {"unknown_\xFF", "unknown_\xEF\xBF\xBD"},
+        {"unknown_\xC3\x28", "unknown_\xEF\xBF\xBD("},
+        {"unknown_ascii", "unknown_ascii"},
+        {"unknown_\xE6\x9D\xB1\xE4\xBA\xAC_\xF0\x9F\x98\x80",
+         "unknown_\xE6\x9D\xB1\xE4\xBA\xAC_\xF0\x9F\x98\x80"},
+    };
+    for (const auto& test_case : cases) {
+        const std::string input = std::string("<tool_call>{\"tool\":\"") + test_case.name +
+                                  "\",\"arguments\":{}}</tool_call>";
+        const std::string expected_error = std::string("Unknown tool: ") + test_case.repaired_name;
+        rac_tool_call_t call{};
+        ASSERT_EQ_INT(rac_tool_call_parse(input.c_str(), &call), RAC_SUCCESS);
+        ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+        for (const bool json_definitions : {false, true}) {
+            rac_tool_call_validation_t validation{};
+            const rac_result_t rc = json_definitions
+                                        ? rac_tool_call_validate_json(&call, "[]", &validation)
+                                        : rac_tool_call_validate(&call, nullptr, 0, &validation);
+            ASSERT_EQ_INT(rc, RAC_SUCCESS);
+            ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
+            ASSERT_EQ_INT(validation.error_code, RAC_ERROR_VALIDATION_FAILED);
+            ASSERT_TRUE(validation.validation_errors_json != nullptr);
+            const auto errors =
+                nlohmann::json::parse(validation.validation_errors_json, nullptr, false);
+            ASSERT_TRUE(errors.is_array());
+            ASSERT_EQ_INT(errors.size(), 1);
+            ASSERT_TRUE(errors[0] == expected_error);
+            ASSERT_TRUE(validation.error_message != nullptr);
+            ASSERT_EQ_STR(validation.error_message, expected_error.c_str());
+            rac_tool_call_validation_free(&validation);
+        }
+        rac_tool_call_free(&call);
+    }
+    return 0;
+}
+
+#if defined(RAC_HAVE_PROTOBUF)
+int test_tool_result_utf8_error_payload() {
+    using rac::llm::tool_calling::tool_result_payload_json;
+    runanywhere::v1::ToolResult result;
+    ASSERT_EQ_STR(tool_result_payload_json(result).c_str(), "{}");
+    // Construct the executor result directly: malformed proto string fields
+    // cannot reliably round-trip through the strict protobuf byte parser.
+    result.set_error("failed: \"\xC3\x28\"\n");
+    auto payload = nlohmann::json::parse(tool_result_payload_json(result), nullptr, false);
+    ASSERT_TRUE(payload.is_object());
+    ASSERT_TRUE(payload["error"] == "failed: \"\xEF\xBF\xBD(\"\n");
+    result.set_error("\xE6\x9D\xB1\xE4\xBA\xAC \xF0\x9F\x98\x80");
+    payload = nlohmann::json::parse(tool_result_payload_json(result), nullptr, false);
+    ASSERT_TRUE(payload.is_object());
+    ASSERT_TRUE(payload["error"] == result.error());
+    // A real result takes precedence over the error, preserving its raw JSON.
+    result.set_result_json("{\"answer\":42}");
+    ASSERT_EQ_STR(tool_result_payload_json(result).c_str(), "{\"answer\":42}");
+    return 0;
+}
+#endif
+
+int test_parse_pythonic_invalid_utf8() {
+    const char* input = "[get_weather(location='\xC3\x28')]";
+    rac_tool_call_t result{};
+    const rac_result_t rc = rac_tool_call_parse(input, &result);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result.has_tool_call, RAC_TRUE);
+    ASSERT_TRUE(result.tool_name != nullptr);
+    ASSERT_EQ_STR(result.tool_name, "get_weather");
+    ASSERT_TRUE(result.arguments_json != nullptr);
+    ASSERT_EQ_STR(result.arguments_json, "{\"location\":\"\xEF\xBF\xBD(\"}");
+    ASSERT_EQ_INT(result.format, RAC_TOOL_FORMAT_PYTHONIC);
+    rac_tool_call_free(&result);
     return 0;
 }
 
@@ -1020,10 +1488,15 @@ int main(int argc, char** argv) {
     (void)argv;
 
     TestCase cases[] = {
+        {.name = "default_repaired_key_collisions", .fn = test_default_repaired_key_collisions},
         {.name = "parse_default_structured", .fn = test_parse_default_structured},
+        {.name = "parse_default_invalid_utf8", .fn = test_parse_default_invalid_utf8},
+        {.name = "normalize_json_utf8_preserves_values",
+         .fn = test_normalize_json_utf8_preserves_values},
         {.name = "parse_default_nested_keys_stay_arguments",
          .fn = test_parse_default_nested_keys_stay_arguments},
         {.name = "parse_lfm2_structured", .fn = test_parse_lfm2_structured},
+        {.name = "parse_lfm2_invalid_utf8", .fn = test_parse_lfm2_invalid_utf8},
         {.name = "parse_free_form_returns_false", .fn = test_parse_free_form_returns_false},
         {.name = "format_prompt_default_two_tools", .fn = test_format_prompt_default_two_tools},
         {.name = "format_prompt_json_lfm2", .fn = test_format_prompt_json_lfm2},
@@ -1036,6 +1509,16 @@ int main(int argc, char** argv) {
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},
         {.name = "tool_call_format_per_family", .fn = test_tool_call_format_per_family},
         {.name = "pythonic_detect_and_parse", .fn = test_pythonic_detect_and_parse},
+        {.name = "pythonic_utf8_strings", .fn = test_pythonic_utf8_strings},
+        {.name = "pythonic_utf8_nested_values", .fn = test_pythonic_utf8_nested_values},
+        {.name = "pythonic_utf8_invalid_scalars", .fn = test_pythonic_utf8_invalid_scalars},
+        {.name = "pythonic_utf8_valid_unicode", .fn = test_pythonic_utf8_valid_unicode},
+        {.name = "pythonic_utf8_argument_key", .fn = test_pythonic_utf8_argument_key},
+        {.name = "validate_invalid_utf8_tool_name", .fn = test_validate_invalid_utf8_tool_name},
+#if defined(RAC_HAVE_PROTOBUF)
+        {.name = "tool_result_utf8_error_payload", .fn = test_tool_result_utf8_error_payload},
+#endif
+        {.name = "parse_pythonic_invalid_utf8", .fn = test_parse_pythonic_invalid_utf8},
         {.name = "pythonic_multibracket_and_special_args",
          .fn = test_pythonic_multibracket_and_special_args},
         {.name = "pythonic_prompt_render", .fn = test_pythonic_prompt_render},
