@@ -94,11 +94,15 @@ rac_result_t mock_initialize(void* impl, const char* model_path) {
 std::mutex g_prompt_mutex;
 std::string g_last_prompt;
 bool g_last_disable_thinking = false;
+int32_t g_last_top_k = -1;
+float g_last_min_p = -1.0f;
 
 void record_prompt(const char* prompt, const rac_llm_options_t* options) {
     std::lock_guard<std::mutex> lock(g_prompt_mutex);
     g_last_prompt = prompt != nullptr ? prompt : "";
     g_last_disable_thinking = options != nullptr && options->disable_thinking == RAC_TRUE;
+    g_last_top_k = options != nullptr ? options->top_k : -1;
+    g_last_min_p = options != nullptr ? options->min_p : -1.0f;
 }
 
 rac_result_t mock_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
@@ -403,6 +407,54 @@ int test_mocked_generation(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+// top_k and min_p are `optional` in llm_options.proto: an absent field must keep
+// the IDL default (as RAG and VLM do), while an explicit 0 still disables it.
+bool generate_and_capture_sampler(const runanywhere::v1::LLMGenerateRequest& request,
+                                  int32_t* top_k, float* min_p) {
+    std::vector<uint8_t> bytes;
+    if (!serialize(request, &bytes)) {
+        return false;
+    }
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = rac_llm_generate_proto(bytes.data(), bytes.size(), &out);
+    rac_proto_buffer_free(&out);
+    std::lock_guard<std::mutex> lock(g_prompt_mutex);
+    *top_k = g_last_top_k;
+    *min_p = g_last_min_p;
+    return rc == RAC_SUCCESS;
+}
+
+int test_generate_sampler_defaults(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for sampler defaults");
+    runanywhere::v1::LLMGenerateRequest request;
+    auto* message = request.add_messages();
+    message->set_role(runanywhere::v1::MESSAGE_ROLE_USER);
+    message->set_content("sampler defaults");
+    int32_t top_k = -1;
+    float min_p = -1.0f;
+
+    CHECK(generate_and_capture_sampler(request, &top_k, &min_p),
+          "generate without options succeeds");
+    CHECK(top_k == RAC_LLM_OPTIONS_DEFAULT.top_k, "generate without options keeps default top_k");
+    CHECK(min_p == RAC_LLM_OPTIONS_DEFAULT.min_p, "generate without options keeps default min_p");
+
+    request.mutable_options()->set_temperature(0.2f);
+    CHECK(generate_and_capture_sampler(request, &top_k, &min_p),
+          "generate with other options succeeds");
+    CHECK(top_k == RAC_LLM_OPTIONS_DEFAULT.top_k, "generate keeps default top_k when unset");
+    CHECK(min_p == RAC_LLM_OPTIONS_DEFAULT.min_p, "generate keeps default min_p when unset");
+
+    request.mutable_options()->set_top_k(0);
+    request.mutable_options()->set_min_p(0.0f);
+    CHECK(generate_and_capture_sampler(request, &top_k, &min_p),
+          "generate with explicit zero sampler succeeds");
+    CHECK(top_k == 0, "generate honours an explicit top_k of 0");
+    CHECK(min_p == 0.0f, "generate honours an explicit min_p of 0");
+    cleanup_environment();
+    return 0;
+}
+
 int test_empty_generation_skips_structured_validation(rac_model_registry_handle_t registry) {
     CHECK(load_mock_model(registry), "mock lifecycle LLM loads for empty response");
     std::vector<uint8_t> bytes = generate_request_bytes("empty response");
@@ -653,6 +705,7 @@ int main() {
         test_request_parse_error();
         test_missing_lifecycle_model();
         test_mocked_generation(registry);
+        test_generate_sampler_defaults(registry);
         test_empty_generation_skips_structured_validation(registry);
         test_stream_terminal_once(registry);
         test_stream_producer_finish_reason_stop(registry);

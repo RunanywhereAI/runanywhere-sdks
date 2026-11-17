@@ -12,6 +12,7 @@ import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.DownloadStartRequest
 import ai.runanywhere.proto.v1.DownloadStartResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.squareup.wire.Message
@@ -54,21 +55,21 @@ object CppBridgeDownload {
     fun plan(request: DownloadPlanRequest): DownloadPlanResult? =
         decodeOrNull(
             DownloadPlanResult.ADAPTER,
-            RunAnywhereBridge.racDownloadPlanProto(DownloadPlanRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racDownloadPlanProto(DownloadPlanRequest.ADAPTER.encode(request)) },
             "downloadPlan",
         )
 
     fun start(request: DownloadStartRequest): DownloadStartResult? =
         decodeOrNull(
             DownloadStartResult.ADAPTER,
-            RunAnywhereBridge.racDownloadStartProto(DownloadStartRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racDownloadStartProto(DownloadStartRequest.ADAPTER.encode(request)) },
             "downloadStart",
         )
 
     fun cancel(request: DownloadCancelRequest): DownloadCancelResult? =
         decodeOrNull(
             DownloadCancelResult.ADAPTER,
-            RunAnywhereBridge.racDownloadCancelProto(DownloadCancelRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racDownloadCancelProto(DownloadCancelRequest.ADAPTER.encode(request)) },
             "downloadCancel",
         )
 
@@ -80,10 +81,12 @@ object CppBridgeDownload {
     fun pollProgress(request: ai.runanywhere.proto.v1.DownloadSubscribeRequest): DownloadProgress? =
         decodeOrNull(
             DownloadProgress.ADAPTER,
-            RunAnywhereBridge.racDownloadProgressPollProto(
-                ai.runanywhere.proto.v1.DownloadSubscribeRequest.ADAPTER
-                    .encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racDownloadProgressPollProto(
+                    ai.runanywhere.proto.v1.DownloadSubscribeRequest.ADAPTER
+                        .encode(request),
+                )
+            },
             "downloadProgressPoll",
         )
 }

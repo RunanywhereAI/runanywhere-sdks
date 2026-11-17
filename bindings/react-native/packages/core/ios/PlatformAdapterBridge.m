@@ -8,6 +8,8 @@
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
+#include <errno.h>
+#include <sys/stat.h>
 #import "PlatformDownloadBridge.h"
 #import "PlatformAdapterBridge.h"  // own header: PlatformDirectoryEntry + PlatformAdapter_listDirectory decls
 
@@ -886,18 +888,26 @@ void PlatformAdapter_listDirectory(const char* dirPath,
             return;
         }
 
-        NSFileManager* fm = [NSFileManager defaultManager];
-        BOOL isDirectory = NO;
-        if (![fm fileExistsAtPath:pathStr isDirectory:&isDirectory] || !isDirectory) {
+        // stat follows symlinks so a link to a real directory enumerates.
+        // A confirmed missing target maps to FILE_NOT_FOUND; denied/other
+        // probes stay inconclusive.
+        const char* pathFs = [pathStr fileSystemRepresentation];
+        struct stat pathInfo;
+        if (!pathFs || stat(pathFs, &pathInfo) != 0) {
+            *outResult = (errno == ENOENT || errno == ENOTDIR) ? -183 : -184;
+            return;
+        }
+        if (!S_ISDIR(pathInfo.st_mode)) {
             *outResult = -183;  // RAC_ERROR_FILE_NOT_FOUND
             return;
         }
 
+        NSFileManager* fm = [NSFileManager defaultManager];
         NSError* error = nil;
         NSArray<NSString*>* entries = [fm contentsOfDirectoryAtPath:pathStr error:&error];
         if (!entries) {
             NSLog(@"[PlatformAdapterBridge] listDirectory error: %@", error);
-            *outResult = -805;  // RAC_ERROR_INTERNAL
+            *outResult = -184;  // RAC_ERROR_FILE_READ_FAILED
             return;
         }
 
@@ -909,44 +919,49 @@ void PlatformAdapter_listDirectory(const char* dirPath,
 
         const size_t capacity = *inOutCount;
         const size_t total = entries.count;
-        const size_t writeCount = total < capacity ? total : capacity;
+        if (total > capacity) {
+            // A partial fill is not a complete listing.
+            *outResult = -184;
+            return;
+        }
         size_t written = 0;
-        size_t skipped = 0;
 
-        for (size_t i = 0; i < writeCount; i++) {
+        for (size_t i = 0; i < total; i++) {
             NSString* entryName = entries[i];
             const char* utf8Name = [entryName UTF8String];
             if (!utf8Name) {
-                continue;
+                *outResult = -184;
+                return;
             }
             size_t nameLen = strlen(utf8Name);
-            // Truncation contract (rac_directory_entry_t::name): skip oversized
-            // names rather than emit a half-name. Mirrors Kotlin / Flutter siblings.
             if (nameLen + 1 > PLATFORM_DIRECTORY_ENTRY_NAME_MAX) {
-                skipped++;
-                continue;
+                // The RN ObjC bridge is below the commons adapter log slot;
+                // NSLog is this file's existing channel. The contract-visible
+                // result below is what callers rely on.
+                NSLog(@"[PlatformAdapterBridge] listDirectory: oversized entry name in %@", pathStr);
+                *outResult = -184;
+                return;
             }
+
+            NSString* fullPath = [pathStr stringByAppendingPathComponent:entryName];
+            const char* fullPathFs = [fullPath fileSystemRepresentation];
+            struct stat childInfo;
+            if (!fullPathFs || stat(fullPathFs, &childInfo) != 0) {
+                if (fullPathFs && (errno == ENOENT || errno == ENOTDIR) &&
+                    lstat(fullPathFs, &childInfo) == 0) {
+                    // Dangling symlink: a non-directory entry.
+                } else {
+                    *outResult = -184;
+                    return;
+                }
+            }
+            const BOOL entryIsDir = S_ISDIR(childInfo.st_mode);
 
             memset(outEntries[written].name, 0, PLATFORM_DIRECTORY_ENTRY_NAME_MAX);
             memcpy(outEntries[written].name, utf8Name, nameLen);
-
-            NSString* fullPath = [pathStr stringByAppendingPathComponent:entryName];
-            BOOL entryIsDir = NO;
-            BOOL exists = [fm fileExistsAtPath:fullPath isDirectory:&entryIsDir];
-            outEntries[written].is_dir = (exists && entryIsDir) ? true : false;
-
-            if (exists && !entryIsDir) {
-                NSDictionary* attrs = [fm attributesOfItemAtPath:fullPath error:nil];
-                outEntries[written].size_bytes = attrs ? (int64_t)[attrs fileSize] : 0;
-            } else {
-                outEntries[written].size_bytes = 0;
-            }
+            outEntries[written].is_dir = entryIsDir ? true : false;
+            outEntries[written].size_bytes = entryIsDir ? 0 : (int64_t)childInfo.st_size;
             written++;
-        }
-
-        if (skipped > 0) {
-            NSLog(@"[PlatformAdapterBridge] listDirectory: skipped %zu oversized entry name(s) in %@",
-                  skipped, pathStr);
         }
 
         *inOutCount = written;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere/runanywhere.dart' show formatFramework;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
-import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 
 typedef ModelInfo = sdk.ModelInfo;
 typedef ModelCategory = sdk.ModelCategory;
@@ -295,9 +294,7 @@ extension ExampleModelInfoView on ModelInfo {
     final tags = hasMetadata()
         ? metadata.tags.map((tag) => tag.toLowerCase()).toSet()
         : const <String>{};
-    return tags.any(_privateHfTags.contains) ||
-        (framework == sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
-            QHexRT.modelRequiresHfAuth(id));
+    return tags.any(_privateHfTags.contains);
   }
 
   int? get memoryRequired {
