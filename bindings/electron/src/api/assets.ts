@@ -147,7 +147,9 @@ export interface RefreshOptions {
   /** Rescan the model store for artifacts on disk. On by default. */
   rescanLocal?: boolean;
   /**
-   * Request orphan pruning. The current native refresh API warns and leaves rows unchanged.
+   * Clear download state for models whose recorded path no longer exists, or still exists
+   * but holds no finished artifact or fails the completeness check. Never deletes files;
+   * warns if the platform adapter lacks `file_exists`. Off by default.
    */
   pruneOrphans?: boolean;
 }
@@ -189,8 +191,8 @@ export interface ModelsNamespace {
   unregister(id: string): Promise<void>;
   /**
    * Re-read the registry and rescan the model store for artifacts that arrived
-   * outside the SDK. The current native refresh API does not prune rows for
-   * missing files; requesting `pruneOrphans` reports a warning instead.
+   * outside the SDK. With `pruneOrphans`, also clear download state for models
+   * whose files have vanished or are unfinished.
    */
   refresh(options?: RefreshOptions): Promise<void>;
   /**
@@ -1420,6 +1422,7 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
         toSegmentationRequest(input.rgb, input.width, input.height, {
           includeDiagnosticImage:
             options.includeDiagnosticImage ?? SEGMENTATION_DEFAULTS.includeDiagnosticImage,
+          includeConfidence: options.includeConfidence ?? SEGMENTATION_DEFAULTS.includeConfidence,
         })
       );
       // Commons owns SegmentationClassSummary.fraction (tag 5).
@@ -1433,6 +1436,9 @@ export function createSegmentationNamespace(deps: AssetDeps): SegmentationNamesp
           pixelCount: c.pixelCount,
           fraction: c.fraction ?? 0,
         })),
+        ...(native.confidenceMaskU8?.byteLength
+          ? { confidenceMask: native.confidenceMaskU8 }
+          : {}),
       };
     },
   };

@@ -214,6 +214,7 @@ void decompose_service(SDKComponent component, rac_handle_t service, detail::Loa
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION: {
             auto* s = static_cast<rac_segmentation_service_t*>(service);
             entry->segmentation_ops = s->ops;
+            entry->segmentation_provider = rac::segmentation::service_provider(service);
             entry->impl = s->impl;
             break;
         }
