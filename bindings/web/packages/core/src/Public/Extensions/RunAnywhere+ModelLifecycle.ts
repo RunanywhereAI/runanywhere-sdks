@@ -23,7 +23,7 @@ import type {
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
-import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
+import { Runtime, prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
@@ -35,12 +35,15 @@ import {
 import {
   getAllRegisteredModules,
   getModuleForModel,
+  getWasmModuleRecord,
   recordModelLifecycle,
 } from '../../runtime/EmscriptenModule.js';
-import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
+import type { EmscriptenRunanywhereModule, WasmCapability } from '../../runtime/EmscriptenModule.js';
 import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
+import type { BackendWorkerModality } from '../../runtime/BackendWorkerProtocol.js';
 import {
   clearModelOwnedByBackendWorker,
+  getBackendWorkerOwner,
   isModelOwnedByBackendWorker,
   listBackendWorkerOwnedModels,
   markModelOwnedByBackendWorker,
@@ -76,21 +79,96 @@ function requireAdapter(
   return adapter;
 }
 
+interface ModelLoadRoute {
+  adapter: ModelLifecycleAdapter;
+  framework?: InferenceFramework;
+}
+
+function isConcreteFramework(
+  framework: InferenceFramework | null | undefined,
+): framework is InferenceFramework {
+  return framework !== undefined
+    && framework !== null
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+}
+
+/** Map model categories to the primitive capabilities advertised by Web backends. */
+function modelLoadCapability(category?: ModelCategory): WasmCapability | undefined {
+  switch (category) {
+    case ModelCategoryEnum.MODEL_CATEGORY_LANGUAGE: return 'llm';
+    case ModelCategoryEnum.MODEL_CATEGORY_VISION:
+    case ModelCategoryEnum.MODEL_CATEGORY_MULTIMODAL: return 'vlm';
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEECH_RECOGNITION: return 'stt';
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEECH_SYNTHESIS: return 'tts';
+    case ModelCategoryEnum.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION: return 'vad';
+    case ModelCategoryEnum.MODEL_CATEGORY_EMBEDDING: return 'embedding';
+    case ModelCategoryEnum.MODEL_CATEGORY_IMAGE_GENERATION: return 'diffusion';
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEAKER_DIARIZATION: return 'diarization';
+    case ModelCategoryEnum.MODEL_CATEGORY_SEMANTIC_SEGMENTATION: return 'segmentation';
+    case ModelCategoryEnum.MODEL_CATEGORY_RERANK: return 'rerank';
+    default: return undefined;
+  }
+}
+
+/** Select the first registered Web WASM that supports this ordered load request. */
+function selectModelLoadRoute(
+  request: ModelLoadRequest,
+  model: ModelInfo | null,
+): ModelLoadRoute {
+  const capability = modelLoadCapability(model?.category ?? request.category);
+  const candidates = [
+    request.framework,
+    ...(request.backendPreferences ?? []),
+    model?.framework,
+  ];
+  const visited = new Set<InferenceFramework>();
+  for (const framework of candidates) {
+    if (!isConcreteFramework(framework) || visited.has(framework)) continue;
+    visited.add(framework);
+    const module = ModelLifecycleAdapter.moduleForFramework(framework);
+    if (module) {
+      const adapter = ModelLifecycleAdapter.fromModule(module);
+      // Consult the candidate's own registration: a last-writer capability
+      // slot can point at a sibling that implements the same primitive.
+      const record = getWasmModuleRecord(lifecycleModuleAsEmscripten(adapter));
+      if (capability && !record?.capabilities.includes(capability)) continue;
+      return {
+        adapter,
+        framework,
+      };
+    }
+  }
+
+  const fallbackFramework = model?.framework ?? request.framework;
+  const adapter = requireAdapter(fallbackFramework);
+  const record = getWasmModuleRecord(lifecycleModuleAsEmscripten(adapter));
+  if (capability && record && !record.capabilities.includes(capability)) {
+    throw SDKException.backendNotAvailable(
+      'ModelLifecycle',
+      `No requested or catalog backend supports the '${capability}' capability. Register a compatible backend before loading this model.`,
+    );
+  }
+  return {
+    adapter,
+    framework: isConcreteFramework(fallbackFramework) ? fallbackFramework : undefined,
+  };
+}
+
 function lifecycleModuleAsEmscripten(
   adapter: ModelLifecycleAdapter,
 ): EmscriptenRunanywhereModule {
   return adapter.boundModule as unknown as EmscriptenRunanywhereModule;
 }
 
-function isBackendWorkerEligibleLLM(
+function isLlamaWorkerEligible(
   model: ModelInfo | null,
   request: ModelLoadRequest,
+  loadFramework?: InferenceFramework,
 ): boolean {
-  const framework = model?.framework ?? request.framework;
+  const framework = loadFramework ?? request.framework ?? model?.framework;
   if (
-    framework !== undefined
-    && framework !== null
-    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+    isConcreteFramework(framework)
     && framework !== InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
   ) {
     return false;
@@ -100,6 +178,7 @@ function isBackendWorkerEligibleLLM(
     category === ModelCategoryEnum.MODEL_CATEGORY_LANGUAGE
     || category === ModelCategoryEnum.MODEL_CATEGORY_VISION
     || category === ModelCategoryEnum.MODEL_CATEGORY_MULTIMODAL
+    || category === ModelCategoryEnum.MODEL_CATEGORY_EMBEDDING
     || category === undefined
   );
 }
@@ -107,7 +186,17 @@ function isBackendWorkerEligibleLLM(
 function onnxWorkerModality(
   model: ModelInfo | null,
   request: ModelLoadRequest,
+  loadFramework?: InferenceFramework,
 ): 'stt' | 'tts' | 'vad' | 'embeddings' | null {
+  const framework = loadFramework ?? request.framework ?? model?.framework;
+  if (
+    isConcreteFramework(framework)
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS
+  ) {
+    return null;
+  }
   const category = model?.category ?? request.category;
   switch (category) {
     case ModelCategoryEnum.MODEL_CATEGORY_SPEECH_RECOGNITION:
@@ -121,6 +210,146 @@ function onnxWorkerModality(
     default:
       return null;
   }
+}
+
+interface BackendWorkerLoadRoute {
+  backendId: 'llamacpp' | 'onnx';
+  modality: BackendWorkerModality;
+}
+
+function backendWorkerLoadRoute(
+  model: ModelInfo | null,
+  request: ModelLoadRequest,
+  loadFramework?: InferenceFramework,
+): BackendWorkerLoadRoute | null {
+  const onnxModality = onnxWorkerModality(model, request, loadFramework);
+  if (onnxModality) return { backendId: 'onnx', modality: onnxModality };
+  if (isLlamaWorkerEligible(model, request, loadFramework)) {
+    const category = model?.category ?? request.category;
+    return {
+      backendId: 'llamacpp',
+      modality: category === ModelCategoryEnum.MODEL_CATEGORY_EMBEDDING
+        ? 'embeddings'
+        : 'llm',
+    };
+  }
+  return null;
+}
+
+/**
+ * Resolved route snapshot for one load — the same id space
+ * `BackendWorkerLoadRoute` uses, or `null` when no registered backend serves it.
+ */
+export interface ModelLoadBackendRoute {
+  /** Owning backend id, or `null` when unknown/unregistered. */
+  backendId: 'llamacpp' | 'onnx' | null;
+  /** Serving framework the router picked, when resolvable. */
+  framework?: InferenceFramework;
+}
+
+function backendIdForFramework(
+  framework: InferenceFramework | null | undefined,
+): ModelLoadBackendRoute['backendId'] {
+  if (framework === InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP) return 'llamacpp';
+  if (
+    framework === InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+    || framework === InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+    || framework === InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS
+  ) {
+    return 'onnx';
+  }
+  return null;
+}
+
+/**
+ * Which backend a load will execute through, without running it.
+ *
+ * Reuses the exact routing machinery the load itself uses
+ * (`selectModelLoadRoute` + `backendWorkerLoadRoute` + the serving module's
+ * recorded backend kind) — mirroring the ordered preferences/capability
+ * selection here would drift and misname the owner. Public API callers use
+ * this to scope per-load settings (e.g. the llama.cpp-only acceleration
+ * switcher) to the backend that will actually serve the request.
+ */
+export function describeModelLoadBackend(
+  request: ModelLoadRequest,
+  model: ModelInfo | null,
+): ModelLoadBackendRoute {
+  let route: ModelLoadRoute | null;
+  try {
+    route = selectModelLoadRoute(request, model);
+  } catch {
+    route = null;
+  }
+  if (route) {
+    const workerRoute = backendWorkerLoadRoute(model, request, route.framework);
+    // Prefer the module that will execute the load: a health fallback can
+    // resolve a framework to a module outside that framework's owner (e.g. an
+    // ONNX framework falling back to the llama module), and only llama.cpp
+    // must ever receive `Runtime.setAcceleration`. Falls back through the
+    // worker route and the framework when the record is not a backend kind.
+    const record = getWasmModuleRecord(lifecycleModuleAsEmscripten(route.adapter));
+    const recordBackend = record?.backend === 'llamacpp'
+      ? 'llamacpp'
+      : record?.backend === 'onnx-sherpa'
+        ? 'onnx'
+        : null;
+    return {
+      backendId: recordBackend ?? workerRoute?.backendId ?? null,
+      framework: route.framework,
+    };
+  }
+  const fallbackFramework = request.framework ?? model?.framework;
+  return { backendId: backendIdForFramework(fallbackFramework), framework: fallbackFramework };
+}
+
+/** Where a successfully loaded model actually runs, as its owner reports it. */
+export interface LoadedModelPlacement {
+  /** Owning backend id, or `null` when the owner cannot be determined. */
+  backendId: ModelLoadBackendRoute['backendId'];
+  /**
+   * Device the owner reports (`'cpu'` | `'webgpu'`), or `null` when it
+   * publishes no device diagnostics — never a fabricated default.
+   */
+  device: 'cpu' | 'webgpu' | null;
+}
+
+/**
+ * Report where `modelId` runs right now, from the runtime that owns it.
+ *
+ * Worker-owned models are asked via `host.health()` — `Runtime.active` tracks
+ * the main-thread llama bridge and drifts from the worker's device after a
+ * bridge-side acceleration switch. Main-thread llama reads `Runtime.active`
+ * (that IS the bridge's device); main-thread ONNX/Sherpa reads
+ * `Runtime.speech.acceleration`, fixed at `ONNX.register()`. Everything else
+ * reports `null` so callers say "unknown" instead of a fake CPU claim.
+ */
+export async function resolveLoadedModelPlacement(
+  modelId: string,
+  framework: InferenceFramework | null | undefined,
+): Promise<LoadedModelPlacement> {
+  for (const backendId of ['llamacpp', 'onnx'] as const) {
+    if (isModelOwnedByBackendWorker(modelId, backendId)) {
+      const host = getActiveBackendWorkerHost(backendId);
+      if (!host) return { backendId, device: null };
+      try {
+        const health = await host.health();
+        const details = (health.details ?? {}) as { acceleration?: string };
+        const device = details.acceleration === 'webgpu' || details.acceleration === 'cpu'
+          ? details.acceleration
+          : null;
+        return { backendId, device };
+      } catch {
+        // Device is a diagnostic, not a load contract: a failed health probe
+        // reports unknown rather than a stale mode.
+        return { backendId, device: null };
+      }
+    }
+  }
+  const backendId = backendIdForFramework(framework);
+  if (backendId === 'llamacpp') return { backendId, device: Runtime.active };
+  if (backendId === 'onnx') return { backendId, device: Runtime.speech.acceleration };
+  return { backendId: null, device: null };
 }
 
 function hydratePathsForModel(model: ModelInfo | null): string[] {
@@ -141,8 +370,11 @@ function currentModelFromBackendWorker(
   if (owned.length === 0) return null;
 
   for (const entry of owned) {
-    const model = safeGetModelSnapshot(entry.modelId);
-    if (!model) continue;
+    const snapshot = safeGetModelSnapshot(entry.modelId);
+    if (!snapshot) continue;
+    const model = entry.framework !== undefined
+      ? { ...snapshot, framework: entry.framework }
+      : snapshot;
     if (
       request.category !== undefined
       && request.category !== null
@@ -174,21 +406,57 @@ function currentModelFromBackendWorker(
   return null;
 }
 
+/**
+ * Release the copy of `modelId` held by its previous owner after it loaded
+ * successfully elsewhere. `nextBackendId` names the BackendWorker that now
+ * owns it (undefined = main thread), and `nextModule` the main-thread WASM
+ * that now owns it (undefined = a worker). Ownership bookkeeping is updated
+ * synchronously, so callers start this without awaiting and record the new
+ * owner immediately afterwards; the unload itself completes in the background.
+ */
+async function releasePreviousModelOwner(
+  modelId: string,
+  nextBackendId?: 'llamacpp' | 'onnx',
+  nextModule?: EmscriptenRunanywhereModule,
+): Promise<void> {
+  if (!modelId) return;
+  const request: ModelUnloadRequest = { modelId, unloadAll: false };
+  const workerOwner = getBackendWorkerOwner(modelId);
+  const previousModule = workerOwner ? null : getModuleForModel(modelId);
+  if (workerOwner === nextBackendId || (!workerOwner && previousModule === nextModule)) return;
+  if (workerOwner) clearModelOwnedByBackendWorker(modelId, workerOwner);
+  if (previousModule) recordModelLifecycle(modelId, previousModule, false);
+  // Best effort: the new load already succeeded, so a failed release must not fail it.
+  try {
+    if (workerOwner) {
+      const host = getActiveBackendWorkerHost(workerOwner);
+      const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
+      await host?.unloadModel(workerOwner === 'onnx' ? 'stt' : 'llm', { requestBytes });
+    } else if (previousModule) {
+      await ModelLifecycleAdapter.fromModule(
+        previousModule as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
+      ).unloadAsync(request);
+    }
+  } catch { /* ignore */ }
+}
+
 async function loadModelViaBackendWorker(
   request: ModelLoadRequest,
   model: ModelInfo | null,
   adapter: ModelLifecycleAdapter,
+  workerRoute: BackendWorkerLoadRoute | null,
 ): Promise<ModelLoadResult | null> {
-  // Prefer an explicit snapshot, else the live registry entry. Derive backend
-  // from the resolved model so a null snapshot cannot force ONNX STT onto the
-  // llamacpp worker.
+  // Prefer an explicit snapshot, else the live registry entry. The worker
+  // route was resolved from the same ordered framework candidates as the
+  // main-thread adapter so hydration and execution cannot choose different
+  // WASM owners.
   const resolved = model ?? (
     request.modelId ? ModelRegistry.getModel(request.modelId) : null
   );
-  const modality = onnxWorkerModality(resolved, request);
-  const backendId = modality ? 'onnx' : 'llamacpp';
+  if (!workerRoute) return null;
+  const { backendId, modality } = workerRoute;
   const host = getActiveBackendWorkerHost(backendId);
-  if (!host || (!modality && !isBackendWorkerEligibleLLM(resolved, request))) return null;
+  if (!host) return null;
   if (!resolved) {
     throw SDKException.fromCode(
       -ProtoErrorCode.ERROR_CODE_MODEL_NOT_FOUND,
@@ -200,7 +468,7 @@ async function loadModelViaBackendWorker(
   const requestBytes = ModelLoadRequestCodec.encode(request).finish();
   const modelInfoBytes = ModelInfoCodec.encode(resolved).finish();
   const response = await host.loadModel(
-    modality ?? 'llm',
+    modality,
     {
       requestBytes,
       modelInfoBytes,
@@ -216,7 +484,12 @@ async function loadModelViaBackendWorker(
   }
   const result = ModelLoadResultCodec.decode(response.resultBytes);
   if (!result.error) {
-    markModelOwnedByBackendWorker(request.modelId, backendId);
+    void releasePreviousModelOwner(request.modelId, backendId);
+    markModelOwnedByBackendWorker(
+      request.modelId,
+      backendId,
+      isConcreteFramework(result.framework) ? result.framework : undefined,
+    );
     recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
   }
   return result;
@@ -486,9 +759,16 @@ export const WebModelLifecycle = {
 
   loadModel(request: ModelLoadRequest): ModelLoadResult | null {
     const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
-    const adapter = requireAdapter(snapshot?.framework);
+    const { adapter } = selectModelLoadRoute(request, snapshot);
     const result = adapter.load(request);
-    if (result && !result.error) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    if (result && !result.error) {
+      void releasePreviousModelOwner(
+        request.modelId,
+        undefined,
+        lifecycleModuleAsEmscripten(adapter),
+      );
+      recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    }
     return result;
   },
 
@@ -526,12 +806,11 @@ export const WebModelLifecycle = {
     // When the BackendWorker owns LLM load/inference, skip main-thread
     // hydration so we do not keep a second copy of the GGUF in UI-thread
     // MEMFS. The worker hydrates its own MEMFS during loadModel RPC.
-    const adapter = requireAdapter(modelSnapshot?.framework);
+    const loadRoute = selectModelLoadRoute(request, modelSnapshot);
+    const { adapter } = loadRoute;
+    const workerRoute = backendWorkerLoadRoute(modelSnapshot, request, loadRoute.framework);
     const workerEligible = Boolean(
-      (onnxWorkerModality(modelSnapshot, request)
-        ? getActiveBackendWorkerHost('onnx')
-        : getActiveBackendWorkerHost('llamacpp'))
-      && (onnxWorkerModality(modelSnapshot, request) || isBackendWorkerEligibleLLM(modelSnapshot, request)),
+      workerRoute && getActiveBackendWorkerHost(workerRoute.backendId),
     );
     if (modelSnapshot?.localPath && !workerEligible) {
       const loadModule = lifecycleModuleAsEmscripten(adapter);
@@ -587,12 +866,21 @@ export const WebModelLifecycle = {
     }
 
     try {
-      const workerResult = await loadModelViaBackendWorker(request, modelSnapshot, adapter);
+      const workerResult = await loadModelViaBackendWorker(
+        request,
+        modelSnapshot,
+        adapter,
+        workerRoute,
+      );
       if (workerResult) return workerResult;
 
       const result = await adapter.loadAsync(request);
       if (result && !result.error) {
-        clearModelOwnedByBackendWorker(request.modelId);
+        void releasePreviousModelOwner(
+          request.modelId,
+          undefined,
+          lifecycleModuleAsEmscripten(adapter),
+        );
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
       }
       return result;
@@ -606,12 +894,27 @@ export const WebModelLifecycle = {
       if (modelSnapshot) {
         ModelRegistry.registerModel(modelSnapshot);
       }
-      const retryAdapter = requireAdapter(modelSnapshot?.framework);
-      const workerResult = await loadModelViaBackendWorker(request, modelSnapshot, retryAdapter);
+      const retryRoute = selectModelLoadRoute(request, modelSnapshot);
+      const retryAdapter = retryRoute.adapter;
+      const retryWorkerRoute = backendWorkerLoadRoute(
+        modelSnapshot,
+        request,
+        retryRoute.framework,
+      );
+      const workerResult = await loadModelViaBackendWorker(
+        request,
+        modelSnapshot,
+        retryAdapter,
+        retryWorkerRoute,
+      );
       if (workerResult) return workerResult;
       const result = await retryAdapter.loadAsync(request);
       if (result && !result.error) {
-        clearModelOwnedByBackendWorker(request.modelId);
+        void releasePreviousModelOwner(
+          request.modelId,
+          undefined,
+          lifecycleModuleAsEmscripten(retryAdapter),
+        );
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(retryAdapter), true);
       }
       return result;
