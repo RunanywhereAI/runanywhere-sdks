@@ -424,7 +424,7 @@ jobs:
   native_cpp_desktop_macos:
     needs: validate
     if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -644,7 +644,7 @@ jobs:
   native_cpp_desktop_macos_neurt_private:
     needs: validate
     if: ${{ !inputs.publish_from_run_id || (inputs.rebuild_cpp_desktop && inputs.reuse_cpp_desktop_run_id == '') }}
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7

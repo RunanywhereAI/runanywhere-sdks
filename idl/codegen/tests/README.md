@@ -42,7 +42,16 @@ python3 idl/codegen/tests/test_convenience_generators.py --update-golden
 python3 idl/codegen/tests/test_convenience_generators.py
 ```
 
-Exit codes:
+The schema-lock integration test runs the CLI in temporary checkouts with and
+without spaces in their paths. It verifies the digest, lock update/check round
+trip, and detection of a changed proto. It needs Python 3, Bash, and a SHA-256
+utility; no protobuf toolchain is required:
+
+```bash
+python3 idl/codegen/tests/test_schema_lock.py
+```
+
+Exit codes for the convenience-generator test:
 
 | Code | Meaning                                                |
 | ---- | ------------------------------------------------------ |

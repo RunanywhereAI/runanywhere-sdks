@@ -47,6 +47,17 @@ extern "C" {
  *
  * Do NOT bump for additive metadata (new flags in `capability_flags`).
  *
+ * Optional interfaces that must work on older hosts of the same version use a
+ * capability bit plus a manifest wrapper instead of a bump: the engine sets the
+ * bit in both its manifest and its metadata, and registers a wrapper struct whose
+ * first member is the unchanged manifest. A host reads the wrapper only after
+ * seeing the bit, then validates its size, version and operation table. Use a
+ * wrapper when the addition is optional and every existing layout stays intact.
+ * Bump (per the rules above) when an existing struct, ops table or slot changes
+ * layout; that does not by itself need a new vtable slot. Add a new slot
+ * (promoting a reserved one, with a bump) only for a new primitive or an entry
+ * point every engine must provide.
+ *
  * Version history:
  *   1u — initial release. 8 primitive slots + 10 reserved slots.
  *                 Metadata = abi_version, name, display_name, engine_version,
@@ -115,6 +126,12 @@ extern "C" {
  *   14u — `rac_decision_options_t` gains grouping, max_length, max_pixels,
  *                 min_pixels and borrowed images. Engines compiled against
  *                 v13 read a shorter struct and are rejected until rebuilt.
+ *       ABI 14 extension (no bump): capability bit 40
+ *                 (`RAC_ENGINE_CAP_SEGMENTATION_CONFIDENCE_V1`) reserves the
+ *                 `rac_segmentation_confidence_manifest_v1_t` wrapper for
+ *                 optional per-pixel segmentation confidence. Unknown flags are
+ *                 ignored by older hosts. See
+ *                 docs/reference/segmentation-confidence-abi.md.
  */
 #define RAC_PLUGIN_API_VERSION 14u
 

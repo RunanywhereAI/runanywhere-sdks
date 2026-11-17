@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { SDKError, ErrorSeverity } from '@runanywhere/proto-ts/errors';
+import { asSDKException, ErrorCodes, ErrorCategories } from '../../dist/errors';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -370,6 +372,46 @@ test('a structured native Error keeps numeric SDK fields over RPC', async () => 
       },
     },
   ]);
+});
+
+test('a structured native Error keeps serialized sdkError bytes over RPC', async () => {
+  const port = makePort();
+  const sdkError = SDKError.encode(SDKError.fromPartial({
+    code: ErrorCodes.MODEL_LOAD_FAILED, category: ErrorCategories.MODEL,
+    cAbiCode: -111, message: 'Model load failed', nestedMessage: 'backend cause',
+    param: 'model', component: 'rag', retryable: true, requestId: 'request-1',
+    severity: ErrorSeverity.ERROR_SEVERITY_ERROR, timestampMs: 123,
+  })).finish();
+  // bridge.wrapNative converts native errors before dispatch sees them.
+  const err = asSDKException(Object.assign(new Error('load_model failed: -111'), { sdkError }));
+  const deps = makeDeps({
+    api: {
+      embed: () => {
+        throw err;
+      },
+    },
+  });
+
+  dispatch(port, { id: 24, method: 'embed', args: [] }, deps);
+  await tick();
+
+  assert.equal(port.posts.length, 1);
+  assert.equal(port.posts[0]?.id, 24);
+  assert.equal(port.posts[0]?.ok, false);
+  const payload = port.posts[0]?.error;
+  assert.ok(payload && typeof payload === 'object');
+  const received = asSDKException(payload);
+  assert.equal(received.message, 'load_model failed: -111 (Model load failed)');
+  assert.equal(received.code, ErrorCodes.MODEL_LOAD_FAILED);
+  assert.equal(received.category, ErrorCategories.MODEL);
+  assert.equal(received.cAbiCode, -111);
+  assert.equal(received.nestedMessage, 'backend cause');
+  assert.equal(received.fieldPath, 'model');
+  assert.equal(received.component, 'rag');
+  assert.equal(received.retryable, true);
+  assert.equal(received.requestId, 'request-1');
+  assert.equal(received.severity, ErrorSeverity.ERROR_SEVERITY_ERROR);
+  assert.equal(received.timestampMs, 123);
 });
 
 test('a non-Error thrown value is String()-ified', async () => {
