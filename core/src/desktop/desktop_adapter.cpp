@@ -47,6 +47,7 @@
 
 #include "desktop/desktop_internal.h"
 #include "desktop/desktop_path_utf8.h"  // utf8_to_path / utf8_fopen / utf8_remove / filename_utf8
+#include "rac/core/rac_logger.h"
 #include "rac/desktop/rac_desktop.h"
 
 namespace fs = std::filesystem;
@@ -266,8 +267,31 @@ rac_result_t desktop_file_delete(const char* path, void* /*user_data*/) {
 // Directory enumeration
 // -----------------------------------------------------------------------------
 
-bool entry_is_hidden(const std::string& name) {
-    return !name.empty() && name[0] == '.';
+// Confirm that `directory` exists and is a directory. Only an affirmative
+// missing/non-directory result maps to FILE_NOT_FOUND; denied or unknown
+// probes stay inconclusive for callers that preserve registry state.
+bool is_confirmed_missing(const std::error_code& ec) {
+    return ec == std::errc::no_such_file_or_directory || ec == std::errc::not_a_directory;
+}
+
+rac_result_t classify_directory_probe(const fs::path& directory) {
+    std::error_code ec;
+    const fs::file_status status = fs::status(directory, ec);
+    if (is_confirmed_missing(ec)) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+    if (ec) {
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    switch (status.type()) {
+        case fs::file_type::not_found:
+            return RAC_ERROR_FILE_NOT_FOUND;
+        case fs::file_type::none:
+        case fs::file_type::unknown:
+            return RAC_ERROR_FILE_READ_FAILED;
+        default:
+            return fs::is_directory(status) ? RAC_SUCCESS : RAC_ERROR_FILE_NOT_FOUND;
+    }
 }
 
 rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_entry_t* out_entries,
@@ -276,12 +300,18 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    const fs::path dir = utf8_to_path(dir_path);
+    const rac_result_t probe_rc = classify_directory_probe(dir);
+    if (probe_rc != RAC_SUCCESS) {
+        return probe_rc;
+    }
+
     const size_t capacity = out_entries ? *in_out_count : 0;
-    size_t count = 0;
+    size_t total = 0;
     std::error_code ec;
-    fs::directory_iterator iterator(utf8_to_path(dir_path), ec);
+    fs::directory_iterator iterator(dir, ec);
     if (ec) {
-        return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+        return RAC_ERROR_FILE_READ_FAILED;
     }
     const fs::directory_iterator end;
     for (; iterator != end; iterator.increment(ec)) {
@@ -289,47 +319,57 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
         // before this guard runs on the next pass — so the final increment is
         // re-checked after the loop below.
         if (ec) {
-            return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+            return RAC_ERROR_FILE_READ_FAILED;
         }
         const fs::directory_entry& entry = *iterator;
         const std::string name = filename_utf8(entry.path());
-        if (entry_is_hidden(name)) {
-            continue;
-        }
         const size_t name_len = name.size();
         if (name_len + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
-            // Truncation contract: skip oversized names, never half-copy them.
-            std::fprintf(stderr, "[WARN] [PlatformAdapter] skipping oversized entry in %s\n",
-                         dir_path);
-            continue;
+            // A skipped name makes this a partial listing; callers must not
+            // mistake it for a complete directory.
+            RAC_LOG_WARNING("PlatformAdapter", "oversized entry in %s", dir_path);
+            return RAC_ERROR_FILE_READ_FAILED;
         }
 
-        if (out_entries) {
-            if (count >= capacity) {
-                break;
-            }
-            rac_directory_entry_t& dst = out_entries[count];
+        if (out_entries && total < capacity) {
+            rac_directory_entry_t& dst = out_entries[total];
             std::memcpy(dst.name, name.c_str(), name_len + 1);
 
             std::error_code type_ec;
-            const bool is_dir = entry.is_directory(type_ec);
-            dst.is_dir = !type_ec && is_dir ? RAC_TRUE : RAC_FALSE;
-            std::error_code size_ec;
-            dst.size_bytes = is_dir ? 0 : static_cast<int64_t>(entry.file_size(size_ec));
-            if (size_ec) {
+            fs::file_status child_status = fs::status(entry.path(), type_ec);
+            if (is_confirmed_missing(type_ec)) {
+                // A dangling symlink has a missing target but is still a
+                // non-directory entry; a vanished entry stays inconclusive.
+                type_ec.clear();
+                child_status = fs::symlink_status(entry.path(), type_ec);
+            }
+            if (type_ec || child_status.type() == fs::file_type::none ||
+                child_status.type() == fs::file_type::unknown ||
+                child_status.type() == fs::file_type::not_found) {
+                return RAC_ERROR_FILE_READ_FAILED;
+            }
+            const bool is_dir = fs::is_directory(child_status);
+            dst.is_dir = is_dir ? RAC_TRUE : RAC_FALSE;
+            if (is_dir) {
                 dst.size_bytes = 0;
+            } else {
+                std::error_code size_ec;
+                const auto size = fs::file_size(entry.path(), size_ec);
+                dst.size_bytes = size_ec ? 0 : static_cast<int64_t>(size);
             }
         }
-        ++count;
+        ++total;
     }
-    // Catch a failure from the increment that advanced the iterator to `end`
-    // (the in-loop guard above never sees it). A capacity `break` leaves `ec`
-    // holding the previous, already-checked success, so it is not a false error.
+    // Catch a failure from the increment that advanced the iterator to `end`.
     if (ec) {
-        return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    if (out_entries && total > capacity) {
+        // The caller's buffer was too small: a partial fill is not a listing.
+        return RAC_ERROR_FILE_READ_FAILED;
     }
 
-    *in_out_count = count;
+    *in_out_count = total;
     return RAC_SUCCESS;
 }
 

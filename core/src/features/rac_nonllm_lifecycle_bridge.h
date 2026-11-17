@@ -1,6 +1,7 @@
 #ifndef RAC_FEATURES_RAC_NONLLM_LIFECYCLE_BRIDGE_H
 #define RAC_FEATURES_RAC_NONLLM_LIFECYCLE_BRIDGE_H
 
+#include "features/segmentation/segmentation_service_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
@@ -75,6 +76,7 @@ struct LifecycleSegmentationRef {
     const char* model_id = nullptr;
     const char* framework_name = nullptr;
     void* opaque = nullptr;
+    std::shared_ptr<rac::segmentation::ProviderContext> provider;
 };
 
 rac_result_t acquire_lifecycle_stt(LifecycleSttRef* out_ref);
