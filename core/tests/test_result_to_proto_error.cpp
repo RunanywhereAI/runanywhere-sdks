@@ -16,6 +16,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
+#include <thread>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -379,6 +381,67 @@ void test_unknown_negative_code_is_handled() {
     }
 }
 
+// Issue #1236 primitive coverage for the thread-local error-detail semantics the
+// Electron binding relies on. These exercise rac_error_set_details /
+// rac_error_clear_details against rac_result_to_proto_error directly; they are
+// primitive TLS/conversion checks, not Electron behavioral proof.
+
+// Serialize the current thread's detail state into an SDKError. Every stage is
+// CHECKed so an absence assertion below can never false-pass on a failed
+// conversion; `nested_out` is written only after a fully verified round-trip.
+void convert_current_details(const char* label, std::string* nested_out) {
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    const rac_result_t rc = rac_result_to_proto_error(RAC_ERROR_MODEL_LOAD_FAILED, &buffer);
+    CHECK(rc == RAC_SUCCESS, label);
+    CHECK(buffer.data != nullptr && buffer.size > 0, label);
+    ::runanywhere::v1::SDKError parsed;
+    const bool parse_ok =
+        buffer.data != nullptr && parsed.ParseFromArray(buffer.data, static_cast<int>(buffer.size));
+    CHECK(parse_ok, label);
+    if (parse_ok) {
+        *nested_out = parsed.nested_message();
+    }
+    rac_proto_buffer_free(&buffer);
+}
+
+void test_details_set_then_clear_excludes_nested_message() {
+    rac_error_set_details("stale backend reason");
+    rac_error_clear_details();
+    std::string nested = "sentinel: conversion never wrote";
+    convert_current_details("set+clear conversion", &nested);
+    CHECK(nested.empty(), "set+clear excludes nested message");
+}
+
+void test_details_set_nullptr_excludes_nested_message() {
+    rac_error_set_details("stale backend reason");
+    rac_error_set_details(nullptr);
+    std::string nested = "sentinel: conversion never wrote";
+    convert_current_details("set nullptr conversion", &nested);
+    CHECK(nested.empty(), "set nullptr excludes nested message");
+}
+
+void test_details_set_preserved_control() {
+    rac_error_set_details("disk full");
+    std::string nested;
+    convert_current_details("set detail conversion", &nested);
+    CHECK(nested == "disk full", "set detail preserved (control)");
+    rac_error_clear_details();
+}
+
+void test_details_fresh_thread_isolation() {
+    rac_error_set_details("main thread detail");
+    std::string worker_nested = "sentinel: conversion never wrote";
+    // A fresh thread starts with an empty detail thread-local: nothing set on
+    // the main thread may leak into its conversion.
+    std::thread worker([&worker_nested] {
+        convert_current_details("fresh thread conversion", &worker_nested);
+    });
+    worker.join();
+    CHECK(worker_nested.empty(), "fresh thread sees no inherited detail");
+    rac_error_clear_details();
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -395,6 +458,14 @@ int main() {
     test_success_code_writes_default_proto();
     std::printf("[ RUN  ] test_unknown_negative_code_is_handled\n");
     test_unknown_negative_code_is_handled();
+    std::printf("[ RUN  ] test_details_set_then_clear_excludes_nested_message\n");
+    test_details_set_then_clear_excludes_nested_message();
+    std::printf("[ RUN  ] test_details_set_nullptr_excludes_nested_message\n");
+    test_details_set_nullptr_excludes_nested_message();
+    std::printf("[ RUN  ] test_details_set_preserved_control\n");
+    test_details_set_preserved_control();
+    std::printf("[ RUN  ] test_details_fresh_thread_isolation\n");
+    test_details_fresh_thread_isolation();
 
     std::printf("\n%d check(s), %d failure(s)\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;

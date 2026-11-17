@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <cstdio>
 #include <mutex>
 #include <thread>
@@ -128,6 +129,21 @@ int main() {
     runanywhere::v1::SDKEvent polled_failure;
     CHECK(poll_event(&polled_failure), "poll returns queued SDKEvent bytes");
     CHECK(polled_failure.id() == callback_event.id(), "callback and poll observe same first event");
+
+    // INT32_MIN has no positive int32 counterpart: populate_error must widen to
+    // int64_t before negating (negating as int32_t is undefined) and fall back
+    // to ERROR_CODE_UNKNOWN, matching populate_sdk_error (rac_error_proto.cpp).
+    rac_sdk_event_clear_queue();
+    rc = rac_sdk_event_publish_failure(static_cast<rac_result_t>(INT32_MIN), "min code", "llm",
+                                       "minCodeOperation", RAC_FALSE);
+    CHECK(rc == RAC_SUCCESS, "failure helper accepts INT32_MIN error code");
+    runanywhere::v1::SDKEvent min_code_event;
+    CHECK(poll_event(&min_code_event), "poll returns INT32_MIN failure event");
+    CHECK(min_code_event.has_error(), "INT32_MIN failure event includes envelope error");
+    CHECK(min_code_event.error().code() == runanywhere::v1::ERROR_CODE_UNKNOWN,
+          "INT32_MIN magnitude falls back to ERROR_CODE_UNKNOWN");
+    CHECK(min_code_event.error().c_abi_code() == INT32_MIN,
+          "INT32_MIN failure envelope preserves raw C ABI error code");
 
     rac_sdk_event_unsubscribe(sub);
     capture.events.clear();

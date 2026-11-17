@@ -63,6 +63,8 @@ Napi::Value EmbeddingsNorm(const Napi::CallbackInfo& info) {
     }
     auto in = info[0].As<Napi::Float32Array>();
     float norm = 0.0f;
+    // Sync path on the JS main thread: no stale thread-local error detail.
+    rac_error_clear_details();
     const rac_result_t rc = rac_embeddings_norm(in.Data(), in.ElementLength(), &norm);
     if (rc != RAC_SUCCESS) {
         ThrowProtoError(env, rc, "rac_embeddings_norm");
@@ -83,6 +85,7 @@ Napi::Value EmbeddingsSimilarity(const Napi::CallbackInfo& info) {
     auto lhs = info[0].As<Napi::Float32Array>();
     auto rhs = info[1].As<Napi::Float32Array>();
     float similarity = 0.0f;
+    rac_error_clear_details();
     const rac_result_t rc = rac_embeddings_similarity(
         lhs.Data(), lhs.ElementLength(), rhs.Data(), rhs.ElementLength(), &similarity);
     if (rc != RAC_SUCCESS) {

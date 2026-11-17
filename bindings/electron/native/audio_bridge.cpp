@@ -21,6 +21,13 @@ void ThrowAudioError(Napi::Env env, rac_result_t code, const char* context) {
     ThrowProtoError(env, code, context);
 }
 
+// Sync wrappers run on the long-lived JS main thread: clear the thread-local
+// error detail before each native call so a failure only reports the detail
+// that call itself produced (see ProtoError).
+void ClearStaleErrorDetails() {
+    rac_error_clear_details();
+}
+
 Napi::Value Float32ToPcm16(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsTypedArray() ||
@@ -31,6 +38,7 @@ Napi::Value Float32ToPcm16(const Napi::CallbackInfo& info) {
     auto in = info[0].As<Napi::Float32Array>();
     const size_t n = in.ElementLength();
     auto out = Napi::Int16Array::New(env, n);
+    ClearStaleErrorDetails();
     const rac_result_t rc = rac_audio_float32_to_pcm16(in.Data(), n, out.Data());
     if (rc != RAC_SUCCESS) {
         ThrowAudioError(env, rc, "rac_audio_float32_to_pcm16");
@@ -49,6 +57,7 @@ Napi::Value Pcm16ToFloat32(const Napi::CallbackInfo& info) {
     auto in = info[0].As<Napi::Int16Array>();
     const size_t n = in.ElementLength();
     auto out = Napi::Float32Array::New(env, n);
+    ClearStaleErrorDetails();
     const rac_result_t rc = rac_audio_pcm16_to_float32(in.Data(), n, out.Data());
     if (rc != RAC_SUCCESS) {
         ThrowAudioError(env, rc, "rac_audio_pcm16_to_float32");
@@ -71,6 +80,7 @@ Napi::Value ResampleF32(const Napi::CallbackInfo& info) {
     const int32_t out_rate = info[2].As<Napi::Number>().Int32Value();
     float* out = nullptr;
     size_t out_frames = 0;
+    ClearStaleErrorDetails();
     const rac_result_t rc =
         rac_audio_resample_f32(in.Data(), in.ElementLength(), in_rate, out_rate, &out, &out_frames);
     if (rc != RAC_SUCCESS) {
@@ -94,6 +104,7 @@ Napi::Value ComputeRms(const Napi::CallbackInfo& info) {
     }
     auto in = info[0].As<Napi::Float32Array>();
     float rms = 0.0f;
+    ClearStaleErrorDetails();
     const rac_result_t rc = rac_audio_compute_rms(in.Data(), in.ElementLength(), &rms);
     if (rc != RAC_SUCCESS) {
         ThrowAudioError(env, rc, "rac_audio_compute_rms");
@@ -115,6 +126,7 @@ Napi::Value Float32ToWav(const Napi::CallbackInfo& info) {
     const int32_t sample_rate = info[1].As<Napi::Number>().Int32Value();
     void* wav = nullptr;
     size_t wav_size = 0;
+    ClearStaleErrorDetails();
     const rac_result_t rc = rac_audio_float32_to_wav(in.Data(), in.ByteLength(), sample_rate, &wav,
                                                     &wav_size);
     if (rc != RAC_SUCCESS) {
@@ -180,6 +192,7 @@ Napi::Value WavToFloat32(const Napi::CallbackInfo& info) {
     float* samples = nullptr;
     size_t n_samples = 0;
     int32_t sample_rate = 0;
+    ClearStaleErrorDetails();
     const rac_result_t rc =
         rac_audio_wav_to_float32(data, size, &samples, &n_samples, &sample_rate);
     if (rc != RAC_SUCCESS) {

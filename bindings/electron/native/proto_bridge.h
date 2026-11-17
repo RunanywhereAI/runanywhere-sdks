@@ -30,8 +30,13 @@ using LeaseRelease = std::function<void()>;
 using NativeWork = std::function<rac_result_t()>;
 using NativeResult = std::function<Napi::Value(Napi::Env)>;
 
+// `details`, when given, is the error detail the failing call produced on its
+// worker thread; it is attached as the sdkError nested message instead of
+// whatever the current thread's thread-local holds. Sync throwers pass
+// nullptr: they clear the thread-local before their native call, so the
+// ambient value is always their own.
 Napi::Error ProtoError(Napi::Env env, rac_result_t code, const std::string& context,
-                       const char* commons_message);
+                       const char* commons_message, const std::string* details = nullptr);
 
 void ThrowProtoError(Napi::Env env, rac_result_t code, const std::string& context);
 

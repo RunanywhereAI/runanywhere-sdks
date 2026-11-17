@@ -35,6 +35,9 @@ Napi::Value RunCatalogCall(const Napi::CallbackInfo& info, const char* context, 
     Napi::Env env = info.Env();
     rac_lora_registry_handle_t registry = rac_get_lora_registry();
     if (registry == nullptr) {
+        // Local failure with no native call: clear so the structured error
+        // cannot pick up a stale thread-local detail.
+        rac_error_clear_details();
         return RejectWithProtoError(env, RAC_ERROR_NOT_INITIALIZED, context);
     }
     auto payload = std::make_shared<std::vector<uint8_t>>(RequireProtoBytes(info, 0, signature));
