@@ -59,6 +59,7 @@ export type {
   RagConfig,
   RagQueryOptions,
   RagRetrievalOptions,
+  RagVectorStore,
   ReasoningOptions,
   SegmentationOptions,
   SttOptions,
