@@ -5,6 +5,17 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- Breaking: removed `QHexRT.modelSupportsArchitecture`,
+  `QHexRT.modelRequiresHfAuth`, and `QHexRT.registerModelForDevice`, together
+  with the native catalog facade. Catalog selection, eligibility, and any
+  required HF-auth preflight are now the application's responsibility. Probe
+  device capabilities with `QHexRT.probeNpu()` and register eligible rows via
+  `RunAnywhere.models.register()`.
+
 ## [0.20.40] - 2026-10-17
 
 - Version bump to keep the backend package in lockstep with the SDK release.

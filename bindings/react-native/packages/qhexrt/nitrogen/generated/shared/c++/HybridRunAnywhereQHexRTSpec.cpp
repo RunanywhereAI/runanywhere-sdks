@@ -19,9 +19,6 @@ namespace margelo::nitro::runanywhere::qhexrt {
       prototype.registerHybridMethod("isBackendRegistered", &HybridRunAnywhereQHexRTSpec::isBackendRegistered);
       prototype.registerHybridMethod("probeNpuProto", &HybridRunAnywhereQHexRTSpec::probeNpuProto);
       prototype.registerHybridMethod("isArchitectureSupported", &HybridRunAnywhereQHexRTSpec::isArchitectureSupported);
-      prototype.registerHybridMethod("modelSupportsArchitecture", &HybridRunAnywhereQHexRTSpec::modelSupportsArchitecture);
-      prototype.registerHybridMethod("modelRequiresHfAuth", &HybridRunAnywhereQHexRTSpec::modelRequiresHfAuth);
-      prototype.registerHybridMethod("catalogRegisterModelProto", &HybridRunAnywhereQHexRTSpec::catalogRegisterModelProto);
     });
   }
 
