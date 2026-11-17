@@ -27,6 +27,7 @@
 #include "posix_platform_adapter.h"
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 
 namespace fs = std::filesystem;
@@ -36,6 +37,36 @@ namespace {
 // Set once by rac_python_fill_posix_adapter before rac_init(); read-only after,
 // so the "callbacks may run on any thread" contract holds without locking.
 std::string g_secure_dir;
+
+// Distinguish a confirmed missing/non-directory path from a permission or I/O
+// failure. The boolean std::filesystem probes collapse both into false, which
+// lets orphan pruning mistake an unreadable download folder for a vanished one.
+bool is_confirmed_missing(const std::error_code& ec) {
+    return ec == std::errc::no_such_file_or_directory || ec == std::errc::not_a_directory;
+}
+
+// Confirm that `directory` exists and is a directory. Only an affirmative
+// missing/non-directory result maps to FILE_NOT_FOUND; denied or unknown
+// probes stay inconclusive for callers that preserve registry state.
+rac_result_t classify_directory_probe(const fs::path& directory) {
+    std::error_code ec;
+    const fs::file_status status = fs::status(directory, ec);
+    if (is_confirmed_missing(ec)) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+    if (ec) {
+        return RAC_ERROR_FILE_READ_FAILED;
+    }
+    switch (status.type()) {
+        case fs::file_type::not_found:
+            return RAC_ERROR_FILE_NOT_FOUND;
+        case fs::file_type::none:
+        case fs::file_type::unknown:
+            return RAC_ERROR_FILE_READ_FAILED;
+        default:
+            return fs::is_directory(status) ? RAC_SUCCESS : RAC_ERROR_FILE_NOT_FOUND;
+    }
+}
 
 const char* level_name(rac_log_level_t lvl) {
     switch (lvl) {
@@ -290,25 +321,53 @@ rac_result_t posix_list_dir(const char* dir_path, rac_directory_entry_t* out_ent
     if (!dir_path || !in_out_count) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::path dir(dir_path);
-    if (!fs::is_directory(dir, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;
+    const rac_result_t probe_rc = classify_directory_probe(dir);
+    if (probe_rc != RAC_SUCCESS) return probe_rc;
     const size_t cap = out_entries ? *in_out_count : 0;
     size_t written = 0, total = 0;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
         ++total;
         if (!out_entries || written >= cap) continue;
         std::string name = it->path().filename().string();
-        if (name.size() + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) continue;  // skip oversized
+        if (name.size() + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
+            // A skipped name makes this a partial listing; callers must not
+            // mistake it for a complete directory.
+            RAC_LOG_WARNING("PlatformAdapter", "oversized entry in %s", dir_path);
+            return RAC_ERROR_FILE_READ_FAILED;
+        }
+        // The type probe decides whether the walk recurses. A failed probe
+        // must stay inconclusive instead of reporting a regular file.
+        std::error_code type_ec;
+        fs::file_status child_status = fs::status(it->path(), type_ec);
+        if (is_confirmed_missing(type_ec)) {
+            // A dangling symlink has a missing target but is still a
+            // non-directory entry; a vanished entry stays inconclusive.
+            type_ec.clear();
+            child_status = fs::symlink_status(it->path(), type_ec);
+        }
+        if (type_ec || child_status.type() == fs::file_type::none ||
+            child_status.type() == fs::file_type::unknown ||
+            child_status.type() == fs::file_type::not_found) {
+            return RAC_ERROR_FILE_READ_FAILED;
+        }
+        const bool is_dir = fs::is_directory(child_status);
         std::strncpy(out_entries[written].name, name.c_str(), RAC_DIRECTORY_ENTRY_NAME_MAX - 1);
         out_entries[written].name[RAC_DIRECTORY_ENTRY_NAME_MAX - 1] = '\0';
-        std::error_code ec2;
-        bool is_dir = fs::is_directory(it->path(), ec2);
         out_entries[written].is_dir = is_dir ? RAC_TRUE : RAC_FALSE;
-        out_entries[written].size_bytes =
-            is_dir ? 0 : static_cast<int64_t>(fs::file_size(it->path(), ec2));
-        if (ec2) {
+        if (is_dir) {
             out_entries[written].size_bytes = 0;
+        } else {
+            std::error_code size_ec;
+            const auto size = fs::file_size(it->path(), size_ec);
+            out_entries[written].size_bytes = size_ec ? 0 : static_cast<int64_t>(size);
         }
         ++written;
+    }
+    // A failed open/advance is an I/O error, not an empty or shorter listing.
+    if (ec) return RAC_ERROR_FILE_READ_FAILED;
+    if (out_entries && total > cap) {
+        // The caller's buffer was too small: a partial fill is not a listing.
+        return RAC_ERROR_FILE_READ_FAILED;
     }
     *in_out_count = out_entries ? written : total;
     return RAC_SUCCESS;

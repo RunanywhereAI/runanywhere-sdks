@@ -16,6 +16,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.EmbeddingsRequest
 import ai.runanywhere.proto.v1.EmbeddingsResult
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAEmbeddingsResult
@@ -33,9 +34,11 @@ object CppBridgeEmbeddings {
     fun embedBatchLifecycle(request: EmbeddingsRequest): RAEmbeddingsResult =
         decodeOrThrow(
             EmbeddingsResult.ADAPTER,
-            RunAnywhereBridge.racEmbeddingsEmbedBatchLifecycleProto(
-                EmbeddingsRequest.ADAPTER.encode(request),
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racEmbeddingsEmbedBatchLifecycleProto(
+                    EmbeddingsRequest.ADAPTER.encode(request),
+                )
+            },
             "racEmbeddingsEmbedBatchLifecycleProto",
         )
 

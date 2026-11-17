@@ -141,6 +141,10 @@ bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/VadNamespace.kt|k
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/ModelsNamespace.kt|kotlin:deprecated-declaration
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/SttNamespace.kt|kotlin:deprecated-declaration
 bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/LoraNamespace.kt|kotlin:deprecated-declaration
+# ModelRegistration retains hidden JVM factories and default-argument bridges
+# for consumers compiled before optional registration metadata was added.
+# Source callers use the current typed factories; these only forward old binaries.
+bindings/kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/ModelRegistration.kt|kotlin:deprecated-declaration
 # Local on-disk resume-state persistence for background downloads — private
 # bookkeeping (a plan record, a resume-byte-count checkpoint) that never crosses
 # a language or process boundary, so there is no proto/wire type to bridge to.

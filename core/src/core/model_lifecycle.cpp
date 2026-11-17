@@ -50,7 +50,11 @@ namespace rac::core::model_lifecycle::detail {
 // defined here exactly once.
 std::mutex g_lifecycle_mutex;
 std::condition_variable g_lifecycle_cv;
-std::map<runanywhere::v1::SDKComponent, std::shared_ptr<LoadedModel>> g_loaded;
+std::map<runanywhere::v1::SDKComponent, std::shared_ptr<LoadedModel>> g_loaded = [] {
+    // Model leases must be released before the plugin registry's static teardown.
+    (void)rac_plugin_count();
+    return std::map<runanywhere::v1::SDKComponent, std::shared_ptr<LoadedModel>>{};
+}();
 
 // Backend creation is intentionally performed outside g_lifecycle_mutex, but
 // the complete check/create/install sequence still has to be single-filed.
@@ -115,6 +119,7 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
     model->diffusion_ops = nullptr;
     model->diarization_ops = nullptr;
     model->segmentation_ops = nullptr;
+    model->segmentation_provider.reset();
     model->ocr_ops = nullptr;
 }
 
@@ -947,6 +952,20 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         vt = rac_plugin_find(primitive);
     }
 
+    // Pin before reading plugin metadata or invoking create. This admission
+    // compares pointer identity under the registry lock, so a stale selection
+    // fails without dereferencing an unloaded vtable.
+    std::shared_ptr<rac::segmentation::ProviderContext> segmentation_provider;
+    rac_result_t provider_rc = RAC_SUCCESS;
+    if (vt && primitive == RAC_PRIMITIVE_SEGMENT) {
+        provider_rc = rac::segmentation::acquire_provider(vt, &segmentation_provider);
+        if (provider_rc != RAC_SUCCESS) {
+            // A stale selection follows normal failed-load state/event handling.
+            // Do not dereference the vtable after admission has failed.
+            vt = nullptr;
+        }
+    }
+
     // v4 placement truth, filled in below once an engine is known. Populated
     // even on the "no backend found"/"create failed" error paths (minus the
     // device_* fields, since no device ever ran) so callers can see what was
@@ -994,7 +1013,14 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     }
 
     if (!vt) {
-        std::string error = "no registered backend serves the requested primitive";
+        std::string error = provider_rc == RAC_SUCCESS
+                                ? "no registered backend serves the requested primitive"
+                                : "segmentation provider unavailable";
+        if (provider_rc != RAC_SUCCESS) {
+            if (const char* reason = rac_error_message(provider_rc)) {
+                error.append(": ").append(reason);
+            }
+        }
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
                                      artifact_resolution.artifacts, 0, error, placement);
@@ -1182,6 +1208,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->diarization_ops = vt->diarization_ops;
     } else if (primitive == RAC_PRIMITIVE_SEGMENT) {
         loaded->segmentation_ops = vt->segmentation_ops;
+        loaded->segmentation_provider = std::move(segmentation_provider);
     } else if (primitive == RAC_PRIMITIVE_OCR) {
         loaded->ocr_ops = vt->ocr_ops;
     } else if (primitive == RAC_PRIMITIVE_DECIDE) {

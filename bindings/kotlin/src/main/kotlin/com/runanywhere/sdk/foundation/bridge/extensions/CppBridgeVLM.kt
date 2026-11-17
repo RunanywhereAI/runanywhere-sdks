@@ -27,6 +27,7 @@ import ai.runanywhere.proto.v1.VLMGenerationRequest
 import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.VLMStreamEvent
 import ai.runanywhere.proto.v1.VLMStreamEventKind
+import com.runanywhere.sdk.foundation.bridge.withNativeProtoFailure
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
@@ -74,7 +75,7 @@ object CppBridgeVLM {
      */
     fun cancel() {
         try {
-            val bytes = RunAnywhereBridge.racVlmCancelLifecycleProto()
+            val bytes = withNativeProtoFailure { RunAnywhereBridge.racVlmCancelLifecycleProto() }
             if (bytes != null) {
                 // Surface event for parity with Swift; not consumed by Kotlin callers today.
                 SDKEvent.ADAPTER.decode(bytes)
@@ -88,7 +89,7 @@ object CppBridgeVLM {
 
     /** Cancel only the matching request-scoped JNI wrapper. */
     internal fun cancelRequest(requestId: Long) {
-        val bytes = RunAnywhereBridge.racVlmCancelRequestLifecycleProto(requestId)
+        val bytes = withNativeProtoFailure { RunAnywhereBridge.racVlmCancelRequestLifecycleProto(requestId) }
         if (bytes != null) {
             // Decode the canonical cancellation event for parity with the
             // unscoped surface; publishing is owned by commons.
@@ -111,7 +112,7 @@ object CppBridgeVLM {
     internal fun processBlocking(request: VLMGenerationRequest): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
-            RunAnywhereBridge.racVlmGenerateProto(VLMGenerationRequest.ADAPTER.encode(request)),
+            withNativeProtoFailure { RunAnywhereBridge.racVlmGenerateProto(VLMGenerationRequest.ADAPTER.encode(request)) },
             "racVlmGenerateProto",
         )
 
@@ -128,10 +129,12 @@ object CppBridgeVLM {
     ): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
-            RunAnywhereBridge.racVlmGenerateRequestProto(
-                requestId,
-                request.requestProto,
-            ),
+            withNativeProtoFailure {
+                RunAnywhereBridge.racVlmGenerateRequestProto(
+                    requestId,
+                    request.requestProto,
+                )
+            },
             "racVlmGenerateRequestProto",
         )
 

@@ -376,20 +376,23 @@ class DartBridgeModelRegistry {
   /// Mirrors Swift's `RunAnywhere.registerModel(id:name:url:...)` URL form
   /// — commons owns the build-and-save flow; we only ship the proto request
   /// bytes and decode the resulting `ModelInfo` proto.
-  Future<model_pb.ModelInfo?> registerModelFromUrl(
+  Future<model_pb.ModelInfo> registerModelFromUrl(
     model_pb.RegisterModelFromUrlRequest request,
   ) async {
-    final fn = RacNative.bindings.rac_register_model_from_url_proto;
     try {
+      final fn = RacNative.bindings.rac_register_model_from_url_proto;
       return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
         request: request,
         invoke: fn,
         decode: model_pb.ModelInfo.fromBuffer,
         symbol: 'rac_register_model_from_url_proto',
+        preserveNativeError: true,
       );
+    } on SDKException catch (e) {
+      e.error.message = '${e.message} (model "${request.name}")';
+      rethrow;
     } catch (e) {
-      _logger.debug('rac_register_model_from_url_proto error: $e');
-      return null;
+      throw SDKException.internalError('$e (model "${request.name}")');
     }
   }
 
@@ -399,20 +402,23 @@ class DartBridgeModelRegistry {
   /// Mirrors Swift's `RunAnywhere.registerModel(multiFile:...)` — commons
   /// builds the MultiFileArtifact ModelInfo and persists it with
   /// merge-on-reseed semantics.
-  Future<model_pb.ModelInfo?> registerMultiFileModel(
+  Future<model_pb.ModelInfo> registerMultiFileModel(
     model_pb.RegisterMultiFileModelRequest request,
   ) async {
-    final fn = RacNative.bindings.rac_register_multi_file_model_proto;
     try {
+      final fn = RacNative.bindings.rac_register_multi_file_model_proto;
       return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
         request: request,
         invoke: fn,
         decode: model_pb.ModelInfo.fromBuffer,
         symbol: 'rac_register_multi_file_model_proto',
+        preserveNativeError: true,
       );
+    } on SDKException catch (e) {
+      e.error.message = '${e.message} (model "${request.name}")';
+      rethrow;
     } catch (e) {
-      _logger.debug('rac_register_multi_file_model_proto error: $e');
-      return null;
+      throw SDKException.internalError('$e (model "${request.name}")');
     }
   }
 
