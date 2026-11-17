@@ -102,6 +102,49 @@ RAC_API rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* reque
                                                             size_t request_size,
                                                             rac_proto_buffer_t* out_validation);
 
+/* ===========================================================================
+ * Cluster Orchestration (Issue #541: Local AI Cluster / Pipeline Sharding)
+ * =========================================================================== */
+
+/**
+ * Start a local AI cluster coordinator session from a serialized
+ * runanywhere.v1.ClusterStartRequest. The coordinator is the host side of the
+ * cluster: a `platform` missing from the role policy, or one whose host role is not
+ * ENABLED, is rejected with RAC_ERROR_NOT_SUPPORTED. Validates peer assignments and
+ * returns the active ClusterState.
+ */
+RAC_API rac_result_t rac_connect_cluster_start_proto(const uint8_t* request_bytes,
+                                                     size_t request_size,
+                                                     rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Join a cluster as a peer from a serialized runanywhere.v1.ClusterJoinRequest.
+ * Rejects (typed `accepted = false`) a peer whose advertised platform is unknown or not
+ * client-ENABLED, one missing from the cluster's layer assignments, and one whose
+ * non-zero max_layers is smaller than its assigned span. The returned
+ * ClusterStartResponse echoes the peer's capability only when the join is accepted.
+ */
+RAC_API rac_result_t rac_connect_cluster_join_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_response);
+
+/**
+ * Stop an active cluster coordinator session and clear peer states.
+ */
+RAC_API rac_result_t rac_connect_cluster_stop_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_cluster_state);
+
+/**
+ * Validate an intermediate activation tensor payload between pipeline stages.
+ * Accepts ClusterActivation and verifies cluster binding, tensor dimensions,
+ * and valid layer boundaries. (Validation only; transport occurs out-of-band).
+ */
+RAC_API rac_result_t
+rac_connect_cluster_validate_activation_proto(const uint8_t* request_bytes,
+                                              size_t request_size,
+                                              rac_proto_buffer_t* out_validation);
+
 #ifdef __cplusplus
 }
 #endif
