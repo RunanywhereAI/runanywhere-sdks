@@ -2910,9 +2910,14 @@ static rac_result_t jni_device_http_post(const char* endpoint, const char* json_
                                          rac_bool_t requires_auth,
                                          rac_device_http_response_t* out_response, void* user_data);
 
-// Static storage for device ID string (needs to persist across calls)
-// Protected by g_device_jni_state.mtx for thread safety
+// Static storage for device ID string (needs to persist across calls).
+// Guarded by its own leaf mutex rather than g_device_jni_state.mtx:
+// jni_device_get_id runs as a device-manager callback with the native
+// device-manager mutex held, so taking g_device_jni_state.mtx there would
+// invert the JNI-state -> device-manager lock order (see
+// racDeviceManagerClearCallbacks). Nothing is acquired while holding this.
 static std::string g_cached_device_id;
+static std::mutex g_cached_device_id_mtx;
 
 // Static storage for device info strings (need to persist for C callbacks)
 static struct {
@@ -3090,8 +3095,9 @@ static const char* jni_device_get_id(void* user_data) {
             return "";
         }
 
-        // Lock mutex to protect g_cached_device_id from concurrent access
-        std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
+        // Leaf lock only: this callback runs under the device-manager mutex and
+        // must never take g_device_jni_state.mtx (lock-order invariant).
+        std::lock_guard<std::mutex> lock(g_cached_device_id_mtx);
         g_cached_device_id = str;
         env->ReleaseStringUTFChars(jResult, str);
         env->DeleteLocalRef(jResult);
@@ -3307,7 +3313,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerClearCa
         // Lock order invariant shared with racDeviceManagerSetCallbacks:
         // JNI state first, then the native device-manager state. Native clear
         // is the quiescence barrier; it waits for in-flight callbacks before
-        // we release their global reference below.
+        // we release their global reference below. The reverse order must
+        // never occur: device-manager callbacks (jni_device_*) run with the
+        // device-manager mutex held and so must not take g_device_jni_state.mtx
+        // — jni_device_get_id guards its cache with g_cached_device_id_mtx,
+        // a leaf lock, instead.
         std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
         rac_device_manager_clear_callbacks();
         if (g_device_jni_state.callback_obj != nullptr) {
@@ -3319,6 +3329,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerClearCa
         g_device_jni_state.is_registered_method = nullptr;
         g_device_jni_state.set_registered_method = nullptr;
         g_device_jni_state.http_post_method = nullptr;
+        std::lock_guard<std::mutex> cache_lock(g_cached_device_id_mtx);
         g_cached_device_id.clear();
     }
     std::lock_guard<std::mutex> info_lock(g_device_info_strings.mtx);
