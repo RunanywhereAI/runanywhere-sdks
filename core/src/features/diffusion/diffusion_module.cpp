@@ -199,8 +199,10 @@ rac_result_t parse_options(const uint8_t* bytes, size_t size, rac_diffusion_opti
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse DiffusionGenerationOptions");
     }
-    if (!rac::foundation::rac_diffusion_options_from_proto(proto, out_options)) {
-        return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
+    const rac_result_t convert_rc =
+        rac::foundation::rac_diffusion_options_from_proto(proto, out_options);
+    if (convert_rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_error, convert_rc,
                                           "failed to convert DiffusionGenerationOptions");
     }
     if (!out_options->prompt || out_options->prompt[0] == '\0') {
@@ -475,9 +477,10 @@ rac_result_t rac_diffusion_generate_lifecycle_proto(const uint8_t* request_proto
     }
 
     rac_diffusion_options_t options = RAC_DIFFUSION_OPTIONS_DEFAULT;
-    if (!rac::foundation::rac_diffusion_options_from_proto(request.options(), &options)) {
+    rc = rac::foundation::rac_diffusion_options_from_proto(request.options(), &options);
+    if (rc != RAC_SUCCESS) {
         rac::lifecycle::release_lifecycle_diffusion(&ref);
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+        return rac_proto_buffer_set_error(out_result, rc,
                                           "failed to convert DiffusionGenerationOptions");
     }
     if (!options.prompt || options.prompt[0] == '\0') {

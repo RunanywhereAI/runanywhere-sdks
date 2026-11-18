@@ -1780,11 +1780,12 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     }
 
     rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
-    if (request.has_options() &&
-        !rac::foundation::rac_stt_options_from_proto(request.options(), &options)) {
-        rac::lifecycle::release_lifecycle_stt(&ref);
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to convert STTOptions");
+    if (request.has_options()) {
+        rc = rac::foundation::rac_stt_options_from_proto(request.options(), &options);
+        if (rc != RAC_SUCCESS) {
+            rac::lifecycle::release_lifecycle_stt(&ref);
+            return rac_proto_buffer_set_error(out_result, rc, "failed to convert STTOptions");
+        }
     }
     if (request.has_options() && request.options().has_language() &&
         !request.options().language().empty()) {
@@ -1956,10 +1957,13 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     }
 
     rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
-    if (request.has_options() &&
-        !rac::foundation::rac_stt_options_from_proto(request.options(), &options)) {
-        rac::lifecycle::release_lifecycle_stt(&ref);
-        return RAC_ERROR_DECODING_ERROR;
+    if (request.has_options()) {
+        const rac_result_t convert_rc =
+            rac::foundation::rac_stt_options_from_proto(request.options(), &options);
+        if (convert_rc != RAC_SUCCESS) {
+            rac::lifecycle::release_lifecycle_stt(&ref);
+            return convert_rc;
+        }
     }
     if (request.has_options() && request.options().has_language() &&
         !request.options().language().empty()) {

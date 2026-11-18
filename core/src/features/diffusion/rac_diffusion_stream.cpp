@@ -307,11 +307,13 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
                 nullptr, 0);
 
             rac_diffusion_options_t options = RAC_DIFFUSION_OPTIONS_DEFAULT;
-            if (!rac::foundation::rac_diffusion_options_from_proto(request.options(), &options)) {
+            const rac_result_t convert_rc =
+                rac::foundation::rac_diffusion_options_from_proto(request.options(), &options);
+            if (convert_rc != RAC_SUCCESS) {
                 rac::diffusion::dispatch_diffusion_stream_event(
                     handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
                     "failed to convert DiffusionGenerationOptions",
-                    static_cast<int>(RAC_ERROR_DECODING_ERROR));
+                    static_cast<int>(convert_rc));
                 std::lock_guard<std::mutex> lock(g_mu());
                 erase_session_locked(session_id, handle);
                 return;

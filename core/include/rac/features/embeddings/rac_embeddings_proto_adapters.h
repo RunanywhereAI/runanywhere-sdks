@@ -28,8 +28,11 @@ class EmbeddingVector;
 
 namespace rac::foundation {
 
-bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
-                                       rac_embeddings_options_t* out);
+// Returns RAC_ERROR_NULL_POINTER for a null out and RAC_ERROR_DECODING_ERROR for
+// an out-of-range value (unknown pooling or input type, negative n_threads, or a
+// batch_size outside 1..RAC_EMBEDDINGS_MAX_BATCH_SIZE). It allocates nothing.
+rac_result_t rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
+                                               rac_embeddings_options_t* out);
 
 bool rac_embedding_vector_to_proto(const rac_embedding_vector_t* in,
                                    ::runanywhere::v1::EmbeddingVector* out);

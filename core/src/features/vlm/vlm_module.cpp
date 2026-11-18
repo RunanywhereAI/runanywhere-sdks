@@ -1043,8 +1043,10 @@ rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t r
     if (image_rc != RAC_SUCCESS) {
         return image_rc;
     }
-    if (!rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options)) {
-        return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
+    const rac_result_t options_rc =
+        rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options);
+    if (options_rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_error, options_rc,
                                           "failed to convert VLMGenerationRequest");
     }
     if (!*out_prompt || (*out_prompt)[0] == '\0') {

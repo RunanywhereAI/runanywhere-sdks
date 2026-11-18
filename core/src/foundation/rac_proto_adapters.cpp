@@ -184,9 +184,10 @@ rac_audio_format_enum_t audio_format_from_proto(::runanywhere::v1::AudioFormat p
 // STT
 // ===========================================================================
 
-bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt_options_t* out) {
+rac_result_t rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in,
+                                        rac_stt_options_t* out) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     *out = RAC_STT_OPTIONS_DEFAULT;
     // Borrows the proto's string storage; `in` must outlive `out` (adapter
     // contract — callers hold the request across the call).
@@ -201,7 +202,7 @@ bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt
     out->enable_diarization = in.diarize() ? RAC_TRUE : RAC_FALSE;
     out->max_speakers = in.has_speakers_expected() ? in.speakers_expected() : 0;
     out->enable_timestamps = in.enable_word_timestamps() ? RAC_TRUE : RAC_FALSE;
-    return true;
+    return RAC_SUCCESS;
 }
 
 bool rac_stt_word_to_proto(const rac_stt_word_t* in, ::runanywhere::v1::WordTimestamp* out) {
@@ -404,16 +405,17 @@ bool rac_tts_result_to_proto(const rac_tts_result_t* in, ::runanywhere::v1::TTSO
 // VLM
 // ===========================================================================
 
-bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& in,
-                                const ::runanywhere::v1::VLMVisionOptions* vision,
-                                rac_vlm_options_t* out) {
+rac_result_t rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& in,
+                                        const ::runanywhere::v1::VLMVisionOptions* vision,
+                                        rac_vlm_options_t* out) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     rac_vlm_options_t defaults = RAC_VLM_OPTIONS_DEFAULT;
     *out = defaults;
-    auto fail = [&]() {
+    // Every failure below is a failed allocation or string copy.
+    auto fail = [&]() -> rac_result_t {
         rac_vlm_options_free_owned(out);
-        return false;
+        return RAC_ERROR_OUT_OF_MEMORY;
     };
     // LLMGenerationOptions has explicit presence on every knob: ABSENT means
     // the annotated default applies (already loaded via RAC_VLM_OPTIONS_DEFAULT
@@ -545,7 +547,7 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& i
     // emit_image_embeddings had no LLMGenerationOptions/VLMVisionOptions
     // equivalent after the merge; leave it at the C default (false, per
     // RAC_VLM_OPTIONS_DEFAULT).
-    return true;
+    return RAC_SUCCESS;
 }
 
 void rac_vlm_options_free_owned(rac_vlm_options_t* options) {
@@ -790,24 +792,24 @@ bool encoded_image_media_type_matches(const std::string& bytes, const std::strin
 
 }  // namespace
 
-bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerationOptions& in,
-                                      rac_diffusion_options_t* out) {
+rac_result_t rac_diffusion_options_from_proto(
+    const ::runanywhere::v1::DiffusionGenerationOptions& in, rac_diffusion_options_t* out) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     *out = RAC_DIFFUSION_OPTIONS_DEFAULT;
     out->prompt = copy_string(in.prompt());
     out->negative_prompt = copy_string(in.negative_prompt());
-    auto fail = [&]() {
+    auto fail = [&](rac_result_t code) -> rac_result_t {
         rac_free(const_cast<char*>(out->prompt));
         rac_free(const_cast<char*>(out->negative_prompt));
         rac_free(const_cast<uint8_t*>(out->input_image_data));
         rac_free(const_cast<uint8_t*>(out->mask_data));
         *out = RAC_DIFFUSION_OPTIONS_DEFAULT;
-        return false;
+        return code;
     };
     if ((!in.prompt().empty() && !out->prompt) ||
         (!in.negative_prompt().empty() && !out->negative_prompt))
-        return fail();
+        return fail(RAC_ERROR_OUT_OF_MEMORY);
     if (in.width() > 0)
         out->width = in.width();
     if (in.height() > 0)
@@ -830,29 +832,29 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
         // Shared across SDKs: reject non-PNG/JPEG payloads before engine dispatch
         // so Kotlin/Swift/Web inpaint helpers do not re-implement sniffing.
         if (!encoded_image_media_type_matches(in.image(), in.image_media_type()))
-            return fail();
+            return fail(RAC_ERROR_DECODING_ERROR);
         out->input_image_data = copy_bytes(in.image());
         if (!out->input_image_data)
-            return fail();
+            return fail(RAC_ERROR_OUT_OF_MEMORY);
         out->input_image_size = in.image().size();
     }
     if (in.has_mask_image() && !in.mask_image().empty()) {
         if (!encoded_image_media_type_matches(in.mask_image(), in.mask_image_media_type()))
-            return fail();
+            return fail(RAC_ERROR_DECODING_ERROR);
         out->mask_data = copy_bytes(in.mask_image());
         if (!out->mask_data)
-            return fail();
+            return fail(RAC_ERROR_OUT_OF_MEMORY);
         out->mask_size = in.mask_image().size();
     }
     if (out->mode == RAC_DIFFUSION_MODE_INPAINTING) {
         if (!out->input_image_data || out->input_image_size == 0 || !out->mask_data ||
             out->mask_size == 0) {
-            return fail();
+            return fail(RAC_ERROR_DECODING_ERROR);
         }
     }
     if (out->mode == RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE) {
         if (!out->input_image_data || out->input_image_size == 0) {
-            return fail();
+            return fail(RAC_ERROR_DECODING_ERROR);
         }
     }
     // input_image_width/input_image_height were deleted from the proto
@@ -863,7 +865,7 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
     // report_intermediate_images / progress_stride were deleted from the
     // proto outright; leave the C struct at RAC_DIFFUSION_OPTIONS_DEFAULT's
     // values (no per-request override exists on the wire anymore).
-    return true;
+    return RAC_SUCCESS;
 }
 
 bool rac_diffusion_progress_to_proto(const rac_diffusion_progress_t* in,
@@ -978,10 +980,10 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
 // EMBEDDINGS
 // ===========================================================================
 
-bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
-                                       rac_embeddings_options_t* out) {
+rac_result_t rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
+                                               rac_embeddings_options_t* out) {
     if (!out)
-        return false;
+        return RAC_ERROR_NULL_POINTER;
     *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
 
     // EmbeddingsOptions.normalize is `optional` with rac_default "true", so
@@ -1006,17 +1008,17 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
             out->pooling = RAC_EMBEDDINGS_POOLING_LAST;
             break;
         default:
-            return false;
+            return RAC_ERROR_DECODING_ERROR;
     }
 
     if (in.n_threads() < 0) {
-        return false;
+        return RAC_ERROR_DECODING_ERROR;
     }
     out->n_threads = in.n_threads();
     out->truncate = in.has_truncate() ? (in.truncate() ? 1 : 0) : -1;
     if (in.has_batch_size()) {
         if (in.batch_size() <= 0 || in.batch_size() > RAC_EMBEDDINGS_MAX_BATCH_SIZE) {
-            return false;
+            return RAC_ERROR_DECODING_ERROR;
         }
         out->batch_size = in.batch_size();
     }
@@ -1032,9 +1034,9 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
             out->input_type = RAC_EMBEDDINGS_INPUT_TYPE_DOCUMENT;
             break;
         default:
-            return false;
+            return RAC_ERROR_DECODING_ERROR;
     }
-    return true;
+    return RAC_SUCCESS;
 }
 
 bool rac_embedding_vector_to_proto(const rac_embedding_vector_t* in,
