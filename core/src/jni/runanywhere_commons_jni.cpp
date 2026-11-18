@@ -5174,20 +5174,31 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeR
 
     // 1. Global-ref the lambda so it survives past this thunk.
     jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
-    if (!lambdaRef)
+    if (!lambdaRef) {
+        jniClearPendingException(env);
         return 0;
+    }
 
-    // 2. Resolve + cache Function1.invoke(Object)
+    // 2. Resolve + cache Function1.invoke(Object). Every failed lookup clears
+    //    its pending exception so it cannot leak into the next JNI call on
+    //    this thread.
     jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
     if (!localFunction1) {
+        jniClearPendingException(env);
         env->DeleteGlobalRef(lambdaRef);
         return 0;
     }
     jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
     env->DeleteLocalRef(localFunction1);
+    if (!function1Cls) {
+        jniClearPendingException(env);
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
     jmethodID invokeMid =
         env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
     if (!invokeMid) {
+        jniClearPendingException(env);
         env->DeleteGlobalRef(lambdaRef);
         env->DeleteGlobalRef(function1Cls);
         return 0;
@@ -5319,20 +5330,31 @@ Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeRegister
 
     // 1. Global-ref the lambda so it survives past this thunk.
     jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
-    if (!lambdaRef)
+    if (!lambdaRef) {
+        jniClearPendingException(env);
         return 0;
+    }
 
-    // 2. Resolve + cache Function1.invoke(Object)
+    // 2. Resolve + cache Function1.invoke(Object). Every failed lookup clears
+    //    its pending exception so it cannot leak into the next JNI call on
+    //    this thread.
     jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
     if (!localFunction1) {
+        jniClearPendingException(env);
         env->DeleteGlobalRef(lambdaRef);
         return 0;
     }
     jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
     env->DeleteLocalRef(localFunction1);
+    if (!function1Cls) {
+        jniClearPendingException(env);
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
     jmethodID invokeMid =
         env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
     if (!invokeMid) {
+        jniClearPendingException(env);
         env->DeleteGlobalRef(lambdaRef);
         env->DeleteGlobalRef(function1Cls);
         return 0;
