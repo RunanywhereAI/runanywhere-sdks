@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <new>
@@ -1066,6 +1067,11 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str,
  * An envelope such as {"function": {"name": ..., "arguments": ...}} is unwrapped
  * once, and so is the single call in OpenAI's {"tool_calls": [...]} array.
  * @p nesting tells the inner passes which of these they are.
+ *
+ * A {"tool_calls": [...]} array with several calls is unwrapped only when the
+ * caller passes @p out_extra_calls: the first call fills the outputs and the
+ * rest are appended there, in order. Without a sink the array keeps the
+ * name-as-key reading, so a single-call caller never drops calls silently.
  */
 enum class ToolCallNesting {
     kTopLevel,
@@ -1073,9 +1079,16 @@ enum class ToolCallNesting {
     kEnvelope,      // inside an envelope: 1 and 2 only
 };
 
+// A call after the first in a multi-element {"tool_calls": [...]} array.
+struct ExtraToolCall {
+    std::string tool_name;
+    std::string arguments_json;
+};
+
 static ToolParseStatus
 extract_tool_name_and_args(const char* json_obj, char** out_tool_name, char** out_args_json,
-                           ToolCallNesting nesting = ToolCallNesting::kTopLevel) {
+                           ToolCallNesting nesting = ToolCallNesting::kTopLevel,
+                           std::vector<ExtraToolCall>* out_extra_calls = nullptr) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
 
@@ -1262,8 +1275,9 @@ extract_tool_name_and_args(const char* json_obj, char** out_tool_name, char** ou
     }
 
     // OpenAI's wire shape: {"tool_calls": [{"type": "function", "function": {...}}]}.
-    // Only a lone call is unwrapped; with several, taking the first would drop
-    // the rest without a trace.
+    // A lone call is always unwrapped. Several are unwrapped only into a caller's
+    // extra-call sink, and only when every element resolves to a call; otherwise
+    // taking the first would drop the rest without a trace.
     {
         char* value = nullptr;
         json_value_kind_t kind = JSON_VALUE_STRING;
@@ -1282,6 +1296,50 @@ extract_tool_name_and_args(const char* json_obj, char** out_tool_name, char** ou
                 call.c_str(), out_tool_name, out_args_json, ToolCallNesting::kArrayElement);
             if (call_status != ToolParseStatus::kNoMatch) {
                 return call_status;
+            }
+        } else if (calls_status == ToolParseStatus::kSuccess && kind == JSON_VALUE_ARRAY &&
+                   out_extra_calls && calls.is_array() && calls.size() > 1) {
+            std::vector<ExtraToolCall> resolved;
+            resolved.reserve(calls.size());
+            ToolParseStatus array_status = ToolParseStatus::kSuccess;
+            for (const auto& element : calls) {
+                if (!element.is_object()) {
+                    array_status = ToolParseStatus::kNoMatch;
+                    break;
+                }
+                const std::string call = element.dump();
+                char* name = nullptr;
+                char* args = nullptr;
+                array_status = extract_tool_name_and_args(call.c_str(), &name, &args,
+                                                          ToolCallNesting::kArrayElement);
+                const std::unique_ptr<char, decltype(&std::free)> owned_name(name, &std::free);
+                const std::unique_ptr<char, decltype(&std::free)> owned_args(args, &std::free);
+                if (array_status != ToolParseStatus::kSuccess) {
+                    break;
+                }
+                if (!owned_name || !owned_args) {
+                    array_status = ToolParseStatus::kNoMatch;
+                    break;
+                }
+                resolved.push_back({owned_name.get(), owned_args.get()});
+            }
+            if (array_status == ToolParseStatus::kSuccess) {
+                *out_tool_name = dup_owned_string(resolved.front().tool_name);
+                *out_args_json = dup_owned_string(resolved.front().arguments_json);
+                if (!*out_tool_name || !*out_args_json) {
+                    free(*out_tool_name);
+                    free(*out_args_json);
+                    *out_tool_name = nullptr;
+                    *out_args_json = nullptr;
+                    return ToolParseStatus::kOutOfMemory;
+                }
+                out_extra_calls->insert(out_extra_calls->end(),
+                                        std::make_move_iterator(resolved.begin() + 1),
+                                        std::make_move_iterator(resolved.end()));
+                return ToolParseStatus::kSuccess;
+            }
+            if (array_status != ToolParseStatus::kNoMatch) {
+                return array_status;
             }
         }
     }
@@ -1807,8 +1865,9 @@ static ToolParseStatus parse_pythonic_format(const char* llm_output, char** out_
  *
  * @return Structured parse status distinguishing no match from allocation failure
  */
-static ToolParseStatus parse_default_format(const char* llm_output, char** out_tool_name,
-                                            char** out_args_json, char** out_clean_text);
+static ToolParseStatus
+parse_default_format(const char* llm_output, char** out_tool_name, char** out_args_json,
+                     char** out_clean_text, std::vector<ExtraToolCall>* out_extra_calls = nullptr);
 
 // =============================================================================
 // PARSE TOOL CALL - Main entry points
@@ -1826,7 +1885,8 @@ extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_cal
  * Parses the default <tool_call>JSON</tool_call> format.
  */
 static ToolParseStatus parse_default_format(const char* llm_output, char** out_tool_name,
-                                            char** out_args_json, char** out_clean_text) {
+                                            char** out_args_json, char** out_clean_text,
+                                            std::vector<ExtraToolCall>* out_extra_calls) {
     *out_tool_name = nullptr;
     *out_args_json = nullptr;
     *out_clean_text = nullptr;
@@ -1888,8 +1948,12 @@ static ToolParseStatus parse_default_format(const char* llm_output, char** out_t
     // Extract tool name and arguments
     const std::unique_ptr<char, decltype(&std::free)> owned_normalized_json(normalized_json,
                                                                            &std::free);
-    const ToolParseStatus extract_status =
-        extract_tool_name_and_args(owned_normalized_json.get(), out_tool_name, out_args_json);
+    // Extra calls are staged locally so a later failure in this function
+    // leaves the caller's sink untouched.
+    std::vector<ExtraToolCall> extra_calls;
+    const ToolParseStatus extract_status = extract_tool_name_and_args(
+        owned_normalized_json.get(), out_tool_name, out_args_json, ToolCallNesting::kTopLevel,
+        out_extra_calls ? &extra_calls : nullptr);
     if (extract_status != ToolParseStatus::kSuccess) {
         return extract_status;
     }
@@ -1925,12 +1989,20 @@ static ToolParseStatus parse_default_format(const char* llm_output, char** out_t
     memcpy(*out_clean_text, clean_text.c_str() + trim_start, clean_len);
     (*out_clean_text)[clean_len] = '\0';
 
+    if (out_extra_calls) {
+        out_extra_calls->insert(out_extra_calls->end(),
+                                std::make_move_iterator(extra_calls.begin()),
+                                std::make_move_iterator(extra_calls.end()));
+    }
     return ToolParseStatus::kSuccess;
 }
 
-extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
-                                                        rac_tool_call_format_t format,
-                                                        rac_tool_call_t* out_result) {
+// Parses one call into @p out_result. With @p out_extra_calls, the rest of a
+// multi-element {"tool_calls": [...]} array lands there (see
+// extract_tool_name_and_args); the public C entry points pass none.
+static rac_result_t parse_tool_call_impl(const char* llm_output, rac_tool_call_format_t format,
+                                         rac_tool_call_t* out_result,
+                                         std::vector<ExtraToolCall>* out_extra_calls) {
     if (!llm_output || !out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1953,8 +2025,9 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     try {
         switch (format) {
             case RAC_TOOL_FORMAT_DEFAULT:
-                parse_status = parse_default_format(llm_output, &parsed.tool_name,
-                                                    &parsed.arguments_json, &parsed.clean_text);
+                parse_status =
+                    parse_default_format(llm_output, &parsed.tool_name, &parsed.arguments_json,
+                                         &parsed.clean_text, out_extra_calls);
                 break;
 
             case RAC_TOOL_FORMAT_LFM2:
@@ -1966,8 +2039,9 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
                 // fall-through to the default parser recovers a well-formed call in that shape
                 // rather than silently dropping it.
                 if (parse_status == ToolParseStatus::kNoMatch) {
-                    parse_status = parse_default_format(
-                        llm_output, &parsed.tool_name, &parsed.arguments_json, &parsed.clean_text);
+                    parse_status =
+                        parse_default_format(llm_output, &parsed.tool_name, &parsed.arguments_json,
+                                             &parsed.clean_text, out_extra_calls);
                     if (parse_status == ToolParseStatus::kSuccess) {
                         effective_format = RAC_TOOL_FORMAT_DEFAULT;
                     }
@@ -2021,6 +2095,12 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     }
 
     return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
+                                                        rac_tool_call_format_t format,
+                                                        rac_tool_call_t* out_result) {
+    return parse_tool_call_impl(llm_output, format, out_result, nullptr);
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -2469,13 +2549,20 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
 
     OwnedToolCall parsed;
     const bool use_explicit_format = request.has_options() && request.options().has_format();
-    const rac_result_t rc = use_explicit_format
-                                ? rac_tool_call_parse_with_format(
-                                      request.text().c_str(),
-                                      rac_tool_call_format_from_name(
-                                          tool_format_key_from_proto(request.options().format())),
-                                      parsed.out())
-                                : rac_tool_call_parse(request.text().c_str(), parsed.out());
+    const bool parallel = request.has_options() && request.options().parallel_tool_calls();
+    // Parses @p text, collecting the rest of a multi-element tool_calls array
+    // into @p extra_calls when the caller opted into parallel_tool_calls.
+    const auto parse_text = [&](const char* text, rac_tool_call_t* out_call,
+                                std::vector<ExtraToolCall>* extra_calls) {
+        const rac_tool_call_format_t format =
+            use_explicit_format
+                ? rac_tool_call_format_from_name(
+                      tool_format_key_from_proto(request.options().format()))
+                : rac_tool_call_detect_format(text);
+        return parse_tool_call_impl(text, format, out_call, parallel ? extra_calls : nullptr);
+    };
+    std::vector<ExtraToolCall> extra_calls;
+    const rac_result_t rc = parse_text(request.text().c_str(), parsed.out(), &extra_calls);
     if (rc != RAC_SUCCESS) {
         return set_tool_parse_proto_error(out_result, request.text(), "tool-call parsing failed",
                                           rc);
@@ -2486,15 +2573,16 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
     result.set_has_tool_call(has_tool_call);
     result.set_remaining_text(parsed.get().clean_text ? parsed.get().clean_text : request.text());
 
-    const auto append_parsed_call = [&result, &request](const rac_tool_call_t& call) {
-        const int64_t call_number = call.call_id != 0 ? call.call_id : next_tool_call_id();
+    const auto append_call = [&result, &request](const char* tool_name, const char* arguments_json,
+                                                 int64_t parsed_call_id) {
+        const int64_t call_number = parsed_call_id != 0 ? parsed_call_id : next_tool_call_id();
         const int64_t created_at_ms = static_cast<int64_t>(std::time(nullptr)) * 1000;
         std::string call_id = "call_";
         call_id += std::to_string(call_number);
         auto* tool_call = result.add_tool_calls();
         tool_call->set_id(call_id);
-        tool_call->set_name(call.tool_name ? call.tool_name : "");
-        tool_call->set_arguments_json(call.arguments_json ? call.arguments_json : "{}");
+        tool_call->set_name(tool_name ? tool_name : "");
+        tool_call->set_arguments_json(arguments_json ? arguments_json : "{}");
         // ToolCall.type (was the constant "function") was deleted outright
         // (idl/tool_calling.proto, tools-reserve-dead-fields) — no code reads
         // it, so there is nothing to set.
@@ -2503,12 +2591,16 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
     };
 
     if (has_tool_call) {
-        append_parsed_call(parsed.get());
+        append_call(parsed.get().tool_name, parsed.get().arguments_json, parsed.get().call_id);
 
         // parallel_tool_calls: one model turn may emit several envelopes.
         // The C parser extracts one envelope per invocation, so re-parse the
         // clean text it hands back until no envelope remains. Only the caller
         // that opted in pays this cost; the default path stays single-parse.
+        // An envelope holding OpenAI's {"tool_calls": [...]} array with several
+        // calls hands the calls after the first back as extra_calls (the clean
+        // text never contains what was inside the tag), and they are appended
+        // here, in order, before the next envelope is parsed.
         //
         // Guardrails against a real failure mode observed with small models
         // under AUTO (no grammar constraint): the model repeats the SAME
@@ -2520,7 +2612,7 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
         // user's request. Stop harvesting the moment a call repeats the
         // immediately-preceding (name, arguments) pair, and never harvest
         // more than the request's own max_tool_calls budget.
-        if (request.has_options() && request.options().parallel_tool_calls()) {
+        if (parallel) {
             const int32_t budget =
                 request.options().has_max_tool_calls() && request.options().max_tool_calls() > 0
                     ? request.options().max_tool_calls()
@@ -2528,17 +2620,29 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
             std::string last_name = parsed.get().tool_name ? parsed.get().tool_name : "";
             std::string last_args =
                 parsed.get().arguments_json ? parsed.get().arguments_json : "{}";
+            // Appends @p calls under the budget and the repeat guard; false
+            // once harvesting must stop.
+            const auto append_extra_calls = [&](const std::vector<ExtraToolCall>& calls) {
+                for (const ExtraToolCall& call : calls) {
+                    if (result.tool_calls_size() >= budget) {
+                        return false;
+                    }
+                    if (call.tool_name == last_name && call.arguments_json == last_args) {
+                        return false;
+                    }
+                    append_call(call.tool_name.c_str(), call.arguments_json.c_str(), 0);
+                    last_name = call.tool_name;
+                    last_args = call.arguments_json;
+                }
+                return true;
+            };
             std::string remainder = parsed.get().clean_text ? parsed.get().clean_text : "";
-            while (!remainder.empty() && result.tool_calls_size() < budget) {
+            bool harvesting = append_extra_calls(extra_calls);
+            while (harvesting && !remainder.empty() && result.tool_calls_size() < budget) {
                 OwnedToolCall next;
+                std::vector<ExtraToolCall> next_extra_calls;
                 const rac_result_t next_rc =
-                    use_explicit_format
-                        ? rac_tool_call_parse_with_format(
-                              remainder.c_str(),
-                              rac_tool_call_format_from_name(
-                                  tool_format_key_from_proto(request.options().format())),
-                              next.out())
-                        : rac_tool_call_parse(remainder.c_str(), next.out());
+                    parse_text(remainder.c_str(), next.out(), &next_extra_calls);
                 if (next_rc != RAC_SUCCESS) {
                     return set_tool_parse_proto_error(
                         out_result, request.text(), "tool-call parsing failed", next_rc);
@@ -2555,10 +2659,11 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
                     // rather than treat the stutter as further intent.
                     break;
                 }
-                append_parsed_call(next.get());
+                append_call(next.get().tool_name, next.get().arguments_json, next.get().call_id);
                 remainder = next.get().clean_text ? next.get().clean_text : "";
                 last_name = next_name;
                 last_args = next_args;
+                harvesting = append_extra_calls(next_extra_calls);
             }
             result.set_remaining_text(remainder);
         }

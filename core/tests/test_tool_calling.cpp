@@ -299,7 +299,8 @@ int test_parse_default_nested_keys_stay_arguments() {
         {R"(<tool_call>{"tool_calls":[]}</tool_call>)", "tool_calls", R"({"input":"[]"})"},
         {R"(<tool_call>{"tool_calls":[{"city":"Paris"}]}</tool_call>)", "tool_calls",
          R"({"input":"[{\"city\":\"Paris\"}]"})"},
-        // two calls are not collapsed into the first one
+        // two calls are not collapsed into the first one (the single-call C API has
+        // nowhere to put the second; the proto ABI returns both under parallel_tool_calls)
         {R"(<tool_call>{"tool_calls":[{"name":"a"},{"name":"b"}]}</tool_call>)", "tool_calls",
          R"({"input":"[{\"name\":\"a\"},{\"name\":\"b\"}]"})"},
         // an array argument of a name-as-key tool is not read as a call
@@ -1151,6 +1152,109 @@ int test_parse_proto_round_trip() {
 #endif
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
+static bool parse_proto_text(const char* text, bool parallel, int32_t max_tool_calls,
+                             runanywhere::v1::ToolParseResult* out) {
+    runanywhere::v1::ToolParseRequest request;
+    request.set_text(text);
+    request.mutable_options()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    request.mutable_options()->set_parallel_tool_calls(parallel);
+    if (max_tool_calls > 0) {
+        request.mutable_options()->set_max_tool_calls(max_tool_calls);
+    }
+
+    std::string request_bytes;
+    if (!request.SerializeToString(&request_bytes)) {
+        return false;
+    }
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    const rac_result_t rc =
+        rac_tool_call_parse_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                  request_bytes.size(), &result_bytes);
+    const bool ok = rc == RAC_SUCCESS && result_bytes.status == RAC_SUCCESS &&
+                    result_bytes.data != nullptr &&
+                    out->ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size));
+    rac_proto_buffer_free(&result_bytes);
+    return ok;
+}
+#endif
+
+// ---------------------------------------------------------------------------
+// 13b. proto ABI: every call in a multi-element OpenAI tool_calls array
+// ---------------------------------------------------------------------------
+int test_parse_proto_multi_element_tool_calls() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    const char* two_calls = R"(<tool_call>{"tool_calls":[{"name":"a"},{"name":"b"}]}</tool_call>)";
+
+    // parallel_tool_calls: both calls, in order
+    {
+        runanywhere::v1::ToolParseResult result;
+        ASSERT_TRUE(parse_proto_text(two_calls, true, 0, &result));
+        ASSERT_EQ_INT(result.has_tool_call(), true);
+        ASSERT_EQ_INT(result.tool_calls_size(), 2);
+        ASSERT_EQ_STR(result.tool_calls(0).name().c_str(), "a");
+        ASSERT_EQ_STR(result.tool_calls(1).name().c_str(), "b");
+        ASSERT_TRUE(result.tool_calls(0).id() != result.tool_calls(1).id());
+    }
+    // ...with OpenAI's own element shape and string arguments, after a lone envelope
+    {
+        runanywhere::v1::ToolParseResult result;
+        ASSERT_TRUE(parse_proto_text(
+            R"(<tool_call>{"tool_calls":[)"
+            R"({"id":"call_1","type":"function","function":{"name":"get_weather",)"
+            R"("arguments":"{\"city\":\"Paris\"}"}},)"
+            R"({"id":"call_2","type":"function","function":{"name":"get_time",)"
+            R"("arguments":"{\"zone\":\"CET\"}"}}]}</tool_call>)"
+            R"( <tool_call>{"tool":"echo","arguments":{"text":"hi"}}</tool_call>)",
+            true, 0, &result));
+        ASSERT_EQ_INT(result.tool_calls_size(), 3);
+        ASSERT_EQ_STR(result.tool_calls(0).name().c_str(), "get_weather");
+        ASSERT_EQ_STR(result.tool_calls(0).arguments_json().c_str(), R"({"city":"Paris"})");
+        ASSERT_EQ_STR(result.tool_calls(1).name().c_str(), "get_time");
+        ASSERT_EQ_STR(result.tool_calls(1).arguments_json().c_str(), R"({"zone":"CET"})");
+        ASSERT_EQ_STR(result.tool_calls(2).name().c_str(), "echo");
+    }
+    // the max_tool_calls budget bounds the array
+    {
+        runanywhere::v1::ToolParseResult result;
+        ASSERT_TRUE(parse_proto_text(
+            R"(<tool_call>{"tool_calls":[{"name":"a"},{"name":"b"},{"name":"c"}]}</tool_call>)",
+            true, 2, &result));
+        ASSERT_EQ_INT(result.tool_calls_size(), 2);
+        ASSERT_EQ_STR(result.tool_calls(1).name().c_str(), "b");
+    }
+    // the repeat guard stops at a call that repeats the one before it
+    {
+        runanywhere::v1::ToolParseResult result;
+        ASSERT_TRUE(parse_proto_text(
+            R"(<tool_call>{"tool_calls":[{"name":"a"},{"name":"a"},{"name":"b"}]}</tool_call>)",
+            true, 0, &result));
+        ASSERT_EQ_INT(result.tool_calls_size(), 1);
+        ASSERT_EQ_STR(result.tool_calls(0).name().c_str(), "a");
+    }
+    // elements that do not all resolve to a call keep the old reading
+    {
+        runanywhere::v1::ToolParseResult result;
+        ASSERT_TRUE(parse_proto_text(
+            R"(<tool_call>{"tool_calls":[{"name":"a"},{"city":"Paris"}]}</tool_call>)", true, 0,
+            &result));
+        ASSERT_EQ_INT(result.tool_calls_size(), 1);
+        ASSERT_EQ_STR(result.tool_calls(0).name().c_str(), "tool_calls");
+    }
+    // without parallel_tool_calls only one call can be returned, so none is dropped
+    {
+        runanywhere::v1::ToolParseResult result;
+        ASSERT_TRUE(parse_proto_text(two_calls, false, 0, &result));
+        ASSERT_EQ_INT(result.tool_calls_size(), 1);
+        ASSERT_EQ_STR(result.tool_calls(0).name().c_str(), "tool_calls");
+    }
+    return 0;
+#endif
+}
+
 // ---------------------------------------------------------------------------
 // 14. generated proto ABI: format ToolPromptFormatRequest -> Result
 // ---------------------------------------------------------------------------
@@ -1529,6 +1633,8 @@ int main(int argc, char** argv) {
         {.name = "validate_tool_call_json_definitions",
          .fn = test_validate_tool_call_json_definitions},
         {.name = "parse_proto_round_trip", .fn = test_parse_proto_round_trip},
+        {.name = "parse_proto_multi_element_tool_calls",
+         .fn = test_parse_proto_multi_element_tool_calls},
         {.name = "format_prompt_proto_round_trip", .fn = test_format_prompt_proto_round_trip},
         {.name = "format_specific_zero_parameter_prompt",
          .fn = test_format_specific_zero_parameter_prompt},
