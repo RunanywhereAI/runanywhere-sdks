@@ -1297,6 +1297,15 @@ interface RAGTokenSpan {
   endOffset: number;
   /** Budget units this token costs: 1 for an ordinary word, its code-point count for a space-free script run. */
   weight: number;
+  /** True when the token is charged per code point (a space-free script run, or a piece of a split oversized run). */
+  perCodePoint: boolean;
+  /**
+   * Budget units charged for the whitespace between the previous token and this one when both
+   * land in the same chunk: the separator's code-point count when either neighbour is charged
+   * per code point, 0 between ordinary words (which are counted as words, not code points), and
+   * 0 for the first token or for pieces of the same whitespace-free run.
+   */
+  gapWeight: number;
 }
 
 /** Scripts written without inter-word spaces, so one whitespace run can hold many words. */
@@ -1319,8 +1328,11 @@ function countCodePoints(str: string): number {
  * Uses whitespace tokenization for spaced text and splits oversized tokens (such as CJK,
  * Thai, or long whitespace-free strings exceeding the budget) by Unicode code
  * points without breaking surrogate pairs. Ordinary words cost one budget unit; space-free
- * script runs cost one unit per code point, so a chunk never exceeds `size` code points
- * however those runs are distributed across lines. Iteratively appends chunks to avoid stack limits.
+ * script runs cost one unit per code point, and so does the whitespace between two tokens
+ * when either of them is charged per code point. A chunk of space-free script text therefore
+ * never exceeds `size` code points of raw text, separators included, however those runs are
+ * distributed across lines — matching the C++ core, which counts separators toward its budget
+ * (#1130). Iteratively appends chunks to avoid stack limits.
  */
 function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
   const matches = [...text.matchAll(/\S+/g)];
@@ -1337,6 +1349,14 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   // on Unicode code-point boundaries (preventing surrogate pair corruption). Ordinary spaced words
   // within or slightly exceeding tiny budgets remain atomic tokens, matching the C++ core separator-first behavior.
   const tokens: RAGTokenSpan[] = [];
+  const pushToken = (startOffset: number, endOffset: number, weight: number, perCodePoint: boolean): void => {
+    const prev = tokens[tokens.length - 1];
+    const gapWeight =
+      prev !== undefined && prev.endOffset < startOffset && (prev.perCodePoint || perCodePoint)
+        ? countCodePoints(text.slice(prev.endOffset, startOffset))
+        : 0;
+    tokens.push({ startOffset, endOffset, weight, perCodePoint, gapWeight });
+  };
   for (const match of matches) {
     const matchStart = match.index ?? 0;
     // A whitespace-free word that mixes Latin text with a space-free script is cut into Latin
@@ -1355,19 +1375,11 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
       const isOversized = cpCount > size && (isScriptRun || cpCount > 40);
 
       if (!isOversized) {
-        tokens.push({
-          startOffset: pieceStart,
-          endOffset: pieceStart + pieceText.length,
-          weight: isScriptRun ? cpCount : 1,
-        });
+        pushToken(pieceStart, pieceStart + pieceText.length, isScriptRun ? cpCount : 1, isScriptRun);
       } else {
         let currentOffset = pieceStart;
         for (const char of pieceText) {
-          tokens.push({
-            startOffset: currentOffset,
-            endOffset: currentOffset + char.length,
-            weight: 1,
-          });
+          pushToken(currentOffset, currentOffset + char.length, 1, true);
           currentOffset += char.length;
         }
       }
@@ -1381,8 +1393,11 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
   while (start < tokens.length) {
     let end = start;
     let used = 0;
-    while (end < tokens.length && (end === start || used + tokens[end]!.weight <= size)) {
-      used += tokens[end]!.weight;
+    while (end < tokens.length) {
+      // The separator before `end` is only charged once a token precedes it in this window.
+      const cost = tokens[end]!.weight + (end > start ? tokens[end]!.gapWeight : 0);
+      if (end > start && used + cost > size) break;
+      used += cost;
       end++;
     }
     const startOffset = tokens[start]!.startOffset;
@@ -1394,11 +1409,14 @@ function splitRAGText(text: string, requestedSize: number, requestedOverlap: num
       tokenCount: end - start,
     });
     if (end === tokens.length) break;
-    // Next window starts at the earliest token whose tail up to `end` fits the overlap budget.
+    // Next window starts at the earliest token whose tail up to `end` fits the overlap budget,
+    // counting the separators between the tail's tokens the same way the window does.
     let next = end;
     let tail = 0;
-    while (next > start + 1 && tail + tokens[next - 1]!.weight <= overlap) {
-      tail += tokens[next - 1]!.weight;
+    while (next > start + 1) {
+      const cost = tokens[next - 1]!.weight + (next < end ? tokens[next]!.gapWeight : 0);
+      if (tail + cost > overlap) break;
+      tail += cost;
       next--;
     }
     start = next;

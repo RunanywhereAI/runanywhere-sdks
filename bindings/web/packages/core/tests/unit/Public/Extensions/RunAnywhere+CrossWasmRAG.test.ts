@@ -817,8 +817,65 @@ ${'中'.repeat(20)}`;
     const chunks = __testing__.splitRAGText(doc, 20, 0);
     expect(chunks.length).toBe(2);
     for (const chunk of chunks) {
-      expect([...chunk.text.replace(/\s/g, '')].length).toBeLessThanOrEqual(20);
+      expect([...chunk.text].length).toBeLessThanOrEqual(20);
     }
+  });
+});
+
+describe('splitRAGText separator accounting (#1130)', () => {
+  // Every chunk's raw text, separators included, must stay within the code-point budget.
+  function expectRawChunksWithin(doc: string, size: number, overlap: number) {
+    const chunks = __testing__.splitRAGText(doc, size, overlap);
+    expect(chunks.length).toBeGreaterThan(0);
+    for (const chunk of chunks) {
+      expect([...chunk.text].length).toBeLessThanOrEqual(size);
+      expect(doc.slice(chunk.startOffset, chunk.endOffset)).toBe(chunk.text);
+    }
+    // Together the chunks still cover every non-whitespace character of the document.
+    expect(chunks[0]!.startOffset).toBe(doc.search(/\S/));
+    expect(chunks[chunks.length - 1]!.endOffset).toBe(doc.trimEnd().length);
+    return chunks;
+  }
+
+  it('counts newlines between short CJK lines toward the budget', () => {
+    const doc = Array(10).fill('机器学习模').join('\n');
+    const chunks = expectRawChunksWithin(doc, 20, 0);
+    // Three 5-code-point lines plus two newlines is 17; a fourth line would need 23.
+    expect(chunks.map((c) => c.text)).toEqual([
+      '机器学习模\n机器学习模\n机器学习模',
+      '机器学习模\n机器学习模\n机器学习模',
+      '机器学习模\n机器学习模\n机器学习模',
+      '机器学习模',
+    ]);
+  });
+
+  it('keeps a long run of short CJK lines within a large budget', () => {
+    expectRawChunksWithin(Array(200).fill('机器学习模').join('\n'), 512, 0);
+  });
+
+  it('counts blank-line separators between single-character CJK lines', () => {
+    const doc = Array(20).fill('中').join('\n\n\n');
+    const chunks = expectRawChunksWithin(doc, 20, 0);
+    // Each character after the first costs 1 plus its 3-newline separator.
+    expect(chunks[0]!.text).toBe(Array(5).fill('中').join('\n\n\n'));
+  });
+
+  it('counts separators inside the overlap tail too', () => {
+    const doc = Array(10).fill('机器学习模').join('\n');
+    const chunks = expectRawChunksWithin(doc, 20, 11);
+    for (let i = 0; i < chunks.length - 1; i += 1) {
+      const overlapText = doc.slice(chunks[i + 1]!.startOffset, chunks[i]!.endOffset);
+      expect([...overlapText].length).toBeLessThanOrEqual(11);
+    }
+    // Two lines plus their newline (11 code points) fit the overlap; three (17) would not.
+    expect(chunks[1]!.text.startsWith('机器学习模\n机器学习模\n')).toBe(true);
+  });
+
+  it('still counts ordinary spaced words as one unit each, ignoring their separators', () => {
+    expect(__testing__.splitRAGText('The big red dog', 3, 0).map((c) => c.text)).toEqual([
+      'The big red',
+      'dog',
+    ]);
   });
 });
 
