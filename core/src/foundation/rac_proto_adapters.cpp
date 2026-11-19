@@ -985,6 +985,12 @@ rac_result_t rac_embeddings_options_from_proto(const ::runanywhere::v1::Embeddin
     if (!out)
         return RAC_ERROR_NULL_POINTER;
     *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    // A rejected value leaves no half-written fields behind: out is reset to
+    // the defaults before the error is returned.
+    const auto fail = [out]() -> rac_result_t {
+        *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+        return RAC_ERROR_DECODING_ERROR;
+    };
 
     // EmbeddingsOptions.normalize is `optional` with rac_default "true", so
     // presence separates "caller said false" from "caller said nothing"
@@ -1008,17 +1014,17 @@ rac_result_t rac_embeddings_options_from_proto(const ::runanywhere::v1::Embeddin
             out->pooling = RAC_EMBEDDINGS_POOLING_LAST;
             break;
         default:
-            return RAC_ERROR_DECODING_ERROR;
+            return fail();
     }
 
     if (in.n_threads() < 0) {
-        return RAC_ERROR_DECODING_ERROR;
+        return fail();
     }
     out->n_threads = in.n_threads();
     out->truncate = in.has_truncate() ? (in.truncate() ? 1 : 0) : -1;
     if (in.has_batch_size()) {
         if (in.batch_size() <= 0 || in.batch_size() > RAC_EMBEDDINGS_MAX_BATCH_SIZE) {
-            return RAC_ERROR_DECODING_ERROR;
+            return fail();
         }
         out->batch_size = in.batch_size();
     }
@@ -1034,7 +1040,7 @@ rac_result_t rac_embeddings_options_from_proto(const ::runanywhere::v1::Embeddin
             out->input_type = RAC_EMBEDDINGS_INPUT_TYPE_DOCUMENT;
             break;
         default:
-            return RAC_ERROR_DECODING_ERROR;
+            return fail();
     }
     return RAC_SUCCESS;
 }

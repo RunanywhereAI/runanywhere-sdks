@@ -31,6 +31,7 @@ namespace rac::foundation {
 // Returns RAC_ERROR_NULL_POINTER for a null out and RAC_ERROR_DECODING_ERROR for
 // an out-of-range value (unknown pooling or input type, negative n_threads, or a
 // batch_size outside 1..RAC_EMBEDDINGS_MAX_BATCH_SIZE). It allocates nothing.
+// On failure with non-null out, out is reset to RAC_EMBEDDINGS_OPTIONS_DEFAULT.
 rac_result_t rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
                                                rac_embeddings_options_t* out);
 

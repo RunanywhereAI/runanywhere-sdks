@@ -711,12 +711,18 @@ int test_options_adapter_result_codes() {
     CHECK(rac::foundation::rac_stt_options_from_proto(stt, nullptr) == RAC_ERROR_NULL_POINTER,
           "STT options adapter rejects a null destination");
 
+    // normalize=false is written before the n_threads check rejects the
+    // request, so this also proves out is reset rather than left half-written.
     runanywhere::v1::EmbeddingsOptions embeddings;
+    embeddings.set_normalize(false);
     embeddings.set_n_threads(-1);
     rac_embeddings_options_t embeddings_raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    const rac_embeddings_options_t embeddings_defaults = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
     CHECK(rac::foundation::rac_embeddings_options_from_proto(embeddings, &embeddings_raw) ==
-              RAC_ERROR_DECODING_ERROR,
-          "embeddings options adapter reports an out-of-range value as DECODING_ERROR");
+                  RAC_ERROR_DECODING_ERROR &&
+              embeddings_raw.normalize == embeddings_defaults.normalize,
+          "embeddings options adapter reports an out-of-range value as DECODING_ERROR and "
+          "resets out");
 
     // An image that is not a PNG/JPEG container is a malformed request, not an
     // allocation failure.
