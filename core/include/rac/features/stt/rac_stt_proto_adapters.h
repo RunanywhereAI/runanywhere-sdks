@@ -30,7 +30,12 @@ class TranscriptionAlternative;
 
 namespace rac::foundation {
 
-bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt_options_t* out);
+// Borrows `in`'s string storage, so `in` must outlive `out`. Returns
+// RAC_ERROR_NULL_POINTER for a null out; it allocates nothing, so it cannot
+// fail for lack of memory. Returns rac_result_t to match the other options
+// adapters.
+rac_result_t rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in,
+                                        rac_stt_options_t* out);
 
 bool rac_stt_word_to_proto(const rac_stt_word_t* in, ::runanywhere::v1::WordTimestamp* out);
 bool rac_stt_word_from_proto(const ::runanywhere::v1::WordTimestamp& in, rac_stt_word_t* out);

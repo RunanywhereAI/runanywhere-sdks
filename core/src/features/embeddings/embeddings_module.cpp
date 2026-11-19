@@ -221,10 +221,13 @@ rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
     }
 
     rac_embeddings_options_t options = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    if (request.has_options() &&
-        !rac::foundation::rac_embeddings_options_from_proto(request.options(), &options)) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to convert EmbeddingsOptions");
+    if (request.has_options()) {
+        const rac_result_t convert_rc =
+            rac::foundation::rac_embeddings_options_from_proto(request.options(), &options);
+        if (convert_rc != RAC_SUCCESS) {
+            return rac_proto_buffer_set_error(out_result, convert_rc,
+                                              "failed to convert EmbeddingsOptions");
+        }
     }
 
     std::vector<const char*> c_texts;
@@ -390,11 +393,16 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
                        "embeddings.embed", 0.0f, static_cast<int64_t>(texts.size()), 0, nullptr);
 
     rac_embeddings_options_t options = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    if (request.has_options() &&
-        !rac::foundation::rac_embeddings_options_from_proto(request.options(), &options)) {
-        rac::lifecycle::release_lifecycle_embeddings(&ref);
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to convert EmbeddingsOptions");
+    if (request.has_options()) {
+        const rac_result_t convert_rc =
+            rac::foundation::rac_embeddings_options_from_proto(request.options(), &options);
+        if (convert_rc != RAC_SUCCESS) {
+            // STARTED is already out; pair it like the embed-failure branch.
+            publish_failure(convert_rc, "embeddings.embed", "failed to convert EmbeddingsOptions");
+            rac::lifecycle::release_lifecycle_embeddings(&ref);
+            return rac_proto_buffer_set_error(out_result, convert_rc,
+                                              "failed to convert EmbeddingsOptions");
+        }
     }
 
     std::vector<const char*> c_texts;

@@ -26,12 +26,19 @@
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
+#include "rac/features/embeddings/rac_embeddings_proto_adapters.h"
+#include "rac/features/stt/rac_stt_proto_adapters.h"
+#include "rac/features/vlm/rac_vlm_proto_adapters.h"
+
 #include "diffusion_options.pb.h"
 #include "embeddings_options.pb.h"
+#include "llm_options.pb.h"
 #include "model_types.pb.h"
 #include "stt_options.pb.h"
 #include "tts_options.pb.h"
 #include "vad_options.pb.h"
+#include "vlm_options.pb.h"
 #endif
 
 #if defined(RAC_TEST_INTERPOSE_RAC_MEMORY)
@@ -696,6 +703,93 @@ int test_portable_source_blockers() {
     return 0;
 }
 
+// The options adapters report their failures by kind: a null destination is
+// NULL_POINTER, a malformed request is DECODING_ERROR, and a failed allocation
+// is OUT_OF_MEMORY, so a caller can tell a bad request from memory pressure.
+int test_options_adapter_result_codes() {
+    runanywhere::v1::STTOptions stt;
+    CHECK(rac::foundation::rac_stt_options_from_proto(stt, nullptr) == RAC_ERROR_NULL_POINTER,
+          "STT options adapter rejects a null destination");
+
+    // normalize=false is written before the n_threads check rejects the
+    // request, so this also proves out is reset rather than left half-written.
+    runanywhere::v1::EmbeddingsOptions embeddings;
+    embeddings.set_normalize(false);
+    embeddings.set_n_threads(-1);
+    rac_embeddings_options_t embeddings_raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    const rac_embeddings_options_t embeddings_defaults = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(embeddings, &embeddings_raw) ==
+                  RAC_ERROR_DECODING_ERROR &&
+              embeddings_raw.normalize == embeddings_defaults.normalize,
+          "embeddings options adapter reports an out-of-range value as DECODING_ERROR and "
+          "resets out");
+
+    // An image that is not a PNG/JPEG container is a malformed request, not an
+    // allocation failure.
+    runanywhere::v1::DiffusionGenerationOptions bad_image;
+    bad_image.set_prompt("a cat");
+    bad_image.set_image("not-an-image");
+    bad_image.set_image_media_type("image/png");
+    rac_diffusion_options_t diffusion_raw = RAC_DIFFUSION_OPTIONS_DEFAULT;
+    CHECK(rac::foundation::rac_diffusion_options_from_proto(bad_image, &diffusion_raw) ==
+                  RAC_ERROR_DECODING_ERROR &&
+              diffusion_raw.prompt == nullptr && diffusion_raw.input_image_data == nullptr,
+          "diffusion options adapter reports a mismatched image as DECODING_ERROR");
+
+#if defined(RAC_TEST_INTERPOSE_RAC_MEMORY)
+    {
+        runanywhere::v1::DiffusionGenerationOptions oom_prompt;
+        oom_prompt.set_prompt(kOomSentinel);
+        diffusion_raw = RAC_DIFFUSION_OPTIONS_DEFAULT;
+        CHECK(rac::foundation::rac_diffusion_options_from_proto(oom_prompt, &diffusion_raw) ==
+                      RAC_ERROR_OUT_OF_MEMORY &&
+                  diffusion_raw.prompt == nullptr,
+              "diffusion prompt allocation failure is OUT_OF_MEMORY");
+
+        // The prompt copy succeeds first, so this also proves it is released.
+        runanywhere::v1::DiffusionGenerationOptions oom_negative;
+        oom_negative.set_prompt("a cat");
+        oom_negative.set_negative_prompt(kOomSentinel);
+        diffusion_raw = RAC_DIFFUSION_OPTIONS_DEFAULT;
+        CHECK(rac::foundation::rac_diffusion_options_from_proto(oom_negative, &diffusion_raw) ==
+                      RAC_ERROR_OUT_OF_MEMORY &&
+                  diffusion_raw.prompt == nullptr && diffusion_raw.negative_prompt == nullptr,
+              "diffusion negative-prompt allocation failure is OUT_OF_MEMORY with no leftovers");
+    }
+    {
+        runanywhere::v1::LLMGenerationOptions oom_system;
+        oom_system.set_system_prompt(kOomSentinel);
+        rac_vlm_options_t vlm_raw = RAC_VLM_OPTIONS_DEFAULT;
+        CHECK(rac::foundation::rac_vlm_options_from_proto(oom_system, nullptr, &vlm_raw) ==
+                      RAC_ERROR_OUT_OF_MEMORY &&
+                  vlm_raw.system_prompt == nullptr,
+              "VLM system-prompt allocation failure is OUT_OF_MEMORY");
+
+        // The chat template is allocated before the marker override fails.
+        runanywhere::v1::LLMGenerationOptions plain;
+        runanywhere::v1::VLMVisionOptions oom_marker;
+        oom_marker.mutable_custom_chat_template()->set_template_text("{{prompt}}");
+        oom_marker.set_image_marker_override(kOomSentinel);
+        vlm_raw = RAC_VLM_OPTIONS_DEFAULT;
+        CHECK(rac::foundation::rac_vlm_options_from_proto(plain, &oom_marker, &vlm_raw) ==
+                      RAC_ERROR_OUT_OF_MEMORY &&
+                  vlm_raw.custom_chat_template == nullptr &&
+                  vlm_raw.image_marker_override == nullptr,
+              "VLM marker-override allocation failure is OUT_OF_MEMORY with no leftovers");
+
+        runanywhere::v1::LLMGenerationOptions oom_stop;
+        oom_stop.set_system_prompt("be brief");
+        oom_stop.add_stop_sequences(kOomSentinel);
+        vlm_raw = RAC_VLM_OPTIONS_DEFAULT;
+        CHECK(rac::foundation::rac_vlm_options_from_proto(oom_stop, nullptr, &vlm_raw) ==
+                      RAC_ERROR_OUT_OF_MEMORY &&
+                  vlm_raw.system_prompt == nullptr && vlm_raw.stop_sequences == nullptr,
+              "VLM stop-sequence allocation failure is OUT_OF_MEMORY with no leftovers");
+    }
+#endif
+    return 0;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -718,6 +812,7 @@ int main() {
 
         test_lifecycle_proto_operations(registry);
         test_portable_source_blockers();
+        test_options_adapter_result_codes();
 
         rac_model_lifecycle_reset();
         rac_plugin_unregister("onnx");

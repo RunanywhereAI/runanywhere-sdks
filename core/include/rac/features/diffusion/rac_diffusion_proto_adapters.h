@@ -28,8 +28,13 @@ class DiffusionResult;
 
 namespace rac::foundation {
 
-bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerationOptions& in,
-                                      rac_diffusion_options_t* out);
+// Returns RAC_ERROR_NULL_POINTER for a null out, RAC_ERROR_OUT_OF_MEMORY when a
+// string or image copy fails, and RAC_ERROR_DECODING_ERROR when the request is
+// malformed (an image payload that is not PNG/JPEG, or an image/inpainting mode
+// missing its image or mask). On failure with non-null out, every owned field is
+// released and out is reset to RAC_DIFFUSION_OPTIONS_DEFAULT.
+rac_result_t rac_diffusion_options_from_proto(
+    const ::runanywhere::v1::DiffusionGenerationOptions& in, rac_diffusion_options_t* out);
 
 bool rac_diffusion_progress_to_proto(const rac_diffusion_progress_t* in,
                                      ::runanywhere::v1::DiffusionProgress* out);

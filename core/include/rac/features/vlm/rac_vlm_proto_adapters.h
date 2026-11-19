@@ -38,9 +38,14 @@ namespace rac::foundation {
 // prompt is now VLMGenerationRequest.prompt (a top-level string), not part of
 // the options message, so this adapter no longer produces it -- callers read
 // request.prompt() directly.
-bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& in,
-                                const ::runanywhere::v1::VLMVisionOptions* vision,
-                                rac_vlm_options_t* out);
+//
+// Returns RAC_ERROR_NULL_POINTER for a null out and RAC_ERROR_OUT_OF_MEMORY when
+// an owned copy (chat template, marker override, system prompt, stop sequences)
+// fails; on failure every owned allocation is released via
+// rac_vlm_options_free_owned.
+rac_result_t rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& in,
+                                        const ::runanywhere::v1::VLMVisionOptions* vision,
+                                        rac_vlm_options_t* out);
 
 void rac_vlm_options_free_owned(rac_vlm_options_t* options);
 

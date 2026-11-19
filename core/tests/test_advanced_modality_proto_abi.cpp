@@ -1074,7 +1074,7 @@ int test_embeddings_options_mapping() {
     options.set_batch_size(32);
 
     rac_embeddings_options_t raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    CHECK(rac::foundation::rac_embeddings_options_from_proto(options, &raw),
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(options, &raw) == RAC_SUCCESS,
           "EmbeddingsOptions maps to the C ABI");
     CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_L2,
           "normalize_mode maps exactly");
@@ -1089,7 +1089,7 @@ int test_embeddings_options_mapping() {
     runanywhere::v1::EmbeddingsOptions no_normalize;
     no_normalize.set_normalize(false);
     raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    CHECK(rac::foundation::rac_embeddings_options_from_proto(no_normalize, &raw),
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(no_normalize, &raw) == RAC_SUCCESS,
           "EmbeddingsOptions with normalize=false maps");
     CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_NONE,
           "an explicit normalize=false reaches the C ABI as NONE");
@@ -1097,22 +1097,26 @@ int test_embeddings_options_mapping() {
     runanywhere::v1::EmbeddingsOptions yes_normalize;
     yes_normalize.set_normalize(true);
     raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    CHECK(rac::foundation::rac_embeddings_options_from_proto(yes_normalize, &raw),
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(yes_normalize, &raw) == RAC_SUCCESS,
           "EmbeddingsOptions with normalize=true maps");
     CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_L2,
           "an explicit normalize=true stays L2");
 
     runanywhere::v1::EmbeddingsOptions defaults;
     raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    CHECK(rac::foundation::rac_embeddings_options_from_proto(defaults, &raw),
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(defaults, &raw) == RAC_SUCCESS,
           "default EmbeddingsOptions maps");
     CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_L2 && raw.pooling == -1 && raw.n_threads == 0 &&
               raw.truncate == -1 && raw.batch_size == 0,
           "unset exact overrides retain backend defaults");
 
     options.set_n_threads(-1);
-    CHECK(!rac::foundation::rac_embeddings_options_from_proto(options, &raw),
-          "negative embedding thread override is rejected");
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(options, &raw) ==
+              RAC_ERROR_DECODING_ERROR,
+          "negative embedding thread override is rejected as a decoding error");
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(options, nullptr) ==
+              RAC_ERROR_NULL_POINTER,
+          "null embeddings options destination is rejected");
     return 0;
 }
 
