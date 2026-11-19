@@ -860,15 +860,32 @@ describe('splitRAGText separator accounting (#1130)', () => {
     expect(chunks[0]!.text).toBe(Array(5).fill('中').join('\n\n\n'));
   });
 
+  // The raw text shared by each pair of adjacent chunks.
+  function overlapsOf(doc: string, chunks: ReturnType<typeof __testing__.splitRAGText>) {
+    return chunks.slice(1).map((chunk, i) => doc.slice(chunk.startOffset, chunks[i]!.endOffset));
+  }
+
   it('counts separators inside the overlap tail too', () => {
     const doc = Array(10).fill('机器学习模').join('\n');
     const chunks = expectRawChunksWithin(doc, 20, 11);
-    for (let i = 0; i < chunks.length - 1; i += 1) {
-      const overlapText = doc.slice(chunks[i + 1]!.startOffset, chunks[i]!.endOffset);
-      expect([...overlapText].length).toBeLessThanOrEqual(11);
-    }
     // Two lines plus their newline (11 code points) fit the overlap; three (17) would not.
-    expect(chunks[1]!.text.startsWith('机器学习模\n机器学习模\n')).toBe(true);
+    const overlaps = overlapsOf(doc, chunks);
+    expect(overlaps.length).toBeGreaterThan(0);
+    for (const overlapText of overlaps) {
+      expect(overlapText).toBe('机器学习模\n机器学习模');
+    }
+  });
+
+  it('drops a tail line once its separator pushes the overlap past the budget', () => {
+    const doc = Array(10).fill('机器学习模').join('\n');
+    const chunks = expectRawChunksWithin(doc, 20, 10);
+    // Two lines cost 10 without their newline but 11 with it, so only one line fits.
+    // Token-only accounting would keep both and overrun the overlap by the newline.
+    const overlaps = overlapsOf(doc, chunks);
+    expect(overlaps.length).toBeGreaterThan(0);
+    for (const overlapText of overlaps) {
+      expect(overlapText).toBe('机器学习模');
+    }
   });
 
   it('still counts ordinary spaced words as one unit each, ignoring their separators', () => {
