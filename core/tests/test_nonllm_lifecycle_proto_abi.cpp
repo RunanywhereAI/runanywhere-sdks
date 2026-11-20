@@ -594,6 +594,38 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     CHECK(vad_result.duration_ms() > 0, "VAD lifecycle result carries duration");
     rac_proto_buffer_free(&out);
 
+    // #896: a per-request activation_threshold is for that request only. The
+    // samples average 0.2: speech at the 0.1 override, silence at the 0.3
+    // configured value. Before the fix the override stuck, so the follow-up
+    // request without one still reported speech.
+    {
+        runanywhere::v1::VADConfiguration vad_config;
+        vad_config.set_activation_threshold(0.3f);
+        std::vector<uint8_t> config_bytes;
+        CHECK(serialize(vad_config, &config_bytes), "VAD lifecycle configuration serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_configure_lifecycle_proto(config_bytes.data(), config_bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS, "VAD lifecycle configure applies 0.3");
+        rac_proto_buffer_free(&out);
+
+        CHECK(serialize(vad_request, &bytes), "VAD override request serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && vad_result.is_speech(),
+              "VAD lifecycle override (0.1) applies to its own request");
+        rac_proto_buffer_free(&out);
+
+        runanywhere::v1::VADProcessRequest plain_request = vad_request;
+        plain_request.clear_options();
+        CHECK(serialize(plain_request, &bytes), "VAD request without override serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && !vad_result.is_speech(),
+              "VAD lifecycle request without override runs at the configured 0.3, "
+              "not the previous request's override");
+        rac_proto_buffer_free(&out);
+    }
+
     runanywhere::v1::EmbeddingsRequest embeddings_request;
     embeddings_request.set_request_id("emb-1");
     embeddings_request.set_model_id("lifecycle.embeddings");
