@@ -143,6 +143,16 @@ static rac_result_t posixListDirectory(const char* path, char*** outEntries,
             continue;
         }
         entries[i] = strdup(entry->d_name);
+        if (!entries[i]) {
+            // Roll back rather than hand out a null slot: the consumers in
+            // core/src/file_manager.cpp strcmp every entry.
+            for (size_t j = 0; j < i; j++) {
+                free(entries[j]);
+            }
+            free(entries);
+            closedir(dir);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
         i++;
     }
     closedir(dir);
