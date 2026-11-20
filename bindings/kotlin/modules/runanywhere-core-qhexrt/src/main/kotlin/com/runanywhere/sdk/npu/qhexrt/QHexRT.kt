@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.withLock
 // RAC_ERROR_* constants (signed C ABI value = negated proto-enum magnitude).
 private val RAC_ERROR_BACKEND_UNAVAILABLE = -ErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE.value
 private val RAC_ERROR_CAPABILITY_UNSUPPORTED = -ErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED.value
+private val RAC_ERROR_PLUGIN_BUSY = -ErrorCode.ERROR_CODE_PLUGIN_BUSY.value
 
 /**
  * QHexRT module — RunAnywhere's Qualcomm Hexagon NPU backend.
@@ -99,13 +100,35 @@ object QHexRT {
         registrationMutex.withLock { registerInternal() }
     }
 
-    /** Unregister the QHexRT backend from the C++ registry. */
+    /**
+     * Unregister the QHexRT backend from the C++ registry.
+     *
+     * Calls native even when [isRegistered] is false: a rejected registration
+     * (unsupported device) still installs the bundle policy, and only the
+     * native unregister removes it. The native call is safe to repeat.
+     */
     suspend fun unregister() {
         registrationMutex.withLock {
-            if (!isRegistered) return
-            unregisterNative()
-            isRegistered = false
-            logger.info("QHexRT backend unregistered")
+            when (val result = unregisterNative()) {
+                RunAnywhereBridge.RAC_SUCCESS,
+                RunAnywhereBridge.RAC_ERROR_MODULE_NOT_FOUND,
+                -> {
+                    if (isRegistered) logger.info("QHexRT backend unregistered")
+                    isRegistered = false
+                }
+                // Native library never loaded, so nothing was installed.
+                RAC_ERROR_BACKEND_UNAVAILABLE -> {
+                    isRegistered = false
+                }
+                RAC_ERROR_PLUGIN_BUSY -> {
+                    logger.warning(
+                        "QHexRT backend still leased by a loaded model; unload it and retry unregistration",
+                    )
+                }
+                else -> {
+                    logger.warning("QHexRT unregistration failed with code: $result")
+                }
+            }
         }
     }
 
