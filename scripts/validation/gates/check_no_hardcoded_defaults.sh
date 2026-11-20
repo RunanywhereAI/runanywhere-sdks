@@ -40,7 +40,7 @@
 # Exit codes:
 #   0  No re-declared defaults found.
 #   1  At least one violation.
-#   2  Repo layout unexpected (idl/sdk_defaults.proto missing).
+#   2  Repo layout unexpected (idl/sdk_defaults.proto or a scan root missing).
 
 set -euo pipefail
 
@@ -58,8 +58,10 @@ LIST_ONLY=0
 [[ "${1:-}" == "--list" ]] && LIST_ONLY=1
 
 # ---------------------------------------------------------------------------
-# Scope. First-party SDK source for the six platform SDKs plus the two Android
-# plugin forks. Deliberately excluded:
+# Scope. First-party SDK source for the platform SDKs (Swift, Kotlin, Flutter,
+# React Native, Web, Python, Electron), including the three Kotlin engine
+# modules (bindings/kotlin/modules/runanywhere-core-{llamacpp,onnx,qhexrt}) and
+# the Electron engine packages. Deliberately excluded:
 #   */generated/*, */Generated/*   the pool and proto output — the declarations
 #   *.pb.*, *_pb2*, *.g.dart       proto codegen
 #   */_generated_*.py              Python codegen (no generated/ dir there)
@@ -71,17 +73,35 @@ LIST_ONLY=0
 # and this gate has to be runnable locally to reproduce a CI failure. Same
 # reasoning as bindings/swift/scripts/sync-dist-repo.sh and
 # scripts/build/build-core-android.sh.
+SCAN_ROOTS=(
+  bindings/swift/Sources
+  bindings/kotlin/src/main
+  bindings/kotlin/modules
+  bindings/flutter/packages
+  bindings/react-native/packages
+  bindings/web/packages
+  bindings/python/runanywhere
+  bindings/electron/src
+  bindings/electron/packages
+)
+
+# The find below runs in a process substitution with stderr discarded, where
+# set -e/pipefail do not apply: a renamed or removed root would just yield no
+# files and the gate would pass while scanning less. Check each root up front.
+for _root in "${SCAN_ROOTS[@]}"; do
+  if [[ ! -d "${_root}" ]]; then
+    printf "::error::Scan root '%s' is missing — the SDK layout moved. Update SCAN_ROOTS in this gate.\n" \
+      "${_root}" >&2
+    exit 2
+  fi
+done
+
 FILES=()
 while IFS= read -r _file; do
   FILES+=("$_file")
 done < <(
   find \
-    bindings/swift/Sources \
-    bindings/kotlin/src/main \
-    bindings/flutter/packages \
-    bindings/react-native/packages \
-    bindings/web/packages \
-    bindings/python/runanywhere \
+    "${SCAN_ROOTS[@]}" \
     -type f \
     \( -name '*.swift' -o -name '*.kt' -o -name '*.dart' -o -name '*.ts' -o -name '*.py' \) \
     2>/dev/null \
