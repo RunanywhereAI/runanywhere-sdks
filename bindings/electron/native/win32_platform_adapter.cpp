@@ -263,8 +263,10 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     size_t put = out.cbData ? fwrite(out.pbData, 1, out.cbData, f) : 0;
-    fclose(f);
-    bool ok = (put == out.cbData);
+    // The blob is far smaller than the stdio buffer, so the real disk write
+    // happens in fclose: a failure there must not be reported as success.
+    int close_rc = fclose(f);
+    bool ok = (put == out.cbData && close_rc == 0);
     LocalFree(out.pbData);
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }

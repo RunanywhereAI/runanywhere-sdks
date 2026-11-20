@@ -223,8 +223,10 @@ rac_result_t posix_secure_set(const char* key, const char* value, void*) {
         }
         off += static_cast<size_t>(w);
     }
-    ::close(fd);
-    return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+    // close() can report a deferred write error (e.g. on NFS); the identity
+    // must not count as committed when it does.
+    int close_rc = ::close(fd);
+    return (ok && close_rc == 0) ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
 rac_result_t posix_secure_delete(const char* key, void*) {
