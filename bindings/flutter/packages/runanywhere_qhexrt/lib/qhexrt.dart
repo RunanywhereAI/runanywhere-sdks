@@ -102,13 +102,18 @@ class QHexRT {
   }
 
   /// Unregister the QHexRT backend. Async for symmetry with [register].
+  ///
+  /// Calls native even when [_isRegistered] is false: a rejected registration
+  /// (unsupported device) still installs the bundle policy, and only the native
+  /// unregister removes it. The native call is safe to repeat.
   static Future<void> unregister() async {
-    if (!_isRegistered) return;
-    final result = _bindings?.unregister() ?? RacResultCodes.success;
+    final bindings = _bindings;
+    if (bindings == null) return;
+    final result = bindings.unregister();
     if (result == RacResultCodes.success ||
         result == RacResultCodes.errorModuleNotFound) {
+      if (_isRegistered) _logger.info('QHexRT backend unregistered');
       _isRegistered = false;
-      _logger.info('QHexRT backend unregistered');
     } else if (result == RacResultCodes.errorPluginBusy) {
       _logger.warning(
         'QHexRT backend still leased by a loaded model; '

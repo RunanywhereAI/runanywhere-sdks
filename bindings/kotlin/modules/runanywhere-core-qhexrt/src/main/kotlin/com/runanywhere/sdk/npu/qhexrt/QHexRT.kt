@@ -100,16 +100,25 @@ object QHexRT {
         registrationMutex.withLock { registerInternal() }
     }
 
-    /** Unregister the QHexRT backend from the C++ registry. */
+    /**
+     * Unregister the QHexRT backend from the C++ registry.
+     *
+     * Calls native even when [isRegistered] is false: a rejected registration
+     * (unsupported device) still installs the bundle policy, and only the
+     * native unregister removes it. The native call is safe to repeat.
+     */
     suspend fun unregister() {
         registrationMutex.withLock {
-            if (!isRegistered) return
             when (val result = unregisterNative()) {
                 RunAnywhereBridge.RAC_SUCCESS,
                 RunAnywhereBridge.RAC_ERROR_MODULE_NOT_FOUND,
                 -> {
+                    if (isRegistered) logger.info("QHexRT backend unregistered")
                     isRegistered = false
-                    logger.info("QHexRT backend unregistered")
+                }
+                // Native library never loaded, so nothing was installed.
+                RAC_ERROR_BACKEND_UNAVAILABLE -> {
+                    isRegistered = false
                 }
                 RAC_ERROR_PLUGIN_BUSY -> {
                     logger.warning(
