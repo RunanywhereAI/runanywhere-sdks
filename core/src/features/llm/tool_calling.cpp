@@ -82,13 +82,11 @@ static int64_t next_tool_call_id() {
     return next.fetch_add(1, std::memory_order_relaxed);
 }
 
-// Standard keys for tool name (case-insensitive matching)
-static const char* TOOL_NAME_KEYS[] = {"tool",   "name",   "function", "func",
-                                       "method", "action", "command",  nullptr};
-
-// Standard keys for arguments (case-insensitive matching)
-static const char* ARGUMENT_KEYS[] = {"arguments",  "args",  "params",
-                                      "parameters", "input", nullptr};
+// Standard keys for tool name and for arguments (case-insensitive matching).
+// The tables live in tool_calling_key_repair_internal.h so the key-collision
+// scan reads the same aliases, in the same order, as this parser.
+static const char* const* const TOOL_NAME_KEYS = rac::llm::tool_calling::kToolNameKeys;
+static const char* const* const ARGUMENT_KEYS = rac::llm::tool_calling::kArgumentKeys;
 
 // =============================================================================
 // FORMAT DETECTION AND NAMING
