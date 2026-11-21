@@ -1407,17 +1407,27 @@ namespace rac::lifecycle {
 
 namespace {
 
-// The threshold the lifecycle-loaded detector runs at between requests: the
-// last value rac_vad_configure_lifecycle_proto applied to it, or
-// kDefaultModelVadThreshold (what a freshly loaded model starts at, as on the
-// component path) if configure never touched it. Keyed by the loaded model
+// Threshold state of the lifecycle-loaded detector. Keyed by the loaded model
 // (lifecycle_vad_owner), so a reload starts from the default even when the
 // backend reuses an impl address. Guarded by lifecycle_vad_mutex().
+//
+// A per-request override is applied lazily and never undone right after its
+// request: on some backends (Sherpa) set_threshold rebuilds the detector and
+// drops its buffered audio and speech state, so restoring after every request
+// would break continuity across consecutive chunks. Instead `applied` tracks
+// the value the detector is at, set_threshold is skipped when it already
+// matches, and the configured value is put back only before a request that
+// needs it.
 struct VadThresholdBaseline {
     std::weak_ptr<const void> owner;
+    // The value requests without an override run at: the last one
+    // rac_vad_configure_lifecycle_proto applied, or kDefaultModelVadThreshold
+    // (what a freshly loaded model starts at, as on the component path).
     float threshold = kDefaultModelVadThreshold;
-    // An override could not be undone: the detector may still be at it.
-    bool restore_pending = false;
+    // The value the detector is at. Unknown after a failed set_threshold,
+    // which forces the next request to set it again.
+    float applied = kDefaultModelVadThreshold;
+    bool applied_known = true;
 };
 
 VadThresholdBaseline& vad_threshold_baseline() {
@@ -1437,6 +1447,21 @@ VadThresholdBaseline& vad_threshold_baseline_for(const LifecycleVadRef& ref) {
     return baseline;
 }
 
+// Puts ref's detector at @p threshold, skipping set_threshold (and the
+// detector rebuild it can cause) when it is already there.
+rac_result_t apply_vad_threshold(const LifecycleVadRef& ref, VadThresholdBaseline& baseline,
+                                 float threshold) {
+    if (baseline.applied_known && baseline.applied == threshold) {
+        return RAC_SUCCESS;
+    }
+    const rac_result_t rc = ref.ops && ref.ops->set_threshold
+                                ? ref.ops->set_threshold(ref.impl, threshold)
+                                : RAC_ERROR_NOT_SUPPORTED;
+    baseline.applied = threshold;
+    baseline.applied_known = rc == RAC_SUCCESS;
+    return rc;
+}
+
 }  // namespace
 
 std::mutex& lifecycle_vad_mutex() {
@@ -1446,14 +1471,7 @@ std::mutex& lifecycle_vad_mutex() {
 
 rac_result_t lifecycle_vad_settle_threshold(const LifecycleVadRef& ref) {
     VadThresholdBaseline& baseline = vad_threshold_baseline_for(ref);
-    if (!baseline.restore_pending) {
-        return RAC_SUCCESS;
-    }
-    const rac_result_t rc = ref.ops && ref.ops->set_threshold
-                                ? ref.ops->set_threshold(ref.impl, baseline.threshold)
-                                : RAC_ERROR_NOT_SUPPORTED;
-    baseline.restore_pending = rc != RAC_SUCCESS;
-    return rc;
+    return apply_vad_threshold(ref, baseline, baseline.threshold);
 }
 
 }  // namespace rac::lifecycle
@@ -1462,22 +1480,28 @@ namespace {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-// With lifecycle_vad_mutex() held: undo a per-request override. A failure is
-// remembered, and lifecycle_vad_settle_threshold retries it before the next
-// request without an override may run.
-rac_result_t restore_lifecycle_vad_threshold(const rac::lifecycle::LifecycleVadRef& ref) {
+// With lifecycle_vad_mutex() held: put ref's detector at a request's
+// activation_threshold override. It stays there until a request that needs a
+// different value (see VadThresholdBaseline).
+rac_result_t apply_lifecycle_vad_override(const rac::lifecycle::LifecycleVadRef& ref,
+                                          float threshold) {
     auto& baseline = rac::lifecycle::vad_threshold_baseline_for(ref);
-    const rac_result_t rc = ref.ops->set_threshold(ref.impl, baseline.threshold);
-    baseline.restore_pending = rc != RAC_SUCCESS;
-    return rc;
+    return rac::lifecycle::apply_vad_threshold(ref, baseline, threshold);
 }
 
-// With lifecycle_vad_mutex() held: configure applied @p threshold to ref's
-// detector, which makes it the value to restore to.
-void record_lifecycle_vad_threshold(const rac::lifecycle::LifecycleVadRef& ref, float threshold) {
+// With lifecycle_vad_mutex() held: configure called set_threshold(@p threshold)
+// on ref's detector with result @p rc. On success it becomes the value requests
+// without an override run at; on failure the detector's value is unknown.
+void record_lifecycle_vad_configure(const rac::lifecycle::LifecycleVadRef& ref, float threshold,
+                                    rac_result_t rc) {
     auto& baseline = rac::lifecycle::vad_threshold_baseline_for(ref);
-    baseline.threshold = threshold;
-    baseline.restore_pending = false;
+    if (rc == RAC_SUCCESS) {
+        baseline.threshold = threshold;
+        baseline.applied = threshold;
+        baseline.applied_known = true;
+    } else {
+        baseline.applied_known = false;
+    }
 }
 
 // Shared anon-ns helpers carried from rac_nonllm_lifecycle_proto_abi.cpp.
@@ -1739,24 +1763,15 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
             // under it: a synchronous subscriber re-entering lifecycle VAD
             // would deadlock on this non-recursive mutex.
             std::lock_guard<std::mutex> threshold_lock(rac::lifecycle::lifecycle_vad_mutex());
-            if (override_threshold) {
-                rc = ref.ops->set_threshold(ref.impl, threshold);
-                if (rc == RAC_SUCCESS) {
-                    rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
-                    // The override is for this request only: put the detector
-                    // back at its configured value before the lock is released.
-                    const rac_result_t restore_rc = restore_lifecycle_vad_threshold(ref);
-                    if (rc == RAC_SUCCESS) {
-                        rc = restore_rc;
-                    }
-                }
-            } else {
-                // A failed restore from an earlier override is retried first;
-                // running anyway would silently use the stale override.
-                rc = rac::lifecycle::lifecycle_vad_settle_threshold(ref);
-                if (rc == RAC_SUCCESS) {
-                    rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
-                }
+            // The override applies to this request only: a request without one
+            // first puts the detector back at its configured value, since
+            // running anyway would silently use an earlier request's override.
+            // Either call is a no-op when the detector is already there, so
+            // consecutive requests at the same value keep its speech state.
+            rc = override_threshold ? apply_lifecycle_vad_override(ref, threshold)
+                                    : rac::lifecycle::lifecycle_vad_settle_threshold(ref);
+            if (rc == RAC_SUCCESS) {
+                rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
             }
         }
         if (rc != RAC_SUCCESS) {
@@ -1849,13 +1864,11 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
     rac_result_t op_rc = RAC_SUCCESS;
     if (have_model) {
         if (ref.ops && ref.ops->set_threshold) {
-            // Under the same lock as process, so a configure cannot land inside
-            // a request's override window and then be undone by its restore.
+            // Under the same lock as process, so the recorded threshold always
+            // matches what the detector was last set to.
             std::lock_guard<std::mutex> threshold_lock(rac::lifecycle::lifecycle_vad_mutex());
             op_rc = ref.ops->set_threshold(ref.impl, threshold);
-            if (op_rc == RAC_SUCCESS) {
-                record_lifecycle_vad_threshold(ref, threshold);
-            }
+            record_lifecycle_vad_configure(ref, threshold, op_rc);
         }
     } else {
         // Configuring with no model loaded arms the built-in energy detector at

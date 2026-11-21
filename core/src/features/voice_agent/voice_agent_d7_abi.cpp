@@ -584,12 +584,13 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         const bool have_lifecycle_vad =
             rac::lifecycle::acquire_lifecycle_vad(&vad_ref) == RAC_SUCCESS;
         if (have_lifecycle_vad && vad_ref.ops && vad_ref.ops->process) {
-            // Same lock as rac_vad_process_lifecycle_proto, so this sweep never
-            // runs inside a lifecycle request's per-request threshold override.
+            // Same lock as rac_vad_process_lifecycle_proto, so the detector's
+            // threshold can't change under this sweep.
             std::unique_lock<std::mutex> vad_lock(rac::lifecycle::lifecycle_vad_mutex());
-            // If an earlier override could not be undone, the detector is not at
-            // its configured threshold: skip it rather than judge the turn at
-            // the stale value, and fall through to the component below.
+            // Put the detector back at its configured threshold if a lifecycle
+            // request left it at an override. If that fails, skip it rather
+            // than judge the turn at the stale value, and fall through to the
+            // component below.
             if (rac::lifecycle::lifecycle_vad_settle_threshold(vad_ref) == RAC_SUCCESS) {
                 // Start from a clean detector: the previous turn's trailing state
                 // is not evidence about this one.

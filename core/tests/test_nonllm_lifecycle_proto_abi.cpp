@@ -226,9 +226,13 @@ rac_result_t mock_vad_process(void* impl, const float* samples, size_t num_sampl
     return RAC_SUCCESS;
 }
 
+// Counts set_threshold calls: on Sherpa each one rebuilds the detector.
+int g_vad_set_threshold_calls = 0;
+
 rac_result_t mock_vad_set_threshold(void* impl, float threshold) {
     if (!impl)
         return RAC_ERROR_NULL_POINTER;
+    ++g_vad_set_threshold_calls;
     static_cast<MockState*>(impl)->vad_threshold = threshold;
     return RAC_SUCCESS;
 }
@@ -607,23 +611,35 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
         rc = rac_vad_configure_lifecycle_proto(config_bytes.data(), config_bytes.size(), &out);
         CHECK(rc == RAC_SUCCESS, "VAD lifecycle configure applies 0.3");
         rac_proto_buffer_free(&out);
+        const int calls_after_configure = g_vad_set_threshold_calls;
 
         CHECK(serialize(vad_request, &bytes), "VAD override request serializes");
-        rac_proto_buffer_init(&out);
-        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
-        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && vad_result.is_speech(),
-              "VAD lifecycle override (0.1) applies to its own request");
-        rac_proto_buffer_free(&out);
+        for (int i = 0; i < 2; ++i) {
+            rac_proto_buffer_init(&out);
+            rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+            CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && vad_result.is_speech(),
+                  "VAD lifecycle override (0.1) applies to its own request");
+            rac_proto_buffer_free(&out);
+        }
+        // set_threshold rebuilds a Sherpa detector, dropping its speech state:
+        // consecutive requests at the same override must not re-apply it.
+        CHECK(g_vad_set_threshold_calls == calls_after_configure + 1,
+              "consecutive VAD requests at the same override set the threshold once");
 
         runanywhere::v1::VADProcessRequest plain_request = vad_request;
         plain_request.clear_options();
         CHECK(serialize(plain_request, &bytes), "VAD request without override serializes");
-        rac_proto_buffer_init(&out);
-        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
-        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && !vad_result.is_speech(),
-              "VAD lifecycle request without override runs at the configured 0.3, "
-              "not the previous request's override");
-        rac_proto_buffer_free(&out);
+        for (int i = 0; i < 2; ++i) {
+            rac_proto_buffer_init(&out);
+            rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+            CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && !vad_result.is_speech(),
+                  "VAD lifecycle request without override runs at the configured 0.3, "
+                  "not the previous request's override");
+            rac_proto_buffer_free(&out);
+        }
+        CHECK(g_vad_set_threshold_calls == calls_after_configure + 2,
+              "the configured VAD threshold is put back once, before the first "
+              "request without an override");
     }
 
     runanywhere::v1::EmbeddingsRequest embeddings_request;
