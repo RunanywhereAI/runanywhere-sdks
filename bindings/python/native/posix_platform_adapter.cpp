@@ -223,7 +223,17 @@ rac_result_t posix_secure_set(const char* key, const char* value, void*) {
         }
         off += static_cast<size_t>(w);
     }
-    ::close(fd);
+    // fsync so the value reaches stable storage before success is reported;
+    // close() can also report a deferred write error (e.g. on NFS).
+    if (ok && ::fsync(fd) != 0) ok = false;
+    int close_rc = ::close(fd);
+    ok = ok && close_rc == 0;
+    if (!ok) {
+        // O_TRUNC already replaced the old contents: remove the partial value
+        // so the next read is a clean miss rather than a malformed secret.
+        std::error_code rm_ec;
+        fs::remove(p, rm_ec);
+    }
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 

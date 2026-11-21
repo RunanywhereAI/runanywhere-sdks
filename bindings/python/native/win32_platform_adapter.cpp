@@ -10,6 +10,7 @@
 #endif
 #include <windows.h>
 #include <wincrypt.h>  // DPAPI: CryptProtectData / CryptUnprotectData (crypt32)
+#include <io.h>        // _commit, _fileno
 
 #include <chrono>
 #include <cstdio>
@@ -230,15 +231,27 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
                           CRYPTPROTECT_UI_FORBIDDEN, &out)) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
-    FILE* f = wfopen_utf8(secure_path(key), L"wb");
+    const fs::path p = secure_path(key);
+    FILE* f = wfopen_utf8(p, L"wb");
     if (!f) {
         LocalFree(out.pbData);
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     size_t put = out.cbData ? fwrite(out.pbData, 1, out.cbData, f) : 0;
-    fclose(f);
-    bool ok = (put == out.cbData);
+    // The blob is far smaller than the stdio buffer, so the bytes only leave
+    // the CRT in fflush, and _commit asks the OS to write them to disk. Every
+    // step is checked, including fclose, so a failed write is never reported
+    // as success.
+    const bool flushed = fflush(f) == 0 && _commit(_fileno(f)) == 0;
+    int close_rc = fclose(f);
+    bool ok = (put == out.cbData && flushed && close_rc == 0);
     LocalFree(out.pbData);
+    if (!ok) {
+        // Don't leave a truncated blob behind: with no file the next read is a
+        // clean miss rather than a decrypt failure.
+        std::error_code rm_ec;
+        fs::remove(p, rm_ec);
+    }
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
