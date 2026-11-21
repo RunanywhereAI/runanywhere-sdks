@@ -584,23 +584,33 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         const bool have_lifecycle_vad =
             rac::lifecycle::acquire_lifecycle_vad(&vad_ref) == RAC_SUCCESS;
         if (have_lifecycle_vad && vad_ref.ops && vad_ref.ops->process) {
-            // Start from a clean detector: the previous turn's trailing state is
-            // not evidence about this one.
-            if (vad_ref.ops->reset) {
-                (void)vad_ref.ops->reset(vad_ref.impl);
-            }
-            bool heard_speech = false;
-            for (size_t offset = 0; offset < count && !heard_speech; offset += kVadSweepSamples) {
-                const size_t window = std::min(kVadSweepSamples, count - offset);
-                rac_bool_t window_speech = RAC_FALSE;
-                if (vad_ref.ops->process(vad_ref.impl, floats.data() + offset, window,
-                                         &window_speech) == RAC_SUCCESS &&
-                    window_speech == RAC_TRUE) {
-                    heard_speech = true;
+            // Same lock as rac_vad_process_lifecycle_proto, so this sweep never
+            // runs inside a lifecycle request's per-request threshold override.
+            std::unique_lock<std::mutex> vad_lock(rac::lifecycle::lifecycle_vad_mutex());
+            // If an earlier override could not be undone, the detector is not at
+            // its configured threshold: skip it rather than judge the turn at
+            // the stale value, and fall through to the component below.
+            if (rac::lifecycle::lifecycle_vad_settle_threshold(vad_ref) == RAC_SUCCESS) {
+                // Start from a clean detector: the previous turn's trailing state
+                // is not evidence about this one.
+                if (vad_ref.ops->reset) {
+                    (void)vad_ref.ops->reset(vad_ref.impl);
                 }
+                bool heard_speech = false;
+                for (size_t offset = 0; offset < count && !heard_speech;
+                     offset += kVadSweepSamples) {
+                    const size_t window = std::min(kVadSweepSamples, count - offset);
+                    rac_bool_t window_speech = RAC_FALSE;
+                    if (vad_ref.ops->process(vad_ref.impl, floats.data() + offset, window,
+                                             &window_speech) == RAC_SUCCESS &&
+                        window_speech == RAC_TRUE) {
+                        heard_speech = true;
+                    }
+                }
+                vad_lock.unlock();
+                rac::lifecycle::release_lifecycle_vad(&vad_ref);
+                return heard_speech ? TurnVadVerdict::speech : TurnVadVerdict::no_speech;
             }
-            rac::lifecycle::release_lifecycle_vad(&vad_ref);
-            return heard_speech ? TurnVadVerdict::speech : TurnVadVerdict::no_speech;
         }
         if (have_lifecycle_vad) {
             rac::lifecycle::release_lifecycle_vad(&vad_ref);

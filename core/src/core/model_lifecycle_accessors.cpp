@@ -387,6 +387,18 @@ void release_lifecycle_vad(LifecycleVadRef* ref) {
 #endif
 }
 
+std::shared_ptr<const void> lifecycle_vad_owner(const LifecycleVadRef& ref) {
+#if defined(RAC_HAVE_PROTOBUF)
+    if (!ref.opaque) {
+        return {};
+    }
+    return *static_cast<const std::shared_ptr<LoadedModel>*>(ref.opaque);
+#else
+    (void)ref;
+    return {};
+#endif
+}
+
 rac_result_t acquire_lifecycle_embeddings(LifecycleEmbeddingsRef* out_ref) {
 #if !defined(RAC_HAVE_PROTOBUF)
     if (out_ref)

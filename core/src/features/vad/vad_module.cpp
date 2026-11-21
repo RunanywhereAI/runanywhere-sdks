@@ -1403,9 +1403,82 @@ extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
 // configure=load.
 // =============================================================================
 
+namespace rac::lifecycle {
+
+namespace {
+
+// The threshold the lifecycle-loaded detector runs at between requests: the
+// last value rac_vad_configure_lifecycle_proto applied to it, or
+// kDefaultModelVadThreshold (what a freshly loaded model starts at, as on the
+// component path) if configure never touched it. Keyed by the loaded model
+// (lifecycle_vad_owner), so a reload starts from the default even when the
+// backend reuses an impl address. Guarded by lifecycle_vad_mutex().
+struct VadThresholdBaseline {
+    std::weak_ptr<const void> owner;
+    float threshold = kDefaultModelVadThreshold;
+    // An override could not be undone: the detector may still be at it.
+    bool restore_pending = false;
+};
+
+VadThresholdBaseline& vad_threshold_baseline() {
+    static VadThresholdBaseline baseline;
+    return baseline;
+}
+
+// Points the baseline at ref's detector, resetting it if it was recorded for a
+// different (or since unloaded) model.
+VadThresholdBaseline& vad_threshold_baseline_for(const LifecycleVadRef& ref) {
+    VadThresholdBaseline& baseline = vad_threshold_baseline();
+    const std::shared_ptr<const void> owner = lifecycle_vad_owner(ref);
+    if (!owner || baseline.owner.lock() != owner) {
+        baseline = VadThresholdBaseline{};
+        baseline.owner = owner;
+    }
+    return baseline;
+}
+
+}  // namespace
+
+std::mutex& lifecycle_vad_mutex() {
+    static std::mutex m;
+    return m;
+}
+
+rac_result_t lifecycle_vad_settle_threshold(const LifecycleVadRef& ref) {
+    VadThresholdBaseline& baseline = vad_threshold_baseline_for(ref);
+    if (!baseline.restore_pending) {
+        return RAC_SUCCESS;
+    }
+    const rac_result_t rc = ref.ops && ref.ops->set_threshold
+                                ? ref.ops->set_threshold(ref.impl, baseline.threshold)
+                                : RAC_ERROR_NOT_SUPPORTED;
+    baseline.restore_pending = rc != RAC_SUCCESS;
+    return rc;
+}
+
+}  // namespace rac::lifecycle
+
 namespace {
 
 #if defined(RAC_HAVE_PROTOBUF)
+
+// With lifecycle_vad_mutex() held: undo a per-request override. A failure is
+// remembered, and lifecycle_vad_settle_threshold retries it before the next
+// request without an override may run.
+rac_result_t restore_lifecycle_vad_threshold(const rac::lifecycle::LifecycleVadRef& ref) {
+    auto& baseline = rac::lifecycle::vad_threshold_baseline_for(ref);
+    const rac_result_t rc = ref.ops->set_threshold(ref.impl, baseline.threshold);
+    baseline.restore_pending = rc != RAC_SUCCESS;
+    return rc;
+}
+
+// With lifecycle_vad_mutex() held: configure applied @p threshold to ref's
+// detector, which makes it the value to restore to.
+void record_lifecycle_vad_threshold(const rac::lifecycle::LifecycleVadRef& ref, float threshold) {
+    auto& baseline = rac::lifecycle::vad_threshold_baseline_for(ref);
+    baseline.threshold = threshold;
+    baseline.restore_pending = false;
+}
 
 // Shared anon-ns helpers carried from rac_nonllm_lifecycle_proto_abi.cpp.
 // Internal linkage; distinct from the component-section helpers above
@@ -1428,11 +1501,6 @@ namespace {
 // its own mutex because the lifecycle entry points take no handle and therefore
 // carry no other serialization.
 std::mutex& fallback_vad_mutex() {
-    static std::mutex m;
-    return m;
-}
-
-std::mutex& lifecycle_threshold_mutex() {
     static std::mutex m;
     return m;
 }
@@ -1652,28 +1720,45 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     rac_bool_t is_speech = RAC_FALSE;
 
     if (have_model) {
-        std::unique_lock<std::mutex> threshold_lock;
-        if (request.has_options() && request.options().has_activation_threshold()) {
-            threshold_lock = std::unique_lock<std::mutex>(lifecycle_threshold_mutex());
-            if (!ref.ops->set_threshold) {
-                rac::lifecycle::release_lifecycle_vad(&ref);
-                return rac_proto_buffer_set_error(
-                    out_result, RAC_ERROR_NOT_SUPPORTED,
-                    "VAD backend cannot apply activation_threshold");
-            }
-            rc = ref.ops->set_threshold(ref.impl, threshold);
-            if (rc != RAC_SUCCESS) {
-                publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
-                rac::lifecycle::release_lifecycle_vad(&ref);
-                return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
-            }
-        }
         if (!ref.ops->process) {
             rac::lifecycle::release_lifecycle_vad(&ref);
             return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
                                               "VAD backend does not implement process");
         }
-        rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
+        const bool override_threshold =
+            request.has_options() && request.options().has_activation_threshold();
+        if (override_threshold && !ref.ops->set_threshold) {
+            rac::lifecycle::release_lifecycle_vad(&ref);
+            return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
+                                              "VAD backend cannot apply activation_threshold");
+        }
+        {
+            // Taken with or without an override, so a request that omits
+            // activation_threshold cannot run inside another one's override
+            // window. Nothing that can call back out (event publishing) runs
+            // under it: a synchronous subscriber re-entering lifecycle VAD
+            // would deadlock on this non-recursive mutex.
+            std::lock_guard<std::mutex> threshold_lock(rac::lifecycle::lifecycle_vad_mutex());
+            if (override_threshold) {
+                rc = ref.ops->set_threshold(ref.impl, threshold);
+                if (rc == RAC_SUCCESS) {
+                    rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
+                    // The override is for this request only: put the detector
+                    // back at its configured value before the lock is released.
+                    const rac_result_t restore_rc = restore_lifecycle_vad_threshold(ref);
+                    if (rc == RAC_SUCCESS) {
+                        rc = restore_rc;
+                    }
+                }
+            } else {
+                // A failed restore from an earlier override is retried first;
+                // running anyway would silently use the stale override.
+                rc = rac::lifecycle::lifecycle_vad_settle_threshold(ref);
+                if (rc == RAC_SUCCESS) {
+                    rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
+                }
+            }
+        }
         if (rc != RAC_SUCCESS) {
             // Record the failure to telemetry — the handle-less path otherwise
             // dropped failures silently (publish_vad_pipeline_event marks the
@@ -1764,7 +1849,13 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
     rac_result_t op_rc = RAC_SUCCESS;
     if (have_model) {
         if (ref.ops && ref.ops->set_threshold) {
+            // Under the same lock as process, so a configure cannot land inside
+            // a request's override window and then be undone by its restore.
+            std::lock_guard<std::mutex> threshold_lock(rac::lifecycle::lifecycle_vad_mutex());
             op_rc = ref.ops->set_threshold(ref.impl, threshold);
+            if (op_rc == RAC_SUCCESS) {
+                record_lifecycle_vad_threshold(ref, threshold);
+            }
         }
     } else {
         // Configuring with no model loaded arms the built-in energy detector at
