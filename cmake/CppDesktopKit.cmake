@@ -131,11 +131,27 @@ endif()
 
 # Plugin ABI from the public header, not a stale comment.
 set(_abi_header "${RAC_SOURCE_DIR}/core/include/rac/plugin/rac_plugin_entry.h")
-file(STRINGS "${_abi_header}" _abi_line REGEX "#define[ \t]+RAC_PLUGIN_API_VERSION")
-string(REGEX REPLACE ".*[^0-9]([0-9]+)u?.*" "\\1" RAC_PLUGIN_API_VERSION "${_abi_line}")
-if(NOT RAC_PLUGIN_API_VERSION)
-    set(RAC_PLUGIN_API_VERSION "9")
+file(STRINGS "${_abi_header}" _abi_line REGEX "#[ \t]*define[ \t]+RAC_PLUGIN_API_VERSION[ \t]")
+# Exactly one define: file(STRINGS) returns a list, and a second define would
+# otherwise be joined onto the first with `;` and could hide inside its comment.
+list(LENGTH _abi_line _abi_count)
+# REGEX MATCH, not REPLACE: REPLACE hands back its input unchanged on a miss,
+# which would let a malformed line through as the "version". The match is
+# anchored at both ends (only whitespace or one comment may follow the value; a
+# block comment ends at its first `*/`), so `0x0e` or `14oops` fail rather than
+# export a truncated prefix. A parse failure stops the configure, like
+# engines/neurt/CMakeLists.txt: a guessed number would ship in
+# share/runanywhere/PLUGIN_API_VERSION and RunAnywhereConfig.
+set(_abi_match "")
+if(_abi_count EQUAL 1)
+    string(REGEX MATCH
+           "^[ \t]*#[ \t]*define[ \t]+RAC_PLUGIN_API_VERSION[ \t]+([0-9]+)[uU]?[ \t\r]*(//.*|/\\*([^*]|\\*+[^*/])*\\*+/)?[ \t\r]*$"
+           _abi_match "${_abi_line}")
 endif()
+if(NOT _abi_match)
+    message(FATAL_ERROR "Could not read RAC_PLUGIN_API_VERSION from ${_abi_header}")
+endif()
+set(RAC_PLUGIN_API_VERSION "${CMAKE_MATCH_1}")
 
 set(_kit_depends rac_commons)
 foreach(_t IN ITEMS
