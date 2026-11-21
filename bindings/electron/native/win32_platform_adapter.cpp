@@ -7,6 +7,7 @@
 #endif
 #include <windows.h>
 #include <wincrypt.h>  // DPAPI: CryptProtectData / CryptUnprotectData (crypt32)
+#include <io.h>        // _commit, _fileno
 
 #include <chrono>
 #include <cstdio>
@@ -263,8 +264,13 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     size_t put = out.cbData ? fwrite(out.pbData, 1, out.cbData, f) : 0;
-    fclose(f);
-    bool ok = (put == out.cbData);
+    // The blob is far smaller than the stdio buffer, so the bytes only leave
+    // the CRT in fflush, and _commit asks the OS to write them to disk. Every
+    // step is checked, including fclose, so a failed write is never reported
+    // as success.
+    const bool flushed = fflush(f) == 0 && _commit(_fileno(f)) == 0;
+    int close_rc = fclose(f);
+    bool ok = (put == out.cbData && flushed && close_rc == 0);
     LocalFree(out.pbData);
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }

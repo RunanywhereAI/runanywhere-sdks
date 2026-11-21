@@ -5,6 +5,7 @@
 // DPAPI. The whole translation unit is compiled only off-Windows.
 #if !defined(_WIN32)
 
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -223,7 +224,24 @@ rac_result_t posix_secure_set(const char* key, const char* value, void*) {
         }
         off += static_cast<size_t>(w);
     }
-    ::close(fd);
+    // fsync so the value reaches stable storage before success is reported;
+    // close() can also report a deferred write error (e.g. on NFS).
+    if (ok && ::fsync(fd) != 0) ok = false;
+    int close_rc = ::close(fd);
+    ok = ok && close_rc == 0;
+    // A newly created file is only durable once its directory entry is too.
+    // Filesystems that can't fsync a directory (EINVAL/ENOTSUP) aren't a
+    // failure. The file is left in place on failure: removing it here could
+    // delete a newer value a concurrent secure_set for the same key just wrote.
+    if (ok) {
+        int dfd = ::open(g_secure_dir.c_str(), O_RDONLY | O_DIRECTORY);
+        if (dfd < 0) {
+            ok = false;
+        } else {
+            if (::fsync(dfd) != 0 && errno != EINVAL && errno != ENOTSUP) ok = false;
+            ::close(dfd);
+        }
+    }
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
