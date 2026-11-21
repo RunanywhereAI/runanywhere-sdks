@@ -754,6 +754,32 @@ int test_unquoted_envelope_arguments_collision_never_executes() {
     return 0;
 }
 
+/** @brief A repeated tool alias must not let a colliding envelope through. */
+int test_repeated_tool_alias_collision_never_executes() {
+    if (!load_mock_llm())
+        return 1;
+    // Valid JSON keeps the last `tool`, so the parser unwraps the envelope and
+    // decodes its arguments even though the first `tool` named the call directly.
+    set_responses({
+        "<tool_call>{\"tool\":\"ignored\",\"tool\":{\"name\":\"get_weather\",\"arguments\":"
+        "\"{\\\"x\xFF\\\":1,\\\"x\xFE\\\":2}\"}}</tool_call>",
+    });
+    auto request = make_request("Look up the weather.");
+    request.mutable_options()->set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "repeated-alias collision request serializes");
+    ExecutorState exec;
+    rac_proto_buffer_t out{};
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(exec.invocation_count == 0, "repeated-alias collision never reaches executor");
+    CHECK(generate_calls() == 1, "repeated-alias collision does not synthesize a result");
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "repeated-alias collision returns invalid argument");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 /** @brief A direct tool name keeps a nested tool object as flat data. */
 int test_direct_name_with_nested_tool_object_still_executes() {
     if (!load_mock_llm())
@@ -2520,6 +2546,7 @@ int main() {
         test_envelope_string_arguments_collision_never_executes();
         test_envelope_unicode_escaped_arguments_collision_never_executes();
         test_unquoted_envelope_arguments_collision_never_executes();
+        test_repeated_tool_alias_collision_never_executes();
         test_direct_name_with_nested_tool_object_still_executes();
         test_nested_tool_data_arguments_string_still_executes();
         test_grammar_backend_ignores_collision_inside_think_block();

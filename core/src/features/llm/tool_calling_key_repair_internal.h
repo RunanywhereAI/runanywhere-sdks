@@ -245,9 +245,21 @@ inline bool scan_repaired_key_collision(const std::string& text, bool first_obje
         // The lowest-ranked envelope that names a call, and its verdict.
         int envelope_match = kAbsent;
         bool envelope_collides = false;
-        // The lone tool_calls element names a call, and its verdict.
+        // A tool_calls element names a call, and whether one that does collides.
         bool calls_match = false;
         bool calls_collide = false;
+
+        // A tool alias or `tool_calls` occurs more than once (case-insensitively,
+        // as the parser matches them). Which occurrence the parser reads then
+        // depends on the path: valid JSON goes through nlohmann, which keeps the
+        // last (or, for case variants, the first in sorted order after dump),
+        // while text with repaired unquoted keys goes straight to
+        // extract_json_value, which takes the first. Such an object is settled
+        // fail-closed: any call path in it that collides rejects the turn.
+        unsigned tool_aliases_seen = 0;
+        bool tool_calls_seen = false;
+        bool ambiguous = false;
+        bool any_envelope_collides = false;
     };
     std::vector<Container> containers;
     std::string last_key;  // last key parsed in the innermost object
@@ -263,8 +275,9 @@ inline bool scan_repaired_key_collision(const std::string& text, bool first_obje
         if (frame.is_array) {
             if (parent != nullptr && frame.elements_are_wrappers && frame.commas == 0 &&
                 frame.object_elements == 1) {
-                parent->calls_match = frame.first_element_names_call;
-                parent->calls_collide = frame.first_element_collides;
+                parent->calls_match = parent->calls_match || frame.first_element_names_call;
+                parent->calls_collide = parent->calls_collide || (frame.first_element_names_call &&
+                                                                  frame.first_element_collides);
             }
             return false;
         }
@@ -281,14 +294,22 @@ inline bool scan_repaired_key_collision(const std::string& text, bool first_obje
             names_call = true;
             collides = frame.calls_collide;
         }
+        if (frame.ambiguous) {
+            const bool direct_collides =
+                frame.names_call && frame.nesting != Nesting::kRoot && frame.args_collide;
+            collides = collides || direct_collides || frame.any_envelope_collides ||
+                       (frame.nesting == Nesting::kRoot && frame.calls_collide);
+        }
         switch (frame.nesting) {
             case Nesting::kRoot:
                 return collides;
             case Nesting::kEnvelope:
-                if (parent != nullptr && names_call &&
-                    frame.envelope_alias < parent->envelope_match) {
-                    parent->envelope_match = frame.envelope_alias;
-                    parent->envelope_collides = collides;
+                if (parent != nullptr && names_call) {
+                    parent->any_envelope_collides = parent->any_envelope_collides || collides;
+                    if (frame.envelope_alias < parent->envelope_match) {
+                        parent->envelope_match = frame.envelope_alias;
+                        parent->envelope_collides = collides;
+                    }
                 }
                 return false;
             case Nesting::kArrayElement:
@@ -311,6 +332,18 @@ inline bool scan_repaired_key_collision(const std::string& text, bool first_obje
             return true;
         }
         last_key = key;
+        const int tool_rank = alias_rank(kToolNameKeys, key);
+        if (tool_rank >= 0) {
+            const unsigned bit = 1u << tool_rank;
+            frame.ambiguous = frame.ambiguous || (frame.tool_aliases_seen & bit) != 0;
+            frame.tool_aliases_seen |= bit;
+        } else if (ascii_lower(key) == "tool_calls") {
+            frame.ambiguous = frame.ambiguous || frame.tool_calls_seen;
+            frame.tool_calls_seen = true;
+        }
+        // Only a lower-ranked alias resets the verdict; a repeat of the selected
+        // alias is scanned again and can only set it, so a collision in any
+        // occurrence stays (fail-closed for the same first-or-last reason).
         const int rank = alias_rank(kArgumentKeys, key);
         if (rank >= 0 && rank < frame.args_alias) {
             frame.args_alias = rank;
@@ -460,7 +493,10 @@ inline bool scan_repaired_key_collision(const std::string& text, bool first_obje
  * Inspect raw string tokens before repair erases their provenance. Only strings
  * followed by ':' are keys (plus the unquoted `key:` the normalizer quotes);
  * braces inside strings never change object scope. Valid duplicate keys keep
- * their existing last-wins behavior.
+ * their existing last-wins behavior, except that a repeated tool alias,
+ * `tool_calls` or argument alias is settled fail-closed: the parser reads the
+ * last occurrence of valid JSON but the first after unquoted-key repair, so a
+ * collision in any occurrence it could read rejects the turn.
  *
  * A string value is scanned recursively only where the parser itself decodes
  * one, following extract_tool_name_and_args: the argument alias it reads (the
