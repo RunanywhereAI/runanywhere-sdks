@@ -258,8 +258,7 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
                           CRYPTPROTECT_UI_FORBIDDEN, &out)) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
-    const fs::path p = secure_path(key);
-    FILE* f = wfopen_utf8(p, L"wb");
+    FILE* f = wfopen_utf8(secure_path(key), L"wb");
     if (!f) {
         LocalFree(out.pbData);
         return RAC_ERROR_SECURE_STORAGE_FAILED;
@@ -273,12 +272,6 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
     int close_rc = fclose(f);
     bool ok = (put == out.cbData && flushed && close_rc == 0);
     LocalFree(out.pbData);
-    if (!ok) {
-        // Don't leave a truncated blob behind: with no file the next read is a
-        // clean miss rather than a decrypt failure.
-        std::error_code rm_ec;
-        fs::remove(p, rm_ec);
-    }
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
