@@ -1408,8 +1408,8 @@ namespace rac::lifecycle {
 namespace {
 
 // Threshold state of the lifecycle-loaded detector. Keyed by the loaded model
-// (lifecycle_vad_owner), so a reload starts from the default even when the
-// backend reuses an impl address. Guarded by lifecycle_vad_mutex().
+// (lifecycle_vad_owner), so a reload starts untouched even when the backend
+// reuses an impl address. Guarded by lifecycle_vad_mutex().
 //
 // A per-request override is applied lazily and never undone right after its
 // request: on some backends (Sherpa) set_threshold rebuilds the detector and
@@ -1420,14 +1420,23 @@ namespace {
 // needs it.
 struct VadThresholdBaseline {
     std::weak_ptr<const void> owner;
-    // The value requests without an override run at: the last one
-    // rac_vad_configure_lifecycle_proto applied, or kDefaultModelVadThreshold
-    // (what a freshly loaded model starts at, as on the component path).
+    // The value requests without an override run at once anything has set the
+    // threshold: the last one rac_vad_configure_lifecycle_proto applied, or
+    // kDefaultModelVadThreshold (as on the component path).
     float threshold = kDefaultModelVadThreshold;
-    // The value the detector is at. Unknown after a failed set_threshold,
-    // which forces the next request to set it again.
+    enum class Applied {
+        // Nothing has called set_threshold since load: the detector is at the
+        // backend's own starting value, whatever that is. Requests without an
+        // override run there unchanged (as before #896); an override must set.
+        kUntouched,
+        // The detector is at `applied`.
+        kKnown,
+        // A set_threshold failed, so the detector's value is unknown: the next
+        // request sets it again.
+        kUnknown,
+    };
+    Applied state = Applied::kUntouched;
     float applied = kDefaultModelVadThreshold;
-    bool applied_known = true;
 };
 
 VadThresholdBaseline& vad_threshold_baseline() {
@@ -1451,14 +1460,15 @@ VadThresholdBaseline& vad_threshold_baseline_for(const LifecycleVadRef& ref) {
 // detector rebuild it can cause) when it is already there.
 rac_result_t apply_vad_threshold(const LifecycleVadRef& ref, VadThresholdBaseline& baseline,
                                  float threshold) {
-    if (baseline.applied_known && baseline.applied == threshold) {
+    using Applied = VadThresholdBaseline::Applied;
+    if (baseline.state == Applied::kKnown && baseline.applied == threshold) {
         return RAC_SUCCESS;
     }
     const rac_result_t rc = ref.ops && ref.ops->set_threshold
                                 ? ref.ops->set_threshold(ref.impl, threshold)
                                 : RAC_ERROR_NOT_SUPPORTED;
     baseline.applied = threshold;
-    baseline.applied_known = rc == RAC_SUCCESS;
+    baseline.state = rc == RAC_SUCCESS ? Applied::kKnown : Applied::kUnknown;
     return rc;
 }
 
@@ -1471,6 +1481,11 @@ std::mutex& lifecycle_vad_mutex() {
 
 rac_result_t lifecycle_vad_settle_threshold(const LifecycleVadRef& ref) {
     VadThresholdBaseline& baseline = vad_threshold_baseline_for(ref);
+    if (baseline.state == VadThresholdBaseline::Applied::kUntouched) {
+        // Nothing has moved the detector off its starting value, so there is
+        // nothing to put back (and nothing is required of the backend).
+        return RAC_SUCCESS;
+    }
     return apply_vad_threshold(ref, baseline, baseline.threshold);
 }
 
@@ -1495,12 +1510,13 @@ rac_result_t apply_lifecycle_vad_override(const rac::lifecycle::LifecycleVadRef&
 void record_lifecycle_vad_configure(const rac::lifecycle::LifecycleVadRef& ref, float threshold,
                                     rac_result_t rc) {
     auto& baseline = rac::lifecycle::vad_threshold_baseline_for(ref);
+    using Applied = rac::lifecycle::VadThresholdBaseline::Applied;
     if (rc == RAC_SUCCESS) {
         baseline.threshold = threshold;
         baseline.applied = threshold;
-        baseline.applied_known = true;
+        baseline.state = Applied::kKnown;
     } else {
-        baseline.applied_known = false;
+        baseline.state = Applied::kUnknown;
     }
 }
 

@@ -587,6 +587,34 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     vad_audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
     vad_audio->set_sample_rate(16000);
     vad_audio->set_channels(1);
+
+    // A freshly loaded detector is at the backend's own threshold (the mock's
+    // 0.015), not kDefaultModelVadThreshold. The samples average 0.2.
+    {
+        runanywhere::v1::VADResult fresh_result;
+        const int calls_before = g_vad_set_threshold_calls;
+        CHECK(serialize(vad_request, &bytes), "fresh VAD request serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &fresh_result) && fresh_result.is_speech(),
+              "VAD request without override on a fresh model runs at the backend's own "
+              "threshold");
+        rac_proto_buffer_free(&out);
+        CHECK(g_vad_set_threshold_calls == calls_before,
+              "VAD request without override on a fresh model does not set the threshold");
+
+        // An explicit 0.5 must be applied, not skipped as "already the default".
+        vad_request.mutable_options()->set_activation_threshold(0.5f);
+        CHECK(serialize(vad_request, &bytes), "fresh VAD 0.5 override serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &fresh_result) && !fresh_result.is_speech(),
+              "first VAD override of 0.5 on a fresh model is applied");
+        rac_proto_buffer_free(&out);
+        CHECK(g_vad_set_threshold_calls == calls_before + 1,
+              "first VAD override on a fresh model calls set_threshold");
+    }
+
     vad_request.mutable_options()->set_activation_threshold(0.1f);
     CHECK(serialize(vad_request, &bytes), "VAD lifecycle request serializes");
     rac_proto_buffer_init(&out);
