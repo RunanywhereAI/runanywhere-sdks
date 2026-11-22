@@ -1422,7 +1422,12 @@ struct VadThresholdBaseline {
     std::weak_ptr<const void> owner;
     // The value requests without an override run at once anything has set the
     // threshold: the last one rac_vad_configure_lifecycle_proto applied, or
-    // kDefaultModelVadThreshold (as on the component path).
+    // kDefaultModelVadThreshold (as on the component path). The VAD ops have no
+    // getter, so a never-configured detector's starting value can't be read
+    // back after an override. kDefaultModelVadThreshold stands in for it: it is
+    // Sherpa's starting threshold (rac_vad_sherpa.h), and Sherpa is the only
+    // backend that implements set_threshold, so the only one an override can
+    // move. A backend that starts elsewhere would need a get_threshold op.
     float threshold = kDefaultModelVadThreshold;
     enum class Applied {
         // Nothing has called set_threshold since load: the detector is at the
