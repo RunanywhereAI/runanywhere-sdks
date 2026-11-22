@@ -158,6 +158,12 @@ MIN_CMAKE_VERSION=3.24
 # from download.onnxruntime.ai and is paired with Sherpa-ONNX 1.13.5 below.
 ONNX_VERSION_IOS=1.28.0
 ONNX_IOS_SHA256=b503cf5949ab718a1dff17d1643237ecc0fecf50ad86264572dcafddb140a327
+# Microsoft publishes the same pinned source commit in NuGet even when the
+# GitHub release assets and the Apple pod archive are unavailable. The nested
+# iOS zip and Maven Android AAR are separately checked before extraction.
+ONNX_NUGET_SHA256=769d1d3ea8ab6cd69f737c9dd4d4462aa4ad0ccfa106eaf506efc40d7bead5db
+ONNX_NUGET_IOS_SHA256=0299c13fb655fe8a23ad752fa049f78d6b983d905b101ba125fd2ccd4b69304d
+ONNX_ANDROID_AAR_SHA256=f351a0638696f54b35184290dbc001d66daae17281ad0b548d2c70347d53b8a9
 
 # Android ONNX Runtime ships inside the pinned Sherpa-ONNX Android archive.
 # The fork workflow builds that archive against this exact upstream source

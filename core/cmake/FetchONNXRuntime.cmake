@@ -26,6 +26,7 @@ endif()
 message(STATUS "ONNX Runtime versions: iOS=${RAC_ONNX_VERSION_IOS}, Android=${RAC_ONNX_VERSION_ANDROID}, macOS=${RAC_ONNX_VERSION_MACOS}, Linux=${RAC_ONNX_VERSION_LINUX}")
 
 include(RacFetchArchive)
+include(RacONNXRegistry)
 
 # Vendored ONNX and Sherpa artifacts live under core/third_party.
 # Anchor all local lookups on this module path so the single-root CMake build no
@@ -96,8 +97,8 @@ elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # Verify the xcframework exists
     if(NOT EXISTS "${ONNX_LOCAL_PATH}/onnxruntime.xcframework")
         message(FATAL_ERROR "ONNX Runtime xcframework not found at ${ONNX_LOCAL_PATH}/onnxruntime.xcframework. "
-                           "Please download it from https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNX_IOS_VERSION}.zip "
-                           "and extract to ${ONNX_LOCAL_PATH}/")
+                           "Run bash core/scripts/ios/download-onnx.sh from the repository root "
+                           "to stage the pinned iOS archive or verified NuGet fallback.")
     endif()
 
     # Set onnxruntime_SOURCE_DIR to point to our local copy
@@ -139,6 +140,9 @@ elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     if(EXISTS "${ONNX_LOCAL_PATH}/Headers")
         list(APPEND ONNX_HEADER_DIRS "${ONNX_LOCAL_PATH}/Headers")
     endif()
+    if(EXISTS "${ONNX_ARCH_DIR}/onnxruntime.framework/Headers")
+        list(APPEND ONNX_HEADER_DIRS "${ONNX_ARCH_DIR}/onnxruntime.framework/Headers")
+    endif()
 
     set_target_properties(onnxruntime PROPERTIES
         IMPORTED_LOCATION "${ONNX_LIB_PATH}"
@@ -177,41 +181,15 @@ elseif(ANDROID)
         )
         target_include_directories(onnxruntime INTERFACE "${ONNX_HEADER_PATH}")
 
-        # Sherpa-ONNX Android prebuilts only ship the C API header. Fetch the
-        # matching header-only C++ wrappers when absent so the imported target
-        # exposes a complete, version-matched ONNX Runtime header set.
+        # Sherpa-ONNX Android prebuilts only ship the C API header. Use the
+        # matching, SHA-256-pinned Maven AAR when C++ headers were not staged
+        # by download-sherpa-onnx.sh.
         if(NOT EXISTS "${ONNX_HEADER_PATH}/onnxruntime_cxx_api.h")
-            if(NOT DEFINED RAC_ONNX_COMMIT_ANDROID OR "${RAC_ONNX_COMMIT_ANDROID}" STREQUAL "")
-                message(FATAL_ERROR
-                    "RAC_ONNX_COMMIT_ANDROID is required for immutable Android header downloads")
+            if(NOT DEFINED RAC_ONNX_ANDROID_AAR_SHA256 OR "${RAC_ONNX_ANDROID_AAR_SHA256}" STREQUAL "")
+                message(FATAL_ERROR "RAC_ONNX_ANDROID_AAR_SHA256 is required for verified Android headers")
             endif()
-            set(ONNX_CXX_HEADER_DIR "${CMAKE_BINARY_DIR}/_deps/onnxruntime-cxx-headers")
-            file(MAKE_DIRECTORY "${ONNX_CXX_HEADER_DIR}")
-
-            set(ONNX_HEADER_BASE_URL "https://raw.githubusercontent.com/microsoft/onnxruntime/${RAC_ONNX_COMMIT_ANDROID}/include/onnxruntime/core/session")
-            set(ONNX_CXX_HEADERS
-                onnxruntime_cxx_api.h
-                onnxruntime_cxx_inline.h
-                onnxruntime_float16.h
-                onnxruntime_session_options_config_keys.h
-                onnxruntime_run_options_config_keys.h
-            )
-
-            foreach(header ${ONNX_CXX_HEADERS})
-                if(NOT EXISTS "${ONNX_CXX_HEADER_DIR}/${header}")
-                    message(STATUS "Downloading ONNX C++ header: ${header}")
-                    file(DOWNLOAD
-                        "${ONNX_HEADER_BASE_URL}/${header}"
-                        "${ONNX_CXX_HEADER_DIR}/${header}"
-                        STATUS download_status
-                    )
-                    list(GET download_status 0 download_code)
-                    if(NOT download_code EQUAL 0)
-                        message(WARNING "Failed to download ${header} (status: ${download_status})")
-                    endif()
-                endif()
-            endforeach()
-
+            rac_onnx_stage_android_headers(ONNX_CXX_HEADER_DIR
+                "${RAC_ONNX_VERSION_ANDROID}" "${RAC_ONNX_ANDROID_AAR_SHA256}")
             target_include_directories(onnxruntime INTERFACE "${ONNX_CXX_HEADER_DIR}")
             message(STATUS "ONNX Runtime C++ headers: ${ONNX_CXX_HEADER_DIR}")
         endif()
@@ -287,13 +265,16 @@ elseif(APPLE)
         message(STATUS "Local ONNX Runtime not found, downloading...")
         if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "aarch64")
             set(ONNX_MACOS_ARCH "arm64")
+            set(ONNX_NUGET_RID "osx-arm64")
         else()
             set(ONNX_MACOS_ARCH "x86_64")
+            set(ONNX_NUGET_RID "osx-x64")
         endif()
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_MACOS_VERSION}/onnxruntime-osx-${ONNX_MACOS_ARCH}-${ONNX_MACOS_VERSION}.tgz")
         message(STATUS "ONNX Runtime macOS URL: ${ONNX_URL}")
 
-        rac_fetchcontent_archive(onnxruntime ${ONNX_URL})
+        rac_onnx_fetch_release_or_nuget(onnxruntime_SOURCE_DIR "${ONNX_URL}"
+            "${ONNX_NUGET_RID}" "${ONNX_MACOS_VERSION}" "${RAC_ONNX_NUGET_SHA256}")
 
         add_library(onnxruntime SHARED IMPORTED GLOBAL)
 
@@ -310,13 +291,18 @@ elseif(APPLE)
 
 elseif(UNIX)
     # Linux: Download Linux binaries
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_LINUX}/onnxruntime-linux-aarch64-${RAC_ONNX_VERSION_LINUX}.tgz")
-    else()
+        set(ONNX_NUGET_RID "linux-arm64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_LINUX}/onnxruntime-linux-x64-${RAC_ONNX_VERSION_LINUX}.tgz")
+        set(ONNX_NUGET_RID "linux-x64")
+    else()
+        message(FATAL_ERROR "Unsupported Linux architecture for ONNX Runtime: ${CMAKE_SYSTEM_PROCESSOR}")
     endif()
 
-    rac_fetchcontent_archive(onnxruntime ${ONNX_URL})
+    rac_onnx_fetch_release_or_nuget(onnxruntime_SOURCE_DIR "${ONNX_URL}"
+        "${ONNX_NUGET_RID}" "${RAC_ONNX_VERSION_LINUX}" "${RAC_ONNX_NUGET_SHA256}")
 
     add_library(onnxruntime SHARED IMPORTED GLOBAL)
 
@@ -336,13 +322,19 @@ elseif(WIN32)
         message(FATAL_ERROR "RAC_ONNX_VERSION_WINDOWS not defined by LoadVersions")
     endif()
 
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64)$")
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_WINDOWS}/onnxruntime-win-arm64-${RAC_ONNX_VERSION_WINDOWS}.zip")
+        set(ONNX_NUGET_RID "win-arm64")
+    elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_WINDOWS}/onnxruntime-win-x64-${RAC_ONNX_VERSION_WINDOWS}.zip")
+        set(ONNX_NUGET_RID "win-x64")
     else()
         set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_WINDOWS}/onnxruntime-win-x86-${RAC_ONNX_VERSION_WINDOWS}.zip")
+        set(ONNX_NUGET_RID "win-x86")
     endif()
 
-    rac_fetchcontent_archive(onnxruntime ${ONNX_URL})
+    rac_onnx_fetch_release_or_nuget(onnxruntime_SOURCE_DIR "${ONNX_URL}"
+        "${ONNX_NUGET_RID}" "${RAC_ONNX_VERSION_WINDOWS}" "${RAC_ONNX_NUGET_SHA256}")
 
     add_library(onnxruntime SHARED IMPORTED GLOBAL)
 

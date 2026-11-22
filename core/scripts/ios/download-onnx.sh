@@ -1,5 +1,5 @@
 #!/bin/bash
-# Download ONNX Runtime iOS xcframework directly from onnxruntime.ai
+# Download the pinned ONNX Runtime iOS XCFramework, falling back to NuGet.
 
 set -euo pipefail
 
@@ -19,41 +19,55 @@ if [ -z "${ONNX_IOS_SHA256:-}" ]; then
     echo "ERROR: ONNX_IOS_SHA256 not loaded from VERSIONS file" >&2
     exit 1
 fi
+if [ -z "${ONNX_NUGET_SHA256:-}" ] || [ -z "${ONNX_NUGET_IOS_SHA256:-}" ]; then
+    echo "ERROR: ONNX Runtime NuGet checksums not loaded from VERSIONS file" >&2
+    exit 1
+fi
 ONNX_VERSION="${ONNX_VERSION_IOS}"
 DOWNLOAD_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNX_VERSION}.zip"
+NUGET_URL="https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/${ONNX_VERSION}/microsoft.ml.onnxruntime.${ONNX_VERSION}.nupkg"
 
 echo "Downloading ONNX Runtime iOS xcframework v${ONNX_VERSION}..."
 
 # Create temp directory for download
 TEMP_DIR=$(mktemp -d)
 TEMP_ZIP="${TEMP_DIR}/onnxruntime.zip"
+trap 'rm -rf "${TEMP_DIR}"' EXIT
 
-# Download the xcframework directly
+# Prefer the existing Apple pod archive when available.
 echo "Downloading from ${DOWNLOAD_URL}..."
-curl -L --progress-bar -o "${TEMP_ZIP}" "${DOWNLOAD_URL}"
-
-# Verify download
-if [ ! -f "${TEMP_ZIP}" ]; then
-    echo "Error: Download failed"
-    exit 1
-fi
-
-ACTUAL_SHA256="$(shasum -a 256 "${TEMP_ZIP}" | awk '{print $1}')"
-if [ "${ACTUAL_SHA256}" != "${ONNX_IOS_SHA256}" ]; then
-    echo "ERROR: ONNX Runtime iOS archive checksum mismatch" >&2
-    echo "  expected: ${ONNX_IOS_SHA256}" >&2
-    echo "  actual:   ${ACTUAL_SHA256}" >&2
-    exit 1
+if curl --fail --location --show-error --silent --connect-timeout 20 \
+    --max-time 180 --output "${TEMP_ZIP}" "${DOWNLOAD_URL}"; then
+    ACTUAL_SHA256="$(shasum -a 256 "${TEMP_ZIP}" | awk '{print $1}')"
+    if [ "${ACTUAL_SHA256}" != "${ONNX_IOS_SHA256}" ]; then
+        echo "ERROR: ONNX Runtime iOS archive checksum mismatch" >&2
+        echo "  expected: ${ONNX_IOS_SHA256}" >&2
+        echo "  actual:   ${ACTUAL_SHA256}" >&2
+        exit 1
+    fi
+else
+    echo "Apple pod archive unavailable; downloading verified NuGet fallback..."
+    NUGET_FILE="${TEMP_DIR}/onnxruntime.nupkg"
+    curl --fail --location --show-error --silent --retry 3 --connect-timeout 20 \
+        --output "${NUGET_FILE}" "${NUGET_URL}"
+    ACTUAL_SHA256="$(shasum -a 256 "${NUGET_FILE}" | awk '{print $1}')"
+    if [ "${ACTUAL_SHA256}" != "${ONNX_NUGET_SHA256}" ]; then
+        echo "ERROR: ONNX Runtime NuGet archive checksum mismatch" >&2
+        exit 1
+    fi
+    unzip -p "${NUGET_FILE}" \
+        runtimes/ios/native/onnxruntime.xcframework.zip > "${TEMP_ZIP}"
+    ACTUAL_SHA256="$(shasum -a 256 "${TEMP_ZIP}" | awk '{print $1}')"
+    if [ "${ACTUAL_SHA256}" != "${ONNX_NUGET_IOS_SHA256}" ]; then
+        echo "ERROR: ONNX Runtime NuGet XCFramework checksum mismatch" >&2
+        exit 1
+    fi
 fi
 
 echo "Download complete. Size: $(du -h "${TEMP_ZIP}" | cut -f1)"
 
-# Extract the xcframework
+# Extract and validate before replacing an existing inventory.
 echo "Extracting xcframework..."
-rm -rf "${ONNX_DIR}"
-mkdir -p "${ONNX_DIR}"
-
-# Unzip to temp directory first
 unzip -q "${TEMP_ZIP}" -d "${TEMP_DIR}/extracted"
 
 # Find and copy the xcframework
@@ -64,15 +78,27 @@ if [ -z "${XCFRAMEWORK}" ]; then
     exit 1
 fi
 
-cp -R "${XCFRAMEWORK}" "${ONNX_DIR}/"
+if [ ! -f "${XCFRAMEWORK}/ios-arm64/onnxruntime.framework/onnxruntime" ] || \
+   [ ! -f "${XCFRAMEWORK}/ios-arm64/onnxruntime.framework/Headers/onnxruntime_c_api.h" ] || \
+   [ ! -f "${XCFRAMEWORK}/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime" ]; then
+    echo "Error: verified ONNX Runtime XCFramework is missing a required iOS slice or header" >&2
+    exit 1
+fi
+
+STAGED_DIR="${TEMP_DIR}/staged"
+mkdir -p "${STAGED_DIR}"
+cp -R "${XCFRAMEWORK}" "${STAGED_DIR}/"
 
 # Also copy headers if they exist at the top level
 if [ -d "${TEMP_DIR}/extracted/Headers" ]; then
-    cp -R "${TEMP_DIR}/extracted/Headers" "${ONNX_DIR}/"
+    cp -R "${TEMP_DIR}/extracted/Headers" "${STAGED_DIR}/"
+else
+    cp -R "${XCFRAMEWORK}/ios-arm64/onnxruntime.framework/Headers" "${STAGED_DIR}/"
 fi
 
-# Clean up
-rm -rf "${TEMP_DIR}"
+mkdir -p "$(dirname "${ONNX_DIR}")"
+rm -rf "${ONNX_DIR}"
+mv "${STAGED_DIR}" "${ONNX_DIR}"
 
 echo ""
 echo "✅ ONNX Runtime xcframework downloaded to ${ONNX_DIR}/onnxruntime.xcframework"

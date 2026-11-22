@@ -36,8 +36,13 @@ if [ -z "${SHERPA_ONNX_COMMIT_MACOS:-}" ]; then
 fi
 if [ -z "${ONNX_VERSION_MACOS:-}" ] || \
    [ -z "${ONNX_MACOS_STATIC_SHA256:-}" ] || \
-   [ -z "${ONNX_MACOS_ERROR_CODE_HEADER_SHA256:-}" ]; then
+   [ -z "${ONNX_MACOS_ERROR_CODE_HEADER_SHA256:-}" ] || \
+   [ -z "${ONNX_ANDROID_AAR_SHA256:-}" ]; then
     echo "ERROR: macOS ONNX Runtime version/checksum not loaded from VERSIONS file" >&2
+    exit 1
+fi
+if [ "${ONNX_VERSION_MACOS}" != "${ONNX_VERSION_ANDROID:-}" ]; then
+    echo "ERROR: macOS and Android ONNX Runtime versions differ; pin a matching AAR before using its header" >&2
     exit 1
 fi
 
@@ -114,12 +119,25 @@ fi
 
 # csukuangfj's static bundle intentionally contains the generated ORT public
 # headers but currently omits onnxruntime_error_code.h, which its own
-# onnxruntime_c_api.h includes. Restore that one file from the exact upstream
-# v${ONNX_VERSION_MACOS} tag and verify its immutable content before use.
+# onnxruntime_c_api.h includes. Restore it from the version-matched Maven AAR
+# and verify both the complete AAR and extracted header before use.
 ONNX_ERROR_CODE_HEADER="${ONNX_ROOT}/include/onnxruntime_error_code.h"
+ONNX_ANDROID_AAR="${BUILD_TEMP}/onnxruntime-android.aar"
 curl --fail --location --show-error --silent --retry 5 \
-    --output "${ONNX_ERROR_CODE_HEADER}" \
-    "https://raw.githubusercontent.com/microsoft/onnxruntime/v${ONNX_VERSION_MACOS}/include/onnxruntime/core/session/onnxruntime_error_code.h"
+    --output "${ONNX_ANDROID_AAR}" \
+    "https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${ONNX_VERSION_MACOS}/onnxruntime-android-${ONNX_VERSION_MACOS}.aar"
+ACTUAL_ONNX_ANDROID_AAR_SHA256="$(shasum -a 256 "${ONNX_ANDROID_AAR}" | awk '{print $1}')"
+if [ "${ACTUAL_ONNX_ANDROID_AAR_SHA256}" != "${ONNX_ANDROID_AAR_SHA256}" ]; then
+    echo "Error: ONNX Runtime Android AAR checksum mismatch" >&2
+    echo "  expected: ${ONNX_ANDROID_AAR_SHA256}" >&2
+    echo "  actual:   ${ACTUAL_ONNX_ANDROID_AAR_SHA256}" >&2
+    exit 1
+fi
+if ! unzip -p "${ONNX_ANDROID_AAR}" headers/onnxruntime_error_code.h > "${ONNX_ERROR_CODE_HEADER}" || \
+   [ ! -s "${ONNX_ERROR_CODE_HEADER}" ]; then
+    echo "Error: verified ONNX Runtime AAR is missing headers/onnxruntime_error_code.h" >&2
+    exit 1
+fi
 ACTUAL_ERROR_CODE_HEADER_SHA256="$(shasum -a 256 "${ONNX_ERROR_CODE_HEADER}" | awk '{print $1}')"
 if [ "${ACTUAL_ERROR_CODE_HEADER_SHA256}" != "${ONNX_MACOS_ERROR_CODE_HEADER_SHA256}" ]; then
     echo "Error: ONNX Runtime error-code header checksum mismatch" >&2
