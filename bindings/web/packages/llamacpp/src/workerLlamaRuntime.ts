@@ -9,6 +9,7 @@
 
 import {
   PlatformAdapter,
+  racLogLevelToProto,
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKLogger,
   type AccelerationMode,
@@ -46,6 +47,7 @@ export interface WorkerLlamaModule {
 
   _rac_init?(configPtr: number): number;
   _rac_shutdown?(): void;
+  _rac_logger_set_min_level?(level: number): void;
   _rac_set_platform_adapter?(adapterPtr: number): number;
   _rac_error_message?(code: number): number;
   _rac_model_paths_set_base_dir?(basePtr: number): number;
@@ -111,8 +113,15 @@ export class WorkerLlamaRuntime {
   private platformAdapter: PlatformAdapter | null = null;
   private accelerationMode: AccelerationMode = 'cpu';
   private loaded = false;
+  private logLevel = 2;
   /** Recent WASM print/printErr/onAbort lines for diagnosing worker aborts. */
   private readonly diagnosticsLog: string[] = [];
+
+  setLogLevel(level: number): void {
+    this.logLevel = level;
+    SDKLogger.setMinLogLevel(racLogLevelToProto(level));
+    this.module?._rac_logger_set_min_level?.(level);
+  }
 
   get isLoaded(): boolean {
     return this.loaded && this.module !== null;
@@ -267,7 +276,7 @@ export class WorkerLlamaRuntime {
         '*',
       );
       if (typeof m._rac_wasm_offsetof_config_log_level === 'function') {
-        m.setValue(configPtr + m._rac_wasm_offsetof_config_log_level(), 2, 'i32');
+        m.setValue(configPtr + m._rac_wasm_offsetof_config_log_level(), this.logLevel, 'i32');
       }
       const result = (await m.ccall(
         'rac_init',
@@ -281,6 +290,8 @@ export class WorkerLlamaRuntime {
         const errMsg = errPtr ? m.UTF8ToString(errPtr) : `rac_init failed (${result})`;
         throw new Error(errMsg);
       }
+      // A live update may have arrived while the async initialization was pending.
+      this.setLogLevel(this.logLevel);
       this.setModelPathsBaseDir('/opfs');
     } finally {
       m._free(configPtr);

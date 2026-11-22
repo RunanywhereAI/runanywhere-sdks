@@ -11,6 +11,7 @@
  * capability registry; it does not contain a concrete backend loader.
  */
 
+import { setBackendWorkersLogLevel } from './BackendWorkerHostRegistry.js';
 import { DownloadAdapter } from '../Adapters/DownloadAdapter.js';
 import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter.js';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter.js';
@@ -1231,9 +1232,10 @@ export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
 
 let _currentCommonsMinLogLevel = 2; // Default to INFO (2)
 
-/** Set the minimum log level across all registered WASM modules. */
+/** Set the minimum log level across local WASM modules and existing backend workers. */
 export function setCommonsMinLogLevel(racLevel: number): void {
   _currentCommonsMinLogLevel = racLevel;
+  setBackendWorkersLogLevel(racLevel);
   for (const mod of getAllRegisteredModules()) {
     try {
       mod._rac_logger_set_min_level?.(racLevel);

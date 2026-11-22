@@ -11,7 +11,9 @@
  */
 import {
   PlatformAdapter,
+  racLogLevelToProto,
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
+  SDKLogger,
   type PlatformAdapterModule,
 } from '@runanywhere/web/backend';
 
@@ -49,6 +51,7 @@ export interface WorkerOnnxModule {
   _rac_error_message?(code: number): number;
   _rac_init?(configPtr: number): number | Promise<number>;
   _rac_shutdown?(): void;
+  _rac_logger_set_min_level?(level: number): void;
   _rac_model_paths_set_base_dir?(basePtr: number): number;
   _rac_backend_onnx_register?(): number | Promise<number>;
   _rac_backend_sherpa_register?(): number | Promise<number>;
@@ -84,10 +87,17 @@ export class WorkerOnnxRuntime {
   private module: WorkerOnnxModule | null = null;
   private adapter: PlatformAdapter | null = null;
   private loaded = false;
+  private logLevel = 2;
   private accelerationMode: 'cpu' | 'webgpu' = 'cpu';
   private threads = 1;
   private fallbackReason: string | null = null;
   private readonly diagnosticsLog: string[] = [];
+
+  setLogLevel(level: number): void {
+    this.logLevel = level;
+    SDKLogger.setMinLogLevel(racLogLevelToProto(level));
+    this.module?._rac_logger_set_min_level?.(level);
+  }
 
   get isLoaded(): boolean {
     return this.loaded && this.module !== null;
@@ -386,12 +396,14 @@ export class WorkerOnnxRuntime {
       for (let index = 0; index < size; index += 1) module.setValue(configPtr + index, 0, 'i8');
       module.setValue(configPtr + offset, adapterPtr, '*');
       const logOffset = module._rac_wasm_offsetof_config_log_level?.();
-      if (logOffset !== undefined) module.setValue(configPtr + logOffset, 2, 'i32');
+      if (logOffset !== undefined) module.setValue(configPtr + logOffset, this.logLevel, 'i32');
       const rc = await module.ccall('rac_init', 'number', ['number'], [configPtr], { async: true }) as number;
       if (rc !== 0) {
         const messagePtr = module._rac_error_message?.(rc) ?? 0;
         throw new Error(messagePtr ? module.UTF8ToString(messagePtr) : `rac_init failed (${rc})`);
       }
+      // A live update may have arrived while the async initialization was pending.
+      this.setLogLevel(this.logLevel);
       this.setModelPathsBaseDir('/opfs');
     } finally {
       module._free(configPtr);

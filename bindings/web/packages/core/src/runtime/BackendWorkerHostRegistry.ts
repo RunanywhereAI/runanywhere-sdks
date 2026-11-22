@@ -30,6 +30,11 @@ export function getBackendWorkerHost(
   return hosts.get(backendId) ?? null;
 }
 
+/** Forward configuration without creating or restarting a worker. */
+export function setBackendWorkersLogLevel(level: number): void {
+  for (const host of hosts.values()) host.setLogLevel(level);
+}
+
 /** Aggregate diagnostics: worker if any backend host is in worker context. */
 export function getRegisteredBackendWorkerDiagnostics(): BackendWorkerDiagnostics {
   let queueDepth = 0;

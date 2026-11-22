@@ -18,6 +18,7 @@ import {
   markLlamaBackendWorkerDead,
   markOnnxBackendWorkerDead,
 } from './BackendWorkerModelOwnership.js';
+import { SDKLogger, toRacLogLevel } from '../Foundation/SDKLogger.js';
 import { setRuntimeDegradedReason } from '../Foundation/RuntimeConfig.js';
 
 function isWasmAbortMessage(message: string): boolean {
@@ -180,12 +181,23 @@ export class BackendWorkerHost {
         worker.onerror = (event) => this.handleCrash(
           new BackendWorkerCrashedError(`Backend worker error: ${event.message || '<unknown>'}`),
         );
-        worker.postMessage({ type: 'init', requestId, payload: initPayload }, transfer);
+        worker.postMessage({
+          type: 'init', requestId, payload: initPayload, logLevel: toRacLogLevel(SDKLogger.level),
+        }, transfer);
       } catch (error) {
         this.initReject?.(error);
       }
     });
     return this.ready;
+  }
+
+  setLogLevel(logLevel: number): void {
+    if (!this.worker) return;
+    try {
+      this.post({ type: 'setLogLevel', requestId: this.nextRequestId('logLevel'), logLevel });
+    } catch (error) {
+      this.handleCrash(error);
+    }
   }
 
   async loadModel(

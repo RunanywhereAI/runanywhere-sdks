@@ -11,7 +11,9 @@
     "playwright.config.ts",
     "tests/browser/opfs-reload-persistence.spec.ts",
     "tests/browser/release-app.e2e.spec.ts",
-    "tests/browser/support/**/*.ts"
+    "tests/browser/support/**/*.ts",
+    "tests/browser/worker-logging.spec.ts",
+    "tests/browser/fixtures/log-level-worker.ts"
   ],
   "exclude": [
     "node_modules",

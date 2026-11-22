@@ -623,6 +623,7 @@ const workerScope = self as unknown as BackendWorkerScope;
 installCrashDiagnostics(workerScope);
 
 runBackendWorker(workerScope, {
+  setLogLevel: (level) => runtime.setLogLevel(level),
   async init(payload: unknown): Promise<void> {
     const options = (payload ?? {}) as LlamaBackendWorkerInitPayload;
     await runtime.ensureLoaded(options.acceleration ?? 'auto');
