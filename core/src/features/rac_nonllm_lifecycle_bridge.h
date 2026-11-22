@@ -12,6 +12,9 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
 
+#include <memory>
+#include <mutex>
+
 namespace rac::lifecycle {
 
 struct LifecycleSttRef {
@@ -87,6 +90,25 @@ void release_lifecycle_tts(LifecycleTtsRef* ref);
 
 rac_result_t acquire_lifecycle_vad(LifecycleVadRef* out_ref);
 void release_lifecycle_vad(LifecycleVadRef* ref);
+
+// The loaded model behind an acquired VAD ref. Distinct per load, so a reload
+// is told apart even if the backend reuses an impl address. Empty when unknown.
+std::shared_ptr<const void> lifecycle_vad_owner(const LifecycleVadRef& ref);
+
+// Serializes the lifecycle-loaded VAD detector's threshold changes with the
+// process calls that depend on them: lifecycle process and configure
+// (vad_module.cpp) and the voice agent's direct ops->process sweep. Other ops
+// (start/stop/reset) don't take it. Whoever holds it can set the threshold and
+// process at that value without another caller changing it in between.
+std::mutex& lifecycle_vad_mutex();
+
+// With lifecycle_vad_mutex() held, before running the detector without an
+// override: puts it at its configured threshold if an earlier request left it
+// at an override (or a set_threshold failed). A no-op when it is already there.
+// Returns RAC_SUCCESS when the detector is at its configured threshold; on
+// failure the caller must not process, or it would silently run at a stale
+// value.
+rac_result_t lifecycle_vad_settle_threshold(const LifecycleVadRef& ref);
 
 rac_result_t acquire_lifecycle_embeddings(LifecycleEmbeddingsRef* out_ref);
 void release_lifecycle_embeddings(LifecycleEmbeddingsRef* ref);

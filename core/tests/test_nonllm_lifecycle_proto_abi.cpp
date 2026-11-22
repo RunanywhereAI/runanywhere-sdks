@@ -226,9 +226,13 @@ rac_result_t mock_vad_process(void* impl, const float* samples, size_t num_sampl
     return RAC_SUCCESS;
 }
 
+// Counts set_threshold calls: on Sherpa each one rebuilds the detector.
+int g_vad_set_threshold_calls = 0;
+
 rac_result_t mock_vad_set_threshold(void* impl, float threshold) {
     if (!impl)
         return RAC_ERROR_NULL_POINTER;
+    ++g_vad_set_threshold_calls;
     static_cast<MockState*>(impl)->vad_threshold = threshold;
     return RAC_SUCCESS;
 }
@@ -583,6 +587,34 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     vad_audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
     vad_audio->set_sample_rate(16000);
     vad_audio->set_channels(1);
+
+    // A freshly loaded detector is at the backend's own threshold (the mock's
+    // 0.015), not kDefaultModelVadThreshold. The samples average 0.2.
+    {
+        runanywhere::v1::VADResult fresh_result;
+        const int calls_before = g_vad_set_threshold_calls;
+        CHECK(serialize(vad_request, &bytes), "fresh VAD request serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &fresh_result) && fresh_result.is_speech(),
+              "VAD request without override on a fresh model runs at the backend's own "
+              "threshold");
+        rac_proto_buffer_free(&out);
+        CHECK(g_vad_set_threshold_calls == calls_before,
+              "VAD request without override on a fresh model does not set the threshold");
+
+        // An explicit 0.5 must be applied, not skipped as "already the default".
+        vad_request.mutable_options()->set_activation_threshold(0.5f);
+        CHECK(serialize(vad_request, &bytes), "fresh VAD 0.5 override serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS && parse_buffer(out, &fresh_result) && !fresh_result.is_speech(),
+              "first VAD override of 0.5 on a fresh model is applied");
+        rac_proto_buffer_free(&out);
+        CHECK(g_vad_set_threshold_calls == calls_before + 1,
+              "first VAD override on a fresh model calls set_threshold");
+    }
+
     vad_request.mutable_options()->set_activation_threshold(0.1f);
     CHECK(serialize(vad_request, &bytes), "VAD lifecycle request serializes");
     rac_proto_buffer_init(&out);
@@ -593,6 +625,50 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     CHECK(vad_result.is_speech(), "VAD lifecycle ABI uses loaded VAD ops");
     CHECK(vad_result.duration_ms() > 0, "VAD lifecycle result carries duration");
     rac_proto_buffer_free(&out);
+
+    // #896: a per-request activation_threshold is for that request only. The
+    // samples average 0.2: speech at the 0.1 override, silence at the 0.3
+    // configured value. Before the fix the override stuck, so the follow-up
+    // request without one still reported speech.
+    {
+        runanywhere::v1::VADConfiguration vad_config;
+        vad_config.set_activation_threshold(0.3f);
+        std::vector<uint8_t> config_bytes;
+        CHECK(serialize(vad_config, &config_bytes), "VAD lifecycle configuration serializes");
+        rac_proto_buffer_init(&out);
+        rc = rac_vad_configure_lifecycle_proto(config_bytes.data(), config_bytes.size(), &out);
+        CHECK(rc == RAC_SUCCESS, "VAD lifecycle configure applies 0.3");
+        rac_proto_buffer_free(&out);
+        const int calls_after_configure = g_vad_set_threshold_calls;
+
+        CHECK(serialize(vad_request, &bytes), "VAD override request serializes");
+        for (int i = 0; i < 2; ++i) {
+            rac_proto_buffer_init(&out);
+            rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+            CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && vad_result.is_speech(),
+                  "VAD lifecycle override (0.1) applies to its own request");
+            rac_proto_buffer_free(&out);
+        }
+        // set_threshold rebuilds a Sherpa detector, dropping its speech state:
+        // consecutive requests at the same override must not re-apply it.
+        CHECK(g_vad_set_threshold_calls == calls_after_configure + 1,
+              "consecutive VAD requests at the same override set the threshold once");
+
+        runanywhere::v1::VADProcessRequest plain_request = vad_request;
+        plain_request.clear_options();
+        CHECK(serialize(plain_request, &bytes), "VAD request without override serializes");
+        for (int i = 0; i < 2; ++i) {
+            rac_proto_buffer_init(&out);
+            rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
+            CHECK(rc == RAC_SUCCESS && parse_buffer(out, &vad_result) && !vad_result.is_speech(),
+                  "VAD lifecycle request without override runs at the configured 0.3, "
+                  "not the previous request's override");
+            rac_proto_buffer_free(&out);
+        }
+        CHECK(g_vad_set_threshold_calls == calls_after_configure + 2,
+              "the configured VAD threshold is put back once, before the first "
+              "request without an override");
+    }
 
     runanywhere::v1::EmbeddingsRequest embeddings_request;
     embeddings_request.set_request_id("emb-1");
