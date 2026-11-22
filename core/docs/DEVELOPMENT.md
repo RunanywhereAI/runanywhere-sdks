@@ -25,6 +25,8 @@ Contributor guide for building, integrating, and extending the internal C/C++ co
 | `RAC_GPU_CUDA` | OFF | Build llama.cpp with the CUDA backend (NVIDIA; needs the CUDA toolkit) |
 | `RAC_REGENERATE_PROTO` | OFF | Re-run `idl/codegen/generate_cpp.sh` when `.proto` files change |
 | `RAC_INCLUDE_LOCAL_DEV_CONFIG` | OFF | Compile the git-ignored local development credentials; never for packaging |
+| `RAC_ONNX_FORCE_REGISTRY` | OFF | Skip GitHub release downloads and stage the verified ONNX Runtime NuGet package for supported desktop targets |
+| `RAC_ONNX_PACKAGE_CACHE_DIR` | Build-local `_deps` directory | Shared download cache for the pinned ONNX Runtime NuGet and Maven archives |
 
 Per-engine `RAC_BACKEND_<NAME>` options are declared by each engine's own `CMakeLists.txt`, not centrally: `RAC_BACKEND_SHERPA` (ON), `RAC_BACKEND_CLOUD` (ON), `RAC_BACKEND_MLX` (ON, Apple), `RAC_BACKEND_NEURT` (Apple), and `RAC_BACKEND_QHEXRT` (OFF; private prebuilt archive). Each engine self-gates with a `return()` guard, so `engines/` descends into all of them unconditionally.
 
@@ -120,6 +122,15 @@ Platform SDKs must provide a `rac_platform_adapter_t` with file I/O, secure stor
 | libarchive | Model archive extraction |
 
 Exact version pins live in the `VERSIONS` file and the repo-root `VERSION` file (currently **0.20.11**).
+
+ONNX Runtime desktop configure first tries the existing GitHub release asset, then
+uses the SHA-256-pinned NuGet package if that download fails. The iOS downloader
+uses the same package's XCFramework if the Apple pod archive is unavailable.
+Android and the macOS static builder obtain matching public headers from the
+pinned Maven AAR. NuGet 1.28.0 provides Linux x64/arm64, Windows x64/arm64, and
+macOS arm64 binaries; Intel macOS and 32-bit Windows still require their GitHub
+release asset. The CMake fallback stages binaries and headers under the build
+directory, leaving local `core/third_party` inventories intact.
 
 Load versions in scripts:
 

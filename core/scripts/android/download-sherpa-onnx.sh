@@ -62,6 +62,7 @@ require_configuration() {
     for variable in \
         ONNX_VERSION_ANDROID \
         ONNX_COMMIT_ANDROID \
+        ONNX_ANDROID_AAR_SHA256 \
         NDK_VERSION \
         SHERPA_ONNX_VERSION_ANDROID \
         SHERPA_ONNX_REPO_ANDROID \
@@ -79,6 +80,10 @@ require_configuration() {
 
     if [[ ! "${SHERPA_ONNX_ANDROID_SHA256}" =~ ^[0-9a-fA-F]{64}$ ]]; then
         fail "SHERPA_ONNX_ANDROID_SHA256 must contain exactly 64 hexadecimal characters"
+        return 1
+    fi
+    if [[ ! "${ONNX_ANDROID_AAR_SHA256}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+        fail "ONNX_ANDROID_AAR_SHA256 must contain exactly 64 hexadecimal characters"
         return 1
     fi
 }
@@ -104,7 +109,8 @@ print_header_identity() {
         "sherpa_repo=${SHERPA_ONNX_HEADER_REPO_ANDROID}" \
         "sherpa_commit=${SHERPA_ONNX_HEADER_COMMIT_ANDROID}" \
         "onnxruntime_version=${ONNX_VERSION_ANDROID}" \
-        "onnxruntime_commit=${ONNX_COMMIT_ANDROID}"
+        "onnxruntime_commit=${ONNX_COMMIT_ANDROID}" \
+        "onnxruntime_aar_sha256=${ONNX_ANDROID_AAR_SHA256}"
 }
 
 write_identity_file() {
@@ -126,7 +132,10 @@ headers_are_current() {
         [ -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] &&
         [ -f "${SHERPA_DIR}/include/onnxruntime_error_code.h" ] &&
         [ -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ] &&
+        [ -f "${SHERPA_DIR}/include/onnxruntime_cxx_inline.h" ] &&
+        [ -f "${SHERPA_DIR}/include/onnxruntime_float16.h" ] &&
         [ -f "${SHERPA_DIR}/include/onnxruntime_ep_c_api.h" ] &&
+        [ -f "${SHERPA_DIR}/include/onnxruntime_ep_device_ep_metadata_keys.h" ] &&
         [ -f "${HEADER_IDENTITY_FILE}" ] &&
         cmp -s <(print_header_identity) "${HEADER_IDENTITY_FILE}"
 }
@@ -410,47 +419,59 @@ validate_library_tree() {
     printf 'Verified %d shared libraries: every PT_LOAD alignment is >= 0x4000.\n' "${count}"
 }
 
-download_headers() {
+download_headers() (
     local sherpa_base
-    local onnx_base
+    local onnx_aar_url
+    local onnx_aar
+    local stage
+    local header
     local include_dir="${SHERPA_DIR}/include"
+    local -a onnx_headers=(
+        onnxruntime_c_api.h
+        onnxruntime_error_code.h
+        onnxruntime_cxx_api.h
+        onnxruntime_cxx_inline.h
+        onnxruntime_float16.h
+        onnxruntime_ep_c_api.h
+        onnxruntime_ep_device_ep_metadata_keys.h
+    )
 
+    stage="$(mktemp -d)"
+    trap 'rm -rf "${stage}"' EXIT
     sherpa_base="https://raw.githubusercontent.com/${SHERPA_ONNX_HEADER_REPO_ANDROID}/${SHERPA_ONNX_HEADER_COMMIT_ANDROID}/sherpa-onnx/c-api"
-    onnx_base="https://raw.githubusercontent.com/microsoft/onnxruntime/${ONNX_COMMIT_ANDROID}/include/onnxruntime/core/session"
+    onnx_aar_url="https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime-android/${ONNX_VERSION_ANDROID}/onnxruntime-android-${ONNX_VERSION_ANDROID}.aar"
+    onnx_aar="${stage}/onnxruntime-android.aar"
 
-    rm -rf "${include_dir}/sherpa-onnx"
-    rm -f \
-        "${include_dir}/onnxruntime_c_api.h" \
-        "${include_dir}/onnxruntime_error_code.h" \
-        "${include_dir}/onnxruntime_cxx_api.h" \
-        "${include_dir}/onnxruntime_cxx_inline.h" \
-        "${include_dir}/onnxruntime_float16.h" \
-        "${include_dir}/onnxruntime_ep_c_api.h" \
-        "${include_dir}/onnxruntime_ep_device_ep_metadata_keys.h" \
-        "${HEADER_IDENTITY_FILE}" \
-        "${include_dir}/.sherpa-header-version" \
-        "${include_dir}/.onnx-header-version"
-    mkdir -p "${include_dir}/sherpa-onnx/c-api"
+    mkdir -p "${stage}/sherpa-onnx/c-api"
 
     printf 'Downloading Sherpa-ONNX headers from %s@%s...\n' \
         "${SHERPA_ONNX_HEADER_REPO_ANDROID}" "${SHERPA_ONNX_HEADER_COMMIT_ANDROID}"
-    download_file "${sherpa_base}/c-api.h" "${include_dir}/sherpa-onnx/c-api/c-api.h"
-    download_file "${sherpa_base}/cxx-api.h" "${include_dir}/sherpa-onnx/c-api/cxx-api.h"
+    download_file "${sherpa_base}/c-api.h" "${stage}/sherpa-onnx/c-api/c-api.h" || return 1
+    download_file "${sherpa_base}/cxx-api.h" "${stage}/sherpa-onnx/c-api/cxx-api.h" || return 1
 
-    printf 'Downloading ONNX Runtime %s headers from commit %s...\n' \
-        "${ONNX_VERSION_ANDROID}" "${ONNX_COMMIT_ANDROID}"
-    download_file "${onnx_base}/onnxruntime_c_api.h" "${include_dir}/onnxruntime_c_api.h"
-    download_file "${onnx_base}/onnxruntime_error_code.h" \
-        "${include_dir}/onnxruntime_error_code.h"
-    download_file "${onnx_base}/onnxruntime_cxx_api.h" "${include_dir}/onnxruntime_cxx_api.h"
-    download_file "${onnx_base}/onnxruntime_cxx_inline.h" "${include_dir}/onnxruntime_cxx_inline.h"
-    download_file "${onnx_base}/onnxruntime_float16.h" "${include_dir}/onnxruntime_float16.h"
-    download_file "${onnx_base}/onnxruntime_ep_c_api.h" "${include_dir}/onnxruntime_ep_c_api.h"
-    download_file "${onnx_base}/onnxruntime_ep_device_ep_metadata_keys.h" \
-        "${include_dir}/onnxruntime_ep_device_ep_metadata_keys.h"
+    printf 'Downloading ONNX Runtime %s headers from pinned Maven AAR...\n' \
+        "${ONNX_VERSION_ANDROID}"
+    download_file "${onnx_aar_url}" "${onnx_aar}" || return 1
+    verify_sha256 "${ONNX_ANDROID_AAR_SHA256}" "${onnx_aar}" || return 1
+    for header in "${onnx_headers[@]}"; do
+        if ! unzip -p "${onnx_aar}" "headers/${header}" > "${stage}/${header}" ||
+           [ ! -s "${stage}/${header}" ]; then
+            fail "Verified ONNX Runtime AAR is missing headers/${header}"
+            return 1
+        fi
+    done
 
-    write_identity_file "${HEADER_IDENTITY_FILE}" print_header_identity
-}
+    mkdir -p "${include_dir}"
+    rm -f "${HEADER_IDENTITY_FILE}" \
+        "${include_dir}/.sherpa-header-version" \
+        "${include_dir}/.onnx-header-version"
+    rm -rf "${include_dir}/sherpa-onnx"
+    cp -R "${stage}/sherpa-onnx" "${include_dir}/" || return 1
+    for header in "${onnx_headers[@]}"; do
+        cp "${stage}/${header}" "${include_dir}/${header}" || return 1
+    done
+    write_identity_file "${HEADER_IDENTITY_FILE}" print_header_identity || return 1
+)
 
 ensure_headers() {
     if headers_are_current; then
@@ -499,7 +520,7 @@ run_check() {
         return 1
     fi
     if ! headers_are_current; then
-        fail "Cached public headers do not match their immutable source commits"
+        fail "Cached public headers do not match the pinned Sherpa source and ONNX Runtime AAR"
         return 1
     fi
     validate_library_tree "${SHERPA_DIR}/jniLibs"
