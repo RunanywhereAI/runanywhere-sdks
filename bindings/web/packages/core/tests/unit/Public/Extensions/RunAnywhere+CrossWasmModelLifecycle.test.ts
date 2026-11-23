@@ -570,6 +570,71 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     expect(getBackendWorkerOwner('moving')).toBe('onnx');
   });
 
+  describe('previous-owner unload serialization', () => {
+    const category = ModelCategory.MODEL_CATEGORY_EMBEDDING;
+    const frameworkOf = (id: 'llamacpp' | 'onnx') => (id === 'onnx'
+      ? InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+      : InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP);
+
+    function setup(unloadOnnx: () => Promise<void>) {
+      const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+      const onnx = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX });
+      registerBackends(llama.module, onnx.module);
+      installRegistrySnapshots([modelSnapshot('moving', category, InferenceFramework.INFERENCE_FRAMEWORK_ONNX)]);
+      vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+      const events: string[] = [];
+      const workerHost = (id: 'llamacpp' | 'onnx') => ({
+        loadModel: vi.fn(async () => {
+          events.push(`load:${id}`);
+          return { resultBytes: ModelLoadResult.encode(ModelLoadResult.create({
+            modelId: 'moving', category, framework: frameworkOf(id),
+          })).finish() };
+        }),
+        unloadModel: vi.fn(async () => {
+          events.push(`unload-start:${id}`);
+          if (id === 'onnx') await unloadOnnx();
+          events.push(`unload-end:${id}`);
+        }),
+      });
+      const hosts = { llamacpp: workerHost('llamacpp'), onnx: workerHost('onnx') };
+      vi.mocked(getActiveBackendWorkerHost).mockImplementation((id = 'llamacpp') => (
+        hosts[id] as unknown as BackendWorkerHost
+      ));
+      const load = (to: 'llamacpp' | 'onnx') => WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+        modelId: 'moving', category, framework: frameworkOf(to), forceReload: true,
+      }));
+      return { events, load };
+    }
+
+    it('waits for a pending previous-owner unload before reloading onto that worker', async () => {
+      let finishUnload!: () => void;
+      const { events, load } = setup(() => new Promise<void>((resolve) => { finishUnload = resolve; }));
+      await load('onnx');
+      await load('llamacpp'); // moves onnx -> llamacpp; onnx unload now suspended
+      expect(events).toContain('unload-start:onnx');
+
+      const back = load('onnx'); // M1 -> M2 -> M1 while the unload is still running
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(events).not.toContain('unload-end:onnx');
+      expect(events.filter((event) => event === 'load:onnx')).toHaveLength(1);
+
+      finishUnload();
+      await back;
+      expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
+      expect(events.filter((event) => event === 'load:onnx')).toHaveLength(2);
+      expect(getBackendWorkerOwner('moving')).toBe('onnx');
+    });
+
+    it('still loads when the pending previous-owner unload fails', async () => {
+      const { events, load } = setup(async () => { throw new Error('unload failed'); });
+      await load('onnx');
+      await load('llamacpp');
+      await expect(load('onnx')).resolves.toMatchObject({ framework: frameworkOf('onnx') });
+      expect(events.filter((event) => event === 'load:onnx')).toHaveLength(2);
+      expect(getBackendWorkerOwner('moving')).toBe('onnx');
+    });
+  });
+
   it('routes framework-scoped current-model queries to the owning WASM', () => {
     const llama = fakeLifecycleRuntime([
       { id: 'llama-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },
