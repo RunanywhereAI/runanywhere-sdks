@@ -323,13 +323,17 @@ class YamlParser {
                     std::string key = strip(after.substr(0, colon));
                     std::string val = strip(after.substr(colon + 1));
                     if (val.empty()) {
-                        // Nested block: child lines belong to this key.
-                        YamlNodePtr child;
-                        if (idx < lines_.size() && !is_blank(lines_[idx]) &&
-                            leading_spaces(lines_[idx]) > indent) {
-                            child = parse_block(idx, leading_spaces(lines_[idx]), err);
-                        } else {
-                            child = YamlNode::make_mapping();
+                        const int key_indent = indent + 1 + leading_spaces(trimmed.substr(1));
+                        auto child = YamlNode::make_mapping();
+                        if (idx < lines_.size()) {
+                            const int next_indent = leading_spaces(lines_[idx]);
+                            const auto next = strip(lines_[idx]);
+                            // YAML permits a sequence value at the key's own indentation.
+                            if (next_indent > key_indent ||
+                                (next_indent == key_indent &&
+                                 (next.starts_with("- ") || next == "-"))) {
+                                child = parse_block(idx, next_indent, err);
+                            }
                         }
                         map->mapping.emplace_back(std::move(key), std::move(child));
                     } else {

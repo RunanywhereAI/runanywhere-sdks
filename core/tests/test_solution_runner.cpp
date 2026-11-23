@@ -1321,8 +1321,10 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
     const char* yaml =
         "name: \"inline\"\n"
         "operators:\n"
-        "  - name: \"src\"\n"
-        "    type: \"source\"\n"
+        "  -   params:\n"
+        "      # This operator has no parameters.\n"
+        "      name: \"src\"\n"
+        "      type: \"source\"\n"
         "  - name: \"snk\"\n"
         "    type: \"sink\"\n"
         "edges:\n"
