@@ -153,7 +153,9 @@ class YamlParser {
                    (clean.back() == ' ' || clean.back() == '\t' || clean.back() == '\r')) {
                 clean.pop_back();
             }
-            lines_.push_back(std::move(clean));
+            // Child lookahead needs the next content line to determine indentation.
+            if (!clean.empty())
+                lines_.push_back(std::move(clean));
         }
     }
 

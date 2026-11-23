@@ -1341,6 +1341,7 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
 TEST(yaml_quoted_scalars_decode_escapes) {
     runanywhere::v1::SolutionConfig single;
     CHECK(rac::solutions::load_solution_from_yaml("voice_agent:\n"
+                                                  "  # Model selection.\n"
                                                   "  llm_model_id: qwen3-4b\n"
                                                   "  system_prompt: 'Don''t use markdown'\n",
                                                   &single) == RAC_SUCCESS);
@@ -1348,7 +1349,7 @@ TEST(yaml_quoted_scalars_decode_escapes) {
 
     runanywhere::v1::SolutionConfig dbl;
     CHECK(rac::solutions::load_solution_from_yaml(
-              "voice_agent:\n"
+              "voice_agent:\n\n"
               "  llm_model_id: qwen3-4b\n"
               "  system_prompt: \"say \\\"hi\\\"\\nthen caf\\u00e9 \\\\ \\q\"\n",
               &dbl) == RAC_SUCCESS);
