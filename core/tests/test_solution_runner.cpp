@@ -1331,6 +1331,14 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
         "  - from: \"src.out\"\n"
         "    to: \"snk.in\"\n";
 
+    runanywhere::v1::PipelineSpec spec;
+    CHECK(rac::solutions::load_pipeline_from_yaml(yaml, &spec) == RAC_SUCCESS);
+    CHECK(spec.operators_size() == 2);
+    const auto& source = spec.operators(0);
+    CHECK(source.name() == "src");
+    CHECK(source.type() == "source");
+    CHECK(source.params_size() == 0);
+
     rac_solution_handle_t h = nullptr;
     rac_result_t st = rac_solution_create_from_yaml(yaml, &h);
     CHECK(st == RAC_SUCCESS);
