@@ -1321,13 +1321,23 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
     const char* yaml =
         "name: \"inline\"\n"
         "operators:\n"
-        "  - name: \"src\"\n"
-        "    type: \"source\"\n"
+        "  -   params:\n"
+        "      # This operator has no parameters.\n"
+        "      name: \"src\"\n"
+        "      type: \"source\"\n"
         "  - name: \"snk\"\n"
         "    type: \"sink\"\n"
         "edges:\n"
         "  - from: \"src.out\"\n"
         "    to: \"snk.in\"\n";
+
+    runanywhere::v1::PipelineSpec spec;
+    CHECK(rac::solutions::load_pipeline_from_yaml(yaml, &spec) == RAC_SUCCESS);
+    CHECK(spec.operators_size() == 2);
+    const auto& source = spec.operators(0);
+    CHECK(source.name() == "src");
+    CHECK(source.type() == "source");
+    CHECK(source.params_size() == 0);
 
     rac_solution_handle_t h = nullptr;
     rac_result_t st = rac_solution_create_from_yaml(yaml, &h);
@@ -1341,6 +1351,7 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
 TEST(yaml_quoted_scalars_decode_escapes) {
     runanywhere::v1::SolutionConfig single;
     CHECK(rac::solutions::load_solution_from_yaml("voice_agent:\n"
+                                                  "  # Model selection.\n"
                                                   "  llm_model_id: qwen3-4b\n"
                                                   "  system_prompt: 'Don''t use markdown'\n",
                                                   &single) == RAC_SUCCESS);
@@ -1348,7 +1359,7 @@ TEST(yaml_quoted_scalars_decode_escapes) {
 
     runanywhere::v1::SolutionConfig dbl;
     CHECK(rac::solutions::load_solution_from_yaml(
-              "voice_agent:\n"
+              "voice_agent:\n\n"
               "  llm_model_id: qwen3-4b\n"
               "  system_prompt: \"say \\\"hi\\\"\\nthen caf\\u00e9 \\\\ \\q\"\n",
               &dbl) == RAC_SUCCESS);
