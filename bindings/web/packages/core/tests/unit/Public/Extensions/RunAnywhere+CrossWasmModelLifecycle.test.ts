@@ -36,6 +36,7 @@ import {
   markModelOwnedByBackendWorker,
 } from '../../../../src/runtime/BackendWorkerModelOwnership';
 import { ModelRegistryAdapter } from '../../../../src/Adapters/ModelRegistryAdapter';
+import { ModelLifecycleAdapter } from '../../../../src/Adapters/ModelLifecycleAdapter';
 import { EmbeddingsProtoAdapter } from '../../../../src/Adapters/EmbeddingsProtoAdapter';
 import { setModelLoadFailureRecovery } from '../../../../src/Foundation/RuntimeConfig';
 
@@ -576,11 +577,11 @@ describe('WebModelLifecycle multi-WASM routing', () => {
       ? InferenceFramework.INFERENCE_FRAMEWORK_ONNX
       : InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP);
 
-    function setup(unloadOnnx: () => Promise<void>) {
+    function setup(unloadOnnx: () => Promise<void>, ids: string[] = ['moving']) {
       const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
       const onnx = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX });
       registerBackends(llama.module, onnx.module);
-      installRegistrySnapshots([modelSnapshot('moving', category, InferenceFramework.INFERENCE_FRAMEWORK_ONNX)]);
+      installRegistrySnapshots(ids.map((id) => modelSnapshot(id, category, InferenceFramework.INFERENCE_FRAMEWORK_ONNX)));
       vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
       const events: string[] = [];
       const workerHost = (id: 'llamacpp' | 'onnx') => ({
@@ -600,8 +601,8 @@ describe('WebModelLifecycle multi-WASM routing', () => {
       vi.mocked(getActiveBackendWorkerHost).mockImplementation((id = 'llamacpp') => (
         hosts[id] as unknown as BackendWorkerHost
       ));
-      const load = (to: 'llamacpp' | 'onnx') => WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
-        modelId: 'moving', category, framework: frameworkOf(to), forceReload: true,
+      const load = (to: 'llamacpp' | 'onnx', modelId = 'moving') => WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+        modelId, category, framework: frameworkOf(to), forceReload: true,
       }));
       return { events, load };
     }
@@ -625,10 +626,67 @@ describe('WebModelLifecycle multi-WASM routing', () => {
       expect(getBackendWorkerOwner('moving')).toBe('onnx');
     });
 
+    it('queues consecutive releases on the same owner and waits for the whole queue', async () => {
+      const gates: Array<() => void> = [];
+      const { events, load } = setup(
+        () => new Promise<void>((resolve) => { gates.push(resolve); }),
+        ['moving', 'other'],
+      );
+      await load('onnx', 'moving');
+      await load('onnx', 'other');
+      await load('llamacpp', 'moving'); // onnx release #1 suspended
+      await load('llamacpp', 'other');  // onnx release #2 queued behind #1
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(1);
+
+      const back = load('onnx', 'moving'); // must wait for the whole queue
+      gates.shift()!(); // finish release #1
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      // second unload starts only after the first ended
+      expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(2);
+      expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('unload-start:onnx'));
+      expect(events.filter((e) => e === 'load:onnx')).toHaveLength(2); // initial two only
+
+      gates.shift()!(); // finish release #2
+      await back;
+      expect(events.filter((e) => e === 'load:onnx')).toHaveLength(3);
+      expect(events.lastIndexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
+    });
+
+    it('rejects a synchronous load while the target module has a pending release', async () => {
+      let finish!: () => void;
+      const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+      registerBackends(llama.module, fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX }).module);
+      installRegistrySnapshots([modelSnapshot('moving', category, InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP)]);
+      vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+      vi.mocked(getActiveBackendWorkerHost).mockReturnValue(null);
+      const req = ModelLoadRequest.create({
+        modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, forceReload: true,
+      });
+      await WebModelLifecycle.loadModelAsync(req);
+      const gate = new Promise<void>((resolve) => { finish = resolve; });
+      const unload = vi.spyOn(ModelLifecycleAdapter.prototype, 'unloadAsync').mockImplementation(async () => { await gate; return null as never; });
+      const host = {
+        loadModel: vi.fn(async () => ({ resultBytes: ModelLoadResult.encode(ModelLoadResult.create({
+          modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        })).finish() })),
+        unloadModel: vi.fn(async () => {}),
+      } as unknown as BackendWorkerHost;
+      vi.mocked(getActiveBackendWorkerHost).mockImplementation((id) => id === 'onnx' ? host : null);
+      await WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+        modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      }));
+      expect(unload).toHaveBeenCalled();
+      expect(() => WebModelLifecycle.loadModel(req)).toThrow(/previous model unload/);
+      finish();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
     it('still loads when the pending previous-owner unload fails', async () => {
       const { events, load } = setup(async () => { throw new Error('unload failed'); });
       await load('onnx');
       await load('llamacpp');
+      expect(events).toContain('unload-start:onnx');
       await expect(load('onnx')).resolves.toMatchObject({ framework: frameworkOf('onnx') });
       expect(events.filter((event) => event === 'load:onnx')).toHaveLength(2);
       expect(getBackendWorkerOwner('moving')).toBe('onnx');

@@ -436,13 +436,25 @@ function trackRelease(
   return current;
 }
 
-/** Wait for any previous-owner unload still running on `target` (never rejects). */
+function pendingReleaseFor(
+  target: { module: object } | { backendId: 'llamacpp' | 'onnx' },
+): Promise<void> | undefined {
+  return 'module' in target
+    ? pendingModuleReleases.get(target.module)
+    : pendingWorkerReleases.get(target.backendId);
+}
+
+/**
+ * Wait until `target` has no previous-owner unload running (never rejects).
+ * Re-reads the owner's latest release after each wait, so releases queued
+ * while this load was waiting are also awaited.
+ */
 async function awaitPendingRelease(
   target: { module: object } | { backendId: 'llamacpp' | 'onnx' },
 ): Promise<void> {
-  await ('module' in target
-    ? pendingModuleReleases.get(target.module)
-    : pendingWorkerReleases.get(target.backendId));
+  for (let pending = pendingReleaseFor(target); pending; pending = pendingReleaseFor(target)) {
+    await pending;
+  }
 }
 
 /**
@@ -812,6 +824,15 @@ export const WebModelLifecycle = {
   loadModel(request: ModelLoadRequest): ModelLoadResult | null {
     const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
     const { adapter } = selectModelLoadRoute(request, snapshot);
+    // The sync path cannot wait, so it must not load onto a module whose
+    // previous-owner unload is still suspended (JSPI); callers use loadModelAsync.
+    if (pendingReleaseFor({ module: lifecycleModuleAsEmscripten(adapter) })) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
+        'a previous model unload is still running on this module; use loadModelAsync',
+        'loadModel',
+      );
+    }
     const result = adapter.load(request);
     if (result && !result.error) {
       void releasePreviousModelOwner(
