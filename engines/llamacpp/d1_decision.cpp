@@ -10,12 +10,23 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
 #include "rac/features/decision/rac_decision_service.h"
 
 namespace {
+
+constexpr const char* kLogCategory = "Decision.LlamaCpp";
+
+// A rendered prompt the context cannot take in one decode. Kept apart from
+// other scoring failures so the caller gets RAC_ERROR_TEXT_TOO_LONG.
+class prompt_too_long : public std::runtime_error {
+   public:
+    using std::runtime_error::runtime_error;
+};
 
 std::string meta_str(const llama_model* model, const std::string& key) {
     char buf[256];
@@ -178,7 +189,18 @@ std::string render_template(const llama_model* model, const common_json& input) 
     return jinja::runtime::gather_string_parts(runtime.execute(tmpl.prog))->as_string().str();
 }
 
+// Each scorer decodes the whole prompt in one llama_decode call, so the prompt
+// must fit n_batch. Omni and GLiNER are non-causal and read every position in
+// one pass, so it must also fit n_ubatch (512 for those models, below n_ctx).
+// llama.cpp aborts the process on either overflow instead of returning an
+// error, so the length is checked before decoding.
 void decode_all(llama_context* ctx, const std::vector<llama_token>& tokens) {
+    const size_t limit = std::min({llama_n_ctx(ctx), llama_n_batch(ctx), llama_n_ubatch(ctx)});
+    if (tokens.size() > limit) {
+        throw prompt_too_long("decision prompt (" + std::to_string(tokens.size()) +
+                              " tokens) exceeds the decode limit (" + std::to_string(limit) +
+                              " tokens)");
+    }
     llama_batch batch =
         llama_batch_get_one(const_cast<llama_token*>(tokens.data()), static_cast<int32_t>(tokens.size()));
     if (llama_decode(ctx, batch) != 0) {
@@ -500,6 +522,10 @@ rac_result_t rac_llamacpp_d1_decide(llama_model* model, llama_context* ctx, rac_
                     break;
             }
         }
+    } catch (const prompt_too_long& error) {
+        RAC_LOG_ERROR(kLogCategory, "%s", error.what());
+        rac_decision_result_free(output);
+        return RAC_ERROR_TEXT_TOO_LONG;
     } catch (const std::exception&) {
         rac_decision_result_free(output);
         return RAC_ERROR_INFERENCE_FAILED;
