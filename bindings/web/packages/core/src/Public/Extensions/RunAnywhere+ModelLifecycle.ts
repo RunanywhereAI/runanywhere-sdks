@@ -407,37 +407,100 @@ function currentModelFromBackendWorker(
 }
 
 /**
+ * In-flight previous-owner unloads, keyed by the owner being unloaded: the
+ * main-thread WASM module, or the BackendWorker id. `releasePreviousModelOwner`
+ * runs in the background, so a later load onto the same owner must wait for it
+ * (`awaitPendingRelease`) or it could interleave with, and be undone by, the
+ * unload still running there (JSPI lets `unloadAsync` suspend mid-flight).
+ */
+const pendingModuleReleases = new WeakMap<object, Promise<void>>();
+const pendingWorkerReleases = new Map<'llamacpp' | 'onnx', Promise<void>>();
+
+function trackRelease(
+  owner: { module: object } | { backendId: 'llamacpp' | 'onnx' },
+  run: (previous: Promise<void> | undefined) => Promise<void>,
+): Promise<void> {
+  const previous = 'module' in owner
+    ? pendingModuleReleases.get(owner.module)
+    : pendingWorkerReleases.get(owner.backendId);
+  // `run` never rejects, so the stored promise is always safe to await.
+  const current: Promise<void> = run(previous).finally(() => {
+    if ('module' in owner) {
+      if (pendingModuleReleases.get(owner.module) === current) pendingModuleReleases.delete(owner.module);
+    } else if (pendingWorkerReleases.get(owner.backendId) === current) {
+      pendingWorkerReleases.delete(owner.backendId);
+    }
+  });
+  if ('module' in owner) pendingModuleReleases.set(owner.module, current);
+  else pendingWorkerReleases.set(owner.backendId, current);
+  return current;
+}
+
+function pendingReleaseFor(
+  target: { module: object } | { backendId: 'llamacpp' | 'onnx' },
+): Promise<void> | undefined {
+  return 'module' in target
+    ? pendingModuleReleases.get(target.module)
+    : pendingWorkerReleases.get(target.backendId);
+}
+
+/**
+ * Wait until `target` has no previous-owner unload running (never rejects).
+ * Re-reads the owner's latest release after each wait, so releases queued
+ * while this load was waiting are also awaited.
+ */
+async function awaitPendingRelease(
+  target: { module: object } | { backendId: 'llamacpp' | 'onnx' },
+): Promise<void> {
+  for (let pending = pendingReleaseFor(target); pending; pending = pendingReleaseFor(target)) {
+    await pending;
+  }
+}
+
+/**
  * Release the copy of `modelId` held by its previous owner after it loaded
  * successfully elsewhere. `nextBackendId` names the BackendWorker that now
  * owns it (undefined = main thread), and `nextModule` the main-thread WASM
  * that now owns it (undefined = a worker). Ownership bookkeeping is updated
  * synchronously, so callers start this without awaiting and record the new
  * owner immediately afterwards; the unload itself completes in the background.
+ * The unload is registered per previous owner, so later loads and unloads on
+ * that module/worker wait for it (see `awaitPendingRelease`).
  */
-async function releasePreviousModelOwner(
+function releasePreviousModelOwner(
   modelId: string,
   nextBackendId?: 'llamacpp' | 'onnx',
   nextModule?: EmscriptenRunanywhereModule,
 ): Promise<void> {
-  if (!modelId) return;
+  if (!modelId) return Promise.resolve();
   const request: ModelUnloadRequest = { modelId, unloadAll: false };
   const workerOwner = getBackendWorkerOwner(modelId);
   const previousModule = workerOwner ? null : getModuleForModel(modelId);
-  if (workerOwner === nextBackendId || (!workerOwner && previousModule === nextModule)) return;
+  if (workerOwner === nextBackendId || (!workerOwner && previousModule === nextModule)) {
+    return Promise.resolve();
+  }
   if (workerOwner) clearModelOwnedByBackendWorker(modelId, workerOwner);
   if (previousModule) recordModelLifecycle(modelId, previousModule, false);
-  // Best effort: the new load already succeeded, so a failed release must not fail it.
-  try {
-    if (workerOwner) {
-      const host = getActiveBackendWorkerHost(workerOwner);
-      const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
-      await host?.unloadModel(workerOwner === 'onnx' ? 'stt' : 'llm', { requestBytes });
-    } else if (previousModule) {
-      await ModelLifecycleAdapter.fromModule(
-        previousModule as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
-      ).unloadAsync(request);
-    }
-  } catch { /* ignore */ }
+  const owner = workerOwner
+    ? { backendId: workerOwner }
+    : previousModule ? { module: previousModule as object } : null;
+  if (!owner) return Promise.resolve();
+  return trackRelease(owner, async (previous) => {
+    // Queue behind an earlier unload on the same owner.
+    await previous;
+    // Best effort: the new load already succeeded, so a failed release must not fail it.
+    try {
+      if (workerOwner) {
+        const host = getActiveBackendWorkerHost(workerOwner);
+        const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
+        await host?.unloadModel(workerOwner === 'onnx' ? 'stt' : 'llm', { requestBytes });
+      } else if (previousModule) {
+        await ModelLifecycleAdapter.fromModule(
+          previousModule as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
+        ).unloadAsync(request);
+      }
+    } catch { /* ignore */ }
+  });
 }
 
 async function loadModelViaBackendWorker(
@@ -467,6 +530,7 @@ async function loadModelViaBackendWorker(
 
   const requestBytes = ModelLoadRequestCodec.encode(request).finish();
   const modelInfoBytes = ModelInfoCodec.encode(resolved).finish();
+  await awaitPendingRelease({ backendId });
   const response = await host.loadModel(
     modality,
     {
@@ -757,9 +821,23 @@ export const WebModelLifecycle = {
     return ModelLifecycleAdapter.tryDefault()?.supportsProtoLifecycle() ?? false;
   },
 
+  /**
+   * Synchronous load. If a previous-owner unload is still running on the
+   * target module, this throws `MODEL_LOAD_FAILED` instead of waiting; retry
+   * after the unload settles, or use `loadModelAsync`, which waits for it.
+   */
   loadModel(request: ModelLoadRequest): ModelLoadResult | null {
     const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
     const { adapter } = selectModelLoadRoute(request, snapshot);
+    // The sync path cannot wait, so it must not load onto a module whose
+    // previous-owner unload is still suspended (JSPI); callers use loadModelAsync.
+    if (pendingReleaseFor({ module: lifecycleModuleAsEmscripten(adapter) })) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
+        'a previous model unload is still running on this module; use loadModelAsync',
+        'loadModel',
+      );
+    }
     const result = adapter.load(request);
     if (result && !result.error) {
       void releasePreviousModelOwner(
@@ -874,6 +952,7 @@ export const WebModelLifecycle = {
       );
       if (workerResult) return workerResult;
 
+      await awaitPendingRelease({ module: lifecycleModuleAsEmscripten(adapter) });
       const result = await adapter.loadAsync(request);
       if (result && !result.error) {
         void releasePreviousModelOwner(
@@ -908,6 +987,7 @@ export const WebModelLifecycle = {
         retryWorkerRoute,
       );
       if (workerResult) return workerResult;
+      await awaitPendingRelease({ module: lifecycleModuleAsEmscripten(retryAdapter) });
       const result = await retryAdapter.loadAsync(request);
       if (result && !result.error) {
         void releasePreviousModelOwner(

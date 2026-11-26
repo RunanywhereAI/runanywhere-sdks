@@ -36,6 +36,7 @@ import {
   markModelOwnedByBackendWorker,
 } from '../../../../src/runtime/BackendWorkerModelOwnership';
 import { ModelRegistryAdapter } from '../../../../src/Adapters/ModelRegistryAdapter';
+import { ModelLifecycleAdapter } from '../../../../src/Adapters/ModelLifecycleAdapter';
 import { EmbeddingsProtoAdapter } from '../../../../src/Adapters/EmbeddingsProtoAdapter';
 import { setModelLoadFailureRecovery } from '../../../../src/Foundation/RuntimeConfig';
 
@@ -568,6 +569,190 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     ]);
     expect(llama.loadedModelIds()).toEqual([]);
     expect(getBackendWorkerOwner('moving')).toBe('onnx');
+  });
+
+  describe('previous-owner unload serialization', () => {
+    const category = ModelCategory.MODEL_CATEGORY_EMBEDDING;
+    const frameworkOf = (id: 'llamacpp' | 'onnx') => (id === 'onnx'
+      ? InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+      : InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP);
+
+    function setup(unloadOnnx: () => Promise<void>, ids: string[] = ['moving']) {
+      const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+      const onnx = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX });
+      registerBackends(llama.module, onnx.module);
+      installRegistrySnapshots(ids.map((id) => modelSnapshot(id, category, InferenceFramework.INFERENCE_FRAMEWORK_ONNX)));
+      vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+      const events: string[] = [];
+      const waiters: Array<{ event: string; count: number; resolve: () => void }> = [];
+      const countOf = (event: string) => events.filter((e) => e === event).length;
+      const record = (event: string) => {
+        events.push(event);
+        for (const w of [...waiters]) {
+          if (countOf(w.event) >= w.count) {
+            waiters.splice(waiters.indexOf(w), 1);
+            w.resolve();
+          }
+        }
+      };
+      // Resolves once `event` has been recorded `count` times (no timers).
+      const waitForEvent = (event: string, count = 1) => new Promise<void>((resolve) => {
+        if (countOf(event) >= count) resolve();
+        else waiters.push({ event, count, resolve });
+      });
+      const workerHost = (id: 'llamacpp' | 'onnx') => ({
+        loadModel: vi.fn(async () => {
+          record(`load:${id}`);
+          return { resultBytes: ModelLoadResult.encode(ModelLoadResult.create({
+            modelId: 'moving', category, framework: frameworkOf(id),
+          })).finish() };
+        }),
+        unloadModel: vi.fn(async () => {
+          record(`unload-start:${id}`);
+          if (id === 'onnx') await unloadOnnx();
+          record(`unload-end:${id}`);
+        }),
+      });
+      const hosts = { llamacpp: workerHost('llamacpp'), onnx: workerHost('onnx') };
+      vi.mocked(getActiveBackendWorkerHost).mockImplementation((id = 'llamacpp') => (
+        hosts[id] as unknown as BackendWorkerHost
+      ));
+      const load = (to: 'llamacpp' | 'onnx', modelId = 'moving') => WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+        modelId, category, framework: frameworkOf(to), forceReload: true,
+      }));
+      return { events, load, waitForEvent };
+    }
+
+    /**
+     * Unloads that stay suspended until released. `releaseAll` also lets
+     * unloads that start afterwards finish at once, so cleanup can drain a queue.
+     */
+    function gatedUnloads() {
+      const gates: Array<() => void> = [];
+      let open = false;
+      return {
+        unload: () => new Promise<void>((resolve) => {
+          if (open) resolve();
+          else gates.push(resolve);
+        }),
+        releaseNext: () => gates.shift()!(),
+        releaseAll: () => {
+          open = true;
+          for (const release of gates.splice(0)) release();
+        },
+      };
+    }
+
+    it('waits for a pending previous-owner unload before reloading onto that worker', async () => {
+      const unloads = gatedUnloads();
+      const { events, load, waitForEvent } = setup(unloads.unload);
+      let back: Promise<unknown> | undefined;
+      try {
+        await load('onnx');
+        await load('llamacpp'); // moves onnx -> llamacpp; onnx unload now suspended
+        await waitForEvent('unload-start:onnx');
+
+        // Encoding the model info is the last step before the load gate.
+        const encode = ModelInfo.encode;
+        let reachGate!: () => void;
+        const atGate = new Promise<void>((resolve) => { reachGate = resolve; });
+        vi.spyOn(ModelInfo, 'encode').mockImplementation((...args) => {
+          reachGate();
+          return encode(...args);
+        });
+
+        back = load('onnx'); // M1 -> M2 -> M1 while the unload is still running
+        await atGate;
+        // One more turn: an ungated load would have called the worker by now.
+        await Promise.resolve();
+        expect(events).not.toContain('unload-end:onnx');
+        expect(events.filter((event) => event === 'load:onnx')).toHaveLength(1);
+
+        unloads.releaseNext();
+        await back;
+        expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
+        expect(events.filter((event) => event === 'load:onnx')).toHaveLength(2);
+        expect(getBackendWorkerOwner('moving')).toBe('onnx');
+      } finally {
+        unloads.releaseAll();
+        // A new onnx load waits for the whole queue, so no release outlives the test.
+        await Promise.allSettled([back, load('onnx')]);
+      }
+    });
+
+    it('queues consecutive releases on the same owner and waits for the whole queue', async () => {
+      const unloads = gatedUnloads();
+      const { events, load, waitForEvent } = setup(unloads.unload, ['moving', 'other']);
+      let back: Promise<unknown> | undefined;
+      try {
+        await load('onnx', 'moving');
+        await load('onnx', 'other');
+        await load('llamacpp', 'moving'); // onnx release #1 suspended
+        await load('llamacpp', 'other');  // onnx release #2 queued behind #1
+        await waitForEvent('unload-start:onnx');
+        expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(1);
+
+        back = load('onnx', 'moving'); // must wait for the whole queue
+        unloads.releaseNext(); // finish release #1
+        await waitForEvent('unload-start:onnx', 2);
+        // second unload starts only after the first ended
+        expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(2);
+        expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('unload-start:onnx'));
+        expect(events.filter((e) => e === 'load:onnx')).toHaveLength(2); // initial two only
+
+        unloads.releaseNext(); // finish release #2
+        await back;
+        expect(events.filter((e) => e === 'load:onnx')).toHaveLength(3);
+        expect(events.lastIndexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
+      } finally {
+        unloads.releaseAll();
+        // A new onnx load waits for the whole queue, so no release outlives the test.
+        await Promise.allSettled([back, load('onnx')]);
+      }
+    });
+
+    it('rejects a synchronous load while the target module has a pending release', async () => {
+      let finish!: () => void;
+      const llama = fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP });
+      registerBackends(llama.module, fakeLifecycleRuntime([], { framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX }).module);
+      installRegistrySnapshots([modelSnapshot('moving', category, InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP)]);
+      vi.spyOn(ModelRegistry, 'registerModel').mockReturnValue(true);
+      vi.mocked(getActiveBackendWorkerHost).mockReturnValue(null);
+      const req = ModelLoadRequest.create({
+        modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, forceReload: true,
+      });
+      await WebModelLifecycle.loadModelAsync(req);
+      const gate = new Promise<void>((resolve) => { finish = resolve; });
+      const unload = vi.spyOn(ModelLifecycleAdapter.prototype, 'unloadAsync').mockImplementation(async () => { await gate; return null as never; });
+      const host = {
+        loadModel: vi.fn(async () => ({ resultBytes: ModelLoadResult.encode(ModelLoadResult.create({
+          modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        })).finish() })),
+        unloadModel: vi.fn(async () => {}),
+      } as unknown as BackendWorkerHost;
+      vi.mocked(getActiveBackendWorkerHost).mockImplementation((id) => id === 'onnx' ? host : null);
+      await WebModelLifecycle.loadModelAsync(ModelLoadRequest.create({
+        modelId: 'moving', category, framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      }));
+      try {
+        expect(unload).toHaveBeenCalled();
+        expect(() => WebModelLifecycle.loadModel(req)).toThrow(/previous model unload/);
+      } finally {
+        finish();
+        // An async load waits for the pending release, so none outlives the test.
+        await WebModelLifecycle.loadModelAsync(req);
+      }
+    });
+
+    it('still loads when the pending previous-owner unload fails', async () => {
+      const { events, load } = setup(async () => { throw new Error('unload failed'); });
+      await load('onnx');
+      await load('llamacpp');
+      expect(events).toContain('unload-start:onnx');
+      await expect(load('onnx')).resolves.toMatchObject({ framework: frameworkOf('onnx') });
+      expect(events.filter((event) => event === 'load:onnx')).toHaveLength(2);
+      expect(getBackendWorkerOwner('moving')).toBe('onnx');
+    });
   });
 
   it('routes framework-scoped current-model queries to the owning WASM', () => {
