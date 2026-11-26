@@ -821,6 +821,11 @@ export const WebModelLifecycle = {
     return ModelLifecycleAdapter.tryDefault()?.supportsProtoLifecycle() ?? false;
   },
 
+  /**
+   * Synchronous load. If a previous-owner unload is still running on the
+   * target module, this throws `MODEL_LOAD_FAILED` instead of waiting; retry
+   * after the unload settles, or use `loadModelAsync`, which waits for it.
+   */
   loadModel(request: ModelLoadRequest): ModelLoadResult | null {
     const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
     const { adapter } = selectModelLoadRoute(request, snapshot);
