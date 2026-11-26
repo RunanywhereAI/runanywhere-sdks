@@ -623,61 +623,92 @@ describe('WebModelLifecycle multi-WASM routing', () => {
       return { events, load, waitForEvent };
     }
 
+    /**
+     * Unloads that stay suspended until released. `releaseAll` also lets
+     * unloads that start afterwards finish at once, so cleanup can drain a queue.
+     */
+    function gatedUnloads() {
+      const gates: Array<() => void> = [];
+      let open = false;
+      return {
+        unload: () => new Promise<void>((resolve) => {
+          if (open) resolve();
+          else gates.push(resolve);
+        }),
+        releaseNext: () => gates.shift()!(),
+        releaseAll: () => {
+          open = true;
+          for (const release of gates.splice(0)) release();
+        },
+      };
+    }
+
     it('waits for a pending previous-owner unload before reloading onto that worker', async () => {
-      let finishUnload!: () => void;
-      const { events, load, waitForEvent } = setup(() => new Promise<void>((resolve) => { finishUnload = resolve; }));
-      await load('onnx');
-      await load('llamacpp'); // moves onnx -> llamacpp; onnx unload now suspended
-      await waitForEvent('unload-start:onnx');
+      const unloads = gatedUnloads();
+      const { events, load, waitForEvent } = setup(unloads.unload);
+      let back: Promise<unknown> | undefined;
+      try {
+        await load('onnx');
+        await load('llamacpp'); // moves onnx -> llamacpp; onnx unload now suspended
+        await waitForEvent('unload-start:onnx');
 
-      // Encoding the model info is the last step before the load gate.
-      const encode = ModelInfo.encode;
-      let reachGate!: () => void;
-      const atGate = new Promise<void>((resolve) => { reachGate = resolve; });
-      vi.spyOn(ModelInfo, 'encode').mockImplementation((...args) => {
-        reachGate();
-        return encode(...args);
-      });
+        // Encoding the model info is the last step before the load gate.
+        const encode = ModelInfo.encode;
+        let reachGate!: () => void;
+        const atGate = new Promise<void>((resolve) => { reachGate = resolve; });
+        vi.spyOn(ModelInfo, 'encode').mockImplementation((...args) => {
+          reachGate();
+          return encode(...args);
+        });
 
-      const back = load('onnx'); // M1 -> M2 -> M1 while the unload is still running
-      await atGate;
-      // One more turn: an ungated load would have called the worker by now.
-      await Promise.resolve();
-      expect(events).not.toContain('unload-end:onnx');
-      expect(events.filter((event) => event === 'load:onnx')).toHaveLength(1);
+        back = load('onnx'); // M1 -> M2 -> M1 while the unload is still running
+        await atGate;
+        // One more turn: an ungated load would have called the worker by now.
+        await Promise.resolve();
+        expect(events).not.toContain('unload-end:onnx');
+        expect(events.filter((event) => event === 'load:onnx')).toHaveLength(1);
 
-      finishUnload();
-      await back;
-      expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
-      expect(events.filter((event) => event === 'load:onnx')).toHaveLength(2);
-      expect(getBackendWorkerOwner('moving')).toBe('onnx');
+        unloads.releaseNext();
+        await back;
+        expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
+        expect(events.filter((event) => event === 'load:onnx')).toHaveLength(2);
+        expect(getBackendWorkerOwner('moving')).toBe('onnx');
+      } finally {
+        unloads.releaseAll();
+        // A new onnx load waits for the whole queue, so no release outlives the test.
+        await Promise.allSettled([back, load('onnx')]);
+      }
     });
 
     it('queues consecutive releases on the same owner and waits for the whole queue', async () => {
-      const gates: Array<() => void> = [];
-      const { events, load, waitForEvent } = setup(
-        () => new Promise<void>((resolve) => { gates.push(resolve); }),
-        ['moving', 'other'],
-      );
-      await load('onnx', 'moving');
-      await load('onnx', 'other');
-      await load('llamacpp', 'moving'); // onnx release #1 suspended
-      await load('llamacpp', 'other');  // onnx release #2 queued behind #1
-      await waitForEvent('unload-start:onnx');
-      expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(1);
+      const unloads = gatedUnloads();
+      const { events, load, waitForEvent } = setup(unloads.unload, ['moving', 'other']);
+      let back: Promise<unknown> | undefined;
+      try {
+        await load('onnx', 'moving');
+        await load('onnx', 'other');
+        await load('llamacpp', 'moving'); // onnx release #1 suspended
+        await load('llamacpp', 'other');  // onnx release #2 queued behind #1
+        await waitForEvent('unload-start:onnx');
+        expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(1);
 
-      const back = load('onnx', 'moving'); // must wait for the whole queue
-      gates.shift()!(); // finish release #1
-      await waitForEvent('unload-start:onnx', 2);
-      // second unload starts only after the first ended
-      expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(2);
-      expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('unload-start:onnx'));
-      expect(events.filter((e) => e === 'load:onnx')).toHaveLength(2); // initial two only
+        back = load('onnx', 'moving'); // must wait for the whole queue
+        unloads.releaseNext(); // finish release #1
+        await waitForEvent('unload-start:onnx', 2);
+        // second unload starts only after the first ended
+        expect(events.filter((e) => e === 'unload-start:onnx')).toHaveLength(2);
+        expect(events.indexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('unload-start:onnx'));
+        expect(events.filter((e) => e === 'load:onnx')).toHaveLength(2); // initial two only
 
-      gates.shift()!(); // finish release #2
-      await back;
-      expect(events.filter((e) => e === 'load:onnx')).toHaveLength(3);
-      expect(events.lastIndexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
+        unloads.releaseNext(); // finish release #2
+        await back;
+        expect(events.filter((e) => e === 'load:onnx')).toHaveLength(3);
+        expect(events.lastIndexOf('unload-end:onnx')).toBeLessThan(events.lastIndexOf('load:onnx'));
+      } finally {
+        unloads.releaseAll();
+        // A new onnx load waits for the whole queue, so no release outlives the test.
+        await Promise.allSettled([back, load('onnx')]);
+      }
     });
 
     it('rejects a synchronous load while the target module has a pending release', async () => {
